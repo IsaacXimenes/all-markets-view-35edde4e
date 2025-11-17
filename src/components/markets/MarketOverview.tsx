@@ -24,7 +24,7 @@ export function MarketOverview({ indices, className }: MarketOverviewProps) {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center">
           <GlobeIcon className="h-5 w-5 mr-2" />
-          Global Markets
+          Mercados Globais
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">

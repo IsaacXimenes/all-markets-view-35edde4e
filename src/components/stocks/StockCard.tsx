@@ -51,9 +51,9 @@ export function StockCard({ stock, priceHistory, className, onClick }: StockCard
             <div className="grid grid-cols-2 gap-1 text-xs">
               <div className="text-muted-foreground">Volume:</div>
               <div className="text-right">{formatNumber(stock.volume)}</div>
-              <div className="text-muted-foreground">Mkt Cap:</div>
+              <div className="text-muted-foreground">Cap Merc:</div>
               <div className="text-right">{formatNumber(stock.marketCap)}</div>
-              <div className="text-muted-foreground">Updated:</div>
+              <div className="text-muted-foreground">Atualizado:</div>
               <div className="text-right">{formatDate(stock.lastUpdated)}</div>
             </div>
           </div>

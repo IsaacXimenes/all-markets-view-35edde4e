@@ -17,10 +17,10 @@ const Stocks = () => {
   });
   
   return (
-    <PageLayout title="Stocks">
+    <PageLayout title="Ações">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-4">
-          <h2 className="text-xl font-semibold">All Stocks</h2>
+          <h2 className="text-xl font-semibold">Todas as Ações</h2>
           <div className="space-y-4">
             {stocksWithHistory.map((stock) => (
               <StockCard 
@@ -44,7 +44,7 @@ const Stocks = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
             <div className="bg-card rounded-lg p-4 shadow">
-              <h3 className="font-medium text-sm text-muted-foreground">Market Cap</h3>
+              <h3 className="font-medium text-sm text-muted-foreground">Cap. de Mercado</h3>
               <p className="text-xl font-semibold mt-1">
                 ${(selectedStock.marketCap / 1000000000).toFixed(2)}B
               </p>
@@ -56,7 +56,7 @@ const Stocks = () => {
               </p>
             </div>
             <div className="bg-card rounded-lg p-4 shadow">
-              <h3 className="font-medium text-sm text-muted-foreground">52W Range</h3>
+              <h3 className="font-medium text-sm text-muted-foreground">Intervalo 52S</h3>
               <p className="text-xl font-semibold mt-1">
                 ${(selectedStock.price * 0.8).toFixed(2)} - ${(selectedStock.price * 1.2).toFixed(2)}
               </p>

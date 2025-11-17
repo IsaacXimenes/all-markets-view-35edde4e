@@ -129,8 +129,8 @@ export function StockChart({
                   borderRadius: "var(--radius)",
                   boxShadow: "0 2px 10px rgba(0, 0, 0, 0.1)",
                 }}
-                formatter={(value: number) => [`$${value.toFixed(2)}`, 'Price']}
-                labelFormatter={(label) => `Date: ${label}`}
+                formatter={(value: number) => [`$${value.toFixed(2)}`, 'Preço']}
+                labelFormatter={(label) => `Data: ${label}`}
               />
               <Legend />
               <Area 

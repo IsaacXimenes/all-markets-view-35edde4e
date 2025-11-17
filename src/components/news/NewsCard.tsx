@@ -17,7 +17,7 @@ export function NewsCard({ news, className }: NewsCardProps) {
       <CardHeader className="pb-3 flex flex-row items-center">
         <div className="flex items-center">
           <NewspaperIcon className="h-5 w-5 mr-2" />
-          <h3 className="font-semibold text-lg">Market News</h3>
+          <h3 className="font-semibold text-lg">Notícias do Mercado</h3>
         </div>
       </CardHeader>
       <CardContent className="p-0">

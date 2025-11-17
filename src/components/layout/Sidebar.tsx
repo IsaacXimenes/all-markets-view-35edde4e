@@ -26,22 +26,22 @@ export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
   
   const navItems = [
     {
-      title: 'Dashboard',
+      title: 'Painel',
       icon: Home,
       href: '/',
     },
     {
-      title: 'Stocks',
+      title: 'Ações',
       icon: BarChart,
       href: '/stocks',
     },
     {
-      title: 'Markets',
+      title: 'Mercados',
       icon: BarChart3,
       href: '/markets',
     },
     {
-      title: 'Currencies',
+      title: 'Moedas',
       icon: DollarSign,
       href: '/currencies',
     },
@@ -51,22 +51,22 @@ export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
       href: '/global',
     },
     {
-      title: 'Portfolio',
+      title: 'Portfólio',
       icon: Wallet,
       href: '/portfolio',
     },
     {
-      title: 'Performance',
+      title: 'Desempenho',
       icon: LineChart,
       href: '/performance',
     },
     {
-      title: 'Analysis',
+      title: 'Análise',
       icon: PieChart,
       href: '/analysis',
     },
     {
-      title: 'Settings',
+      title: 'Configurações',
       icon: Settings,
       href: '/settings',
     }
@@ -83,7 +83,7 @@ export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
           "font-semibold tracking-tight transition-opacity duration-200",
           isCollapsed ? "opacity-0" : "opacity-100"
         )}>
-          MarketPulse
+          Thiago imports
         </h2>
         
         <Button
@@ -131,9 +131,9 @@ export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
           "transition-opacity duration-200 rounded-md bg-sidebar-accent/50 p-2 text-xs text-sidebar-accent-foreground",
           isCollapsed ? "opacity-0" : "opacity-100"
         )}>
-          <p className="font-medium">Market Status</p>
-          <p>Markets are open</p>
-          <p className="text-[10px]">Closes in 3h 45m</p>
+          <p className="font-medium">Status do Mercado</p>
+          <p>Mercados abertos</p>
+          <p className="text-[10px]">Fecha em 3h 45m</p>
         </div>
       </div>
     </aside>

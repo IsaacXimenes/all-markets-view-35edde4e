@@ -6,31 +6,31 @@ import { Bell, Globe, Lock, User, Settings as SettingsIcon } from 'lucide-react'
 
 const Settings = () => {
   return (
-    <PageLayout title="Settings">
+    <PageLayout title="Configurações">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <div className="bg-card rounded-lg p-6 shadow">
-            <h2 className="text-xl font-semibold mb-4">Settings</h2>
+            <h2 className="text-xl font-semibold mb-4">Configurações</h2>
             <nav className="space-y-2">
               <Button variant="ghost" className="w-full justify-start" size="lg">
                 <User className="mr-2 h-5 w-5" />
-                Account
+                Conta
               </Button>
               <Button variant="ghost" className="w-full justify-start" size="lg">
                 <Bell className="mr-2 h-5 w-5" />
-                Notifications
+                Notificações
               </Button>
               <Button variant="ghost" className="w-full justify-start" size="lg">
                 <Lock className="mr-2 h-5 w-5" />
-                Security
+                Segurança
               </Button>
               <Button variant="ghost" className="w-full justify-start" size="lg">
                 <Globe className="mr-2 h-5 w-5" />
-                Regional Settings
+                Configurações Regionais
               </Button>
               <Button variant="ghost" className="w-full justify-start" size="lg">
                 <SettingsIcon className="mr-2 h-5 w-5" />
-                Preferences
+                Preferências
               </Button>
             </nav>
           </div>
@@ -38,25 +38,25 @@ const Settings = () => {
         
         <div className="lg:col-span-2">
           <div className="bg-card rounded-lg p-6 shadow">
-            <h2 className="text-xl font-semibold mb-6">Account Settings</h2>
+            <h2 className="text-xl font-semibold mb-6">Configurações da Conta</h2>
             
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium mb-4">Personal Information</h3>
+                <h3 className="text-lg font-medium mb-4">Informações Pessoais</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">First Name</label>
+                    <label className="block text-sm font-medium mb-1">Primeiro Nome</label>
                     <input 
                       type="text" 
-                      defaultValue="John"
+                      defaultValue="João"
                       className="w-full px-3 py-2 border rounded-md" 
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Last Name</label>
+                    <label className="block text-sm font-medium mb-1">Sobrenome</label>
                     <input 
                       type="text" 
-                      defaultValue="Smith"
+                      defaultValue="Silva"
                       className="w-full px-3 py-2 border rounded-md" 
                     />
                   </div>
@@ -64,15 +64,15 @@ const Settings = () => {
                     <label className="block text-sm font-medium mb-1">Email</label>
                     <input 
                       type="email" 
-                      defaultValue="john.smith@example.com"
+                      defaultValue="joao.silva@exemplo.com"
                       className="w-full px-3 py-2 border rounded-md" 
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Phone</label>
+                    <label className="block text-sm font-medium mb-1">Telefone</label>
                     <input 
                       type="text" 
-                      defaultValue="+1 (555) 123-4567"
+                      defaultValue="+55 (11) 98765-4321"
                       className="w-full px-3 py-2 border rounded-md" 
                     />
                   </div>
@@ -80,12 +80,12 @@ const Settings = () => {
               </div>
               
               <div>
-                <h3 className="text-lg font-medium mb-4">Display Settings</h3>
+                <h3 className="text-lg font-medium mb-4">Configurações de Exibição</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Dark Mode</p>
-                      <p className="text-sm text-muted-foreground">Switch between light and dark theme</p>
+                      <p className="font-medium">Modo Escuro</p>
+                      <p className="text-sm text-muted-foreground">Alternar entre tema claro e escuro</p>
                     </div>
                     <div>
                       <label className="relative inline-flex items-center cursor-pointer">
@@ -97,8 +97,8 @@ const Settings = () => {
                   
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Compact View</p>
-                      <p className="text-sm text-muted-foreground">Show more data with less spacing</p>
+                      <p className="font-medium">Visualização Compacta</p>
+                      <p className="text-sm text-muted-foreground">Mostrar mais dados com menos espaçamento</p>
                     </div>
                     <div>
                       <label className="relative inline-flex items-center cursor-pointer">
@@ -111,8 +111,8 @@ const Settings = () => {
               </div>
               
               <div className="pt-4 border-t">
-                <Button>Save Changes</Button>
-                <Button variant="outline" className="ml-2">Cancel</Button>
+                <Button>Salvar Alterações</Button>
+                <Button variant="outline" className="ml-2">Cancelar</Button>
               </div>
             </div>
           </div>

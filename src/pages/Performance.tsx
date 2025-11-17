@@ -48,20 +48,20 @@ const Performance = () => {
   
   // Mock sector allocation data
   const sectorAllocation = [
-    { name: 'Technology', value: 45 },
-    { name: 'Healthcare', value: 20 },
-    { name: 'Financials', value: 15 },
-    { name: 'Consumer', value: 10 },
-    { name: 'Energy', value: 5 },
-    { name: 'Other', value: 5 }
+    { name: 'Tecnologia', value: 45 },
+    { name: 'Saúde', value: 20 },
+    { name: 'Financeiro', value: 15 },
+    { name: 'Consumo', value: 10 },
+    { name: 'Energia', value: 5 },
+    { name: 'Outros', value: 5 }
   ];
   
   return (
-    <PageLayout title="Performance">
+    <PageLayout title="Desempenho">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-3">
           <div className="bg-card rounded-lg p-6 shadow">
-            <h2 className="text-xl font-semibold mb-4">Portfolio Performance</h2>
+            <h2 className="text-xl font-semibold mb-4">Desempenho do Portfólio</h2>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
@@ -76,7 +76,7 @@ const Performance = () => {
                   <Line 
                     type="monotone" 
                     dataKey="portfolio" 
-                    name="Your Portfolio" 
+                    name="Seu Portfólio" 
                     stroke="#8884d8" 
                     strokeWidth={2} 
                     dot={false} 
@@ -98,24 +98,24 @@ const Performance = () => {
         
         <div className="lg:col-span-1">
           <div className="bg-card rounded-lg p-6 shadow">
-            <h2 className="text-xl font-semibold mb-4">Performance Summary</h2>
+            <h2 className="text-xl font-semibold mb-4">Resumo de Desempenho</h2>
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-muted-foreground">Total Return</p>
+                <p className="text-sm text-muted-foreground">Retorno Total</p>
                 <p className={`text-2xl font-bold ${totalReturn >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {totalReturn >= 0 ? '+' : ''}{totalReturn.toFixed(2)}%
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Initial Investment</p>
+                <p className="text-sm text-muted-foreground">Investimento Inicial</p>
                 <p className="text-xl font-bold">${initialPortfolio.toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Current Value</p>
+                <p className="text-sm text-muted-foreground">Valor Atual</p>
                 <p className="text-xl font-bold">${currentPortfolio.toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Absolute Return</p>
+                <p className="text-sm text-muted-foreground">Retorno Absoluto</p>
                 <p className={`text-xl font-bold ${(currentPortfolio - initialPortfolio) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   ${(currentPortfolio - initialPortfolio).toFixed(2)}
                 </p>
@@ -126,7 +126,7 @@ const Performance = () => {
         
         <div className="lg:col-span-1">
           <div className="bg-card rounded-lg p-6 shadow">
-            <h2 className="text-xl font-semibold mb-4">Sector Allocation</h2>
+            <h2 className="text-xl font-semibold mb-4">Alocação por Setor</h2>
             <div className="space-y-4">
               {sectorAllocation.map((sector) => (
                 <div key={sector.name}>
@@ -148,9 +148,9 @@ const Performance = () => {
         
         <div className="lg:col-span-1">
           <div className="bg-card rounded-lg p-6 shadow">
-            <h2 className="text-xl font-semibold mb-4">Monthly Returns (%)</h2>
+            <h2 className="text-xl font-semibold mb-4">Retornos Mensais (%)</h2>
             <div className="grid grid-cols-3 gap-2">
-              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month) => {
+              {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].map((month) => {
                 const returnValue = (Math.random() * 6) - 2;
                 return (
                   <div key={month} className="text-center p-2">

@@ -8,7 +8,7 @@ const Markets = () => {
   const indices = useMarketIndices(mockIndices);
   
   return (
-    <PageLayout title="Markets Overview">
+    <PageLayout title="Visão Geral dos Mercados">
       <div className="grid grid-cols-1 gap-6">
         <MarketOverview indices={indices} />
         
@@ -31,7 +31,7 @@ const Markets = () => {
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mt-4">
-                Last updated: {new Date(index.lastUpdated).toLocaleTimeString()}
+                Última atualização: {new Date(index.lastUpdated).toLocaleTimeString()}
               </p>
             </div>
           ))}

@@ -9,29 +9,29 @@ import { Bitcoin, TrendingUp, TrendingDown } from 'lucide-react';
 const Analysis = () => {
   // Mock data for sector performance
   const sectorPerformance = [
-    { name: 'Technology', value: 8.2 },
-    { name: 'Healthcare', value: 3.5 },
-    { name: 'Financials', value: -1.2 },
-    { name: 'Consumer', value: 2.8 },
-    { name: 'Energy', value: -2.5 },
-    { name: 'Materials', value: 0.9 },
-    { name: 'Utilities', value: -0.7 },
+    { name: 'Tecnologia', value: 8.2 },
+    { name: 'Saúde', value: 3.5 },
+    { name: 'Financeiro', value: -1.2 },
+    { name: 'Consumo', value: 2.8 },
+    { name: 'Energia', value: -2.5 },
+    { name: 'Materiais', value: 0.9 },
+    { name: 'Utilidades', value: -0.7 },
   ];
   
   // Mock data for risk assessment
   const riskData = [
-    { name: 'Volatility', value: 65 },
-    { name: 'Correlation', value: 42 },
-    { name: 'Downside Risk', value: 38 },
-    { name: 'Sharpe Ratio', value: 78 },
-    { name: 'Liquidity', value: 85 },
+    { name: 'Volatilidade', value: 65 },
+    { name: 'Correlação', value: 42 },
+    { name: 'Risco de Queda', value: 38 },
+    { name: 'Índice Sharpe', value: 78 },
+    { name: 'Liquidez', value: 85 },
   ];
   
   // Mock data for portfolio distribution
   const distributionData = [
-    { name: 'Large Cap', value: 55 },
-    { name: 'Mid Cap', value: 30 },
-    { name: 'Small Cap', value: 15 },
+    { name: 'Grande Porte', value: 55 },
+    { name: 'Médio Porte', value: 30 },
+    { name: 'Pequeno Porte', value: 15 },
   ];
   
   // Format stock data for the heatmap (treemap)
@@ -123,10 +123,10 @@ const Analysis = () => {
   };
   
   return (
-    <PageLayout title="Market Analysis">
+    <PageLayout title="Análise de Mercado">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-card rounded-lg p-6 shadow">
-          <h2 className="text-xl font-semibold mb-4">Sector Performance (YTD)</h2>
+          <h2 className="text-xl font-semibold mb-4">Desempenho por Setor (Ano)</h2>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
@@ -153,7 +153,7 @@ const Analysis = () => {
         </div>
         
         <div className="lg:col-span-2 bg-card rounded-lg p-6 shadow">
-          <h2 className="text-xl font-semibold mb-4">Stock Performance Heatmap</h2>
+          <h2 className="text-xl font-semibold mb-4">Mapa de Calor de Desempenho de Ações</h2>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <Treemap
@@ -167,7 +167,7 @@ const Analysis = () => {
             </ResponsiveContainer>
           </div>
           <div className="mt-4 text-sm text-muted-foreground">
-            <p>Showing performance by percentage change. Green indicates positive growth, red indicates decline.</p>
+            <p>Mostrando desempenho por variação percentual. Verde indica crescimento positivo, vermelho indica declínio.</p>
           </div>
         </div>
         
@@ -175,7 +175,7 @@ const Analysis = () => {
         <div className="lg:col-span-2 mt-4">
           <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
             <Bitcoin className="text-orange-500" />
-            Cryptocurrency Analysis
+            Análise de Criptomoedas
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -205,7 +205,7 @@ const Analysis = () => {
                       <span>{formatNumber(crypto.volume)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Market Cap:</span>
+                      <span>Cap. Mercado:</span>
                       <span>{formatNumber(crypto.marketCap)}</span>
                     </div>
                   </div>
@@ -219,7 +219,7 @@ const Analysis = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Bitcoin className="h-5 w-5 text-orange-500" />
-                  Bitcoin Price History (30 Days)
+                  Histórico de Preço do Bitcoin (30 Dias)
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -247,7 +247,7 @@ const Analysis = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <div className="h-5 w-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs">Ξ</div>
-                  Ethereum Price History (30 Days)
+                  Histórico de Preço do Ethereum (30 Dias)
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -274,7 +274,7 @@ const Analysis = () => {
           
           <Card className="mt-6 bg-card shadow">
             <CardHeader>
-              <CardTitle>Top Cryptocurrencies by Market Cap</CardTitle>
+              <CardTitle>Principais Criptomoedas por Capitalização de Mercado</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -282,10 +282,10 @@ const Analysis = () => {
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-3 px-4">#</th>
-                      <th className="text-left py-3 px-4">Name</th>
-                      <th className="text-right py-3 px-4">Price</th>
+                      <th className="text-left py-3 px-4">Nome</th>
+                      <th className="text-right py-3 px-4">Preço</th>
                       <th className="text-right py-3 px-4">24h %</th>
-                      <th className="text-right py-3 px-4">Market Cap</th>
+                      <th className="text-right py-3 px-4">Cap. Mercado</th>
                       <th className="text-right py-3 px-4">Volume (24h)</th>
                     </tr>
                   </thead>
@@ -317,7 +317,7 @@ const Analysis = () => {
         </div>
         
         <div className="bg-card rounded-lg p-6 shadow">
-          <h2 className="text-xl font-semibold mb-4">Risk Assessment</h2>
+          <h2 className="text-xl font-semibold mb-4">Avaliação de Risco</h2>
           <div className="space-y-4">
             {riskData.map((item) => (
               <div key={item.name}>
@@ -339,7 +339,7 @@ const Analysis = () => {
         </div>
         
         <div className="bg-card rounded-lg p-6 shadow">
-          <h2 className="text-xl font-semibold mb-4">Market Capitalization Distribution</h2>
+          <h2 className="text-xl font-semibold mb-4">Distribuição de Capitalização de Mercado</h2>
           <div className="h-64 flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -357,53 +357,53 @@ const Analysis = () => {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [`${value}%`, 'Allocation']} />
+                <Tooltip formatter={(value) => [`${value}%`, 'Alocação']} />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
         
         <div className="bg-card rounded-lg p-6 shadow">
-          <h2 className="text-xl font-semibold mb-4">Technical Indicators</h2>
+          <h2 className="text-xl font-semibold mb-4">Indicadores Técnicos</h2>
           <div className="space-y-4">
             <div className="flex justify-between p-3 border rounded-md">
               <div>
                 <h3 className="font-medium">S&P 500</h3>
-                <p className="text-sm text-muted-foreground">Moving Averages</p>
+                <p className="text-sm text-muted-foreground">Médias Móveis</p>
               </div>
               <div className="text-right">
-                <p className="font-medium text-green-500">BUY</p>
-                <p className="text-sm">12 of 15 indicators</p>
+                <p className="font-medium text-green-500">COMPRAR</p>
+                <p className="text-sm">12 de 15 indicadores</p>
               </div>
             </div>
             <div className="flex justify-between p-3 border rounded-md">
               <div>
                 <h3 className="font-medium">Nasdaq</h3>
-                <p className="text-sm text-muted-foreground">Moving Averages</p>
+                <p className="text-sm text-muted-foreground">Médias Móveis</p>
               </div>
               <div className="text-right">
-                <p className="font-medium text-green-500">BUY</p>
-                <p className="text-sm">10 of 15 indicators</p>
+                <p className="font-medium text-green-500">COMPRAR</p>
+                <p className="text-sm">10 de 15 indicadores</p>
               </div>
             </div>
             <div className="flex justify-between p-3 border rounded-md">
               <div>
                 <h3 className="font-medium">Dow Jones</h3>
-                <p className="text-sm text-muted-foreground">Moving Averages</p>
+                <p className="text-sm text-muted-foreground">Médias Móveis</p>
               </div>
               <div className="text-right">
-                <p className="font-medium text-yellow-500">NEUTRAL</p>
-                <p className="text-sm">8 of 15 indicators</p>
+                <p className="font-medium text-yellow-500">NEUTRO</p>
+                <p className="text-sm">8 de 15 indicadores</p>
               </div>
             </div>
             <div className="flex justify-between p-3 border rounded-md">
               <div>
                 <h3 className="font-medium">Russell 2000</h3>
-                <p className="text-sm text-muted-foreground">Moving Averages</p>
+                <p className="text-sm text-muted-foreground">Médias Móveis</p>
               </div>
               <div className="text-right">
-                <p className="font-medium text-red-500">SELL</p>
-                <p className="text-sm">4 of 15 indicators</p>
+                <p className="font-medium text-red-500">VENDER</p>
+                <p className="text-sm">4 de 15 indicadores</p>
               </div>
             </div>
           </div>

@@ -16,7 +16,7 @@ export function CurrencyExchange({ currencies, className }: CurrencyExchangeProp
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center">
           <DollarSignIcon className="h-5 w-5 mr-2" />
-          Currency Exchange
+          Câmbio
         </CardTitle>
       </CardHeader>
       <CardContent className="p-4">
@@ -53,7 +53,7 @@ export function CurrencyExchange({ currencies, className }: CurrencyExchangeProp
           ))}
         </div>
         <div className="text-xs text-right mt-4 text-muted-foreground">
-          Updated: {formatDate(new Date())}
+          Atualizado: {formatDate(new Date())}
         </div>
       </CardContent>
     </Card>

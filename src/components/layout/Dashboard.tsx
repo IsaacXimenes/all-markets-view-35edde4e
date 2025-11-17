@@ -58,26 +58,26 @@ export function Dashboard() {
         
         <main className="flex-1 transition-all duration-300">
           <div className="container max-w-full p-4 lg:p-6 animate-fade-in">
-            <h1 className="text-2xl font-bold mb-6">Market Dashboard</h1>
+            <h1 className="text-2xl font-bold mb-6">Painel do Mercado</h1>
             
             {/* Stats Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 animate-slide-up" style={{ '--delay': '100ms' } as React.CSSProperties}>
               <StatsCard 
-                title="Market Cap" 
+                title="Cap. de Mercado" 
                 value="$13.42T"
                 trend={0.47}
                 icon={<Wallet2 />}
                 className="bg-primary/5"
               />
               <StatsCard 
-                title="Trading Volume" 
+                title="Volume Negociado" 
                 value="487.32M"
-                description="Today's volume"
+                description="Volume de hoje"
                 icon={<BarChart3 />}
                 className="bg-primary/5"
               />
               <StatsCard 
-                title="Top Gainer" 
+                title="Maior Alta" 
                 value={topGainer.symbol}
                 trend={topGainer.changePercent}
                 trendLabel={topGainer.name}
@@ -85,7 +85,7 @@ export function Dashboard() {
                 className="bg-success/5"
               />
               <StatsCard 
-                title="Top Loser" 
+                title="Maior Baixa" 
                 value={topLoser.symbol}
                 trend={topLoser.changePercent}
                 trendLabel={topLoser.name}
@@ -98,7 +98,7 @@ export function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               {/* Left column - Stock list */}
               <div className="lg:col-span-1 space-y-4 animate-slide-up" style={{ '--delay': '200ms' } as React.CSSProperties}>
-                <h2 className="text-xl font-semibold">Watchlist</h2>
+                <h2 className="text-xl font-semibold">Lista de Observação</h2>
                 <div className="space-y-4">
                   {stocksWithHistory.slice(0, 5).map((stock) => (
                     <StockCard 

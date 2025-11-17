@@ -50,18 +50,18 @@ const Portfolio = () => {
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
   
   return (
-    <PageLayout title="Portfolio">
+    <PageLayout title="Portfólio">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <div className="bg-card rounded-lg p-6 shadow">
-            <h2 className="text-xl font-semibold mb-4">Portfolio Summary</h2>
+            <h2 className="text-xl font-semibold mb-4">Resumo do Portfólio</h2>
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-muted-foreground">Total Value</p>
+                <p className="text-sm text-muted-foreground">Valor Total</p>
                 <p className="text-2xl font-bold">${totalValue.toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Gain/Loss</p>
+                <p className="text-sm text-muted-foreground">Ganho/Perda Total</p>
                 <div className="flex items-center">
                   <p className={`text-xl font-bold ${totalGain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                     ${totalGain.toFixed(2)}
@@ -99,17 +99,17 @@ const Portfolio = () => {
         
         <div className="lg:col-span-2">
           <div className="bg-card rounded-lg p-6 shadow">
-            <h2 className="text-xl font-semibold mb-4">Holdings</h2>
+            <h2 className="text-xl font-semibold mb-4">Participações</h2>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-2 px-4">Symbol</th>
-                    <th className="text-left py-2 px-4">Name</th>
-                    <th className="text-right py-2 px-4">Shares</th>
-                    <th className="text-right py-2 px-4">Price</th>
-                    <th className="text-right py-2 px-4">Value</th>
-                    <th className="text-right py-2 px-4">Gain/Loss</th>
+                    <th className="text-left py-2 px-4">Símbolo</th>
+                    <th className="text-left py-2 px-4">Nome</th>
+                    <th className="text-right py-2 px-4">Ações</th>
+                    <th className="text-right py-2 px-4">Preço</th>
+                    <th className="text-right py-2 px-4">Valor</th>
+                    <th className="text-right py-2 px-4">Ganho/Perda</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { NewsItem, formatDate } from '@/utils/stocksApi';
+import { NewsItem } from '@/utils/productsApi';
 import { cn } from '@/lib/utils';
 import { NewspaperIcon } from 'lucide-react';
 
@@ -11,13 +11,29 @@ interface NewsCardProps {
   className?: string;
 }
 
+const formatDate = (date: Date) => {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  
+  if (diffHours < 1) {
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    return `${diffMinutes}m atrás`;
+  } else if (diffHours < 24) {
+    return `${diffHours}h atrás`;
+  } else {
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d atrás`;
+  }
+};
+
 export function NewsCard({ news, className }: NewsCardProps) {
   return (
     <Card className={cn("overflow-hidden", className)}>
       <CardHeader className="pb-3 flex flex-row items-center">
         <div className="flex items-center">
           <NewspaperIcon className="h-5 w-5 mr-2" />
-          <h3 className="font-semibold text-lg">Notícias do Mercado</h3>
+          <h3 className="font-semibold text-lg">Notícias e Novidades</h3>
         </div>
       </CardHeader>
       <CardContent className="p-0">
@@ -45,11 +61,11 @@ export function NewsCard({ news, className }: NewsCardProps) {
               
               <div className="flex items-center justify-between">
                 <div className="flex gap-1">
-                  {item.relatedSymbols?.map((symbol) => (
-                    <Badge key={symbol} variant="outline" className="text-xs">
-                      {symbol}
+                  {item.category && (
+                    <Badge variant="outline" className="text-xs">
+                      {item.category}
                     </Badge>
-                  ))}
+                  )}
                 </div>
                 <span className="text-xs font-medium text-primary">{item.source}</span>
               </div>

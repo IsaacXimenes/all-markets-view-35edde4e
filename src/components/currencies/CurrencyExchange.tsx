@@ -16,7 +16,7 @@ export function CurrencyExchange({ currencies, className }: CurrencyExchangeProp
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center">
           <DollarSignIcon className="h-5 w-5 mr-2" />
-          Câmbio
+          Métricas de Vendas
         </CardTitle>
       </CardHeader>
       <CardContent className="p-4">

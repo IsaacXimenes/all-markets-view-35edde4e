@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
 import { 
-  useStockData, useMarketIndices, useCurrencyPairs, 
-  mockStocks, mockIndices, mockCurrencies, mockNews,
+  useProductData, useCategoryData, useSalesMetrics,
+  mockProducts, mockCategories, mockSalesMetrics, mockNews,
   generatePriceHistory 
-} from '@/utils/stocksApi';
+} from '@/utils/productsApi';
 import { Navbar } from '@/components/layout/Navbar';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { StockCard } from '@/components/stocks/StockCard';
@@ -13,37 +13,35 @@ import { MarketOverview } from '@/components/markets/MarketOverview';
 import { CurrencyExchange } from '@/components/currencies/CurrencyExchange';
 import { NewsCard } from '@/components/news/NewsCard';
 import { StatsCard } from '@/components/ui/StatsCard';
-import { BarChart3, TrendingDown, TrendingUp, Wallet2 } from 'lucide-react';
+import { BarChart3, TrendingDown, TrendingUp, Wallet2, Package, ShoppingCart } from 'lucide-react';
 
 export function Dashboard() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [selectedStock, setSelectedStock] = useState(mockStocks[0]);
+  const [selectedProduct, setSelectedProduct] = useState(mockProducts[0]);
   
-  // Use our hooks to get real-time mock data
-  const stocks = useStockData(mockStocks);
-  const indices = useMarketIndices(mockIndices);
-  const currencies = useCurrencyPairs(mockCurrencies);
+  // Use nossos hooks para dados em tempo real
+  const products = useProductData(mockProducts);
+  const categories = useCategoryData(mockCategories);
+  const salesMetrics = useSalesMetrics(mockSalesMetrics);
   
-  // Generate chart data for the selected stock
-  const selectedStockHistory = generatePriceHistory(30, selectedStock.price, 2);
+  // Gerar histórico de preços para o produto selecionado
+  const selectedProductHistory = generatePriceHistory(30, selectedProduct.price, 2);
   
-  // Generate chart data for stock cards
-  const stocksWithHistory = stocks.map(stock => {
+  // Gerar histórico para os cards de produtos
+  const productsWithHistory = products.map(product => {
     return {
-      ...stock,
-      priceHistory: generatePriceHistory(30, stock.price, 2)
+      ...product,
+      priceHistory: generatePriceHistory(30, product.price, 2)
     };
   });
   
-  // Calculate market statistics
-  const gainers = stocks.filter(stock => stock.changePercent > 0);
-  const losers = stocks.filter(stock => stock.changePercent < 0);
+  // Calcular estatísticas
+  const productsInStock = products.filter(p => p.stock > 0);
+  const lowStock = products.filter(p => p.stock < 50);
   
-  const topGainer = [...stocks].sort((a, b) => b.changePercent - a.changePercent)[0];
-  const topLoser = [...stocks].sort((a, b) => a.changePercent - b.changePercent)[0];
-  
-  const totalMarketCap = stocks.reduce((sum, stock) => sum + stock.marketCap, 0);
-  const totalVolume = stocks.reduce((sum, stock) => sum + stock.volume, 0);
+  const topSeller = [...products].sort((a, b) => b.sales - a.sales)[0];
+  const totalRevenue = products.reduce((sum, p) => sum + (p.price * p.sales), 0);
+  const totalSales = products.reduce((sum, p) => sum + p.sales, 0);
   
   const toggleSidebar = () => {
     setIsSidebarCollapsed(prev => !prev);
@@ -59,56 +57,65 @@ export function Dashboard() {
         <main className="flex-1 transition-all duration-300 overflow-hidden">
           <div className="container max-w-full h-full p-4 lg:p-6 flex flex-col animate-fade-in">
             <div className="bg-muted/30 rounded-lg p-4 mb-4 text-center border border-border">
-              <h1 className="text-2xl font-bold">Painel do Mercado</h1>
+              <h1 className="text-2xl font-bold">Painel da Loja</h1>
             </div>
             
             {/* Stats Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4 animate-slide-up" style={{ '--delay': '100ms' } as React.CSSProperties}>
               <StatsCard 
-                title="Cap. de Mercado" 
-                value="$13.42T"
-                trend={0.47}
+                title="Receita Total" 
+                value={`R$ ${(totalRevenue / 1000000).toFixed(2)}M`}
+                trend={5.2}
                 icon={<Wallet2 />}
                 className="bg-primary/5"
               />
               <StatsCard 
-                title="Volume Negociado" 
-                value="487.32M"
-                description="Volume de hoje"
-                icon={<BarChart3 />}
+                title="Vendas Totais" 
+                value={totalSales.toLocaleString()}
+                description="Unidades vendidas"
+                icon={<ShoppingCart />}
                 className="bg-primary/5"
               />
               <StatsCard 
-                title="Maior Alta" 
-                value={topGainer.symbol}
-                trend={topGainer.changePercent}
-                trendLabel={topGainer.name}
+                title="Mais Vendido" 
+                value={topSeller.name}
+                trend={((topSeller.sales / totalSales) * 100)}
+                trendLabel={`${topSeller.sales} vendas`}
                 icon={<TrendingUp />}
                 className="bg-success/5"
               />
               <StatsCard 
-                title="Maior Baixa" 
-                value={topLoser.symbol}
-                trend={topLoser.changePercent}
-                trendLabel={topLoser.name}
-                icon={<TrendingDown />}
-                className="bg-danger/5"
+                title="Produtos em Estoque" 
+                value={productsInStock.length.toString()}
+                trend={lowStock.length > 0 ? -lowStock.length : 0}
+                trendLabel={lowStock.length > 0 ? `${lowStock.length} com estoque baixo` : 'Estoque bom'}
+                icon={<Package />}
+                className={lowStock.length > 0 ? "bg-danger/5" : "bg-success/5"}
               />
             </div>
             
             {/* Main Content Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 flex-1 min-h-0">
-              {/* Left column - Stock list */}
+              {/* Left column - Product list */}
               <div className="lg:col-span-1 flex flex-col animate-slide-up overflow-hidden" style={{ '--delay': '200ms' } as React.CSSProperties}>
-                <h2 className="text-xl font-semibold mb-3">Lista de Observação</h2>
+                <h2 className="text-xl font-semibold mb-3">Produtos em Destaque</h2>
                 <div className="space-y-3 overflow-y-auto">
-                  {stocksWithHistory.slice(0, 5).map((stock) => (
+                  {productsWithHistory.slice(0, 5).map((product) => (
                     <StockCard 
-                      key={stock.symbol} 
-                      stock={stock} 
-                      priceHistory={stock.priceHistory}
-                      onClick={() => setSelectedStock(stock)}
-                      className={selectedStock.symbol === stock.symbol ? "ring-2 ring-primary" : ""}
+                      key={product.id} 
+                      stock={{
+                        symbol: product.id,
+                        name: product.name,
+                        price: product.price,
+                        change: product.discount || 0,
+                        changePercent: product.discount ? ((product.discount / product.price) * 100) : 0,
+                        volume: product.sales,
+                        marketCap: product.stock,
+                        lastUpdated: product.lastUpdated
+                      }}
+                      priceHistory={product.priceHistory}
+                      onClick={() => setSelectedProduct(product)}
+                      className={selectedProduct.id === product.id ? "ring-2 ring-primary" : ""}
                     />
                   ))}
                 </div>
@@ -118,9 +125,9 @@ export function Dashboard() {
               <div className="lg:col-span-2 flex flex-col gap-4 animate-slide-up overflow-hidden" style={{ '--delay': '300ms' } as React.CSSProperties}>
                 <div className="flex-1 min-h-0">
                   <StockChart 
-                    symbol={selectedStock.symbol} 
-                    name={selectedStock.name} 
-                    currentPrice={selectedStock.price}
+                    symbol={selectedProduct.id} 
+                    name={selectedProduct.name} 
+                    currentPrice={selectedProduct.price}
                     volatility={2.5}
                   />
                 </div>
@@ -129,13 +136,29 @@ export function Dashboard() {
                 </div>
               </div>
               
-              {/* Right column - Markets and currencies */}
+              {/* Right column - Categories and sales */}
               <div className="lg:col-span-1 flex flex-col gap-4 animate-slide-up overflow-hidden" style={{ '--delay': '400ms' } as React.CSSProperties}>
                 <div className="flex-1 min-h-0 overflow-hidden">
-                  <MarketOverview indices={indices} />
+                  <MarketOverview indices={categories.map(cat => ({
+                    symbol: cat.id,
+                    name: cat.name,
+                    value: cat.revenue,
+                    change: cat.change,
+                    changePercent: cat.changePercent,
+                    region: `${cat.totalProducts} produtos`,
+                    lastUpdated: cat.lastUpdated
+                  }))} />
                 </div>
                 <div className="flex-1 min-h-0 overflow-hidden">
-                  <CurrencyExchange currencies={currencies} />
+                  <CurrencyExchange currencies={salesMetrics.map(metric => ({
+                    symbol: metric.period,
+                    fromCurrency: 'Vendas',
+                    toCurrency: metric.period,
+                    rate: metric.value,
+                    change: metric.change,
+                    changePercent: metric.changePercent,
+                    lastUpdated: metric.lastUpdated
+                  }))} />
                 </div>
               </div>
             </div>

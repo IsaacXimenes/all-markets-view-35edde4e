@@ -31,27 +31,27 @@ export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
       href: '/',
     },
     {
-      title: 'Ações',
+      title: 'Smartphones',
       icon: BarChart,
       href: '/stocks',
     },
     {
-      title: 'Mercados',
+      title: 'Categorias',
       icon: BarChart3,
       href: '/markets',
     },
     {
-      title: 'Moedas',
+      title: 'Capinhas',
       icon: DollarSign,
       href: '/currencies',
     },
     {
-      title: 'Global',
+      title: 'Acessórios',
       icon: Globe,
       href: '/global',
     },
     {
-      title: 'Portfólio',
+      title: 'Vendas',
       icon: Wallet,
       href: '/portfolio',
     },
@@ -61,7 +61,7 @@ export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
       href: '/performance',
     },
     {
-      title: 'Análise',
+      title: 'Relatórios',
       icon: PieChart,
       href: '/analysis',
     },
@@ -131,9 +131,9 @@ export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
           "transition-opacity duration-200 rounded-md bg-sidebar-accent/50 p-2 text-xs text-sidebar-accent-foreground",
           isCollapsed ? "opacity-0" : "opacity-100"
         )}>
-          <p className="font-medium">Status do Mercado</p>
-          <p>Mercados abertos</p>
-          <p className="text-[10px]">Fecha em 3h 45m</p>
+          <p className="font-medium">Status da Loja</p>
+          <p>Loja aberta</p>
+          <p className="text-[10px]">Pedidos: 47 hoje</p>
         </div>
       </div>
     </aside>

@@ -56,12 +56,12 @@ export function Dashboard() {
       <div className="flex-1 flex">
         <Sidebar isCollapsed={isSidebarCollapsed} onToggle={toggleSidebar} />
         
-        <main className="flex-1 transition-all duration-300">
-          <div className="container max-w-full p-4 lg:p-6 animate-fade-in">
-            <h1 className="text-2xl font-bold mb-6">Painel do Mercado</h1>
+        <main className="flex-1 transition-all duration-300 overflow-hidden">
+          <div className="container max-w-full h-full p-4 lg:p-6 flex flex-col animate-fade-in">
+            <h1 className="text-2xl font-bold mb-4">Painel do Mercado</h1>
             
             {/* Stats Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 animate-slide-up" style={{ '--delay': '100ms' } as React.CSSProperties}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4 animate-slide-up" style={{ '--delay': '100ms' } as React.CSSProperties}>
               <StatsCard 
                 title="Cap. de Mercado" 
                 value="$13.42T"
@@ -95,11 +95,11 @@ export function Dashboard() {
             </div>
             
             {/* Main Content Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 flex-1 min-h-0">
               {/* Left column - Stock list */}
-              <div className="lg:col-span-1 space-y-4 animate-slide-up" style={{ '--delay': '200ms' } as React.CSSProperties}>
-                <h2 className="text-xl font-semibold">Lista de Observação</h2>
-                <div className="space-y-4">
+              <div className="lg:col-span-1 flex flex-col animate-slide-up overflow-hidden" style={{ '--delay': '200ms' } as React.CSSProperties}>
+                <h2 className="text-xl font-semibold mb-3">Lista de Observação</h2>
+                <div className="space-y-3 overflow-y-auto">
                   {stocksWithHistory.slice(0, 5).map((stock) => (
                     <StockCard 
                       key={stock.symbol} 
@@ -113,20 +113,28 @@ export function Dashboard() {
               </div>
               
               {/* Middle column - Chart and news */}
-              <div className="lg:col-span-2 space-y-4 animate-slide-up" style={{ '--delay': '300ms' } as React.CSSProperties}>
-                <StockChart 
-                  symbol={selectedStock.symbol} 
-                  name={selectedStock.name} 
-                  currentPrice={selectedStock.price}
-                  volatility={2.5}
-                />
-                <NewsCard news={mockNews} className="mt-6" />
+              <div className="lg:col-span-2 flex flex-col gap-4 animate-slide-up overflow-hidden" style={{ '--delay': '300ms' } as React.CSSProperties}>
+                <div className="flex-1 min-h-0">
+                  <StockChart 
+                    symbol={selectedStock.symbol} 
+                    name={selectedStock.name} 
+                    currentPrice={selectedStock.price}
+                    volatility={2.5}
+                  />
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <NewsCard news={mockNews} className="h-full" />
+                </div>
               </div>
               
               {/* Right column - Markets and currencies */}
-              <div className="lg:col-span-1 space-y-4 animate-slide-up" style={{ '--delay': '400ms' } as React.CSSProperties}>
-                <MarketOverview indices={indices} />
-                <CurrencyExchange currencies={currencies} />
+              <div className="lg:col-span-1 flex flex-col gap-4 animate-slide-up overflow-hidden" style={{ '--delay': '400ms' } as React.CSSProperties}>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <MarketOverview indices={indices} />
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <CurrencyExchange currencies={currencies} />
+                </div>
               </div>
             </div>
           </div>

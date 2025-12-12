@@ -9,12 +9,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Download, Eye, Copy, TrendingUp, DollarSign, Percent, ShoppingCart } from 'lucide-react';
 import { getVendas, exportVendasToCSV, formatCurrency, Venda } from '@/utils/vendasApi';
-import { getLojas, Loja } from '@/utils/cadastrosApi';
+import { getLojas, getColaboradores, Loja, Colaborador } from '@/utils/cadastrosApi';
 
 export default function Vendas() {
   const navigate = useNavigate();
   const [vendas] = useState<Venda[]>(getVendas());
   const [lojas] = useState<Loja[]>(getLojas());
+  const [colaboradores] = useState<Colaborador[]>(getColaboradores());
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [lojaFiltro, setLojaFiltro] = useState('');
@@ -22,6 +23,22 @@ export default function Vendas() {
   const getLojaName = (id: string) => {
     const loja = lojas.find(l => l.id === id);
     return loja?.nome || id;
+  };
+
+  const getColaboradorNome = (id: string) => {
+    const col = colaboradores.find(c => c.id === id);
+    return col?.nome || id;
+  };
+
+  // Cálculos corretos para cada venda
+  const calcularTotaisVenda = (venda: Venda) => {
+    const valorCusto = venda.itens.reduce((acc, item) => acc + item.valorCusto * item.quantidade, 0);
+    const valorRecomendado = venda.itens.reduce((acc, item) => acc + item.valorRecomendado * item.quantidade, 0);
+    const valorVenda = venda.total;
+    const lucro = valorVenda - valorCusto;
+    const margem = valorCusto > 0 ? ((lucro / valorCusto) * 100) : 0;
+    
+    return { valorCusto, valorRecomendado, valorVenda, lucro, margem };
   };
 
   const vendasFiltradas = useMemo(() => {
@@ -46,11 +63,18 @@ export default function Vendas() {
   }, [vendas, dataInicio, dataFim, lojaFiltro]);
 
   const totais = useMemo(() => {
-    const totalVendas = vendasFiltradas.reduce((acc, v) => acc + v.total, 0);
-    const totalLucro = vendasFiltradas.reduce((acc, v) => acc + v.lucro, 0);
-    const margemMedia = vendasFiltradas.length > 0 
-      ? vendasFiltradas.reduce((acc, v) => acc + v.margem, 0) / vendasFiltradas.length 
-      : 0;
+    let totalVendas = 0;
+    let totalLucro = 0;
+    let totalMargem = 0;
+    
+    vendasFiltradas.forEach(v => {
+      const calc = calcularTotaisVenda(v);
+      totalVendas += calc.valorVenda;
+      totalLucro += calc.lucro;
+      totalMargem += calc.margem;
+    });
+    
+    const margemMedia = vendasFiltradas.length > 0 ? totalMargem / vendasFiltradas.length : 0;
     
     return { totalVendas, totalLucro, margemMedia, quantidade: vendasFiltradas.length };
   }, [vendasFiltradas]);
@@ -139,7 +163,7 @@ export default function Vendas() {
             </div>
             <div>
               <label className="text-sm font-medium mb-2 block">Loja de Venda</label>
-              <Select value={lojaFiltro} onValueChange={(val) => setLojaFiltro(val === 'all' ? '' : val)}>
+              <Select value={lojaFiltro || 'all'} onValueChange={(val) => setLojaFiltro(val === 'all' ? '' : val)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todas as Lojas" />
                 </SelectTrigger>
@@ -172,8 +196,8 @@ export default function Vendas() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Data/Hora</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Produto</TableHead>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Cliente</TableHead>
                   <TableHead>Vendedor</TableHead>
                   <TableHead>Loja</TableHead>
                   <TableHead className="text-right">Valor Recomendado</TableHead>
@@ -184,24 +208,34 @@ export default function Vendas() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {vendasFiltradas.map((venda) => (
-                  venda.itens.map((item, idx) => (
-                    <TableRow key={`${venda.id}-${idx}`}>
+                {vendasFiltradas.map((venda) => {
+                  const calc = calcularTotaisVenda(venda);
+                  const isPrejuizo = calc.lucro < 0;
+                  
+                  return (
+                    <TableRow key={venda.id}>
                       <TableCell className="whitespace-nowrap">
                         {new Date(venda.dataHora).toLocaleString('pt-BR')}
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{item.categoria}</Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{item.produto}</TableCell>
-                      <TableCell>{venda.vendedor}</TableCell>
+                      <TableCell className="font-mono text-xs">{venda.id}</TableCell>
+                      <TableCell className="font-medium">{venda.clienteNome}</TableCell>
+                      <TableCell>{getColaboradorNome(venda.vendedor)}</TableCell>
                       <TableCell>{getLojaName(venda.lojaVenda)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.valorRecomendado)}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(item.valorVenda)}</TableCell>
-                      <TableCell className="text-right text-green-600">{formatCurrency(venda.lucro)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatCurrency(calc.valorRecomendado)}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(calc.valorVenda)}
+                      </TableCell>
+                      <TableCell className={`text-right font-medium ${isPrejuizo ? 'text-destructive bg-destructive/10' : 'text-green-600'}`}>
+                        {formatCurrency(calc.lucro)}
+                      </TableCell>
                       <TableCell className="text-right">
-                        <Badge variant={venda.margem >= 40 ? "default" : "secondary"}>
-                          {venda.margem.toFixed(2)}%
+                        <Badge 
+                          variant={isPrejuizo ? "destructive" : calc.margem >= 40 ? "default" : "secondary"}
+                          className={isPrejuizo ? 'bg-destructive/10' : ''}
+                        >
+                          {calc.margem.toFixed(2)}%
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -210,6 +244,7 @@ export default function Vendas() {
                             variant="ghost" 
                             size="icon"
                             onClick={() => navigate(`/vendas/${venda.id}`)}
+                            title="Ver detalhes"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -217,14 +252,15 @@ export default function Vendas() {
                             variant="ghost" 
                             size="icon"
                             onClick={() => navigate(`/vendas/nova?duplicar=${venda.id}`)}
+                            title="Duplicar venda"
                           >
                             <Copy className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

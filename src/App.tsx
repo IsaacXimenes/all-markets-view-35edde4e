@@ -42,6 +42,7 @@ import CadastrosModelosPagamento from "./pages/CadastrosModelosPagamento";
 import CadastrosContasFinanceiras from "./pages/CadastrosContasFinanceiras";
 import Vendas from "./pages/Vendas";
 import VendasNova from "./pages/VendasNova";
+import VendaDetalhes from "./pages/VendaDetalhes";
 
 const queryClient = new QueryClient();
 
@@ -89,6 +90,7 @@ const App = () => (
           <Route path="/cadastros/contas-financeiras" element={<CadastrosContasFinanceiras />} />
           <Route path="/vendas" element={<Vendas />} />
           <Route path="/vendas/nova" element={<VendasNova />} />
+          <Route path="/vendas/:id" element={<VendaDetalhes />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

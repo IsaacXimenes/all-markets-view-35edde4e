@@ -143,14 +143,16 @@ export default function VendasNova() {
   const totalPagamentos = useMemo(() => pagamentos.reduce((acc, p) => acc + p.valor, 0), [pagamentos]);
   const total = useMemo(() => subtotal - totalTradeIn + taxaEntrega, [subtotal, totalTradeIn, taxaEntrega]);
   const valorPendente = useMemo(() => total - totalPagamentos, [total, totalPagamentos]);
-  const lucroProjetado = useMemo(() => {
-    const custoTotal = itens.reduce((acc, item) => acc + item.valorCusto, 0);
-    return total - custoTotal;
-  }, [total, itens]);
+  
+  // Cálculos corretos
+  const valorCustoTotal = useMemo(() => itens.reduce((acc, item) => acc + item.valorCusto * item.quantidade, 0), [itens]);
+  const valorRecomendadoTotal = useMemo(() => itens.reduce((acc, item) => acc + item.valorRecomendado * item.quantidade, 0), [itens]);
+  const lucroProjetado = useMemo(() => total - valorCustoTotal, [total, valorCustoTotal]);
   const margemProjetada = useMemo(() => {
-    if (total === 0) return 0;
-    return (lucroProjetado / total) * 100;
-  }, [lucroProjetado, total]);
+    if (valorCustoTotal === 0) return 0;
+    return ((lucroProjetado / valorCustoTotal) * 100);
+  }, [lucroProjetado, valorCustoTotal]);
+  const isPrejuizo = lucroProjetado < 0;
 
   // Buscar cliente
   const clientesFiltrados = useMemo(() => {
@@ -600,17 +602,22 @@ export default function VendasNova() {
                         {formatCurrency(item.valorRecomendado)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Input 
-                          type="number"
-                          value={item.valorVenda}
-                          onChange={(e) => {
-                            const updated = itens.map(i => 
-                              i.id === item.id ? { ...i, valorVenda: Number(e.target.value) } : i
-                            );
-                            setItens(updated);
-                          }}
-                          className="w-32 text-right"
-                        />
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                          <Input 
+                            type="text"
+                            value={item.valorVenda.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, '');
+                              const numValue = Number(value) / 100;
+                              const updated = itens.map(i => 
+                                i.id === item.id ? { ...i, valorVenda: numValue } : i
+                              );
+                              setItens(updated);
+                            }}
+                            className="w-36 text-right pl-8"
+                          />
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Button 
@@ -774,12 +781,19 @@ export default function VendasNova() {
               {tipoRetirada === 'Entrega' && (
                 <div>
                   <label className="text-sm font-medium">Taxa de Entrega</label>
-                  <Input 
-                    type="number"
-                    value={taxaEntrega}
-                    onChange={(e) => setTaxaEntrega(Number(e.target.value))}
-                    placeholder="R$ 0,00"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                    <Input 
+                      type="text"
+                      value={taxaEntrega.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        setTaxaEntrega(Number(value) / 100);
+                      }}
+                      className="pl-10"
+                      placeholder="0,00"
+                    />
+                  </div>
                 </div>
               )}
               
@@ -813,7 +827,7 @@ export default function VendasNova() {
         </Card>
 
         {/* Resumo */}
-        <Card className="border-primary">
+        <Card className={`border-2 ${isPrejuizo ? 'border-destructive' : 'border-primary'}`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -823,35 +837,59 @@ export default function VendasNova() {
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal Produtos</span>
+                <span className="text-muted-foreground">Valor de Custo:</span>
+                <span className="font-medium">{formatCurrency(valorCustoTotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Valor Recomendado:</span>
+                <span className="font-medium">{formatCurrency(valorRecomendadoTotal)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal Produtos:</span>
                 <span className="font-medium">{formatCurrency(subtotal)}</span>
               </div>
               {totalTradeIn > 0 && (
                 <div className="flex justify-between text-green-600">
-                  <span>(-) Trade-In</span>
+                  <span>(-) Trade-In:</span>
                   <span className="font-medium">-{formatCurrency(totalTradeIn)}</span>
                 </div>
               )}
               {taxaEntrega > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">(+) Taxa de Entrega</span>
+                  <span className="text-muted-foreground">(+) Taxa de Entrega:</span>
                   <span className="font-medium">{formatCurrency(taxaEntrega)}</span>
                 </div>
               )}
               <Separator />
               <div className="flex justify-between text-lg">
-                <span className="font-bold">Total a Pagar</span>
+                <span className="font-bold">Valor de Venda:</span>
                 <span className="font-bold">{formatCurrency(total)}</span>
               </div>
               <Separator />
-              <div className="flex justify-between text-blue-600">
-                <span>Lucro Projetado</span>
-                <span className="font-medium">{formatCurrency(lucroProjetado)}</span>
+              <div className={`flex justify-between p-2 rounded-lg ${isPrejuizo ? 'bg-destructive/10' : ''}`}>
+                <span className={isPrejuizo ? 'text-destructive font-medium' : 'text-blue-600'}>
+                  {isPrejuizo && <AlertTriangle className="h-4 w-4 inline mr-1" />}
+                  Lucro Projetado:
+                </span>
+                <span className={`font-medium ${isPrejuizo ? 'text-destructive' : 'text-blue-600'}`}>
+                  {formatCurrency(lucroProjetado)}
+                </span>
               </div>
-              <div className="flex justify-between text-purple-600">
-                <span>Margem % Projetada</span>
-                <span className="font-medium">{margemProjetada.toFixed(2)}%</span>
+              <div className={`flex justify-between p-2 rounded-lg ${isPrejuizo ? 'bg-destructive/10' : ''}`}>
+                <span className={isPrejuizo ? 'text-destructive font-medium' : 'text-purple-600'}>
+                  Margem Projetada:
+                </span>
+                <span className={`font-medium ${isPrejuizo ? 'text-destructive' : 'text-purple-600'}`}>
+                  {margemProjetada.toFixed(2)}%
+                </span>
               </div>
+              {isPrejuizo && (
+                <div className="bg-destructive/10 p-3 rounded-lg flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-5 w-5" />
+                  <span className="font-medium">Venda com prejuízo</span>
+                </div>
+              )}
             </div>
             
             <Button 

@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Download, Eye, Copy, TrendingUp, DollarSign, Percent, ShoppingCart } from 'lucide-react';
+import { Plus, Download, Eye, TrendingUp, DollarSign, Percent, ShoppingCart } from 'lucide-react';
 import { getVendas, exportVendasToCSV, formatCurrency, Venda } from '@/utils/vendasApi';
 import { getLojas, getColaboradores, Loja, Colaborador } from '@/utils/cadastrosApi';
 
@@ -28,6 +28,13 @@ export default function Vendas() {
   const getColaboradorNome = (id: string) => {
     const col = colaboradores.find(c => c.id === id);
     return col?.nome || id;
+  };
+
+  const getResponsavelLoja = (lojaId: string) => {
+    const loja = lojas.find(l => l.id === lojaId);
+    if (!loja) return '-';
+    const responsavel = colaboradores.find(c => c.id === loja.responsavel);
+    return responsavel?.nome || loja.responsavel;
   };
 
   // Cálculos corretos para cada venda
@@ -198,10 +205,12 @@ export default function Vendas() {
                   <TableHead>Data/Hora</TableHead>
                   <TableHead>ID</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Vendedor</TableHead>
+                  <TableHead>Resp. Venda</TableHead>
                   <TableHead>Loja</TableHead>
-                  <TableHead className="text-right">Valor Recomendado</TableHead>
-                  <TableHead className="text-right">Valor Venda</TableHead>
+                  <TableHead>Resp. Loja</TableHead>
+                  <TableHead className="text-right">V. Custo</TableHead>
+                  <TableHead className="text-right">V. Recomendado</TableHead>
+                  <TableHead className="text-right">V. Venda</TableHead>
                   <TableHead className="text-right">Lucro</TableHead>
                   <TableHead className="text-right">Margem %</TableHead>
                   <TableHead>Ações</TableHead>
@@ -213,7 +222,7 @@ export default function Vendas() {
                   const isPrejuizo = calc.lucro < 0;
                   
                   return (
-                    <TableRow key={venda.id}>
+                    <TableRow key={venda.id} className={isPrejuizo ? 'bg-destructive/10' : ''}>
                       <TableCell className="whitespace-nowrap">
                         {new Date(venda.dataHora).toLocaleString('pt-BR')}
                       </TableCell>
@@ -221,42 +230,35 @@ export default function Vendas() {
                       <TableCell className="font-medium">{venda.clienteNome}</TableCell>
                       <TableCell>{getColaboradorNome(venda.vendedor)}</TableCell>
                       <TableCell>{getLojaName(venda.lojaVenda)}</TableCell>
+                      <TableCell className="text-muted-foreground">{getResponsavelLoja(venda.lojaVenda)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatCurrency(calc.valorCusto)}
+                      </TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {formatCurrency(calc.valorRecomendado)}
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(calc.valorVenda)}
                       </TableCell>
-                      <TableCell className={`text-right font-medium ${isPrejuizo ? 'text-destructive bg-destructive/10' : 'text-green-600'}`}>
+                      <TableCell className={`text-right font-medium ${isPrejuizo ? 'text-destructive' : 'text-green-600'}`}>
                         {formatCurrency(calc.lucro)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Badge 
                           variant={isPrejuizo ? "destructive" : calc.margem >= 40 ? "default" : "secondary"}
-                          className={isPrejuizo ? 'bg-destructive/10' : ''}
                         >
                           {calc.margem.toFixed(2)}%
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => navigate(`/vendas/${venda.id}`)}
-                            title="Ver detalhes"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => navigate(`/vendas/nova?duplicar=${venda.id}`)}
-                            title="Duplicar venda"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => navigate(`/vendas/${venda.id}`)}
+                          title="Ver detalhes"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );

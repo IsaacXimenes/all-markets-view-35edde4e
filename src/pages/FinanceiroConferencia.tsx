@@ -228,7 +228,10 @@ export default function FinanceiroConferencia() {
                 </TableHeader>
                 <TableBody>
                   {filteredPagamentos.map((pag) => (
-                    <TableRow key={pag.id}>
+                    <TableRow 
+                      key={pag.id}
+                      className={pag.status === 'Pendente' ? 'bg-destructive/20' : 'bg-green-500/20'}
+                    >
                       <TableCell className="font-mono text-xs">{pag.id}</TableCell>
                       <TableCell>{new Date(pag.data).toLocaleDateString('pt-BR')}</TableCell>
                       <TableCell>{pag.descricao}</TableCell>
@@ -237,7 +240,7 @@ export default function FinanceiroConferencia() {
                       <TableCell className="text-xs">{pag.conta}</TableCell>
                       <TableCell>{pag.loja}</TableCell>
                       <TableCell>
-                        <Badge variant={pag.status === 'Conferido' ? 'default' : 'secondary'}>
+                        <Badge variant={pag.status === 'Conferido' ? 'default' : 'destructive'}>
                           {pag.status}
                         </Badge>
                       </TableCell>

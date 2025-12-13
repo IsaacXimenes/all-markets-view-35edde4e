@@ -166,6 +166,12 @@ export default function VendasNova() {
 
   // Selecionar cliente
   const handleSelectCliente = (cliente: Cliente) => {
+    // Verificar se cliente está inativo/bloqueado
+    if (cliente.status === 'Inativo') {
+      toast({ title: "Cliente bloqueado", description: "Este cliente está inativo e não pode realizar compras.", variant: "destructive" });
+      return;
+    }
+    
     setClienteId(cliente.id);
     setClienteNome(cliente.nome);
     setClienteCpf(cliente.cpf);
@@ -177,11 +183,44 @@ export default function VendasNova() {
     setBuscaCliente('');
   };
 
+  // Formatar CPF/CNPJ dinamicamente
+  const formatCpfCnpj = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 11) {
+      // CPF: 000.000.000-00
+      return numbers
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    } else {
+      // CNPJ: 00.000.000/0000-00
+      return numbers
+        .replace(/(\d{2})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1/$2')
+        .replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+    }
+  };
+
   // Adicionar novo cliente
   const handleAddCliente = () => {
     if (!novoCliente.nome || !novoCliente.cpf) {
-      toast({ title: "Erro", description: "Nome e CPF são obrigatórios", variant: "destructive" });
+      toast({ title: "Erro", description: "Nome e CPF/CNPJ são obrigatórios", variant: "destructive" });
       return;
+    }
+    
+    // Verificar se CPF já existe e está inativo
+    const cpfLimpo = novoCliente.cpf.replace(/\D/g, '');
+    const clienteExistente = clientes.find(c => c.cpf.replace(/\D/g, '') === cpfLimpo);
+    
+    if (clienteExistente) {
+      if (clienteExistente.status === 'Inativo') {
+        toast({ title: "Cliente bloqueado", description: "Cliente bloqueado — não permitido cadastrar novamente.", variant: "destructive" });
+        return;
+      } else {
+        toast({ title: "Cliente já cadastrado", description: "Este CPF/CNPJ já está cadastrado no sistema.", variant: "destructive" });
+        return;
+      }
     }
     
     const cliente = addCliente({
@@ -261,8 +300,8 @@ export default function VendasNova() {
 
   // Adicionar trade-in
   const handleAddTradeIn = () => {
-    if (!novoTradeIn.modelo || !novoTradeIn.valorAbatimento) {
-      toast({ title: "Erro", description: "Modelo e valor são obrigatórios", variant: "destructive" });
+    if (!novoTradeIn.modelo || !novoTradeIn.valorAbatimento || !novoTradeIn.condicao) {
+      toast({ title: "Erro", description: "Modelo, condição e valor são obrigatórios", variant: "destructive" });
       return;
     }
     
@@ -271,7 +310,9 @@ export default function VendasNova() {
       modelo: novoTradeIn.modelo!,
       descricao: novoTradeIn.descricao || '',
       imei: novoTradeIn.imei || '',
-      valorAbatimento: novoTradeIn.valorAbatimento!
+      valorAbatimento: novoTradeIn.valorAbatimento!,
+      imeiValidado: novoTradeIn.imeiValidado || false,
+      condicao: novoTradeIn.condicao as 'Novo' | 'Semi-novo'
     };
     
     setTradeIns([...tradeIns, tradeIn]);
@@ -322,6 +363,11 @@ export default function VendasNova() {
     }
   };
 
+  // Verificar se há trade-in com IMEI não validado
+  const tradeInNaoValidado = useMemo(() => {
+    return tradeIns.some(t => !t.imeiValidado);
+  }, [tradeIns]);
+
   // Validar venda
   const canSubmit = useMemo(() => {
     return (
@@ -331,9 +377,10 @@ export default function VendasNova() {
       origemVenda &&
       localRetirada &&
       itens.length > 0 &&
-      valorPendente <= 0
+      valorPendente <= 0 &&
+      !tradeInNaoValidado
     );
-  }, [lojaVenda, vendedor, clienteId, origemVenda, localRetirada, itens.length, valorPendente]);
+  }, [lojaVenda, vendedor, clienteId, origemVenda, localRetirada, itens.length, valorPendente, tradeInNaoValidado]);
 
   // Registrar venda
   const handleRegistrarVenda = () => {
@@ -406,6 +453,13 @@ export default function VendasNova() {
 
   return (
     <PageLayout title="Nova Venda">
+      {/* Botão Voltar */}
+      <div className="mb-4">
+        <Button variant="ghost" onClick={() => navigate('/vendas')} className="gap-2">
+          <span>←</span> Voltar
+        </Button>
+      </div>
+
       {/* Timer */}
       {timer !== null && (
         <div className={`fixed top-20 right-6 z-50 p-4 rounded-lg shadow-lg flex items-center gap-3 ${
@@ -449,10 +503,10 @@ export default function VendasNova() {
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium">Vendedor *</label>
+                <label className="text-sm font-medium">Responsável pela Venda *</label>
                 <Select value={vendedor} onValueChange={setVendedor}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione o vendedor" />
+                    <SelectValue placeholder="Selecione o responsável" />
                   </SelectTrigger>
                   <SelectContent>
                     {vendedoresDisponiveis.map(col => (
@@ -461,6 +515,40 @@ export default function VendasNova() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            {/* Botão Limpar Tudo */}
+            <div className="flex justify-end pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (window.confirm('Limpar todos os campos? Esta ação não pode ser desfeita.')) {
+                    setLojaVenda('');
+                    setVendedor('');
+                    setClienteId('');
+                    setClienteNome('');
+                    setClienteCpf('');
+                    setClienteTelefone('');
+                    setClienteEmail('');
+                    setClienteCidade('');
+                    setHistoricoCliente([]);
+                    setOrigemVenda('');
+                    setLocalRetirada('');
+                    setItens([]);
+                    setTradeIns([]);
+                    setPagamentos([]);
+                    setTaxaEntrega(0);
+                    setObservacoes('');
+                    setTimer(null);
+                    setTimerStart(null);
+                  }
+                }}
+                className="text-destructive border-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Limpar Tudo
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -660,18 +748,28 @@ export default function VendasNova() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Modelo</TableHead>
-                    <TableHead>Descrição</TableHead>
+                    <TableHead>Condição</TableHead>
                     <TableHead>IMEI</TableHead>
+                    <TableHead>IMEI Validado</TableHead>
                     <TableHead className="text-right">Valor Abatimento</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {tradeIns.map(trade => (
-                    <TableRow key={trade.id}>
+                    <TableRow key={trade.id} className={!trade.imeiValidado ? 'bg-destructive/10' : ''}>
                       <TableCell className="font-medium">{trade.modelo}</TableCell>
-                      <TableCell className="text-muted-foreground">{trade.descricao}</TableCell>
-                      <TableCell>{trade.imei}</TableCell>
+                      <TableCell>
+                        <Badge variant={trade.condicao === 'Novo' ? 'default' : 'secondary'}>{trade.condicao}</Badge>
+                      </TableCell>
+                      <TableCell>{trade.imei || '-'}</TableCell>
+                      <TableCell>
+                        {trade.imeiValidado ? (
+                          <Badge variant="default" className="bg-green-500">Sim</Badge>
+                        ) : (
+                          <Badge variant="destructive">Não</Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right text-green-600">
                         -{formatCurrency(trade.valorAbatimento)}
                       </TableCell>
@@ -688,6 +786,13 @@ export default function VendasNova() {
                   ))}
                 </TableBody>
               </Table>
+            )}
+            
+            {tradeInNaoValidado && (
+              <div className="mt-4 p-3 bg-destructive/10 rounded-lg flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                <span className="font-medium">Há trade-in com IMEI NÃO validado! Registrar venda desabilitado.</span>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -944,6 +1049,8 @@ export default function VendasNova() {
                 <TableRow>
                   <TableHead>CPF</TableHead>
                   <TableHead>Nome</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Telefone</TableHead>
                   <TableHead>Cidade</TableHead>
                   <TableHead></TableHead>
@@ -951,18 +1058,34 @@ export default function VendasNova() {
               </TableHeader>
               <TableBody>
                 {clientesFiltrados.map(cliente => (
-                  <TableRow key={cliente.id}>
+                  <TableRow key={cliente.id} className={cliente.status === 'Inativo' ? 'bg-destructive/10' : ''}>
                     <TableCell>{cliente.cpf}</TableCell>
                     <TableCell className="font-medium">{cliente.nome}</TableCell>
+                    <TableCell>
+                      <Badge variant={cliente.tipoCliente === 'VIP' ? 'default' : 'secondary'}>
+                        {cliente.tipoCliente}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {cliente.status === 'Inativo' ? (
+                        <Badge variant="destructive">Bloqueado</Badge>
+                      ) : (
+                        <Badge variant="outline">Ativo</Badge>
+                      )}
+                    </TableCell>
                     <TableCell>{cliente.telefone}</TableCell>
                     <TableCell>{cliente.cidade}</TableCell>
                     <TableCell>
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleSelectCliente(cliente)}
-                      >
-                        Selecionar
-                      </Button>
+                      {cliente.status === 'Inativo' ? (
+                        <span className="text-destructive text-sm font-medium">Cliente bloqueado</span>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          onClick={() => handleSelectCliente(cliente)}
+                        >
+                          Selecionar
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -987,12 +1110,16 @@ export default function VendasNova() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">CPF *</label>
+              <label className="text-sm font-medium">CPF/CNPJ *</label>
               <Input 
                 value={novoCliente.cpf || ''}
-                onChange={(e) => setNovoCliente({ ...novoCliente, cpf: e.target.value })}
-                placeholder="000.000.000-00"
+                onChange={(e) => setNovoCliente({ ...novoCliente, cpf: formatCpfCnpj(e.target.value) })}
+                placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                maxLength={18}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {(novoCliente.cpf?.replace(/\D/g, '').length || 0) <= 11 ? 'CPF' : 'CNPJ'}
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium">Telefone</label>
@@ -1267,7 +1394,7 @@ export default function VendasNova() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Vendedor</label>
+              <label className="text-sm font-medium">Responsável pela Venda</label>
               <Select value={confirmVendedor} onValueChange={setConfirmVendedor}>
                 <SelectTrigger>
                   <SelectValue />

@@ -19,6 +19,8 @@ export interface ItemTradeIn {
   descricao: string;
   imei: string;
   valorAbatimento: number;
+  imeiValidado: boolean;
+  condicao: 'Novo' | 'Semi-novo';
 }
 
 export interface Pagamento {
@@ -103,7 +105,7 @@ let vendas: Venda[] = [
     totalTradeIn: 0,
     total: 14500.00,
     lucro: 7300.00,
-    margem: 50.34,
+    margem: 101.39,
     observacoes: '',
     status: 'Concluída'
   },
@@ -143,7 +145,9 @@ let vendas: Venda[] = [
         modelo: 'iPhone 12',
         descricao: 'Tela em ótimo estado, bateria 75%',
         imei: '999888777666555',
-        valorAbatimento: 1500.00
+        valorAbatimento: 1500.00,
+        imeiValidado: true,
+        condicao: 'Semi-novo'
       }
     ],
     pagamentos: [
@@ -153,8 +157,8 @@ let vendas: Venda[] = [
     subtotal: 12800.00,
     totalTradeIn: 1500.00,
     total: 11350.00,
-    lucro: 4900.00,
-    margem: 43.17,
+    lucro: 4950.00,
+    margem: 77.34,
     observacoes: 'Cliente VIP - desconto especial aplicado',
     status: 'Concluída'
   },
@@ -278,7 +282,9 @@ let vendas: Venda[] = [
         modelo: 'iPhone 11',
         descricao: 'Seminovo, funcionando perfeitamente',
         imei: '888777666555444',
-        valorAbatimento: 1200.00
+        valorAbatimento: 1200.00,
+        imeiValidado: true,
+        condicao: 'Semi-novo'
       }
     ],
     pagamentos: [
@@ -287,9 +293,94 @@ let vendas: Venda[] = [
     subtotal: 11500.00,
     totalTradeIn: 1200.00,
     total: 10300.00,
-    lucro: 4300.00,
-    margem: 41.75,
+    lucro: 4500.00,
+    margem: 77.59,
     observacoes: 'Cliente retorno - segunda compra este mês',
+    status: 'Concluída'
+  },
+  // Vendas com PREJUÍZO
+  {
+    id: 'VEN-2025-0006',
+    numero: 6,
+    dataHora: '2025-01-20T14:00:00',
+    lojaVenda: 'LOJA-002',
+    vendedor: 'COL-004',
+    clienteId: 'CLI-003',
+    clienteNome: 'Pedro Oliveira',
+    clienteCpf: '345.678.901-22',
+    clienteTelefone: '(11) 99999-3333',
+    clienteEmail: 'pedro@email.com',
+    clienteCidade: 'São Paulo',
+    origemVenda: 'WhatsApp',
+    localRetirada: 'LOJA-002',
+    tipoRetirada: 'Retirada Balcão',
+    taxaEntrega: 0,
+    itens: [
+      {
+        id: 'ITEM-006',
+        produtoId: 'PROD-0010',
+        produto: 'iPhone 14 Pro Max',
+        imei: '352123456789022',
+        categoria: 'iPhone',
+        quantidade: 1,
+        valorRecomendado: 8500.00,
+        valorVenda: 5800.00,
+        valorCusto: 6200.00,
+        loja: 'Loja Norte'
+      }
+    ],
+    tradeIns: [],
+    pagamentos: [
+      { id: 'PAG-007', meioPagamento: 'Pix', valor: 5800.00, contaDestino: 'CTA-002' }
+    ],
+    subtotal: 5800.00,
+    totalTradeIn: 0,
+    total: 5800.00,
+    lucro: -400.00,
+    margem: -6.45,
+    observacoes: 'Venda promocional - cliente exigiu desconto alto',
+    status: 'Concluída'
+  },
+  {
+    id: 'VEN-2025-0007',
+    numero: 7,
+    dataHora: '2025-01-21T09:15:00',
+    lojaVenda: 'LOJA-003',
+    vendedor: 'COL-004',
+    clienteId: 'CLI-004',
+    clienteNome: 'Ana Costa',
+    clienteCpf: '456.789.012-33',
+    clienteTelefone: '(11) 99999-4444',
+    clienteEmail: 'ana@email.com',
+    clienteCidade: 'São Paulo',
+    origemVenda: 'Mercado Livre',
+    localRetirada: 'LOJA-003',
+    tipoRetirada: 'Entrega',
+    taxaEntrega: 50.00,
+    itens: [
+      {
+        id: 'ITEM-007',
+        produtoId: 'PROD-0011',
+        produto: 'iPhone 13',
+        imei: '352123456789023',
+        categoria: 'iPhone',
+        quantidade: 1,
+        valorRecomendado: 5200.00,
+        valorVenda: 3900.00,
+        valorCusto: 4100.00,
+        loja: 'Loja Sul'
+      }
+    ],
+    tradeIns: [],
+    pagamentos: [
+      { id: 'PAG-008', meioPagamento: 'Cartão Crédito', valor: 3950.00, contaDestino: 'CTA-003' }
+    ],
+    subtotal: 3900.00,
+    totalTradeIn: 0,
+    total: 3950.00,
+    lucro: -150.00,
+    margem: -3.66,
+    observacoes: 'Venda ML com taxa alta - prejuízo calculado',
     status: 'Concluída'
   }
 ];

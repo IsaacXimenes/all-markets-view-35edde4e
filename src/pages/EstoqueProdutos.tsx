@@ -162,6 +162,20 @@ export default function EstoqueProdutos() {
 
         {/* Filters */}
         <div className="flex flex-wrap gap-4">
+          <Input
+            placeholder="IMEI"
+            value={imeiFilter}
+            onChange={(e) => setImeiFilter(e.target.value)}
+            className="w-[200px]"
+          />
+
+          <Input
+            placeholder="Modelo"
+            value={modeloFilter}
+            onChange={(e) => setModeloFilter(e.target.value)}
+            className="w-[200px]"
+          />
+
           <Select value={lojaFilter} onValueChange={setLojaFilter}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Todas as lojas" />
@@ -173,20 +187,6 @@ export default function EstoqueProdutos() {
               ))}
             </SelectContent>
           </Select>
-
-          <Input
-            placeholder="Modelo"
-            value={modeloFilter}
-            onChange={(e) => setModeloFilter(e.target.value)}
-            className="w-[200px]"
-          />
-
-          <Input
-            placeholder="IMEI"
-            value={imeiFilter}
-            onChange={(e) => setImeiFilter(e.target.value)}
-            className="w-[200px]"
-          />
 
           <div className="flex items-center space-x-2">
             <Checkbox 
@@ -216,8 +216,8 @@ export default function EstoqueProdutos() {
                 <TableHead>Qtd</TableHead>
                 <TableHead>Custo</TableHead>
                 <TableHead>Venda Recomendada</TableHead>
-                <TableHead>Saúde Bat.</TableHead>
-                <TableHead>Loja do Produto</TableHead>
+                  <TableHead>Saúde Bat.</TableHead>
+                <TableHead>Loja</TableHead>
                 <TableHead>Estoque</TableHead>
                 <TableHead>Assistência</TableHead>
                 <TableHead>Ações</TableHead>
@@ -293,21 +293,7 @@ export default function EstoqueProdutos() {
                       {produto.saudeBateria}%
                     </span>
                   </TableCell>
-                  <TableCell>
-                    <Select 
-                      value={produto.loja} 
-                      onValueChange={(value) => handleLojaChange(produto.id, value)}
-                    >
-                      <SelectTrigger className="w-[140px] h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {lojasEstoque.map(loja => (
-                          <SelectItem key={loja} value={loja}>{loja}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
+                  <TableCell className="text-sm">{produto.loja}</TableCell>
                   <TableCell>
                     {produto.estoqueConferido ? (
                       <CheckCircle className="h-4 w-4 text-green-500" />

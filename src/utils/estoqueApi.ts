@@ -1,4 +1,6 @@
 // Tipos
+import { initializeProductIds, registerProductId, generateProductId, isProductIdRegistered } from './idManager';
+
 export interface HistoricoValorRecomendado {
   data: string;
   usuario: string;
@@ -87,7 +89,7 @@ const fornecedores = [
 
 let produtos: Produto[] = [
   {
-    id: 'PROD-0001',
+    id: 'PROD-0010',
     imei: '352123456789012',
     marca: 'Apple',
     modelo: 'iPhone 15 Pro Max',
@@ -114,7 +116,7 @@ let produtos: Produto[] = [
     origemEntrada: 'Fornecedor'
   },
   {
-    id: 'PROD-0002',
+    id: 'PROD-0011',
     imei: '352123456789013',
     marca: 'Apple',
     modelo: 'iPhone 15 Pro',
@@ -140,7 +142,7 @@ let produtos: Produto[] = [
     origemEntrada: 'Fornecedor'
   },
   {
-    id: 'PROD-0003',
+    id: 'PROD-0012',
     imei: '352123456789014',
     marca: 'Apple',
     modelo: 'iPhone 14 Pro',
@@ -166,7 +168,7 @@ let produtos: Produto[] = [
     origemEntrada: 'Nota de Entrada'
   },
   {
-    id: 'PROD-0004',
+    id: 'PROD-0013',
     imei: '352123456789015',
     marca: 'Apple',
     modelo: 'iPhone 13',
@@ -192,7 +194,7 @@ let produtos: Produto[] = [
     origemEntrada: 'Trade-In'
   },
   {
-    id: 'PROD-0005',
+    id: 'PROD-0014',
     imei: '352123456789016',
     marca: 'Apple',
     modelo: 'iPhone 15',
@@ -217,7 +219,7 @@ let produtos: Produto[] = [
     origemEntrada: 'Fornecedor'
   },
   {
-    id: 'PROD-0006',
+    id: 'PROD-0015',
     imei: '352123456789017',
     marca: 'Apple',
     modelo: 'iPhone 12',
@@ -240,7 +242,7 @@ let produtos: Produto[] = [
     origemEntrada: 'Trade-In'
   },
   {
-    id: 'PROD-0007',
+    id: 'PROD-0016',
     imei: '352123456789018',
     marca: 'Apple',
     modelo: 'iPhone 14 Plus',
@@ -265,7 +267,7 @@ let produtos: Produto[] = [
     origemEntrada: 'Fornecedor'
   },
   {
-    id: 'PROD-0008',
+    id: 'PROD-0017',
     imei: '352123456789019',
     marca: 'Apple',
     modelo: 'iPhone SE 2022',
@@ -290,7 +292,7 @@ let produtos: Produto[] = [
     origemEntrada: 'Nota de Entrada'
   },
   {
-    id: 'PROD-0009',
+    id: 'PROD-0018',
     imei: '352123456789020',
     marca: 'Apple',
     modelo: 'iPhone 13 Pro',
@@ -315,7 +317,7 @@ let produtos: Produto[] = [
     origemEntrada: 'Trade-In'
   },
   {
-    id: 'PROD-0010',
+    id: 'PROD-0019',
     imei: '352123456789021',
     marca: 'Apple',
     modelo: 'iPhone 15 Pro',
@@ -337,7 +339,7 @@ let produtos: Produto[] = [
     origemEntrada: 'Fornecedor'
   },
   {
-    id: 'PROD-0011',
+    id: 'PROD-0020',
     imei: '352123456789022',
     marca: 'Apple',
     modelo: 'iPhone 14',
@@ -359,7 +361,7 @@ let produtos: Produto[] = [
     origemEntrada: 'Nota de Entrada'
   },
   {
-    id: 'PROD-0012',
+    id: 'PROD-0021',
     imei: '352123456789023',
     marca: 'Apple',
     modelo: 'iPhone 11',
@@ -382,6 +384,15 @@ let produtos: Produto[] = [
     origemEntrada: 'Trade-In'
   }
 ];
+
+// Inicializa IDs existentes no sistema
+const initializeExistingIds = () => {
+  const allIds = produtos.map(p => p.id);
+  initializeProductIds(allIds);
+};
+
+// Inicializa ao carregar o módulo
+initializeExistingIds();
 
 let notasCompra: NotaCompra[] = [
   {

@@ -1,8 +1,9 @@
 // Vendas API - Mock Data
+import { generateProductId, registerProductId } from './idManager';
 
 export interface ItemVenda {
   id: string;
-  produtoId: string;
+  produtoId: string; // PROD-XXXX - ID único e persistente do produto
   produto: string;
   imei: string;
   categoria: string;
@@ -15,6 +16,7 @@ export interface ItemVenda {
 
 export interface ItemTradeIn {
   id: string;
+  produtoId?: string; // PROD-XXXX - ID único gerado para o produto de trade-in
   modelo: string;
   descricao: string;
   imei: string;
@@ -65,7 +67,7 @@ export interface HistoricoCompraCliente {
   valor: number;
 }
 
-// Dados mockados
+// Dados mockados - IDs PROD-XXXX únicos e consistentes com estoqueApi
 let vendas: Venda[] = [
   {
     id: 'VEN-2025-0001',
@@ -86,7 +88,7 @@ let vendas: Venda[] = [
     itens: [
       {
         id: 'ITEM-001',
-        produtoId: 'PROD-0001',
+        produtoId: 'PROD-0010',
         produto: 'iPhone 15 Pro Max',
         imei: '352123456789012',
         categoria: 'iPhone',
@@ -128,7 +130,7 @@ let vendas: Venda[] = [
     itens: [
       {
         id: 'ITEM-002',
-        produtoId: 'PROD-0002',
+        produtoId: 'PROD-0011',
         produto: 'iPhone 15 Pro',
         imei: '352123456789013',
         categoria: 'iPhone',
@@ -142,6 +144,7 @@ let vendas: Venda[] = [
     tradeIns: [
       {
         id: 'TRADE-001',
+        produtoId: 'PROD-0006',
         modelo: 'iPhone 12',
         descricao: 'Tela em ótimo estado, bateria 75%',
         imei: '999888777666555',
@@ -181,7 +184,7 @@ let vendas: Venda[] = [
     itens: [
       {
         id: 'ITEM-003',
-        produtoId: 'PROD-0003',
+        produtoId: 'PROD-0012',
         produto: 'iPhone 14 Pro',
         imei: '352123456789014',
         categoria: 'iPhone',
@@ -223,7 +226,7 @@ let vendas: Venda[] = [
     itens: [
       {
         id: 'ITEM-004',
-        produtoId: 'PROD-0005',
+        produtoId: 'PROD-0014',
         produto: 'iPhone 15',
         imei: '352123456789016',
         categoria: 'iPhone',
@@ -265,7 +268,7 @@ let vendas: Venda[] = [
     itens: [
       {
         id: 'ITEM-005',
-        produtoId: 'PROD-0007',
+        produtoId: 'PROD-0016',
         produto: 'iPhone 14 Plus',
         imei: '352123456789018',
         categoria: 'iPhone',
@@ -279,6 +282,7 @@ let vendas: Venda[] = [
     tradeIns: [
       {
         id: 'TRADE-002',
+        produtoId: 'PROD-0007',
         modelo: 'iPhone 11',
         descricao: 'Seminovo, funcionando perfeitamente',
         imei: '888777666555444',
@@ -318,7 +322,7 @@ let vendas: Venda[] = [
     itens: [
       {
         id: 'ITEM-006',
-        produtoId: 'PROD-0010',
+        produtoId: 'PROD-0020',
         produto: 'iPhone 14 Pro Max',
         imei: '352123456789022',
         categoria: 'iPhone',
@@ -360,7 +364,7 @@ let vendas: Venda[] = [
     itens: [
       {
         id: 'ITEM-007',
-        produtoId: 'PROD-0011',
+        produtoId: 'PROD-0021',
         produto: 'iPhone 13',
         imei: '352123456789023',
         categoria: 'iPhone',
@@ -422,10 +426,20 @@ export const addVenda = (venda: Omit<Venda, 'id' | 'numero'>): Venda => {
   vendaCounter++;
   const year = new Date().getFullYear();
   const newId = `VEN-${year}-${String(vendaCounter).padStart(4, '0')}`;
+  
+  // Gerar IDs para trade-ins que ainda não têm
+  const tradeInsComIds = venda.tradeIns.map(ti => {
+    if (!ti.produtoId) {
+      ti.produtoId = generateProductId();
+    }
+    return ti;
+  });
+  
   const newVenda: Venda = {
     ...venda,
     id: newId,
-    numero: vendaCounter
+    numero: vendaCounter,
+    tradeIns: tradeInsComIds
   };
   vendas.push(newVenda);
   return newVenda;

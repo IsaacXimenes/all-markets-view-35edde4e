@@ -427,74 +427,76 @@ export default function OSProdutoDetalhes() {
                           }}
                         />
                       </div>
-                      <div className="space-y-3">
-                        {/* Checkbox: Peça no estoque */}
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id={`pecaEstoque-${index}`}
-                            checked={peca.pecaNoEstoque}
-                            onChange={(e) => {
-                              handlePecaChange(index, 'pecaNoEstoque', e.target.checked);
-                              if (e.target.checked) {
-                                handlePecaChange(index, 'pecaDeFornecedor', false);
-                                handlePecaChange(index, 'fornecedor', '');
-                              }
-                            }}
-                            className="h-4 w-4 rounded border-border"
-                          />
-                          <Label htmlFor={`pecaEstoque-${index}`} className="text-sm font-medium">
-                            Peça no estoque
-                          </Label>
+                      {/* Checkboxes e Lixeira na mesma linha */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-6">
+                          {/* Checkbox: Peça no estoque */}
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`pecaEstoque-${index}`}
+                              checked={peca.pecaNoEstoque}
+                              onChange={(e) => {
+                                handlePecaChange(index, 'pecaNoEstoque', e.target.checked);
+                                if (e.target.checked) {
+                                  handlePecaChange(index, 'pecaDeFornecedor', false);
+                                  handlePecaChange(index, 'fornecedor', '');
+                                }
+                              }}
+                              className="h-4 w-4 rounded border-border"
+                            />
+                            <Label htmlFor={`pecaEstoque-${index}`} className="text-sm font-medium">
+                              Peça no estoque
+                            </Label>
+                          </div>
+
+                          {/* Checkbox: Fornecedor */}
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`pecaFornecedor-${index}`}
+                              checked={peca.pecaDeFornecedor}
+                              onChange={(e) => {
+                                handlePecaChange(index, 'pecaDeFornecedor', e.target.checked);
+                                if (e.target.checked) {
+                                  handlePecaChange(index, 'pecaNoEstoque', false);
+                                } else {
+                                  handlePecaChange(index, 'fornecedor', '');
+                                }
+                              }}
+                              className="h-4 w-4 rounded border-border"
+                            />
+                            <Label htmlFor={`pecaFornecedor-${index}`} className="text-sm font-medium">
+                              Fornecedor
+                            </Label>
+                          </div>
                         </div>
 
-                        {/* Checkbox: Fornecedor */}
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id={`pecaFornecedor-${index}`}
-                            checked={peca.pecaDeFornecedor}
-                            onChange={(e) => {
-                              handlePecaChange(index, 'pecaDeFornecedor', e.target.checked);
-                              if (e.target.checked) {
-                                handlePecaChange(index, 'pecaNoEstoque', false);
-                              } else {
-                                handlePecaChange(index, 'fornecedor', '');
-                              }
-                            }}
-                            className="h-4 w-4 rounded border-border"
-                          />
-                          <Label htmlFor={`pecaFornecedor-${index}`} className="text-sm font-medium">
-                            Fornecedor
-                          </Label>
-                        </div>
-
-                        {/* Select de Fornecedor (apenas se "Fornecedor" marcado) */}
-                        {peca.pecaDeFornecedor && (
-                          <Select 
-                            value={peca.fornecedor} 
-                            onValueChange={(v) => handlePecaChange(index, 'fornecedor', v)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o fornecedor" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {fornecedores.map((f) => (
-                                <SelectItem key={f} value={f}>{f}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleRemovePeca(index)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
                       </div>
 
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => handleRemovePeca(index)}
-                        className="self-start"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
+                      {/* Select de Fornecedor (apenas se "Fornecedor" marcado) */}
+                      {peca.pecaDeFornecedor && (
+                        <Select 
+                          value={peca.fornecedor} 
+                          onValueChange={(v) => handlePecaChange(index, 'fornecedor', v)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o fornecedor" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {fornecedores.map((f) => (
+                              <SelectItem key={f} value={f}>{f}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
                   ))}
 

@@ -1,5 +1,6 @@
 // API para Lista de Reparos (OS)
 import { Produto } from './estoqueApi';
+import { generateProductId, registerProductId, isProductIdRegistered } from './idManager';
 
 export interface ParecerEstoque {
   id: string;
@@ -33,7 +34,7 @@ export interface TimelineEntry {
 }
 
 export interface ProdutoPendente {
-  id: string;
+  id: string; // PROD-XXXX - ID único e persistente
   imei: string;
   imagem?: string;
   marca: string;
@@ -54,9 +55,10 @@ export interface ProdutoPendente {
   statusGeral: 'Pendente Estoque' | 'Em Análise Assistência' | 'Aguardando Peça' | 'Liberado';
 }
 
-// Dados mockados de produtos pendentes - IDs PROD-XXXX para rastreabilidade
+// Dados mockados de produtos pendentes - IDs PROD-XXXX únicos para rastreabilidade
+// IMPORTANTE: Estes IDs são DIFERENTES dos IDs em estoqueApi.ts para evitar duplicação
 let produtosPendentes: ProdutoPendente[] = [
-  // 3 produtos em Produtos Pendentes
+  // 3 produtos em Produtos Pendentes (IDs PROD-0001 a PROD-0003)
   {
     id: 'PROD-0001',
     imei: '352999888777001',
@@ -138,7 +140,7 @@ let produtosPendentes: ProdutoPendente[] = [
     custoAssistencia: 0,
     statusGeral: 'Pendente Estoque'
   },
-  // 2 produtos em OS > Produtos para Análise (já encaminhados para assistência)
+  // 2 produtos em OS > Produtos para Análise (já encaminhados para assistência) - IDs PROD-0004 e PROD-0005
   {
     id: 'PROD-0004',
     imei: '352999888777004',
@@ -224,6 +226,16 @@ let produtosPendentes: ProdutoPendente[] = [
     statusGeral: 'Em Análise Assistência'
   }
 ];
+
+// Registrar IDs dos produtos pendentes no sistema central
+const initializePendingIds = () => {
+  produtosPendentes.forEach(p => {
+    registerProductId(p.id);
+  });
+};
+
+// Inicializa ao carregar o módulo
+initializePendingIds();
 
 // Lista de produtos migrados para o estoque (para integração)
 let produtosMigrados: Produto[] = [];
@@ -438,13 +450,14 @@ export const liberarProdutoPendente = (id: string): boolean => {
 };
 
 export const addProdutoPendente = (produto: Omit<ProdutoPendente, 'id' | 'timeline' | 'custoAssistencia' | 'statusGeral'>): ProdutoPendente => {
-  // Gerar ID único no formato PROD-XXXX
-  const existingIds = produtosPendentes.map(p => {
-    const match = p.id.match(/PROD-(\d+)/);
-    return match ? parseInt(match[1]) : 0;
-  });
-  const maxId = Math.max(0, ...existingIds);
-  const newId = `PROD-${String(maxId + 1).padStart(4, '0')}`;
+  // Gerar ID único usando o sistema centralizado
+  const newId = generateProductId();
+  
+  // Validar que o ID não está duplicado
+  if (isProductIdRegistered(newId)) {
+    console.error(`Erro de rastreabilidade – ID duplicado detectado: ${newId}`);
+    throw new Error(`Erro de rastreabilidade – ID duplicado detectado: ${newId}`);
+  }
   
   const newProduto: ProdutoPendente = {
     ...produto,
@@ -456,6 +469,41 @@ export const addProdutoPendente = (produto: Omit<ProdutoPendente, 'id' | 'timeli
         tipo: 'entrada',
         titulo: produto.origemEntrada === 'Trade-In' ? 'Entrada via Trade-In' : 'Entrada via Nota de Compra',
         descricao: `Produto ${newId} recebido ${produto.origemEntrada === 'Trade-In' ? 'como trade-in' : 'via nota de compra'} - ${produto.notaOuVendaId || 'N/A'}`,
+        responsavel: 'Sistema'
+      }
+    ],
+    custoAssistencia: 0,
+    statusGeral: 'Pendente Estoque'
+  };
+
+  produtosPendentes.push(newProduto);
+  return newProduto;
+};
+
+// Função para adicionar produto pendente com ID específico (para trade-ins)
+export const addProdutoPendenteComId = (
+  id: string,
+  produto: Omit<ProdutoPendente, 'id' | 'timeline' | 'custoAssistencia' | 'statusGeral'>
+): ProdutoPendente => {
+  // Validar que o ID não está duplicado
+  if (isProductIdRegistered(id)) {
+    console.error(`Erro de rastreabilidade – ID duplicado detectado: ${id}`);
+    throw new Error(`Erro de rastreabilidade – ID duplicado detectado: ${id}`);
+  }
+  
+  // Registrar o ID
+  registerProductId(id);
+  
+  const newProduto: ProdutoPendente = {
+    ...produto,
+    id,
+    timeline: [
+      {
+        id: `TL-${Date.now()}`,
+        data: new Date().toISOString(),
+        tipo: 'entrada',
+        titulo: produto.origemEntrada === 'Trade-In' ? 'Entrada via Trade-In' : 'Entrada via Nota de Compra',
+        descricao: `Produto ${id} recebido ${produto.origemEntrada === 'Trade-In' ? 'como trade-in' : 'via nota de compra'} - ${produto.notaOuVendaId || 'N/A'}`,
         responsavel: 'Sistema'
       }
     ],

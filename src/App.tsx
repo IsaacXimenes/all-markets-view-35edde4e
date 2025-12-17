@@ -49,6 +49,7 @@ import OSProdutosAnalise from "./pages/OSProdutosAnalise";
 import OSProdutoDetalhes from "./pages/OSProdutoDetalhes";
 import OSAssistencia from "./pages/OSAssistencia";
 import OSAssistenciaNova from "./pages/OSAssistenciaNova";
+import OSAssistenciaDetalhes from "./pages/OSAssistenciaDetalhes";
 
 const queryClient = new QueryClient();
 
@@ -89,6 +90,7 @@ const App = () => (
           <Route path="/os/produto/:id" element={<OSProdutoDetalhes />} />
           <Route path="/os/assistencia" element={<OSAssistencia />} />
           <Route path="/os/assistencia/nova" element={<OSAssistenciaNova />} />
+          <Route path="/os/assistencia/:id" element={<OSAssistenciaDetalhes />} />
           <Route path="/cadastros" element={<Cadastros />} />
           <Route path="/cadastros/lojas" element={<CadastrosLojas />} />
           <Route path="/cadastros/clientes" element={<CadastrosClientes />} />

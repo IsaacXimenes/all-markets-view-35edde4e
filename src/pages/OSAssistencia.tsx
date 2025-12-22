@@ -82,6 +82,12 @@ export default function OSAssistencia() {
         return <Badge className="bg-blue-500 hover:bg-blue-600">Em serviço</Badge>;
       case 'Aguardando Peça':
         return <Badge className="bg-yellow-500 hover:bg-yellow-600">Aguardando Peça</Badge>;
+      case 'Solicitação Enviada':
+        return <Badge className="bg-orange-500 hover:bg-orange-600">Solicitação Enviada</Badge>;
+      case 'Em Análise':
+        return <Badge className="bg-purple-500 hover:bg-purple-600">Em Análise</Badge>;
+      case 'Peça Recebida':
+        return <Badge className="bg-teal-500 hover:bg-teal-600">Peça Recebida</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -134,7 +140,12 @@ export default function OSAssistencia() {
   const totalOS = ordensFiltradas.length;
   const osConcluidas = ordensFiltradas.filter(os => os.status === 'Serviço concluído').length;
   const osEmAndamento = ordensFiltradas.filter(os => os.status === 'Em serviço').length;
-  const osAguardando = ordensFiltradas.filter(os => os.status === 'Aguardando Peça').length;
+  const osAguardando = ordensFiltradas.filter(os => 
+    os.status === 'Aguardando Peça' || 
+    os.status === 'Solicitação Enviada' || 
+    os.status === 'Em Análise' || 
+    os.status === 'Peça Recebida'
+  ).length;
   const valorTotal = ordensFiltradas.reduce((acc, os) => acc + os.valorTotal, 0);
 
   return (
@@ -163,7 +174,7 @@ export default function OSAssistencia() {
           <Card>
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-yellow-600">{osAguardando}</div>
-              <div className="text-xs text-muted-foreground">Aguardando Peça</div>
+              <div className="text-xs text-muted-foreground">Aguardando/Peças</div>
             </CardContent>
           </Card>
           <Card>
@@ -224,6 +235,9 @@ export default function OSAssistencia() {
                   <SelectItem value="Serviço concluído">Serviço concluído</SelectItem>
                   <SelectItem value="Em serviço">Em serviço</SelectItem>
                   <SelectItem value="Aguardando Peça">Aguardando Peça</SelectItem>
+                  <SelectItem value="Solicitação Enviada">Solicitação Enviada</SelectItem>
+                  <SelectItem value="Em Análise">Em Análise</SelectItem>
+                  <SelectItem value="Peça Recebida">Peça Recebida</SelectItem>
                 </SelectContent>
               </Select>
             </div>

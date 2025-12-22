@@ -38,7 +38,7 @@ export interface OrdemServico {
   setor: 'GARANTIA' | 'ASSISTÊNCIA' | 'TROCA';
   tecnicoId: string;
   lojaId: string;
-  status: 'Serviço concluído' | 'Em serviço' | 'Aguardando Peça';
+  status: 'Serviço concluído' | 'Em serviço' | 'Aguardando Peça' | 'Solicitação Enviada' | 'Em Análise' | 'Peça Recebida';
   pecas: PecaServico[];
   pagamentos: Pagamento[];
   descricao: string;
@@ -221,6 +221,28 @@ let ordensServico: OrdemServico[] = [
     ],
     valorTotal: 200,
     custoTotal: 80
+  },
+  // OS-2025-0020 - Exemplo de fluxo completo com solicitação de peça
+  {
+    id: 'OS-2025-0020',
+    dataHora: '2025-01-18T09:00:00',
+    clienteId: 'CLI-001',
+    setor: 'ASSISTÊNCIA',
+    tecnicoId: 'COL-003',
+    lojaId: 'LOJA-001',
+    status: 'Solicitação Enviada',
+    pecas: [
+      { id: 'PC-020', peca: 'Bateria iPhone 13 Pro', imei: '999888777666001', valor: 280, percentual: 0, valorTotal: 280, servicoTerceirizado: false, unidadeServico: 'LOJA-001', pecaNoEstoque: false, pecaDeFornecedor: true }
+    ],
+    pagamentos: [],
+    descricao: 'Troca de bateria - saúde em 65%, aguardando peça do fornecedor',
+    timeline: [
+      { data: '2025-01-18T09:00:00', tipo: 'registro', descricao: 'OS registrada', responsavel: 'Roberto Alves' },
+      { data: '2025-01-18T09:30:00', tipo: 'status', descricao: 'Status alterado para Aguardando Peça', responsavel: 'Roberto Alves' },
+      { data: '2025-01-18T10:00:00', tipo: 'peca', descricao: 'Solicitação de peça SOL-020 enviada para análise da matriz', responsavel: 'Roberto Alves' }
+    ],
+    valorTotal: 280,
+    custoTotal: 150
   }
 ];
 

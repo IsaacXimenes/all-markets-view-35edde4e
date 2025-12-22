@@ -1,5 +1,5 @@
 // Solicitação de Peças API - Mock Data
-
+import { getOrdemServicoById, updateOrdemServico } from './assistenciaApi';
 export interface SolicitacaoPeca {
   id: string;
   osId: string;
@@ -50,6 +50,18 @@ export interface NotaAssistencia {
 
 // Mock data
 let solicitacoes: SolicitacaoPeca[] = [
+  // Solicitação vinculada à OS-2025-0020 (exemplo de fluxo completo)
+  {
+    id: 'SOL-020',
+    osId: 'OS-2025-0020',
+    peca: 'Bateria iPhone 13 Pro',
+    quantidade: 1,
+    justificativa: 'Bateria com saúde em 65%, cliente relatou desligamentos',
+    modeloImei: '999888777666001',
+    lojaSolicitante: 'LOJA-001',
+    dataSolicitacao: '2025-01-18T10:00:00',
+    status: 'Pendente'
+  },
   {
     id: 'SOL-001',
     osId: 'OS-2025-0007',
@@ -275,9 +287,9 @@ let notasAssistencia: NotaAssistencia[] = [
   }
 ];
 
-let solicitacaoCounter = 6;
-let loteCounter = 3;
-let notaAssistenciaCounter = 2;
+let solicitacaoCounter = 21;
+let loteCounter = 10;
+let notaAssistenciaCounter = 9;
 
 // Getters
 export const getSolicitacoes = () => [...solicitacoes];
@@ -315,6 +327,22 @@ export const aprovarSolicitacao = (id: string, dados: {
     ...dados,
     status: 'Aprovada'
   };
+
+  // Atualizar status da OS correspondente para "Em Análise"
+  const osId = solicitacoes[index].osId;
+  const os = getOrdemServicoById(osId);
+  if (os) {
+    updateOrdemServico(osId, {
+      status: 'Em Análise',
+      timeline: [...os.timeline, {
+        data: new Date().toISOString(),
+        tipo: 'peca',
+        descricao: `Solicitação ${id} aprovada pela gestora da matriz`,
+        responsavel: dados.responsavelCompra
+      }]
+    });
+  }
+
   return solicitacoes[index];
 };
 
@@ -416,7 +444,8 @@ export const finalizarNotaAssistencia = (notaId: string, dados: {
   notasAssistencia[notaIndex] = {
     ...nota,
     ...dados,
-    status: 'Concluído'
+    status: 'Concluído',
+    dataConferencia: new Date().toISOString().split('T')[0]
   };
   
   // Atualizar lote
@@ -429,8 +458,39 @@ export const finalizarNotaAssistencia = (notaId: string, dados: {
       const idx = solicitacoes.findIndex(s => s.id === solId);
       if (idx !== -1) {
         solicitacoes[idx].status = 'Recebida';
+        
+        // Atualizar OS correspondente para "Peça Recebida"
+        const osId = solicitacoes[idx].osId;
+        const os = getOrdemServicoById(osId);
+        if (os) {
+          updateOrdemServico(osId, {
+            status: 'Peça Recebida',
+            timeline: [...os.timeline, {
+              data: new Date().toISOString(),
+              tipo: 'peca',
+              descricao: `Peça recebida via nota ${notaId} - ${solicitacoes[idx].peca}`,
+              responsavel: dados.responsavelFinanceiro
+            }]
+          });
+        }
       }
     });
+  }
+
+  // Também atualizar OS se a nota tiver osId diretamente
+  if (nota.osId) {
+    const os = getOrdemServicoById(nota.osId);
+    if (os && os.status !== 'Peça Recebida') {
+      updateOrdemServico(nota.osId, {
+        status: 'Peça Recebida',
+        timeline: [...os.timeline, {
+          data: new Date().toISOString(),
+          tipo: 'peca',
+          descricao: `Peça recebida via nota ${notaId}`,
+          responsavel: dados.responsavelFinanceiro
+        }]
+      });
+    }
   }
   
   return notasAssistencia[notaIndex];

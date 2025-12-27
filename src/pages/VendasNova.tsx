@@ -23,6 +23,7 @@ import {
 } from '@/utils/cadastrosApi';
 import { getProdutos, Produto, updateProduto } from '@/utils/estoqueApi';
 import { addVenda, getNextVendaNumber, getHistoricoComprasCliente, formatCurrency, ItemVenda, ItemTradeIn, Pagamento } from '@/utils/vendasApi';
+import { getAcessorios, Acessorio, subtrairEstoqueAcessorio, VendaAcessorio, formatCurrency as formatCurrencyAcessorio } from '@/utils/acessoriosApi';
 import { getProdutosCadastro, ProdutoCadastro, calcularTipoPessoa } from '@/utils/cadastrosApi';
 import { getProdutosPendentes, ProdutoPendente } from '@/utils/osApi';
 
@@ -41,6 +42,7 @@ export default function VendasNova() {
   const [produtosEstoque] = useState<Produto[]>(getProdutos());
   const [produtosCadastro] = useState<ProdutoCadastro[]>(getProdutosCadastro());
   const [produtosPendentes] = useState<ProdutoPendente[]>(getProdutosPendentes());
+  const [acessoriosEstoque, setAcessoriosEstoque] = useState<Acessorio[]>(getAcessorios());
   
   // Info da venda
   const [vendaInfo] = useState(getNextVendaNumber());
@@ -74,6 +76,11 @@ export default function VendasNova() {
   const [buscaProduto, setBuscaProduto] = useState('');
   const [buscaModeloProduto, setBuscaModeloProduto] = useState('');
   const [filtroLojaProduto, setFiltroLojaProduto] = useState('');
+  
+  // Acessórios
+  const [acessoriosVenda, setAcessoriosVenda] = useState<VendaAcessorio[]>([]);
+  const [showAcessorioModal, setShowAcessorioModal] = useState(false);
+  const [buscaAcessorio, setBuscaAcessorio] = useState('');
   
   // Timer
   const [timer, setTimer] = useState<number | null>(null);
@@ -143,13 +150,18 @@ export default function VendasNova() {
 
   // Cálculos
   const subtotal = useMemo(() => itens.reduce((acc, item) => acc + item.valorVenda, 0), [itens]);
+  const totalAcessorios = useMemo(() => acessoriosVenda.reduce((acc, a) => acc + a.valorTotal, 0), [acessoriosVenda]);
   const totalTradeIn = useMemo(() => tradeIns.reduce((acc, t) => acc + t.valorAbatimento, 0), [tradeIns]);
   const totalPagamentos = useMemo(() => pagamentos.reduce((acc, p) => acc + p.valor, 0), [pagamentos]);
-  const total = useMemo(() => subtotal - totalTradeIn + taxaEntrega, [subtotal, totalTradeIn, taxaEntrega]);
+  const total = useMemo(() => subtotal + totalAcessorios - totalTradeIn + taxaEntrega, [subtotal, totalAcessorios, totalTradeIn, taxaEntrega]);
   const valorPendente = useMemo(() => total - totalPagamentos, [total, totalPagamentos]);
   
   // Cálculos corretos
-  const valorCustoTotal = useMemo(() => itens.reduce((acc, item) => acc + item.valorCusto * item.quantidade, 0), [itens]);
+  const valorCustoAcessorios = useMemo(() => acessoriosVenda.reduce((acc, a) => {
+    const acessorio = acessoriosEstoque.find(ae => ae.id === a.acessorioId);
+    return acc + (acessorio?.valorCusto || 0) * a.quantidade;
+  }, 0), [acessoriosVenda, acessoriosEstoque]);
+  const valorCustoTotal = useMemo(() => itens.reduce((acc, item) => acc + item.valorCusto * item.quantidade, 0) + valorCustoAcessorios, [itens, valorCustoAcessorios]);
   const valorRecomendadoTotal = useMemo(() => itens.reduce((acc, item) => acc + item.valorRecomendado * item.quantidade, 0), [itens]);
   const lucroProjetado = useMemo(() => total - valorCustoTotal, [total, valorCustoTotal]);
   const margemProjetada = useMemo(() => {
@@ -294,7 +306,67 @@ export default function VendasNova() {
   // Remover item
   const handleRemoveItem = (itemId: string) => {
     setItens(itens.filter(i => i.id !== itemId));
-    if (itens.length === 1) {
+    if (itens.length === 1 && acessoriosVenda.length === 0) {
+      setTimer(null);
+      setTimerStart(null);
+    }
+  };
+
+  // Acessórios filtrados
+  const acessoriosFiltrados = useMemo(() => {
+    return acessoriosEstoque.filter(a => {
+      if (a.quantidade <= 0) return false;
+      if (buscaAcessorio && !a.descricao.toLowerCase().includes(buscaAcessorio.toLowerCase())) return false;
+      return true;
+    });
+  }, [acessoriosEstoque, buscaAcessorio]);
+
+  // Adicionar acessório à venda
+  const handleAddAcessorio = (acessorio: Acessorio) => {
+    // Verificar se já existe na venda
+    const existente = acessoriosVenda.find(a => a.acessorioId === acessorio.id);
+    
+    if (existente) {
+      // Verificar estoque
+      if (existente.quantidade + 1 > acessorio.quantidade) {
+        toast({ title: "Estoque insuficiente", description: `Apenas ${acessorio.quantidade} unidades disponíveis.`, variant: "destructive" });
+        return;
+      }
+      // Incrementar quantidade
+      const updated = acessoriosVenda.map(a => 
+        a.acessorioId === acessorio.id 
+          ? { ...a, quantidade: a.quantidade + 1, valorTotal: (a.quantidade + 1) * a.valorUnitario }
+          : a
+      );
+      setAcessoriosVenda(updated);
+    } else {
+      // Adicionar novo
+      const novoAcessorio: VendaAcessorio = {
+        id: `ACESSV-${Date.now()}`,
+        acessorioId: acessorio.id,
+        descricao: acessorio.descricao,
+        quantidade: 1,
+        valorUnitario: acessorio.valorCusto * 1.5, // Margem de 50%
+        valorTotal: acessorio.valorCusto * 1.5
+      };
+      setAcessoriosVenda([...acessoriosVenda, novoAcessorio]);
+      
+      // Iniciar timer se for o primeiro item
+      if (itens.length === 0 && acessoriosVenda.length === 0) {
+        setTimerStart(Date.now());
+        setTimer(TIMER_DURATION);
+      }
+    }
+    
+    setShowAcessorioModal(false);
+    setBuscaAcessorio('');
+    toast({ title: "Acessório adicionado", description: `${acessorio.descricao} adicionado à venda` });
+  };
+
+  // Remover acessório
+  const handleRemoveAcessorio = (acessorioId: string) => {
+    setAcessoriosVenda(acessoriosVenda.filter(a => a.id !== acessorioId));
+    if (itens.length === 0 && acessoriosVenda.length === 1) {
       setTimer(null);
       setTimerStart(null);
     }
@@ -378,11 +450,11 @@ export default function VendasNova() {
       clienteId &&
       origemVenda &&
       localRetirada &&
-      itens.length > 0 &&
+      (itens.length > 0 || acessoriosVenda.length > 0) &&
       valorPendente <= 0 &&
       !tradeInNaoValidado
     );
-  }, [lojaVenda, vendedor, clienteId, origemVenda, localRetirada, itens.length, valorPendente, tradeInNaoValidado]);
+  }, [lojaVenda, vendedor, clienteId, origemVenda, localRetirada, itens.length, acessoriosVenda.length, valorPendente, tradeInNaoValidado]);
 
   // Registrar venda
   const handleRegistrarVenda = () => {
@@ -401,6 +473,12 @@ export default function VendasNova() {
         updateProduto(produto.id, { quantidade: produto.quantidade - item.quantidade });
       }
     });
+
+    // Subtrair acessórios do estoque
+    acessoriosVenda.forEach(acessorio => {
+      subtrairEstoqueAcessorio(acessorio.acessorioId, acessorio.quantidade);
+    });
+    setAcessoriosEstoque(getAcessorios());
 
     // Registrar venda
     const venda = addVenda({
@@ -726,6 +804,126 @@ export default function VendasNova() {
           </CardContent>
         </Card>
 
+        {/* Acessórios */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Acessórios
+              </span>
+              <Button onClick={() => setShowAcessorioModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Selecionar Acessório
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {acessoriosVenda.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhum acessório adicionado. Clique em "Selecionar Acessório" para adicionar.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Acessório</TableHead>
+                    <TableHead className="text-center">Qtd</TableHead>
+                    <TableHead className="text-right">Valor Unit.</TableHead>
+                    <TableHead className="text-right">Valor Total</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {acessoriosVenda.map(acessorio => (
+                    <TableRow key={acessorio.id}>
+                      <TableCell className="font-medium">{acessorio.descricao}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-6 w-6"
+                            onClick={() => {
+                              if (acessorio.quantidade > 1) {
+                                const updated = acessoriosVenda.map(a => 
+                                  a.id === acessorio.id 
+                                    ? { ...a, quantidade: a.quantidade - 1, valorTotal: (a.quantidade - 1) * a.valorUnitario }
+                                    : a
+                                );
+                                setAcessoriosVenda(updated);
+                              }
+                            }}
+                          >
+                            -
+                          </Button>
+                          <span className="w-8 text-center">{acessorio.quantidade}</span>
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-6 w-6"
+                            onClick={() => {
+                              const acessorioEstoque = acessoriosEstoque.find(a => a.id === acessorio.acessorioId);
+                              if (acessorioEstoque && acessorio.quantidade < acessorioEstoque.quantidade) {
+                                const updated = acessoriosVenda.map(a => 
+                                  a.id === acessorio.id 
+                                    ? { ...a, quantidade: a.quantidade + 1, valorTotal: (a.quantidade + 1) * a.valorUnitario }
+                                    : a
+                                );
+                                setAcessoriosVenda(updated);
+                              } else {
+                                toast({ title: "Estoque insuficiente", description: "Quantidade máxima atingida.", variant: "destructive" });
+                              }
+                            }}
+                          >
+                            +
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                          <Input 
+                            type="text"
+                            value={acessorio.valorUnitario.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, '');
+                              const numValue = Number(value) / 100;
+                              const updated = acessoriosVenda.map(a => 
+                                a.id === acessorio.id ? { ...a, valorUnitario: numValue, valorTotal: numValue * a.quantidade } : a
+                              );
+                              setAcessoriosVenda(updated);
+                            }}
+                            className="w-28 text-right pl-8"
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(acessorio.valorTotal)}
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleRemoveAcessorio(acessorio.id)}
+                        >
+                          <X className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            {totalAcessorios > 0 && (
+              <div className="mt-4 p-3 bg-muted rounded-lg flex justify-between items-center">
+                <span className="font-medium">Total Acessórios:</span>
+                <span className="font-bold">{formatCurrency(totalAcessorios)}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Base de Troca */}
         <Card>
           <CardHeader>
@@ -956,6 +1154,12 @@ export default function VendasNova() {
                 <span className="text-muted-foreground">Subtotal Produtos:</span>
                 <span className="font-medium">{formatCurrency(subtotal)}</span>
               </div>
+              {totalAcessorios > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">(+) Subtotal Acessórios:</span>
+                  <span className="font-medium">{formatCurrency(totalAcessorios)}</span>
+                </div>
+              )}
               {totalTradeIn > 0 && (
                 <div className="flex justify-between text-green-600">
                   <span>(-) Base de Troca:</span>
@@ -1726,6 +1930,71 @@ export default function VendasNova() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDetalheProduto(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Selecionar Acessório */}
+      <Dialog open={showAcessorioModal} onOpenChange={setShowAcessorioModal}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Selecionar Acessório</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input 
+              placeholder="Buscar acessório..."
+              value={buscaAcessorio}
+              onChange={(e) => setBuscaAcessorio(e.target.value)}
+            />
+            
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead className="text-center">Qtd Disp.</TableHead>
+                  <TableHead className="text-right">Valor Custo</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {acessoriosFiltrados.map(acessorio => (
+                  <TableRow key={acessorio.id} className={acessorio.quantidade < 10 ? 'bg-destructive/10' : ''}>
+                    <TableCell className="font-mono text-sm">{acessorio.id}</TableCell>
+                    <TableCell className="font-medium">{acessorio.descricao}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{acessorio.categoria}</Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={acessorio.quantidade < 10 ? "destructive" : "secondary"}>
+                        {acessorio.quantidade}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{formatCurrency(acessorio.valorCusto)}</TableCell>
+                    <TableCell>
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleAddAcessorio(acessorio)}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Adicionar
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {acessoriosFiltrados.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      Nenhum acessório encontrado.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAcessorioModal(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

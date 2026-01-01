@@ -20,11 +20,14 @@ import {
   calcularSLASolicitacao,
   formatCurrency,
   SolicitacaoPeca,
-  LotePecas
+  LotePecas,
+  LoteTimeline,
+  editarLote,
+  getLoteById
 } from '@/utils/solicitacaoPecasApi';
 import { getLojas, getFornecedores, getColaboradoresByPermissao, addFornecedor } from '@/utils/cadastrosApi';
 import { getOrdemServicoById, updateOrdemServico } from '@/utils/assistenciaApi';
-import { Eye, Check, X, Package, Clock, AlertTriangle, Layers, Send, Plus } from 'lucide-react';
+import { Eye, Check, X, Package, Clock, AlertTriangle, Layers, Send, Plus, Edit, History } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -44,16 +47,19 @@ export default function OSSolicitacoesPecas() {
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [filtroNumeroOS, setFiltroNumeroOS] = useState('');
 
-  // Modal aprovar
+  // Modal aprovar com campos por peça
   const [aprovarOpen, setAprovarOpen] = useState(false);
-  const [solicitacaoSelecionada, setSolicitacaoSelecionada] = useState<SolicitacaoPeca | null>(null);
-  const [formAprovar, setFormAprovar] = useState({
-    fornecedorId: '',
-    valorPeca: '',
-    responsavelCompra: '',
-    dataRecebimento: '',
-    dataEnvio: ''
-  });
+  const [solicitacoesSelecionadasAprovar, setSolicitacoesSelecionadasAprovar] = useState<SolicitacaoPeca[]>([]);
+  const [fornecedoresPorPeca, setFornecedoresPorPeca] = useState<{[key: string]: { fornecedorId: string; valorPeca: string }}>({});
+  const [responsavelCompraGlobal, setResponsavelCompraGlobal] = useState('');
+  const [dataRecebimentoGlobal, setDataRecebimentoGlobal] = useState('');
+  const [dataEnvioGlobal, setDataEnvioGlobal] = useState('');
+
+  // Modal ver/editar lote
+  const [verLoteOpen, setVerLoteOpen] = useState(false);
+  const [editarLoteOpen, setEditarLoteOpen] = useState(false);
+  const [loteSelecionado, setLoteSelecionado] = useState<LotePecas | null>(null);
+  const [editLoteValorTotal, setEditLoteValorTotal] = useState('');
 
   // Modal novo fornecedor
   const [novoFornecedorOpen, setNovoFornecedorOpen] = useState(false);
@@ -118,50 +124,75 @@ export default function OSSolicitacoesPecas() {
   };
 
   const handleAbrirAprovar = (solicitacao: SolicitacaoPeca) => {
-    setSolicitacaoSelecionada(solicitacao);
-    setFormAprovar({
-      fornecedorId: '',
-      valorPeca: '',
-      responsavelCompra: '',
-      dataRecebimento: '',
-      dataEnvio: ''
+    setSolicitacoesSelecionadasAprovar([solicitacao]);
+    setFornecedoresPorPeca({
+      [solicitacao.id]: { fornecedorId: '', valorPeca: '' }
     });
+    setResponsavelCompraGlobal('');
+    setDataRecebimentoGlobal('');
+    setDataEnvioGlobal('');
+    setAprovarOpen(true);
+  };
+
+  const handleAbrirAprovarMultiplas = (solicitacoesIds: string[]) => {
+    const selecionadas = solicitacoes.filter(s => solicitacoesIds.includes(s.id) && s.status === 'Pendente');
+    if (selecionadas.length === 0) return;
+    
+    setSolicitacoesSelecionadasAprovar(selecionadas);
+    const fornecedoresInit: {[key: string]: { fornecedorId: string; valorPeca: string }} = {};
+    selecionadas.forEach(s => {
+      fornecedoresInit[s.id] = { fornecedorId: '', valorPeca: '' };
+    });
+    setFornecedoresPorPeca(fornecedoresInit);
+    setResponsavelCompraGlobal('');
+    setDataRecebimentoGlobal('');
+    setDataEnvioGlobal('');
     setAprovarOpen(true);
   };
 
   const handleAprovar = () => {
-    if (!solicitacaoSelecionada) return;
-    if (!formAprovar.fornecedorId || !formAprovar.valorPeca || !formAprovar.responsavelCompra) {
-      toast({ title: 'Erro', description: 'Preencha todos os campos obrigatórios', variant: 'destructive' });
+    // Validar campos obrigatórios
+    if (!responsavelCompraGlobal) {
+      toast({ title: 'Erro', description: 'Selecione o responsável pela compra', variant: 'destructive' });
       return;
     }
+    
+    for (const sol of solicitacoesSelecionadasAprovar) {
+      const dados = fornecedoresPorPeca[sol.id];
+      if (!dados?.fornecedorId || !dados?.valorPeca) {
+        toast({ title: 'Erro', description: `Preencha fornecedor e valor para: ${sol.peca}`, variant: 'destructive' });
+        return;
+      }
+    }
 
-    const resultado = aprovarSolicitacao(solicitacaoSelecionada.id, {
-      fornecedorId: formAprovar.fornecedorId,
-      valorPeca: parseFloat(formAprovar.valorPeca.replace(/\D/g, '')) / 100,
-      responsavelCompra: formAprovar.responsavelCompra,
-      dataRecebimento: formAprovar.dataRecebimento,
-      dataEnvio: formAprovar.dataEnvio
-    });
+    // Aprovar cada solicitação
+    for (const sol of solicitacoesSelecionadasAprovar) {
+      const dados = fornecedoresPorPeca[sol.id];
+      aprovarSolicitacao(sol.id, {
+        fornecedorId: dados.fornecedorId,
+        valorPeca: parseFloat(dados.valorPeca.replace(/\D/g, '')) / 100,
+        responsavelCompra: responsavelCompraGlobal,
+        dataRecebimento: dataRecebimentoGlobal,
+        dataEnvio: dataEnvioGlobal
+      });
 
-    if (resultado) {
       // Atualizar OS
-      const os = getOrdemServicoById(solicitacaoSelecionada.osId);
+      const os = getOrdemServicoById(sol.osId);
       if (os) {
         updateOrdemServico(os.id, {
           timeline: [...os.timeline, {
             data: new Date().toISOString(),
             tipo: 'peca',
-            descricao: `Solicitação de peça aprovada – ${solicitacaoSelecionada.peca} x ${solicitacaoSelecionada.quantidade}`,
+            descricao: `Solicitação de peça aprovada – ${sol.peca} x ${sol.quantidade}`,
             responsavel: 'Gestora Matriz'
           }]
         });
       }
-
-      setSolicitacoes(getSolicitacoes());
-      setAprovarOpen(false);
-      toast({ title: 'Sucesso', description: 'Solicitação aprovada!' });
     }
+
+    setSolicitacoes(getSolicitacoes());
+    setAprovarOpen(false);
+    toast({ title: 'Sucesso', description: `${solicitacoesSelecionadasAprovar.length} solicitação(ões) aprovada(s)!` });
   };
 
   const handleRejeitar = (solicitacao: SolicitacaoPeca) => {
@@ -179,6 +210,29 @@ export default function OSSolicitacoesPecas() {
       setSelecionadas(selecionadas.filter(s => s !== id));
     }
   };
+
+  const handleVerLote = (lote: LotePecas) => {
+    setLoteSelecionado(lote);
+    setVerLoteOpen(true);
+  };
+
+  const handleEditarLote = (lote: LotePecas) => {
+    setLoteSelecionado(lote);
+    setEditLoteValorTotal(formatCurrencyInput(String(Math.round(lote.valorTotal * 100))));
+    setEditarLoteOpen(true);
+  };
+
+  const handleSalvarEdicaoLote = () => {
+    if (!loteSelecionado) return;
+    const novoValor = parseFloat(editLoteValorTotal.replace(/\D/g, '')) / 100;
+    const resultado = editarLote(loteSelecionado.id, { valorTotal: novoValor }, 'Usuário Sistema');
+    if (resultado) {
+      setLotes(getLotes());
+      setEditarLoteOpen(false);
+      toast({ title: 'Sucesso', description: 'Lote atualizado!' });
+    }
+  };
+    }
 
   const handleCriarLote = () => {
     if (selecionadas.length === 0) {
@@ -208,9 +262,14 @@ export default function OSSolicitacoesPecas() {
       toast({ title: 'Sucesso', description: `Lote ${novoLote.id} criado com ${selecionadas.length} solicitações!` });
     }
   };
-
   const handleEnviarLote = (loteId: string) => {
     const resultado = enviarLote(loteId);
+    if (resultado) {
+      setSolicitacoes(getSolicitacoes());
+      setLotes(getLotes());
+      toast({ title: 'Sucesso', description: `Lote ${loteId} enviado! Nota ${resultado.nota.id} criada no Financeiro.` });
+    }
+  };
     if (resultado) {
       setSolicitacoes(getSolicitacoes());
       setLotes(getLotes());

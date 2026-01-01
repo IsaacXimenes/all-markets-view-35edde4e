@@ -104,7 +104,9 @@ export default function OSAssistenciaNova() {
     numero: '',
     bairro: '',
     cidade: '',
-    estado: ''
+    estado: '',
+    tipoPessoa: 'Física' as 'Física' | 'Jurídica',
+    tipoCliente: 'Normal' as 'VIP' | 'Normal' | 'Novo'
   });
 
   // Confirmação form
@@ -786,20 +788,27 @@ export default function OSAssistenciaNova() {
         </div>
       </div>
 
-      {/* Dialog Buscar Cliente */}
+      {/* Dialog Buscar Cliente - Layout idêntico ao de Vendas */}
       <Dialog open={buscarClienteOpen} onOpenChange={setBuscarClienteOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Buscar Cliente</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Buscar/Selecionar Cliente
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex gap-2">
-              <Input
-                placeholder="Buscar por nome ou CPF..."
-                value={buscarClienteTermo}
-                onChange={e => setBuscarClienteTermo(e.target.value)}
-              />
-              <Button variant="outline" onClick={() => setNovoClienteOpen(true)}>
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por Nome ou CPF/CNPJ..."
+                  value={buscarClienteTermo}
+                  onChange={e => setBuscarClienteTermo(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Button onClick={() => setNovoClienteOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Novo Cliente
               </Button>
@@ -808,35 +817,56 @@ export default function OSAssistenciaNova() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nome</TableHead>
                     <TableHead>CPF/CNPJ</TableHead>
+                    <TableHead>Nome</TableHead>
                     <TableHead>Telefone</TableHead>
+                    <TableHead>Cidade</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {clientesFiltrados.map(c => (
-                    <TableRow key={c.id} className={c.status === 'Inativo' ? 'opacity-50' : ''}>
-                      <TableCell>{c.nome}</TableCell>
-                      <TableCell className="font-mono text-xs">{c.cpf}</TableCell>
-                      <TableCell>{c.telefone}</TableCell>
-                      <TableCell>
-                        <Badge variant={c.status === 'Ativo' ? 'default' : 'destructive'}>
-                          {c.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          onClick={() => handleSelecionarCliente(c)}
-                          disabled={c.status === 'Inativo'}
-                        >
-                          Selecionar
-                        </Button>
+                  {clientesFiltrados.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        Nenhum cliente encontrado
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    clientesFiltrados.map(c => (
+                      <TableRow 
+                        key={c.id} 
+                        className={cn(
+                          c.status === 'Inativo' && 'opacity-50 bg-muted/50',
+                          'cursor-pointer hover:bg-muted/50'
+                        )}
+                        onClick={() => c.status !== 'Inativo' && handleSelecionarCliente(c)}
+                      >
+                        <TableCell className="font-mono text-xs">{c.cpf}</TableCell>
+                        <TableCell className="font-medium">{c.nome}</TableCell>
+                        <TableCell>{c.telefone}</TableCell>
+                        <TableCell>{c.cidade || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant={c.status === 'Ativo' ? 'default' : 'destructive'}>
+                            {c.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelecionarCliente(c);
+                            }}
+                            disabled={c.status === 'Inativo'}
+                          >
+                            Selecionar
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -844,33 +874,67 @@ export default function OSAssistenciaNova() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Novo Cliente */}
+      {/* Dialog Novo Cliente - Layout igual ao Cadastros > Clientes */}
       <Dialog open={novoClienteOpen} onOpenChange={setNovoClienteOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Novo Cliente</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Novo Cliente
+            </DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+            {/* Tipo de Pessoa */}
+            <div className="space-y-2">
+              <Label>Tipo de Pessoa *</Label>
+              <Select 
+                value={novoClienteForm.tipoPessoa} 
+                onValueChange={(v) => setNovoClienteForm({ ...novoClienteForm, tipoPessoa: v as 'Física' | 'Jurídica' })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Física">Pessoa Física</SelectItem>
+                  <SelectItem value="Jurídica">Pessoa Jurídica</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Nome *</Label>
               <Input
                 value={novoClienteForm.nome}
                 onChange={e => setNovoClienteForm({ ...novoClienteForm, nome: e.target.value })}
+                placeholder="Nome completo"
               />
             </div>
             <div className="space-y-2">
-              <Label>CPF/CNPJ *</Label>
+              <Label>{novoClienteForm.tipoPessoa === 'Física' ? 'CPF' : 'CNPJ'} *</Label>
               <Input
                 value={novoClienteForm.cpf}
                 onChange={e => setNovoClienteForm({ ...novoClienteForm, cpf: formatCpfCnpj(e.target.value) })}
-                maxLength={18}
+                maxLength={novoClienteForm.tipoPessoa === 'Física' ? 14 : 18}
+                placeholder={novoClienteForm.tipoPessoa === 'Física' ? '000.000.000-00' : '00.000.000/0000-00'}
               />
             </div>
             <div className="space-y-2">
-              <Label>Telefone</Label>
+              <Label>Tipo de Cliente</Label>
+              <Select 
+                value={novoClienteForm.tipoCliente} 
+                onValueChange={(v) => setNovoClienteForm({ ...novoClienteForm, tipoCliente: v as 'VIP' | 'Normal' | 'Novo' })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="VIP">VIP</SelectItem>
+                  <SelectItem value="Normal">Normal</SelectItem>
+                  <SelectItem value="Novo">Novo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Telefone *</Label>
               <Input
                 value={novoClienteForm.telefone}
                 onChange={e => setNovoClienteForm({ ...novoClienteForm, telefone: e.target.value })}
+                placeholder="(00) 00000-0000"
               />
             </div>
             <div className="space-y-2">
@@ -881,12 +945,13 @@ export default function OSAssistenciaNova() {
                 onChange={e => setNovoClienteForm({ ...novoClienteForm, dataNascimento: e.target.value })}
               />
             </div>
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2 md:col-span-3">
               <Label>E-mail</Label>
               <Input
                 type="email"
                 value={novoClienteForm.email}
                 onChange={e => setNovoClienteForm({ ...novoClienteForm, email: e.target.value })}
+                placeholder="email@exemplo.com"
               />
             </div>
             <div className="space-y-2">
@@ -894,13 +959,15 @@ export default function OSAssistenciaNova() {
               <Input
                 value={novoClienteForm.cep}
                 onChange={e => setNovoClienteForm({ ...novoClienteForm, cep: e.target.value })}
+                placeholder="00000-000"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <Label>Endereço</Label>
               <Input
                 value={novoClienteForm.endereco}
                 onChange={e => setNovoClienteForm({ ...novoClienteForm, endereco: e.target.value })}
+                placeholder="Rua, Avenida..."
               />
             </div>
             <div className="space-y-2">
@@ -926,20 +993,25 @@ export default function OSAssistenciaNova() {
             </div>
             <div className="space-y-2">
               <Label>Estado</Label>
-              <Input
-                value={novoClienteForm.estado}
-                onChange={e => setNovoClienteForm({ ...novoClienteForm, estado: e.target.value })}
-                maxLength={2}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Origem</Label>
-              <Input value="Assistência" disabled className="bg-muted" />
+              <Select 
+                value={novoClienteForm.estado} 
+                onValueChange={(v) => setNovoClienteForm({ ...novoClienteForm, estado: v })}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  {['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(uf => (
+                    <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNovoClienteOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSalvarNovoCliente}>Salvar</Button>
+            <Button onClick={handleSalvarNovoCliente}>
+              <Plus className="h-4 w-4 mr-2" />
+              Cadastrar Cliente
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

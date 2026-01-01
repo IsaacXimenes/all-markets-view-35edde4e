@@ -794,20 +794,17 @@ export default function OSAssistenciaNova() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Search className="h-5 w-5" />
-              Buscar/Selecionar Cliente
+              Selecionar Cliente
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por Nome ou CPF/CNPJ..."
-                  value={buscarClienteTermo}
-                  onChange={e => setBuscarClienteTermo(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+              <Input
+                placeholder="Buscar por nome ou CPF..."
+                value={buscarClienteTermo}
+                onChange={e => setBuscarClienteTermo(e.target.value)}
+                className="flex-1"
+              />
               <Button onClick={() => setNovoClienteOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Novo Cliente
@@ -819,16 +816,17 @@ export default function OSAssistenciaNova() {
                   <TableRow>
                     <TableHead>CPF/CNPJ</TableHead>
                     <TableHead>Nome</TableHead>
-                    <TableHead>Telefone</TableHead>
-                    <TableHead>Cidade</TableHead>
+                    <TableHead>Tipo Pessoa</TableHead>
+                    <TableHead>Tipo Cliente</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Telefone</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {clientesFiltrados.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Nenhum cliente encontrado
                       </TableCell>
                     </TableRow>
@@ -837,32 +835,45 @@ export default function OSAssistenciaNova() {
                       <TableRow 
                         key={c.id} 
                         className={cn(
-                          c.status === 'Inativo' && 'opacity-50 bg-muted/50',
+                          c.status === 'Inativo' && 'bg-destructive/10',
                           'cursor-pointer hover:bg-muted/50'
                         )}
                         onClick={() => c.status !== 'Inativo' && handleSelecionarCliente(c)}
                       >
                         <TableCell className="font-mono text-xs">{c.cpf}</TableCell>
                         <TableCell className="font-medium">{c.nome}</TableCell>
-                        <TableCell>{c.telefone}</TableCell>
-                        <TableCell>{c.cidade || '-'}</TableCell>
                         <TableCell>
-                          <Badge variant={c.status === 'Ativo' ? 'default' : 'destructive'}>
-                            {c.status}
+                          <Badge className={c.tipoPessoa === 'Pessoa Jurídica' ? 'bg-blue-500' : 'bg-green-500'}>
+                            {c.tipoPessoa === 'Pessoa Jurídica' ? 'PJ' : 'PF'}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSelecionarCliente(c);
-                            }}
-                            disabled={c.status === 'Inativo'}
-                          >
-                            Selecionar
-                          </Button>
+                          <Badge variant={c.tipoCliente === 'VIP' ? 'default' : 'secondary'}>
+                            {c.tipoCliente}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {c.status === 'Inativo' ? (
+                            <Badge variant="destructive">Bloqueado</Badge>
+                          ) : (
+                            <Badge variant="outline">Ativo</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>{c.telefone}</TableCell>
+                        <TableCell>
+                          {c.status === 'Inativo' ? (
+                            <span className="text-destructive text-sm font-medium">Bloqueado</span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelecionarCliente(c);
+                              }}
+                            >
+                              Selecionar
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))

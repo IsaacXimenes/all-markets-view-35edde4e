@@ -1022,6 +1022,8 @@ export default function VendasFinalizarDigital() {
                   <TableRow>
                     <TableHead>CPF/CNPJ</TableHead>
                     <TableHead>Nome</TableHead>
+                    <TableHead>Tipo Pessoa</TableHead>
+                    <TableHead>Tipo Cliente</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Telefone</TableHead>
                     <TableHead></TableHead>
@@ -1032,6 +1034,16 @@ export default function VendasFinalizarDigital() {
                     <TableRow key={cliente.id} className={cliente.status === 'Inativo' ? 'bg-destructive/10' : ''}>
                       <TableCell>{cliente.cpf}</TableCell>
                       <TableCell className="font-medium">{cliente.nome}</TableCell>
+                      <TableCell>
+                        <Badge className={cliente.tipoPessoa === 'Pessoa Jurídica' ? 'bg-blue-500' : 'bg-green-500'}>
+                          {cliente.tipoPessoa === 'Pessoa Jurídica' ? 'PJ' : 'PF'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={cliente.tipoCliente === 'VIP' ? 'default' : 'secondary'}>
+                          {cliente.tipoCliente}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         {cliente.status === 'Inativo' ? (
                           <Badge variant="destructive">Bloqueado</Badge>
@@ -1080,9 +1092,12 @@ export default function VendasFinalizarDigital() {
               <Input 
                 value={novoCliente.cpf || ''}
                 onChange={(e) => setNovoCliente({ ...novoCliente, cpf: formatCpfCnpj(e.target.value) })}
-                placeholder="000.000.000-00"
+                placeholder="000.000.000-00 ou 00.000.000/0000-00"
                 maxLength={18}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {(novoCliente.cpf?.replace(/\D/g, '').length || 0) <= 11 ? 'CPF' : 'CNPJ'}
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium">Telefone</label>
@@ -1099,10 +1114,39 @@ export default function VendasFinalizarDigital() {
               />
             </div>
             <div>
+              <label className="text-sm font-medium">Data de Nascimento</label>
+              <Input 
+                type="date"
+                value={novoCliente.dataNascimento || ''}
+                onChange={(e) => setNovoCliente({ ...novoCliente, dataNascimento: e.target.value })}
+              />
+            </div>
+            <div>
               <label className="text-sm font-medium">CEP</label>
               <Input 
                 value={novoCliente.cep || ''}
                 onChange={(e) => setNovoCliente({ ...novoCliente, cep: e.target.value })}
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="text-sm font-medium">Endereço</label>
+              <Input 
+                value={novoCliente.endereco || ''}
+                onChange={(e) => setNovoCliente({ ...novoCliente, endereco: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Número</label>
+              <Input 
+                value={novoCliente.numero || ''}
+                onChange={(e) => setNovoCliente({ ...novoCliente, numero: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Bairro</label>
+              <Input 
+                value={novoCliente.bairro || ''}
+                onChange={(e) => setNovoCliente({ ...novoCliente, bairro: e.target.value })}
               />
             </div>
             <div>
@@ -1110,6 +1154,13 @@ export default function VendasFinalizarDigital() {
               <Input 
                 value={novoCliente.cidade || ''}
                 onChange={(e) => setNovoCliente({ ...novoCliente, cidade: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Estado</label>
+              <Input 
+                value={novoCliente.estado || ''}
+                onChange={(e) => setNovoCliente({ ...novoCliente, estado: e.target.value })}
               />
             </div>
           </div>

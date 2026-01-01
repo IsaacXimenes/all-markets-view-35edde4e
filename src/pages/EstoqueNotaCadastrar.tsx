@@ -17,6 +17,7 @@ interface ProdutoLinha {
   modelo: string;
   cor: string;
   categoria: 'Novo' | 'Seminovo';
+  tipo: 'Aparelho' | 'Acessórios' | 'Peças';
   quantidade: number;
   custoUnitario: number;
   custoTotal: number;
@@ -36,6 +37,7 @@ export default function EstoqueNotaCadastrar() {
       modelo: '',
       cor: '',
       categoria: 'Novo',
+      tipo: 'Aparelho',
       quantidade: 1,
       custoUnitario: 0,
       custoTotal: 0
@@ -51,6 +53,7 @@ export default function EstoqueNotaCadastrar() {
         modelo: '',
         cor: '',
         categoria: 'Novo',
+        tipo: 'Aparelho',
         quantidade: 1,
         custoUnitario: 0,
         custoTotal: 0
@@ -102,6 +105,7 @@ export default function EstoqueNotaCadastrar() {
         cor: p.cor,
         imei: p.imei || 'N/A',
         tipo: p.categoria,
+        tipoProduto: p.tipo, // Aparelho | Acessórios | Peças
         quantidade: p.quantidade,
         valorUnitario: p.custoUnitario,
         valorTotal: p.custoTotal,
@@ -177,6 +181,7 @@ export default function EstoqueNotaCadastrar() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Tipo *</TableHead>
                     <TableHead>Marca</TableHead>
                     <TableHead>IMEI</TableHead>
                     <TableHead>Modelo *</TableHead>
@@ -191,6 +196,21 @@ export default function EstoqueNotaCadastrar() {
                 <TableBody>
                   {produtos.map((produto, index) => (
                     <TableRow key={index}>
+                      <TableCell>
+                        <Select 
+                          value={produto.tipo}
+                          onValueChange={(value) => atualizarProduto(index, 'tipo', value)}
+                        >
+                          <SelectTrigger className="w-28">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Aparelho">Aparelho</SelectItem>
+                            <SelectItem value="Acessórios">Acessórios</SelectItem>
+                            <SelectItem value="Peças">Peças</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
                       <TableCell>
                         <Input 
                           value={produto.marca}
@@ -210,7 +230,7 @@ export default function EstoqueNotaCadastrar() {
                         <Input 
                           value={produto.modelo}
                           onChange={(e) => atualizarProduto(index, 'modelo', e.target.value)}
-                          placeholder="Ex: iPhone 15 Pro"
+                          placeholder={produto.tipo === 'Peças' ? 'Ex: Bateria iPhone 14' : 'Ex: iPhone 15 Pro'}
                           className="w-40"
                         />
                       </TableCell>
@@ -218,7 +238,7 @@ export default function EstoqueNotaCadastrar() {
                         <Input 
                           value={produto.cor}
                           onChange={(e) => atualizarProduto(index, 'cor', e.target.value)}
-                          placeholder="Ex: Preto"
+                          placeholder={produto.tipo === 'Peças' ? 'N/A' : 'Ex: Preto'}
                           className="w-28"
                         />
                       </TableCell>

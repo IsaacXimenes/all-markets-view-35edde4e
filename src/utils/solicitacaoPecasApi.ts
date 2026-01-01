@@ -18,6 +18,13 @@ export interface SolicitacaoPeca {
   loteId?: string;
 }
 
+export interface LoteTimeline {
+  data: string;
+  tipo: 'criacao' | 'edicao' | 'envio';
+  descricao: string;
+  responsavel: string;
+}
+
 export interface LotePecas {
   id: string;
   fornecedorId: string;
@@ -26,6 +33,7 @@ export interface LotePecas {
   status: 'Pendente' | 'Enviado' | 'Finalizado';
   valorTotal: number;
   notaId?: string;
+  timeline?: LoteTimeline[];
 }
 
 export interface NotaAssistencia {
@@ -144,7 +152,11 @@ let lotes: LotePecas[] = [
     solicitacoes: ['SOL-003', 'SOL-004'],
     dataCriacao: '2025-01-15T10:00:00',
     status: 'Enviado',
-    valorTotal: 495
+    valorTotal: 495,
+    timeline: [
+      { data: '2025-01-15T10:00:00', tipo: 'criacao', descricao: 'Lote criado', responsavel: 'Maria Santos' },
+      { data: '2025-01-15T14:30:00', tipo: 'envio', descricao: 'Lote enviado ao fornecedor', responsavel: 'Maria Santos' }
+    ]
   },
   {
     id: 'LOTE-002',
@@ -153,7 +165,11 @@ let lotes: LotePecas[] = [
     dataCriacao: '2025-01-12T14:00:00',
     status: 'Finalizado',
     valorTotal: 320,
-    notaId: 'NOTA-ASS-001'
+    notaId: 'NOTA-ASS-001',
+    timeline: [
+      { data: '2025-01-12T14:00:00', tipo: 'criacao', descricao: 'Lote criado', responsavel: 'João Lima' },
+      { data: '2025-01-13T09:00:00', tipo: 'envio', descricao: 'Lote enviado ao fornecedor', responsavel: 'João Lima' }
+    ]
   }
 ];
 
@@ -374,7 +390,15 @@ export const criarLote = (fornecedorId: string, solicitacaoIds: string[]): LoteP
     solicitacoes: solicitacaoIds,
     dataCriacao: new Date().toISOString(),
     status: 'Pendente',
-    valorTotal
+    valorTotal,
+    timeline: [
+      {
+        data: new Date().toISOString(),
+        tipo: 'criacao',
+        descricao: 'Lote criado',
+        responsavel: 'Usuário Sistema'
+      }
+    ]
   };
   
   // Atualizar loteId nas solicitações
@@ -387,6 +411,40 @@ export const criarLote = (fornecedorId: string, solicitacaoIds: string[]): LoteP
   
   lotes.push(novoLote);
   return novoLote;
+};
+
+export const editarLote = (loteId: string, dados: { valorTotal?: number; solicitacoes?: string[] }, responsavel: string): LotePecas | null => {
+  const loteIndex = lotes.findIndex(l => l.id === loteId);
+  if (loteIndex === -1 || lotes[loteIndex].status !== 'Pendente') return null;
+  
+  const lote = lotes[loteIndex];
+  const alteracoes: string[] = [];
+  
+  if (dados.valorTotal !== undefined && dados.valorTotal !== lote.valorTotal) {
+    alteracoes.push(`Valor alterado de R$ ${lote.valorTotal.toFixed(2)} para R$ ${dados.valorTotal.toFixed(2)}`);
+  }
+  if (dados.solicitacoes && dados.solicitacoes.length !== lote.solicitacoes.length) {
+    alteracoes.push(`Solicitações alteradas de ${lote.solicitacoes.length} para ${dados.solicitacoes.length} itens`);
+  }
+  
+  const novaTimeline: LoteTimeline = {
+    data: new Date().toISOString(),
+    tipo: 'edicao',
+    descricao: alteracoes.join('; ') || 'Lote editado',
+    responsavel
+  };
+  
+  lotes[loteIndex] = {
+    ...lote,
+    ...dados,
+    timeline: [...(lote.timeline || []), novaTimeline]
+  };
+  
+  return lotes[loteIndex];
+};
+
+export const getLoteById = (loteId: string): LotePecas | null => {
+  return lotes.find(l => l.id === loteId) || null;
 };
 
 export const enviarLote = (loteId: string): { lote: LotePecas; nota: NotaAssistencia } | null => {
@@ -417,7 +475,13 @@ export const enviarLote = (loteId: string): { lote: LotePecas; nota: NotaAssiste
   lotes[loteIndex] = {
     ...lote,
     status: 'Enviado',
-    notaId: novaNota.id
+    notaId: novaNota.id,
+    timeline: [...(lote.timeline || []), {
+      data: new Date().toISOString(),
+      tipo: 'envio',
+      descricao: `Lote enviado ao fornecedor - Nota ${novaNota.id} criada`,
+      responsavel: 'Usuário Sistema'
+    }]
   };
   
   // Atualizar status das solicitações

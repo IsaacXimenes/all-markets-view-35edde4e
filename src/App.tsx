@@ -19,6 +19,7 @@ import LojaRH from "./pages/LojaRH";
 import FuncionarioDetalhes from "./pages/FuncionarioDetalhes";
 import RHFeedback from "./pages/RHFeedback";
 import FinanceiroConferencia from "./pages/FinanceiroConferencia";
+import FinanceiroContas from "./pages/FinanceiroContas";
 import FinanceiroDespesasFixas from "./pages/FinanceiroDespesasFixas";
 import FinanceiroDespesasVariaveis from "./pages/FinanceiroDespesasVariaveis";
 import FinanceiroConferenciaNotas from "./pages/FinanceiroConferenciaNotas";
@@ -90,6 +91,7 @@ const App = () => (
           <Route path="/rh/funcionario/:id" element={<FuncionarioDetalhes />} />
           <Route path="/rh/feedback" element={<RHFeedback />} />
           <Route path="/financeiro/conferencia" element={<FinanceiroConferencia />} />
+          <Route path="/financeiro/contas" element={<FinanceiroContas />} />
           <Route path="/financeiro/despesas-fixas" element={<FinanceiroDespesasFixas />} />
           <Route path="/financeiro/despesas-variaveis" element={<FinanceiroDespesasVariaveis />} />
           <Route path="/financeiro/conferencia-notas-entrada" element={<FinanceiroConferenciaNotas />} />

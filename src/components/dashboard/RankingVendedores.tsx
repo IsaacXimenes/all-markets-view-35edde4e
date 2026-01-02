@@ -2,9 +2,40 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Trophy, Medal, Award, TrendingUp } from 'lucide-react';
-import { getTopSellers, getStoreById } from '@/utils/rhApi';
+import { getColaboradores, getLojaById, getCargos } from '@/utils/cadastrosApi';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/utils/formatUtils';
+
+// Gerar dados mock de vendas para ranking
+const getTopSellers = (limit: number) => {
+  const colaboradores = getColaboradores().filter(c => c.status === 'Ativo');
+  const cargos = getCargos();
+  
+  // Filtrar apenas vendedores
+  const cargoVendedor = cargos.find(c => c.funcao.toLowerCase().includes('vendedor'));
+  const vendedores = colaboradores.filter(c => 
+    c.cargo === cargoVendedor?.id || 
+    cargos.find(cargo => cargo.id === c.cargo)?.funcao.toLowerCase().includes('vendedor')
+  );
+  
+  // Gerar vendas mock baseadas no ID para consistência
+  const vendedoresComVendas = vendedores.map(v => {
+    const seed = parseInt(v.id.replace('COL-', '')) || 1;
+    const sales = Math.floor(15000 + (seed * 3500) + Math.sin(seed) * 5000);
+    const commission = sales * 0.05;
+    return {
+      id: v.id,
+      name: v.nome,
+      storeId: v.loja || '',
+      sales,
+      commission
+    };
+  });
+  
+  return vendedoresComVendas
+    .sort((a, b) => b.sales - a.sales)
+    .slice(0, limit);
+};
 
 export function RankingVendedores() {
   const topSellers = getTopSellers(10);
@@ -33,7 +64,7 @@ export function RankingVendedores() {
         <div className="space-y-2">
           {/* Top 3 em Destaque */}
           {topSellers.slice(0, 3).map((seller, index) => {
-            const store = getStoreById(seller.storeId);
+            const store = getLojaById(seller.storeId);
             const position = index + 1;
             
             return (
@@ -58,7 +89,7 @@ export function RankingVendedores() {
                   <div className="flex-1 min-w-0">
                     <p className="font-bold truncate">{seller.name}</p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {store?.name.replace('Thiago Imports - ', '')}
+                      {store?.nome.replace('Thiago Imports - ', '')}
                     </p>
                   </div>
                   <div className="text-right">
@@ -75,7 +106,7 @@ export function RankingVendedores() {
           {/* Demais (4º ao 10º) */}
           <div className="pt-2 space-y-1">
             {topSellers.slice(3).map((seller, index) => {
-              const store = getStoreById(seller.storeId);
+              const store = getLojaById(seller.storeId);
               const position = index + 4;
               
               return (
@@ -96,7 +127,7 @@ export function RankingVendedores() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{seller.name}</p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {store?.name.replace('Thiago Imports - ', '')}
+                      {store?.nome.replace('Thiago Imports - ', '')}
                     </p>
                   </div>
                   <div className="text-right">

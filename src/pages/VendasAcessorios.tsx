@@ -233,13 +233,16 @@ export default function VendasAcessorios() {
       return;
     }
 
+    const valorRecomendado = acessorioSelecionado.valorRecomendado || acessorioSelecionado.valorCusto * 1.5;
+
     const novoItem: VendaAcessorio = {
       id: `VA-${Date.now()}`,
       acessorioId: acessorioSelecionado.id,
       descricao: acessorioSelecionado.descricao,
       quantidade: quantidadeAcessorio,
-      valorUnitario: acessorioSelecionado.valorCusto * 1.5, // Markup de 50%
-      valorTotal: (acessorioSelecionado.valorCusto * 1.5) * quantidadeAcessorio
+      valorRecomendado: valorRecomendado,
+      valorUnitario: valorRecomendado,
+      valorTotal: valorRecomendado * quantidadeAcessorio
     };
     
     setAcessorios([...acessorios, novoItem]);
@@ -480,6 +483,7 @@ export default function VendasAcessorios() {
                   <TableRow>
                     <TableHead>Acessório</TableHead>
                     <TableHead className="text-center">Qtd</TableHead>
+                    <TableHead className="text-right">Valor Recomendado</TableHead>
                     <TableHead className="text-right">Valor Unit.</TableHead>
                     <TableHead className="text-right">Valor Total</TableHead>
                     <TableHead></TableHead>
@@ -490,6 +494,9 @@ export default function VendasAcessorios() {
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.descricao}</TableCell>
                       <TableCell className="text-center">{item.quantidade}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatCurrency(item.valorRecomendado)}
+                      </TableCell>
                       <TableCell className="text-right">{formatCurrency(item.valorUnitario)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(item.valorTotal)}</TableCell>
                       <TableCell>

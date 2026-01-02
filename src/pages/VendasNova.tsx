@@ -341,13 +341,15 @@ export default function VendasNova() {
       setAcessoriosVenda(updated);
     } else {
       // Adicionar novo
+      const valorRecomendado = acessorio.valorRecomendado || acessorio.valorCusto * 1.5;
       const novoAcessorio: VendaAcessorio = {
         id: `ACESSV-${Date.now()}`,
         acessorioId: acessorio.id,
         descricao: acessorio.descricao,
         quantidade: 1,
-        valorUnitario: acessorio.valorCusto * 1.5, // Margem de 50%
-        valorTotal: acessorio.valorCusto * 1.5
+        valorRecomendado: valorRecomendado,
+        valorUnitario: valorRecomendado,
+        valorTotal: valorRecomendado
       };
       setAcessoriosVenda([...acessoriosVenda, novoAcessorio]);
       
@@ -770,21 +772,23 @@ export default function VendasNova() {
                         {formatCurrency(item.valorRecomendado)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="relative">
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
-                          <Input 
-                            type="text"
-                            value={item.valorVenda.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\D/g, '');
-                              const numValue = Number(value) / 100;
-                              const updated = itens.map(i => 
-                                i.id === item.id ? { ...i, valorVenda: numValue } : i
-                              );
-                              setItens(updated);
-                            }}
-                            className="w-36 text-right pl-8"
-                          />
+                        <div className="flex justify-end">
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                            <Input 
+                              type="text"
+                              value={item.valorVenda.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, '');
+                                const numValue = Number(value) / 100;
+                                const updated = itens.map(i => 
+                                  i.id === item.id ? { ...i, valorVenda: numValue } : i
+                                );
+                                setItens(updated);
+                              }}
+                              className="w-36 text-right pl-8"
+                            />
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -829,6 +833,7 @@ export default function VendasNova() {
                   <TableRow>
                     <TableHead>Acessório</TableHead>
                     <TableHead className="text-center">Qtd</TableHead>
+                    <TableHead className="text-right">Valor Recomendado</TableHead>
                     <TableHead className="text-right">Valor Unit.</TableHead>
                     <TableHead className="text-right">Valor Total</TableHead>
                     <TableHead></TableHead>
@@ -880,22 +885,27 @@ export default function VendasNova() {
                           </Button>
                         </div>
                       </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatCurrency(acessorio.valorRecomendado)}
+                      </TableCell>
                       <TableCell className="text-right">
-                        <div className="relative">
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
-                          <Input 
-                            type="text"
-                            value={acessorio.valorUnitario.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\D/g, '');
-                              const numValue = Number(value) / 100;
-                              const updated = acessoriosVenda.map(a => 
-                                a.id === acessorio.id ? { ...a, valorUnitario: numValue, valorTotal: numValue * a.quantidade } : a
-                              );
-                              setAcessoriosVenda(updated);
-                            }}
-                            className="w-28 text-right pl-8"
-                          />
+                        <div className="flex justify-end">
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                            <Input 
+                              type="text"
+                              value={acessorio.valorUnitario.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, '');
+                                const numValue = Number(value) / 100;
+                                const updated = acessoriosVenda.map(a => 
+                                  a.id === acessorio.id ? { ...a, valorUnitario: numValue, valorTotal: numValue * a.quantidade } : a
+                                );
+                                setAcessoriosVenda(updated);
+                              }}
+                              className="w-28 text-right pl-8"
+                            />
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-medium">

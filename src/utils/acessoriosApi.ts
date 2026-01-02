@@ -32,12 +32,21 @@ export const isAcessorioIdRegistered = (id: string): boolean => {
   return registeredAcessorioIds.has(id);
 };
 
+export interface HistoricoValorRecomendadoAcessorio {
+  data: string;
+  usuario: string;
+  valorAntigo: number | null;
+  valorNovo: number;
+}
+
 export interface Acessorio {
   id: string;
   descricao: string;
   categoria: string;
   quantidade: number;
   valorCusto: number;
+  valorRecomendado?: number;
+  historicoValorRecomendado?: HistoricoValorRecomendadoAcessorio[];
   loja: string;
 }
 
@@ -46,6 +55,7 @@ export interface VendaAcessorio {
   acessorioId: string;
   descricao: string;
   quantidade: number;
+  valorRecomendado: number;
   valorUnitario: number;
   valorTotal: number;
 }
@@ -58,6 +68,7 @@ let acessorios: Acessorio[] = [
     categoria: 'Capas',
     quantidade: 25,
     valorCusto: 45.00,
+    valorRecomendado: 89.90,
     loja: 'Loja Centro'
   },
   {
@@ -66,6 +77,7 @@ let acessorios: Acessorio[] = [
     categoria: 'Carregadores',
     quantidade: 18,
     valorCusto: 89.00,
+    valorRecomendado: 149.90,
     loja: 'Loja Centro'
   },
   {
@@ -74,6 +86,7 @@ let acessorios: Acessorio[] = [
     categoria: 'Áudio',
     quantidade: 8,
     valorCusto: 120.00,
+    valorRecomendado: 249.90,
     loja: 'Loja Shopping'
   },
   {
@@ -82,6 +95,7 @@ let acessorios: Acessorio[] = [
     categoria: 'Películas',
     quantidade: 32,
     valorCusto: 25.00,
+    valorRecomendado: 49.90,
     loja: 'Loja Norte'
   },
   {
@@ -90,6 +104,7 @@ let acessorios: Acessorio[] = [
     categoria: 'Cabos',
     quantidade: 5,
     valorCusto: 35.00,
+    valorRecomendado: 69.90,
     loja: 'Loja Sul'
   }
 ];
@@ -193,10 +208,34 @@ export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
+export const updateValorRecomendadoAcessorio = (
+  id: string,
+  novoValor: number,
+  usuario: string
+): Acessorio | null => {
+  const acessorio = acessorios.find(a => a.id === id);
+  if (!acessorio) return null;
+
+  const historicoEntry: HistoricoValorRecomendadoAcessorio = {
+    data: new Date().toISOString().split('T')[0],
+    usuario,
+    valorAntigo: acessorio.valorRecomendado || null,
+    valorNovo: novoValor
+  };
+
+  acessorio.valorRecomendado = novoValor;
+  if (!acessorio.historicoValorRecomendado) {
+    acessorio.historicoValorRecomendado = [];
+  }
+  acessorio.historicoValorRecomendado.unshift(historicoEntry);
+
+  return acessorio;
+};
+
 export const exportAcessoriosToCSV = (data: Acessorio[], filename: string) => {
   if (data.length === 0) return;
   
-  const headers = ['ID', 'Descrição', 'Categoria', 'Quantidade', 'Valor Custo', 'Loja'];
+  const headers = ['ID', 'Descrição', 'Categoria', 'Quantidade', 'Valor Custo', 'Valor Recomendado', 'Loja'];
   const csvContent = [
     headers.join(','),
     ...data.map(row => [
@@ -205,6 +244,7 @@ export const exportAcessoriosToCSV = (data: Acessorio[], filename: string) => {
       row.categoria,
       row.quantidade,
       row.valorCusto.toFixed(2),
+      row.valorRecomendado?.toFixed(2) || '',
       row.loja
     ].join(','))
   ].join('\n');

@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { getMovimentacoes, getLojas, addMovimentacao } from '@/utils/estoqueApi';
+import { getMovimentacoes, addMovimentacao } from '@/utils/estoqueApi';
+import { getLojas, getLojaById } from '@/utils/cadastrosApi';
 import { exportToCSV } from '@/utils/formatUtils';
 import { Download, Plus } from 'lucide-react';
 import { Label } from '@/components/ui/label';
@@ -17,6 +18,16 @@ export default function EstoqueMovimentacoes() {
   const [destinoFilter, setDestinoFilter] = useState<string>('todas');
   const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
+
+  const lojas = getLojas().filter(l => l.status === 'Ativo');
+
+  const getLojaNome = (lojaIdOuNome: string) => {
+    // Primeiro tenta buscar por ID
+    const lojaPorId = getLojaById(lojaIdOuNome);
+    if (lojaPorId) return lojaPorId.nome;
+    // Se não encontrar, retorna o valor original (pode ser um nome legado)
+    return lojaIdOuNome;
+  };
 
   const movimentacoesFiltradas = movimentacoes.filter(m => {
     if (origemFilter !== 'todas' && m.origem !== origemFilter) return false;
@@ -61,8 +72,8 @@ export default function EstoqueMovimentacoes() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todas">Todas as origens</SelectItem>
-              {getLojas().map(loja => (
-                <SelectItem key={loja} value={loja}>{loja}</SelectItem>
+              {lojas.map(loja => (
+                <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -73,8 +84,8 @@ export default function EstoqueMovimentacoes() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todas">Todos os destinos</SelectItem>
-              {getLojas().map(loja => (
-                <SelectItem key={loja} value={loja}>{loja}</SelectItem>
+              {lojas.map(loja => (
+                <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -120,8 +131,8 @@ export default function EstoqueMovimentacoes() {
                           <SelectValue placeholder="Selecione" />
                         </SelectTrigger>
                         <SelectContent>
-                          {getLojas().map(loja => (
-                            <SelectItem key={loja} value={loja}>{loja}</SelectItem>
+                          {lojas.map(loja => (
+                            <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -134,8 +145,8 @@ export default function EstoqueMovimentacoes() {
                           <SelectValue placeholder="Selecione" />
                         </SelectTrigger>
                         <SelectContent>
-                          {getLojas().map(loja => (
-                            <SelectItem key={loja} value={loja}>{loja}</SelectItem>
+                          {lojas.map(loja => (
+                            <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -192,8 +203,8 @@ export default function EstoqueMovimentacoes() {
                   <TableCell>{mov.produto}</TableCell>
                   <TableCell className="font-mono text-xs">{mov.imei}</TableCell>
                   <TableCell>{mov.quantidade}</TableCell>
-                  <TableCell>{mov.origem}</TableCell>
-                  <TableCell>{mov.destino}</TableCell>
+                  <TableCell>{getLojaNome(mov.origem)}</TableCell>
+                  <TableCell>{getLojaNome(mov.destino)}</TableCell>
                   <TableCell>{mov.responsavel}</TableCell>
                   <TableCell>{mov.motivo}</TableCell>
                 </TableRow>

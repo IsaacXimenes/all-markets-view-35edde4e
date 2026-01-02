@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/table';
 import { Eye, Wrench, Clock, AlertTriangle, CheckCircle, Package, Filter, Download, AlertCircle } from 'lucide-react';
 import { getProdutosParaAnaliseOS, ProdutoPendente, calcularSLA } from '@/utils/osApi';
-import { getLojas } from '@/utils/cadastrosApi';
+import { getLojas, getLojaById } from '@/utils/cadastrosApi';
 import { toast } from 'sonner';
 
 import { formatCurrency, exportToCSV } from '@/utils/formatUtils';
@@ -32,6 +32,11 @@ export default function OSProdutosAnalise() {
   const navigate = useNavigate();
   const [produtos, setProdutos] = useState<ProdutoPendente[]>([]);
   const lojas = getLojas();
+
+  const getLojaNome = (lojaId: string) => {
+    const loja = getLojaById(lojaId);
+    return loja?.nome || lojaId;
+  };
 
   // Filtros
   const [filters, setFilters] = useState({
@@ -129,7 +134,7 @@ export default function OSProdutosAnalise() {
         Produto: `${p.marca} ${p.modelo}`,
         Cor: p.cor,
         Origem: p.origemEntrada,
-        Loja: p.loja,
+        Loja: getLojaNome(p.loja),
         'Custo Original': formatCurrency(p.valorCustoOriginal),
         'Custo Assistência': formatCurrency(p.custoAssistencia),
         'SLA (dias)': sla.dias,
@@ -304,7 +309,7 @@ export default function OSProdutosAnalise() {
                         </div>
                       </TableCell>
                       <TableCell>{produto.modelo}</TableCell>
-                      <TableCell>{produto.loja}</TableCell>
+                      <TableCell>{getLojaNome(produto.loja)}</TableCell>
                       <TableCell>{getOrigemBadge(produto.origemEntrada)}</TableCell>
                       <TableCell>{getSLABadge(produto.dataEntrada)}</TableCell>
                       <TableCell>{getStatusAssistenciaBadge(produto)}</TableCell>

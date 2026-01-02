@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/table';
 import { Eye, Clock, AlertTriangle, CheckCircle, Package, Filter, Download, AlertCircle, Wrench, RotateCcw } from 'lucide-react';
 import { getProdutosPendentes, ProdutoPendente, calcularSLA } from '@/utils/osApi';
-import { getLojas } from '@/utils/cadastrosApi';
+import { getLojas, getLojaById } from '@/utils/cadastrosApi';
 import { toast } from 'sonner';
 import { formatIMEI } from '@/utils/imeiMask';
 
@@ -33,6 +33,11 @@ export default function EstoqueProdutosPendentes() {
   const navigate = useNavigate();
   const [produtosPendentes, setProdutosPendentes] = useState<ProdutoPendente[]>([]);
   const lojas = getLojas();
+
+  const getLojaNome = (lojaId: string) => {
+    const loja = getLojaById(lojaId);
+    return loja?.nome || lojaId;
+  };
 
   // Filtros - igual à aba Produtos + filtro de status
   const [filters, setFilters] = useState({
@@ -147,7 +152,7 @@ export default function EstoqueProdutosPendentes() {
         Produto: `${p.marca} ${p.modelo}`,
         Cor: p.cor,
         Origem: p.origemEntrada,
-        Loja: p.loja,
+        Loja: getLojaNome(p.loja),
         'Valor Custo': formatCurrency(p.valorCusto),
         'Saúde Bateria': `${p.saudeBateria}%`,
         'SLA (dias)': sla.dias,
@@ -337,7 +342,7 @@ export default function EstoqueProdutosPendentes() {
                         </div>
                       </TableCell>
                       <TableCell>{getOrigemBadge(produto.origemEntrada)}</TableCell>
-                      <TableCell>{produto.loja}</TableCell>
+                      <TableCell>{getLojaNome(produto.loja)}</TableCell>
                       <TableCell>{getSLABadge(produto.dataEntrada)}</TableCell>
                       <TableCell>{getStatusBadge(produto)}</TableCell>
                       <TableCell>

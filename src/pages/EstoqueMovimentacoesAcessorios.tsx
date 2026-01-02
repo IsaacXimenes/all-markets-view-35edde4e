@@ -4,9 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { getLojas } from '@/utils/estoqueApi';
 import { getAcessorios, Acessorio } from '@/utils/acessoriosApi';
-import { getLojas as getLojasApi, Loja } from '@/utils/cadastrosApi';
+import { getLojas, getLojaById } from '@/utils/cadastrosApi';
 import { Download, Plus } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -70,8 +69,18 @@ export default function EstoqueMovimentacoesAcessorios() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const lojas = getLojasApi().filter(l => l.status === 'Ativo');
+  const lojas = getLojas().filter(l => l.status === 'Ativo');
   const acessorios = getAcessorios();
+
+  const getLojaNome = (lojaIdOuNome: string) => {
+    // Primeiro tenta buscar por ID
+    const lojaPorId = getLojaById(lojaIdOuNome);
+    if (lojaPorId) return lojaPorId.nome;
+    // Fallback para dados legados com nome
+    const lojaPorNome = lojas.find(l => l.nome.toLowerCase().includes(lojaIdOuNome.toLowerCase()));
+    if (lojaPorNome) return lojaPorNome.nome;
+    return lojaIdOuNome;
+  };
 
   const movimentacoesFiltradas = useMemo(() => {
     return movimentacoes.filter(m => {
@@ -275,8 +284,8 @@ export default function EstoqueMovimentacoesAcessorios() {
                   <TableCell>{new Date(mov.data).toLocaleDateString('pt-BR')}</TableCell>
                   <TableCell>{mov.acessorio}</TableCell>
                   <TableCell>{mov.quantidade}</TableCell>
-                  <TableCell>{mov.origem}</TableCell>
-                  <TableCell>{mov.destino}</TableCell>
+                  <TableCell>{getLojaNome(mov.origem)}</TableCell>
+                  <TableCell>{getLojaNome(mov.destino)}</TableCell>
                   <TableCell>{mov.responsavel}</TableCell>
                   <TableCell>{mov.motivo}</TableCell>
                 </TableRow>

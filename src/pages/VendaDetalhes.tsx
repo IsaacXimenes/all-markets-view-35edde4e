@@ -255,7 +255,7 @@ export default function VendaDetalhes() {
                         <TableCell className="font-medium">{trade.modelo}</TableCell>
                         <TableCell className="text-muted-foreground">{trade.descricao}</TableCell>
                         <TableCell className="font-mono text-sm">{trade.imei}</TableCell>
-                        <TableCell className="text-right text-green-600 font-medium">-{formatCurrency(trade.valorAbatimento)}</TableCell>
+                        <TableCell className="text-right text-green-600 font-medium">-{formatCurrency(trade.valorCompraUsado)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

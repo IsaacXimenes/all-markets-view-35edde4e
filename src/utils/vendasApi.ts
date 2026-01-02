@@ -1,6 +1,8 @@
 // Vendas API - Mock Data
 import { generateProductId, registerProductId } from './idManager';
-
+import { addProdutoPendente } from './osApi';
+import { getProdutos, updateProduto, addMovimentacao } from './estoqueApi';
+import { subtrairEstoqueAcessorio, VendaAcessorio } from './acessoriosApi';
 export interface ItemVenda {
   id: string;
   produtoId: string; // PROD-XXXX - ID único e persistente do produto
@@ -20,7 +22,7 @@ export interface ItemTradeIn {
   modelo: string;
   descricao: string;
   imei: string;
-  valorAbatimento: number;
+  valorCompraUsado: number; // Renomeado de valorAbatimento para clareza
   imeiValidado: boolean;
   condicao: 'Novo' | 'Semi-novo';
 }
@@ -50,6 +52,7 @@ export interface Venda {
   taxaEntrega: number;
   itens: ItemVenda[];
   tradeIns: ItemTradeIn[];
+  acessorios?: VendaAcessorio[]; // Acessórios vendidos
   pagamentos: Pagamento[];
   subtotal: number;
   totalTradeIn: number;
@@ -58,6 +61,7 @@ export interface Venda {
   margem: number;
   observacoes: string;
   status: 'Concluída' | 'Cancelada' | 'Pendente';
+  motivoCancelamento?: string;
 }
 
 export interface HistoricoCompraCliente {
@@ -148,7 +152,7 @@ let vendas: Venda[] = [
         modelo: 'iPhone 12',
         descricao: 'Tela em ótimo estado, bateria 75%',
         imei: '999888777666555',
-        valorAbatimento: 1500.00,
+        valorCompraUsado: 1500.00,
         imeiValidado: true,
         condicao: 'Semi-novo'
       }
@@ -286,7 +290,7 @@ let vendas: Venda[] = [
         modelo: 'iPhone 11',
         descricao: 'Seminovo, funcionando perfeitamente',
         imei: '888777666555444',
-        valorAbatimento: 1200.00,
+        valorCompraUsado: 1200.00,
         imeiValidado: true,
         condicao: 'Semi-novo'
       }
@@ -422,6 +426,18 @@ export const getVendaById = (id: string): Venda | null => {
   return vendas.find(v => v.id === id) || null;
 };
 
+// Extrai marca do modelo para produtos de Trade-In
+const extrairMarca = (modelo: string): string => {
+  const modeloLower = modelo.toLowerCase();
+  if (modeloLower.includes('iphone') || modeloLower.includes('apple')) return 'Apple';
+  if (modeloLower.includes('samsung') || modeloLower.includes('galaxy')) return 'Samsung';
+  if (modeloLower.includes('motorola') || modeloLower.includes('moto')) return 'Motorola';
+  if (modeloLower.includes('xiaomi') || modeloLower.includes('redmi') || modeloLower.includes('poco')) return 'Xiaomi';
+  if (modeloLower.includes('huawei')) return 'Huawei';
+  if (modeloLower.includes('lg')) return 'LG';
+  return 'Outra';
+};
+
 export const addVenda = (venda: Omit<Venda, 'id' | 'numero'>): Venda => {
   vendaCounter++;
   const year = new Date().getFullYear();
@@ -442,7 +458,101 @@ export const addVenda = (venda: Omit<Venda, 'id' | 'numero'>): Venda => {
     tradeIns: tradeInsComIds
   };
   vendas.push(newVenda);
+  
+  // ========== INTEGRAÇÃO: Redução de Estoque de Aparelhos ==========
+  // Para cada item vendido, marcar produto como "Vendido" e registrar movimentação
+  venda.itens.forEach(item => {
+    const produto = getProdutos().find(p => p.id === item.produtoId);
+    if (produto) {
+      // Marcar produto como vendido (status diferente ou remover do estoque ativo)
+      updateProduto(item.produtoId, { 
+        statusNota: 'Concluído',
+        quantidade: 0 // Marca como sem estoque
+      });
+      
+      // Registrar movimentação de saída
+      addMovimentacao({
+        data: new Date().toISOString().split('T')[0],
+        produto: produto.modelo,
+        imei: produto.imei,
+        quantidade: 1,
+        origem: produto.loja,
+        destino: 'Vendido',
+        responsavel: 'Sistema de Vendas',
+        motivo: `Venda ${newId} - Cliente: ${venda.clienteNome}`
+      });
+    }
+  });
+  
+  // ========== INTEGRAÇÃO: Redução de Estoque de Acessórios ==========
+  if (venda.acessorios && venda.acessorios.length > 0) {
+    venda.acessorios.forEach(acessorio => {
+      subtrairEstoqueAcessorio(acessorio.acessorioId, acessorio.quantidade);
+    });
+  }
+  
+  // ========== INTEGRAÇÃO: Trade-In para Produtos Pendentes ==========
+  // Cada trade-in cria um produto pendente no sistema de estoque
+  tradeInsComIds.forEach(ti => {
+    try {
+      addProdutoPendente({
+        imei: ti.imei || '',
+        marca: extrairMarca(ti.modelo),
+        modelo: ti.modelo,
+        cor: 'A definir', // Cor não informada no trade-in
+        tipo: 'Seminovo',
+        condicao: ti.condicao,
+        origemEntrada: 'Base de Troca',
+        notaOuVendaId: newId,
+        valorCusto: ti.valorCompraUsado,
+        saudeBateria: 0, // Será definido na conferência
+        loja: venda.lojaVenda,
+        dataEntrada: new Date().toISOString()
+      });
+      console.log(`[VENDAS] Trade-In ${ti.modelo} registrado como produto pendente (ID: ${ti.produtoId})`);
+    } catch (error) {
+      console.error(`[VENDAS] Erro ao registrar trade-in como pendente:`, error);
+    }
+  });
+  
   return newVenda;
+};
+
+// Função para cancelar uma venda
+export const cancelarVenda = (id: string, motivo: string): Venda | null => {
+  const venda = vendas.find(v => v.id === id);
+  if (!venda) return null;
+  
+  if (venda.status === 'Cancelada') {
+    console.warn(`Venda ${id} já está cancelada`);
+    return venda;
+  }
+  
+  // Reverter estoque dos produtos vendidos
+  venda.itens.forEach(item => {
+    const produto = getProdutos().find(p => p.id === item.produtoId);
+    if (produto) {
+      updateProduto(item.produtoId, { quantidade: 1 });
+      
+      // Registrar movimentação de retorno
+      addMovimentacao({
+        data: new Date().toISOString().split('T')[0],
+        produto: produto.modelo,
+        imei: produto.imei,
+        quantidade: 1,
+        origem: 'Cancelamento de Venda',
+        destino: produto.loja,
+        responsavel: 'Sistema',
+        motivo: `Cancelamento da venda ${id}: ${motivo}`
+      });
+    }
+  });
+  
+  // Atualizar status da venda
+  venda.status = 'Cancelada';
+  venda.motivoCancelamento = motivo;
+  
+  return venda;
 };
 
 export const getHistoricoComprasCliente = (clienteId: string): HistoricoCompraCliente[] => {

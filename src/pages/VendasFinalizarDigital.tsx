@@ -160,7 +160,7 @@ export default function VendasFinalizarDigital() {
   // Cálculos
   const subtotal = useMemo(() => itens.reduce((acc, item) => acc + item.valorVenda, 0), [itens]);
   const totalAcessorios = useMemo(() => acessoriosVenda.reduce((acc, a) => acc + a.valorTotal, 0), [acessoriosVenda]);
-  const totalTradeIn = useMemo(() => tradeIns.reduce((acc, t) => acc + t.valorAbatimento, 0), [tradeIns]);
+  const totalTradeIn = useMemo(() => tradeIns.reduce((acc, t) => acc + t.valorCompraUsado, 0), [tradeIns]);
   const totalPagamentos = useMemo(() => pagamentos.reduce((acc, p) => acc + p.valor, 0), [pagamentos]);
   const total = useMemo(() => subtotal + totalAcessorios - totalTradeIn + taxaEntrega, [subtotal, totalAcessorios, totalTradeIn, taxaEntrega]);
   const valorPendente = useMemo(() => total - totalPagamentos, [total, totalPagamentos]);
@@ -359,7 +359,7 @@ export default function VendasFinalizarDigital() {
   };
 
   const handleAddTradeIn = () => {
-    if (!novoTradeIn.modelo || !novoTradeIn.valorAbatimento || !novoTradeIn.condicao) {
+    if (!novoTradeIn.modelo || !novoTradeIn.valorCompraUsado || !novoTradeIn.condicao) {
       toast.error('Modelo, condição e valor são obrigatórios');
       return;
     }
@@ -369,7 +369,7 @@ export default function VendasFinalizarDigital() {
       modelo: novoTradeIn.modelo!,
       descricao: novoTradeIn.descricao || '',
       imei: novoTradeIn.imei || '',
-      valorAbatimento: novoTradeIn.valorAbatimento!,
+      valorCompraUsado: novoTradeIn.valorCompraUsado!,
       imeiValidado: novoTradeIn.imeiValidado || false,
       condicao: novoTradeIn.condicao as 'Novo' | 'Semi-novo'
     };
@@ -917,7 +917,7 @@ export default function VendasFinalizarDigital() {
                         )}
                       </TableCell>
                       <TableCell className="text-right text-green-600">
-                        -{formatCurrency(trade.valorAbatimento)}
+                        -{formatCurrency(trade.valorCompraUsado)}
                       </TableCell>
                       <TableCell>
                         <Button 
@@ -1509,10 +1509,10 @@ export default function VendasFinalizarDigital() {
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">R$</span>
                 <Input
                   type="text"
-                  value={(novoTradeIn.valorAbatimento || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  value={(novoTradeIn.valorCompraUsado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   onChange={(e) => {
                     const value = e.target.value.replace(/\D/g, '');
-                    setNovoTradeIn({ ...novoTradeIn, valorAbatimento: Number(value) / 100 });
+                    setNovoTradeIn({ ...novoTradeIn, valorCompraUsado: Number(value) / 100 });
                   }}
                   className="pl-10"
                 />

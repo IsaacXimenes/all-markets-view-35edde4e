@@ -8,27 +8,37 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Download, Package, Edit, AlertTriangle } from 'lucide-react';
+import { Download, Package, Edit, AlertTriangle, DollarSign, History } from 'lucide-react';
 import { 
   getAcessorios, 
   getCategoriasAcessorios, 
-  updateAcessorioQuantidade, 
+  updateAcessorioQuantidade,
+  updateValorRecomendadoAcessorio,
   formatCurrency, 
   exportAcessoriosToCSV,
-  Acessorio 
+  Acessorio,
+  HistoricoValorRecomendadoAcessorio
 } from '@/utils/acessoriosApi';
 import { getLojas } from '@/utils/estoqueApi';
+import { getColaboradores } from '@/utils/cadastrosApi';
 
 export default function EstoqueAcessorios() {
   const [acessorios, setAcessorios] = useState<Acessorio[]>(getAcessorios());
   const [categorias] = useState<string[]>(getCategoriasAcessorios());
   const [lojas] = useState<string[]>(getLojas());
+  const [colaboradores] = useState(getColaboradores());
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroLoja, setFiltroLoja] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [acessorioSelecionado, setAcessorioSelecionado] = useState<Acessorio | null>(null);
   const [novaQuantidade, setNovaQuantidade] = useState(0);
+  
+  // Modal de Valor Recomendado
+  const [showValorRecomendadoModal, setShowValorRecomendadoModal] = useState(false);
+  const [novoValorRecomendado, setNovoValorRecomendado] = useState('');
+  const [colaboradorSelecionado, setColaboradorSelecionado] = useState('');
 
   // Agrupa acessórios por ID/Descrição
   const acessoriosAgrupados = useMemo(() => {
@@ -38,6 +48,8 @@ export default function EstoqueAcessorios() {
       categoria: string; 
       quantidadeTotal: number; 
       valorCusto: number;
+      valorRecomendado?: number;
+      historicoValorRecomendado?: HistoricoValorRecomendadoAcessorio[];
       lojas: string[];
       itens: Acessorio[];
     }> = {};
@@ -50,6 +62,8 @@ export default function EstoqueAcessorios() {
           categoria: a.categoria,
           quantidadeTotal: 0,
           valorCusto: a.valorCusto,
+          valorRecomendado: a.valorRecomendado,
+          historicoValorRecomendado: a.historicoValorRecomendado,
           lojas: [],
           itens: []
         };
@@ -92,6 +106,35 @@ export default function EstoqueAcessorios() {
     toast.success('Quantidade atualizada com sucesso!');
   };
 
+  const handleOpenValorRecomendado = (acessorio: Acessorio) => {
+    setAcessorioSelecionado(acessorio);
+    setNovoValorRecomendado(acessorio.valorRecomendado?.toString() || '');
+    setColaboradorSelecionado('');
+    setShowValorRecomendadoModal(true);
+  };
+
+  const handleSalvarValorRecomendado = () => {
+    if (!acessorioSelecionado || !colaboradorSelecionado) {
+      toast.error('Selecione o colaborador responsável');
+      return;
+    }
+
+    const valor = parseFloat(novoValorRecomendado.replace(',', '.'));
+    if (isNaN(valor) || valor <= 0) {
+      toast.error('Informe um valor válido');
+      return;
+    }
+
+    const colaborador = colaboradores.find(c => c.id === colaboradorSelecionado);
+    const nomeColaborador = colaborador?.nome || colaboradorSelecionado;
+
+    updateValorRecomendadoAcessorio(acessorioSelecionado.id, valor, nomeColaborador);
+    setAcessorios(getAcessorios());
+    setShowValorRecomendadoModal(false);
+    setAcessorioSelecionado(null);
+    toast.success('Valor recomendado atualizado com sucesso!');
+  };
+
   const handleExportCSV = () => {
     const dataToExport = acessoriosFiltrados.map(a => ({
       id: a.id,
@@ -99,10 +142,17 @@ export default function EstoqueAcessorios() {
       categoria: a.categoria,
       quantidade: a.quantidadeTotal,
       valorCusto: a.valorCusto,
+      valorRecomendado: a.valorRecomendado,
       loja: a.lojas.join(', ')
     }));
     exportAcessoriosToCSV(dataToExport as any, `acessorios_${new Date().toISOString().split('T')[0]}.csv`);
     toast.success('CSV exportado com sucesso!');
+  };
+
+  const formatarValorInput = (valor: string) => {
+    const numeros = valor.replace(/\D/g, '');
+    const valorNumerico = parseFloat(numeros) / 100;
+    return valorNumerico.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   return (
@@ -169,6 +219,7 @@ export default function EstoqueAcessorios() {
                     <TableHead>Loja</TableHead>
                     <TableHead className="text-right">Estoque Disponível</TableHead>
                     <TableHead className="text-right">Valor Custo</TableHead>
+                    <TableHead className="text-right">Valor Recomendado</TableHead>
                     <TableHead className="text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -196,25 +247,43 @@ export default function EstoqueAcessorios() {
                       <TableCell className="text-right">
                         {formatCurrency(acessorio.valorCusto)}
                       </TableCell>
-                      <TableCell className="text-center">
-                        {acessorio.itens.map(item => (
+                      <TableCell className="text-right">
+                        {acessorio.valorRecomendado ? (
+                          <span className="font-medium text-primary">
+                            {formatCurrency(acessorio.valorRecomendado)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center gap-1">
+                          {acessorio.itens.map(item => (
+                            <Button
+                              key={item.id + item.loja}
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditQuantidade(item)}
+                              className="gap-1"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          ))}
                           <Button
-                            key={item.id + item.loja}
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleEditQuantidade(item)}
+                            onClick={() => handleOpenValorRecomendado(acessorio.itens[0])}
                             className="gap-1"
                           >
-                            <Edit className="h-4 w-4" />
-                            Editar Qtd
+                            <DollarSign className="h-4 w-4" />
                           </Button>
-                        ))}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
                   {acessoriosFiltrados.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         Nenhum acessório encontrado.
                       </TableCell>
                     </TableRow>
@@ -258,6 +327,103 @@ export default function EstoqueAcessorios() {
                 Cancelar
               </Button>
               <Button onClick={handleSalvarQuantidade}>
+                Salvar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Valor Recomendado */}
+        <Dialog open={showValorRecomendadoModal} onOpenChange={setShowValorRecomendadoModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Informar Valor Recomendado
+              </DialogTitle>
+            </DialogHeader>
+            {acessorioSelecionado && (
+              <div className="space-y-4">
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Acessório</p>
+                  <p className="font-medium">{acessorioSelecionado.descricao}</p>
+                  <p className="text-sm text-muted-foreground mt-2">Valor de Custo</p>
+                  <p className="font-medium">{formatCurrency(acessorioSelecionado.valorCusto)}</p>
+                  {acessorioSelecionado.valorRecomendado && (
+                    <>
+                      <p className="text-sm text-muted-foreground mt-2">Valor Recomendado Atual</p>
+                      <p className="font-medium text-primary">{formatCurrency(acessorioSelecionado.valorRecomendado)}</p>
+                    </>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="valorRecomendado">Novo Valor Recomendado</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                    <Input
+                      id="valorRecomendado"
+                      type="text"
+                      value={novoValorRecomendado}
+                      onChange={(e) => setNovoValorRecomendado(formatarValorInput(e.target.value))}
+                      className="pl-10"
+                      placeholder="0,00"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Colaborador Responsável</Label>
+                  <Select value={colaboradorSelecionado} onValueChange={setColaboradorSelecionado}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o colaborador" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {colaboradores.map(col => (
+                        <SelectItem key={col.id} value={col.id}>{col.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Histórico */}
+                {acessorioSelecionado.historicoValorRecomendado && acessorioSelecionado.historicoValorRecomendado.length > 0 && (
+                  <>
+                    <Separator />
+                    <div>
+                      <Label className="flex items-center gap-2 mb-3">
+                        <History className="h-4 w-4" />
+                        Histórico de Alterações
+                      </Label>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {acessorioSelecionado.historicoValorRecomendado.map((hist, index) => (
+                          <div key={index} className="text-sm p-2 bg-muted/50 rounded">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">{hist.data}</span>
+                              <span className="font-medium">{hist.usuario}</span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-muted-foreground">
+                                {hist.valorAntigo ? formatCurrency(hist.valorAntigo) : '-'}
+                              </span>
+                              <span>→</span>
+                              <span className="font-medium text-primary">
+                                {formatCurrency(hist.valorNovo)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowValorRecomendadoModal(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSalvarValorRecomendado}>
                 Salvar
               </Button>
             </DialogFooter>

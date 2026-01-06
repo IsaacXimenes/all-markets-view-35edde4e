@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { Button } from '@/components/ui/button';
@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Printer, ShoppingCart, User, Package, CreditCard, Truck, Clock, DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Printer, ShoppingCart, User, Package, CreditCard, Truck, Clock, DollarSign, TrendingUp, AlertTriangle, Shield } from 'lucide-react';
 import { getVendaById, formatCurrency, Venda } from '@/utils/vendasApi';
 import { getColaboradores, getLojas, getContasFinanceiras } from '@/utils/cadastrosApi';
+import { getGarantiasByVendaId, calcularStatusExpiracao } from '@/utils/garantiasApi';
+import { format, addMonths } from 'date-fns';
 import QRCode from 'qrcode';
 
 export default function VendaDetalhes() {
@@ -325,6 +327,77 @@ export default function VendaDetalhes() {
                   <p className="font-medium">{venda.observacoes}</p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Garantia */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Garantia
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {venda.itens.map(item => {
+                  const garantias = getGarantiasByVendaId(venda.id);
+                  const garantiaItem = garantias.find(g => g.imei === item.imei);
+                  
+                  // Se não tem garantia registrada, calcular baseado na venda
+                  const dataVenda = new Date(venda.dataHora);
+                  const tipoGarantia = garantiaItem?.tipoGarantia || 'Garantia - Apple';
+                  const dataFimGarantia = garantiaItem?.dataFimGarantia || format(addMonths(dataVenda, 12), 'yyyy-MM-dd');
+                  const statusExp = calcularStatusExpiracao(dataFimGarantia);
+                  
+                  const getBadgeClass = () => {
+                    switch (statusExp.status) {
+                      case 'expirada':
+                        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+                      case 'urgente':
+                        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
+                      case 'atencao':
+                        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+                      default:
+                        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+                    }
+                  };
+                  
+                  return (
+                    <div key={item.id} className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+                      <div>
+                        <p className="font-medium">{item.produto}</p>
+                        <p className="text-sm text-muted-foreground">IMEI: {item.imei}</p>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <Badge variant="outline" className={getBadgeClass()}>
+                          {tipoGarantia}
+                        </Badge>
+                        <p className="text-sm text-muted-foreground">
+                          Válida até: {format(new Date(dataFimGarantia), 'dd/MM/yyyy')}
+                        </p>
+                        {statusExp.status !== 'ativa' && (
+                          <p className={`text-xs ${
+                            statusExp.status === 'expirada' ? 'text-red-600' :
+                            statusExp.status === 'urgente' ? 'text-orange-600' :
+                            'text-yellow-600'
+                          }`}>
+                            {statusExp.mensagem}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <Button 
+                onClick={() => navigate(`/garantias/nova?vendaId=${venda.id}`)} 
+                className="w-full mt-4 gap-2"
+              >
+                <Shield className="h-4 w-4" />
+                Acionar Garantia
+              </Button>
             </CardContent>
           </Card>
         </div>

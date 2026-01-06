@@ -11,6 +11,8 @@ import { Plus, Download, Eye, TrendingUp, DollarSign, Percent, ShoppingCart } fr
 import { getVendas, exportVendasToCSV, formatCurrency, Venda } from '@/utils/vendasApi';
 import { getLojas, getColaboradores, Loja, Colaborador } from '@/utils/cadastrosApi';
 import { getStatusConferenciaByVendaId, StatusConferencia } from '@/utils/conferenciaGestorApi';
+import { getGarantiasByVendaId, calcularStatusExpiracao } from '@/utils/garantiasApi';
+import { format, addMonths } from 'date-fns';
 
 export default function Vendas() {
   const navigate = useNavigate();
@@ -23,6 +25,7 @@ export default function Vendas() {
   const [modeloFiltro, setModeloFiltro] = useState('');
   const [imeiFiltro, setImeiFiltro] = useState('');
   const [vendedorFiltro, setVendedorFiltro] = useState('');
+  const [filtroGarantia, setFiltroGarantia] = useState('');
 
   const getLojaName = (id: string) => {
     const loja = lojas.find(l => l.id === id);
@@ -50,6 +53,34 @@ export default function Vendas() {
     const margem = valorCusto > 0 ? ((lucro / valorCusto) * 100) : 0;
     
     return { valorCusto, valorRecomendado, valorVenda, lucro, margem };
+  };
+
+  // Obter info de garantia para uma venda
+  const getGarantiaInfo = (venda: Venda) => {
+    const garantias = getGarantiasByVendaId(venda.id);
+    
+    // Se tem garantia registrada, usar
+    if (garantias.length > 0) {
+      const primeira = garantias[0];
+      return {
+        tipoGarantia: primeira.tipoGarantia,
+        dataFimGarantia: primeira.dataFimGarantia,
+        status: primeira.status
+      };
+    }
+    
+    // Se não, calcular baseado na venda
+    const primeiroItem = venda.itens[0];
+    if (primeiroItem) {
+      const dataVenda = new Date(venda.dataHora);
+      return {
+        tipoGarantia: 'Garantia - Apple',
+        dataFimGarantia: format(addMonths(dataVenda, 12), 'yyyy-MM-dd'),
+        status: 'Ativa'
+      };
+    }
+    
+    return null;
   };
 
   const vendasFiltradas = useMemo(() => {
@@ -85,9 +116,25 @@ export default function Vendas() {
         if (!temImei) return false;
       }
       
+      // Filtro de garantia
+      if (filtroGarantia) {
+        const garantiaInfo = getGarantiaInfo(v);
+        if (!garantiaInfo) return false;
+        
+        const statusExp = calcularStatusExpiracao(garantiaInfo.dataFimGarantia);
+        
+        if (filtroGarantia === 'ativa') {
+          if (statusExp.status === 'expirada') return false;
+        } else if (filtroGarantia === 'expirada') {
+          if (statusExp.status !== 'expirada') return false;
+        } else if (filtroGarantia === 'em-tratativa') {
+          if (garantiaInfo.status !== 'Em Tratativa') return false;
+        }
+      }
+      
       return true;
     });
-  }, [vendas, dataInicio, dataFim, lojaFiltro, vendedorFiltro, modeloFiltro, imeiFiltro]);
+  }, [vendas, dataInicio, dataFim, lojaFiltro, vendedorFiltro, modeloFiltro, imeiFiltro, filtroGarantia]);
 
   const totais = useMemo(() => {
     let totalVendas = 0;
@@ -108,6 +155,21 @@ export default function Vendas() {
 
   const handleExportCSV = () => {
     exportVendasToCSV(vendasFiltradas, 'vendas-export.csv');
+  };
+
+  // Função para cor do badge de garantia
+  const getGarantiaBadgeClass = (dataFim: string) => {
+    const status = calcularStatusExpiracao(dataFim);
+    switch (status.status) {
+      case 'expirada':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      case 'urgente':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
+      case 'atencao':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+      default:
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+    }
   };
 
   return (
@@ -173,7 +235,7 @@ export default function Vendas() {
       {/* Filtros */}
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Data Início</label>
               <Input
@@ -234,6 +296,20 @@ export default function Vendas() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Status Garantia</label>
+              <Select value={filtroGarantia || 'all'} onValueChange={(val) => setFiltroGarantia(val === 'all' ? '' : val)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="ativa">Com Garantia Ativa</SelectItem>
+                  <SelectItem value="expirada">Garantia Expirada</SelectItem>
+                  <SelectItem value="em-tratativa">Em Tratativa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-end gap-2">
               <Button onClick={() => navigate('/vendas/nova')} className="flex-1">
                 <Plus className="h-4 w-4 mr-2" />
@@ -267,6 +343,8 @@ export default function Vendas() {
                   <TableHead className="text-right">V. Venda</TableHead>
                   <TableHead className="text-right">Lucro</TableHead>
                   <TableHead className="text-right">Margem %</TableHead>
+                  <TableHead>Resp. Garantia</TableHead>
+                  <TableHead>Data Fim Garantia</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
@@ -276,6 +354,7 @@ export default function Vendas() {
                   const calc = calcularTotaisVenda(venda);
                   const isPrejuizo = calc.lucro < 0;
                   const statusConferencia = getStatusConferenciaByVendaId(venda.id);
+                  const garantiaInfo = getGarantiaInfo(venda);
                   
                   // Pegar modelos e IMEIs dos itens
                   const modelos = venda.itens.map(i => i.produto).join(', ');
@@ -331,6 +410,23 @@ export default function Vendas() {
                         >
                           {calc.margem.toFixed(2)}%
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {garantiaInfo && (
+                          <Badge variant="outline" className="whitespace-nowrap text-xs">
+                            {garantiaInfo.tipoGarantia.replace('Garantia - ', '')}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {garantiaInfo && (
+                          <Badge 
+                            variant="outline" 
+                            className={`whitespace-nowrap text-xs ${getGarantiaBadgeClass(garantiaInfo.dataFimGarantia)}`}
+                          >
+                            {format(new Date(garantiaInfo.dataFimGarantia), 'dd/MM/yyyy')}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         {getStatusBadge(statusConferencia)}

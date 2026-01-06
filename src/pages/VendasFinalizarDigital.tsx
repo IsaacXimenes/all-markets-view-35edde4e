@@ -14,8 +14,10 @@ import { toast } from 'sonner';
 import QRCode from 'qrcode';
 import { 
   Lock, User, Calendar, DollarSign, Search, Plus, Clock, CheckCircle,
-  ShoppingCart, Package, CreditCard, Truck, FileText, AlertTriangle, Check, X, Eye, Trash2
+  ShoppingCart, Package, CreditCard, Truck, FileText, AlertTriangle, Check, X, Eye, Trash2, Shield
 } from 'lucide-react';
+import { format, addMonths } from 'date-fns';
+
 import { 
   getVendaDigitalById, 
   finalizarVendaDigital, 
@@ -114,6 +116,16 @@ export default function VendasFinalizarDigital() {
   // Detalhes do produto
   const [showDetalheProduto, setShowDetalheProduto] = useState(false);
   const [produtoDetalhe, setProdutoDetalhe] = useState<Produto | null>(null);
+  
+  // Garantias por item
+  interface GarantiaItemVenda {
+    itemId: string;
+    tipoGarantia: 'Garantia - Apple' | 'Garantia - Thiago Imports';
+    mesesGarantia: number;
+    dataFimGarantia: string;
+  }
+  const [garantiaItens, setGarantiaItens] = useState<GarantiaItemVenda[]>([]);
+
 
   // Carregar dados do pré-cadastro
   useEffect(() => {
@@ -896,6 +908,140 @@ export default function VendasFinalizarDigital() {
             )}
           </CardContent>
         </Card>
+
+        {/* Garantia dos Produtos */}
+        {itens.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Garantia dos Produtos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Produto</TableHead>
+                    <TableHead>IMEI</TableHead>
+                    <TableHead>Condição</TableHead>
+                    <TableHead>Tipo Garantia</TableHead>
+                    <TableHead>Meses</TableHead>
+                    <TableHead>Data Fim</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {itens.map(item => {
+                    // Buscar condição do produto no estoque
+                    const produto = produtosEstoque.find(p => p.id === item.produtoId);
+                    const condicao = produto?.tipo || 'Semi-novo';
+                    const isNovo = condicao === 'Novo';
+                    
+                    // Buscar garantia configurada para este item
+                    const garantiaItem = garantiaItens.find(g => g.itemId === item.id);
+                    
+                    // Calcular data fim garantia
+                    const meses = garantiaItem?.mesesGarantia || 12;
+                    const dataFim = format(addMonths(new Date(), meses), 'dd/MM/yyyy');
+                    
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.produto}</TableCell>
+                        <TableCell className="font-mono text-sm">{item.imei}</TableCell>
+                        <TableCell>
+                          <Badge variant={isNovo ? 'default' : 'secondary'}>
+                            {condicao}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {isNovo ? (
+                            <Badge variant="outline">Garantia - Apple</Badge>
+                          ) : (
+                            <Select 
+                              value={garantiaItem?.tipoGarantia || 'Garantia - Apple'} 
+                              onValueChange={(val: 'Garantia - Apple' | 'Garantia - Thiago Imports') => {
+                                setGarantiaItens(prev => {
+                                  const existing = prev.find(g => g.itemId === item.id);
+                                  const mesesDefault = val === 'Garantia - Thiago Imports' ? 12 : (existing?.mesesGarantia || 12);
+                                  if (existing) {
+                                    return prev.map(g => 
+                                      g.itemId === item.id 
+                                        ? { ...g, tipoGarantia: val, mesesGarantia: mesesDefault, dataFimGarantia: format(addMonths(new Date(), mesesDefault), 'yyyy-MM-dd') }
+                                        : g
+                                    );
+                                  } else {
+                                    return [...prev, { 
+                                      itemId: item.id, 
+                                      tipoGarantia: val,
+                                      mesesGarantia: mesesDefault,
+                                      dataFimGarantia: format(addMonths(new Date(), mesesDefault), 'yyyy-MM-dd')
+                                    }];
+                                  }
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Garantia - Apple">Garantia - Apple</SelectItem>
+                                <SelectItem value="Garantia - Thiago Imports">Garantia - Thiago Imports</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {isNovo ? (
+                            <span className="text-muted-foreground">12</span>
+                          ) : (garantiaItem?.tipoGarantia || 'Garantia - Apple') === 'Garantia - Apple' ? (
+                            <Input 
+                              type="number" 
+                              min={1} 
+                              max={12}
+                              className="w-20"
+                              value={garantiaItem?.mesesGarantia || 12}
+                              onChange={(e) => {
+                                const meses = parseInt(e.target.value) || 12;
+                                setGarantiaItens(prev => {
+                                  const existing = prev.find(g => g.itemId === item.id);
+                                  if (existing) {
+                                    return prev.map(g => 
+                                      g.itemId === item.id 
+                                        ? { ...g, mesesGarantia: meses, dataFimGarantia: format(addMonths(new Date(), meses), 'yyyy-MM-dd') }
+                                        : g
+                                    );
+                                  } else {
+                                    return [...prev, { 
+                                      itemId: item.id, 
+                                      tipoGarantia: 'Garantia - Apple',
+                                      mesesGarantia: meses,
+                                      dataFimGarantia: format(addMonths(new Date(), meses), 'yyyy-MM-dd')
+                                    }];
+                                  }
+                                });
+                              }}
+                              placeholder="1-12"
+                            />
+                          ) : (
+                            <span className="text-muted-foreground">12</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">
+                            {garantiaItem?.dataFimGarantia 
+                              ? format(new Date(garantiaItem.dataFimGarantia), 'dd/MM/yyyy')
+                              : dataFim
+                            }
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Base de Troca */}
         <Card>

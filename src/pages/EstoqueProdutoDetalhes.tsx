@@ -4,8 +4,9 @@ import { EstoqueLayout } from '@/components/layout/EstoqueLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Upload, Printer, Clock, Package, Wrench, CheckCircle, AlertCircle, DollarSign } from 'lucide-react';
+import { ArrowLeft, Upload, Printer, Clock, Package, Wrench, CheckCircle, AlertCircle, DollarSign, AlertTriangle } from 'lucide-react';
 import { getProdutos, Produto, TimelineEntry } from '@/utils/estoqueApi';
+import { getHistoricoGarantiasByIMEI } from '@/utils/garantiasApi';
 import { cn } from '@/lib/utils';
 import QRCode from 'qrcode';
 import { formatIMEI } from '@/utils/imeiMask';
@@ -223,6 +224,25 @@ export default function EstoqueProdutoDetalhes() {
                   <p className="text-sm text-muted-foreground">Quantidade</p>
                   <p className="font-semibold">{produto.quantidade}</p>
                 </div>
+                
+                {/* Badge de Garantia Acionada */}
+                {(() => {
+                  const garantiasAcionadas = getHistoricoGarantiasByIMEI(produto.imei);
+                  if (garantiasAcionadas.length > 0) {
+                    return (
+                      <div className="col-span-2">
+                        <Badge 
+                          variant="outline" 
+                          className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+                        >
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Teve Garantia Acionada ({garantiasAcionadas.length}x)
+                        </Badge>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </CardContent>
           </Card>

@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
@@ -25,7 +24,7 @@ import {
   verificarTratativaAtivaByIMEI, calcularStatusExpiracao,
   GarantiaItem
 } from '@/utils/garantiasApi';
-import { format } from 'date-fns';
+import { format, addMonths } from 'date-fns';
 
 export default function GarantiasNova() {
   const navigate = useNavigate();
@@ -34,7 +33,6 @@ export default function GarantiasNova() {
   const vendas = getVendas();
   
   // Estados
-  const [showVendaModal, setShowVendaModal] = useState(false);
   const [buscaImei, setBuscaImei] = useState('');
   const [buscaLoja, setBuscaLoja] = useState('');
   const [dataInicio, setDataInicio] = useState('');
@@ -42,6 +40,7 @@ export default function GarantiasNova() {
   
   // Venda selecionada
   const [vendaSelecionada, setVendaSelecionada] = useState<Venda | null>(null);
+  const [itemSelecionado, setItemSelecionado] = useState<any | null>(null);
   const [garantiaSelecionada, setGarantiaSelecionada] = useState<GarantiaItem | null>(null);
   
   // Tratativa
@@ -52,27 +51,55 @@ export default function GarantiasNova() {
   const getLojaName = (id: string) => lojas.find(l => l.id === id)?.nome || id;
   const getColaboradorNome = (id: string) => colaboradores.find(c => c.id === id)?.nome || id;
   
+  // Flatten vendas para exibir uma linha por item (IMEI)
+  const vendasComItens = useMemo(() => {
+    const resultado: { venda: Venda; item: any; garantiaInfo: any }[] = [];
+    
+    vendas.forEach(venda => {
+      if (venda.status === 'Cancelada') return;
+      
+      venda.itens.forEach(item => {
+        // Buscar garantia existente para este item
+        const garantias = getGarantiasByVendaId(venda.id);
+        const garantiaItem = garantias.find(g => g.imei === item.imei);
+        
+        // Calcular data fim garantia se não existir
+        const dataVenda = new Date(venda.dataHora);
+        const meses = garantiaItem?.mesesGarantia || 12;
+        const dataFimCalc = garantiaItem?.dataFimGarantia || format(addMonths(dataVenda, meses), 'yyyy-MM-dd');
+        const tipoGarantia = garantiaItem?.tipoGarantia || 'Garantia - Apple';
+        
+        resultado.push({
+          venda,
+          item: {
+            ...item,
+            tipoGarantia,
+            dataFimGarantia: dataFimCalc
+          },
+          garantiaInfo: garantiaItem
+        });
+      });
+    });
+    
+    return resultado;
+  }, [vendas]);
+  
   // Filtrar vendas
   const vendasFiltradas = useMemo(() => {
-    return vendas.filter(v => {
-      if (v.status === 'Cancelada') return false;
-      
+    return vendasComItens.filter(({ venda, item }) => {
       // Filtrar por IMEI
-      if (buscaImei) {
-        const temImei = v.itens.some(item => item.imei.includes(buscaImei));
-        if (!temImei) return false;
-      }
+      if (buscaImei && !item.imei.includes(buscaImei)) return false;
       
       // Filtrar por loja
-      if (buscaLoja && v.lojaVenda !== buscaLoja) return false;
+      if (buscaLoja && venda.lojaVenda !== buscaLoja) return false;
       
       // Filtrar por data
       if (dataInicio) {
-        const data = new Date(v.dataHora);
+        const data = new Date(venda.dataHora);
         if (data < new Date(dataInicio)) return false;
       }
       if (dataFim) {
-        const data = new Date(v.dataHora);
+        const data = new Date(venda.dataHora);
         const fim = new Date(dataFim);
         fim.setHours(23, 59, 59);
         if (data > fim) return false;
@@ -80,47 +107,41 @@ export default function GarantiasNova() {
       
       return true;
     });
-  }, [vendas, buscaImei, buscaLoja, dataInicio, dataFim]);
+  }, [vendasComItens, buscaImei, buscaLoja, dataInicio, dataFim]);
   
   // Selecionar venda
-  const handleSelectVenda = (venda: Venda) => {
+  const handleSelectVenda = (venda: Venda, item: any) => {
     setVendaSelecionada(venda);
+    setItemSelecionado(item);
     
-    // Buscar garantias existentes para esta venda
+    // Buscar garantias existentes para este IMEI
     const garantias = getGarantiasByVendaId(venda.id);
+    const garantiaExistente = garantias.find(g => g.imei === item.imei);
     
-    if (garantias.length > 0) {
-      // Se já tem garantia, usar a primeira
-      setGarantiaSelecionada(garantias[0]);
+    if (garantiaExistente) {
+      setGarantiaSelecionada(garantiaExistente);
     } else {
-      // Criar garantia mock baseada nos itens da venda
-      const primeiroItem = venda.itens[0];
-      if (primeiroItem) {
-        const novaGarantia: GarantiaItem = {
-          id: '',
-          vendaId: venda.id,
-          itemVendaId: primeiroItem.id,
-          produtoId: primeiroItem.produtoId,
-          imei: primeiroItem.imei,
-          modelo: primeiroItem.produto,
-          tipoGarantia: 'Garantia - Apple',
-          mesesGarantia: 12,
-          dataInicioGarantia: venda.dataHora.split('T')[0],
-          dataFimGarantia: format(new Date(new Date(venda.dataHora).setMonth(new Date(venda.dataHora).getMonth() + 12)), 'yyyy-MM-dd'),
-          status: 'Ativa',
-          lojaVenda: venda.lojaVenda,
-          clienteId: venda.clienteId,
-          clienteNome: venda.clienteNome,
-          clienteTelefone: venda.clienteTelefone,
-          clienteEmail: venda.clienteEmail
-        };
-        setGarantiaSelecionada(novaGarantia);
-      }
+      // Criar garantia mock baseada no item
+      const novaGarantia: GarantiaItem = {
+        id: '',
+        vendaId: venda.id,
+        itemVendaId: item.id,
+        produtoId: item.produtoId,
+        imei: item.imei,
+        modelo: item.produto,
+        tipoGarantia: item.tipoGarantia || 'Garantia - Apple',
+        mesesGarantia: 12,
+        dataInicioGarantia: venda.dataHora.split('T')[0],
+        dataFimGarantia: item.dataFimGarantia,
+        status: 'Ativa',
+        lojaVenda: venda.lojaVenda,
+        clienteId: venda.clienteId,
+        clienteNome: venda.clienteNome,
+        clienteTelefone: venda.clienteTelefone,
+        clienteEmail: venda.clienteEmail
+      };
+      setGarantiaSelecionada(novaGarantia);
     }
-    
-    setShowVendaModal(false);
-    setBuscaImei('');
-    setBuscaLoja('');
   };
   
   // Verificar tratativa ativa
@@ -194,6 +215,7 @@ export default function GarantiasNova() {
     
     // Limpar formulário
     setVendaSelecionada(null);
+    setItemSelecionado(null);
     setGarantiaSelecionada(null);
     setTipoTratativa('');
     setDescricaoTratativa('');
@@ -210,25 +232,141 @@ export default function GarantiasNova() {
     return getTratativasByGarantiaId(garantiaSelecionada.id);
   }, [garantiaSelecionada]);
 
+  // Função para cor do badge de garantia
+  const getGarantiaBadgeClass = (dataFim: string) => {
+    const status = calcularStatusExpiracao(dataFim);
+    switch (status.status) {
+      case 'expirada':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      case 'urgente':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
+      case 'atencao':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+      default:
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+    }
+  };
+
   return (
     <GarantiasLayout title="Nova Garantia">
       <div className="space-y-6">
-        {/* Quadro Consultar Garantia */}
+        {/* Quadro Histórico de Vendas - Tabela Direta */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Search className="h-5 w-5" />
-              Consultar Garantia
+              <FileText className="h-5 w-5" />
+              Histórico de Vendas
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <Button onClick={() => setShowVendaModal(true)} className="gap-2">
-              <FileText className="h-4 w-4" />
-              Selecionar Venda
-            </Button>
+          <CardContent className="space-y-4">
+            {/* Filtros inline */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <Label>IMEI</Label>
+                <Input 
+                  placeholder="Buscar IMEI..."
+                  value={buscaImei}
+                  onChange={(e) => setBuscaImei(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Data Início</Label>
+                <Input 
+                  type="date"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Data Fim</Label>
+                <Input 
+                  type="date"
+                  value={dataFim}
+                  onChange={(e) => setDataFim(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Loja</Label>
+                <Select value={buscaLoja || 'all'} onValueChange={(v) => setBuscaLoja(v === 'all' ? '' : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas as Lojas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Lojas</SelectItem>
+                    {lojas.map(l => (
+                      <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             
+            {/* Tabela de Vendas (sempre visível) */}
+            <div className="border rounded-lg overflow-hidden">
+              <div className="max-h-[400px] overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID Venda</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Loja</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Modelo</TableHead>
+                      <TableHead>IMEI</TableHead>
+                      <TableHead>Resp. Garantia</TableHead>
+                      <TableHead>Data Fim Garantia</TableHead>
+                      <TableHead>Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {vendasFiltradas.slice(0, 50).map(({ venda, item }, index) => (
+                      <TableRow key={`${venda.id}-${item.id}-${index}`} className="cursor-pointer hover:bg-muted/50">
+                        <TableCell className="font-medium">{venda.id}</TableCell>
+                        <TableCell>{format(new Date(venda.dataHora), 'dd/MM/yyyy')}</TableCell>
+                        <TableCell>{getLojaName(venda.lojaVenda)}</TableCell>
+                        <TableCell>{venda.clienteNome}</TableCell>
+                        <TableCell>{item.produto}</TableCell>
+                        <TableCell className="font-mono text-xs">{item.imei}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{item.tipoGarantia}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getGarantiaBadgeClass(item.dataFimGarantia)}>
+                            {format(new Date(item.dataFimGarantia), 'dd/MM/yyyy')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleSelectVenda(venda, item)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Selecionar
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {vendasFiltradas.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                          Nenhuma venda encontrada com os filtros aplicados
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+            
+            {/* Contador de resultados */}
+            <p className="text-sm text-muted-foreground">
+              {vendasFiltradas.length} {vendasFiltradas.length === 1 ? 'venda encontrada' : 'vendas encontradas'}
+            </p>
+            
+            {/* Dados da Venda Selecionada */}
             {vendaSelecionada && garantiaSelecionada && (
-              <div className="mt-6 space-y-6">
+              <div className="mt-6 space-y-6 border-t pt-6">
                 {/* Alertas de Expiração */}
                 {statusExpiracao && (
                   <Alert variant={statusExpiracao.status === 'expirada' ? 'destructive' : 'default'} 
@@ -429,108 +567,6 @@ export default function GarantiasNova() {
           </Card>
         )}
       </div>
-      
-      {/* Modal Seleção de Venda */}
-      <Dialog open={showVendaModal} onOpenChange={setShowVendaModal}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>Selecionar Venda para Garantia</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {/* Filtros */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <Label>IMEI</Label>
-                <Input 
-                  placeholder="Buscar IMEI..."
-                  value={buscaImei}
-                  onChange={(e) => setBuscaImei(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label>Loja</Label>
-                <Select value={buscaLoja || 'all'} onValueChange={(v) => setBuscaLoja(v === 'all' ? '' : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as Lojas</SelectItem>
-                    {lojas.map(l => (
-                      <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Data Início</Label>
-                <Input 
-                  type="date"
-                  value={dataInicio}
-                  onChange={(e) => setDataInicio(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label>Data Fim</Label>
-                <Input 
-                  type="date"
-                  value={dataFim}
-                  onChange={(e) => setDataFim(e.target.value)}
-                />
-              </div>
-            </div>
-            
-            {/* Tabela */}
-            <div className="max-h-[400px] overflow-auto border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID Venda</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Loja</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Modelo</TableHead>
-                    <TableHead>IMEI</TableHead>
-                    <TableHead>Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {vendasFiltradas.slice(0, 50).map(venda => (
-                    <TableRow key={venda.id}>
-                      <TableCell className="font-medium">{venda.id}</TableCell>
-                      <TableCell>{format(new Date(venda.dataHora), 'dd/MM/yyyy')}</TableCell>
-                      <TableCell>{getLojaName(venda.lojaVenda)}</TableCell>
-                      <TableCell>{venda.clienteNome}</TableCell>
-                      <TableCell>
-                        {venda.itens.map(i => i.produto).join(', ')}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {venda.itens.map(i => i.imei).join(', ')}
-                      </TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleSelectVenda(venda)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Selecionar
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowVendaModal(false)}>
-              Cancelar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </GarantiasLayout>
   );
 }

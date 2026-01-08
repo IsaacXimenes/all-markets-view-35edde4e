@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Download, Eye, TrendingUp, DollarSign, Percent, ShoppingCart } from 'lucide-react';
+import { Plus, Download, Eye, TrendingUp, DollarSign, Percent, ShoppingCart, CreditCard } from 'lucide-react';
 import { getVendas, exportVendasToCSV, formatCurrency, Venda } from '@/utils/vendasApi';
 import { getLojas, getColaboradores, Loja, Colaborador } from '@/utils/cadastrosApi';
 import { getStatusConferenciaByVendaId, StatusConferencia } from '@/utils/conferenciaGestorApi';
@@ -26,6 +26,12 @@ export default function Vendas() {
   const [imeiFiltro, setImeiFiltro] = useState('');
   const [vendedorFiltro, setVendedorFiltro] = useState('');
   const [filtroGarantia, setFiltroGarantia] = useState('');
+  const [tipoPagamentoFiltro, setTipoPagamentoFiltro] = useState('');
+
+  // Verifica se uma venda é Fiado
+  const isFiadoVenda = (venda: Venda) => {
+    return venda.pagamentos.some(p => p.isFiado === true);
+  };
 
   const getLojaName = (id: string) => {
     const loja = lojas.find(l => l.id === id);
@@ -131,10 +137,17 @@ export default function Vendas() {
           if (garantiaInfo.status !== 'Em Tratativa') return false;
         }
       }
+
+      // Filtro de tipo de pagamento
+      if (tipoPagamentoFiltro) {
+        const isFiado = isFiadoVenda(v);
+        if (tipoPagamentoFiltro === 'fiado' && !isFiado) return false;
+        if (tipoPagamentoFiltro === 'normal' && isFiado) return false;
+      }
       
       return true;
     });
-  }, [vendas, dataInicio, dataFim, lojaFiltro, vendedorFiltro, modeloFiltro, imeiFiltro, filtroGarantia]);
+  }, [vendas, dataInicio, dataFim, lojaFiltro, vendedorFiltro, modeloFiltro, imeiFiltro, filtroGarantia, tipoPagamentoFiltro]);
 
   const totais = useMemo(() => {
     let totalVendas = 0;
@@ -310,6 +323,19 @@ export default function Vendas() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Tipo Pagamento</label>
+              <Select value={tipoPagamentoFiltro || 'all'} onValueChange={(val) => setTipoPagamentoFiltro(val === 'all' ? '' : val)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="fiado">Fiado</SelectItem>
+                  <SelectItem value="normal">À Vista / Cartão</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-end gap-2">
               <Button onClick={() => navigate('/vendas/nova')} className="flex-1">
                 <Plus className="h-4 w-4 mr-2" />
@@ -331,6 +357,7 @@ export default function Vendas() {
               <TableHeader>
                 <TableRow>
                   <TableHead>ID Venda</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Data/Hora</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Modelo</TableHead>
@@ -355,6 +382,7 @@ export default function Vendas() {
                   const isPrejuizo = calc.lucro < 0;
                   const statusConferencia = getStatusConferenciaByVendaId(venda.id);
                   const garantiaInfo = getGarantiaInfo(venda);
+                  const vendaIsFiado = isFiadoVenda(venda);
                   
                   // Pegar modelos e IMEIs dos itens
                   const modelos = venda.itens.map(i => i.produto).join(', ');
@@ -383,6 +411,18 @@ export default function Vendas() {
                   return (
                     <TableRow key={venda.id} className={getRowBgClass()}>
                       <TableCell className="font-medium">{venda.id}</TableCell>
+                      <TableCell>
+                        {vendaIsFiado ? (
+                          <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 whitespace-nowrap">
+                            <CreditCard className="h-3 w-3 mr-1" />
+                            Fiado
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="whitespace-nowrap text-xs">
+                            Normal
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {new Date(venda.dataHora).toLocaleString('pt-BR')}
                       </TableCell>

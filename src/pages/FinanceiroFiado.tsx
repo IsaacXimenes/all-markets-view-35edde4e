@@ -413,13 +413,12 @@ export default function FinanceiroFiado() {
                       const groupIndex = getGroupIndex(parcela.vendaId);
                       const isEvenGroup = groupIndex % 2 === 0;
                       
-                      return (
+                        return (
                         <TableRow 
                           key={parcela.id}
                           className={`
                             ${getRowClassName(parcela.status)}
                             ${isFirstOfGroup ? 'border-t-2 border-t-primary/30' : ''}
-                            ${isEvenGroup ? 'bg-opacity-100' : 'bg-muted/20'}
                           `}
                         >
                           <TableCell className={`font-medium ${isFirstOfGroup ? '' : 'text-muted-foreground/60'}`}>

@@ -31,6 +31,7 @@ import { getProdutosCadastro, ProdutoCadastro, calcularTipoPessoa } from '@/util
 import { getProdutosPendentes, ProdutoPendente } from '@/utils/osApi';
 import { useDraftVenda } from '@/hooks/useDraftVenda';
 import { getPlanosPorModelo, PlanoGarantia } from '@/utils/planosGarantiaApi';
+import { displayIMEI } from '@/utils/imeiMask';
 
 const TIMER_DURATION = 1800; // 30 minutos em segundos
 const DRAFT_KEY = 'draft_venda_nova';
@@ -960,6 +961,7 @@ export default function VendasNova() {
                     <TableHead>Produto</TableHead>
                     <TableHead>IMEI</TableHead>
                     <TableHead>Loja</TableHead>
+                    <TableHead className="text-right">Custo do Produto</TableHead>
                     <TableHead className="text-right">Valor Recomendado</TableHead>
                     <TableHead className="text-right">Valor Venda</TableHead>
                     <TableHead></TableHead>
@@ -969,8 +971,11 @@ export default function VendasNova() {
                   {itens.map(item => (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.produto}</TableCell>
-                      <TableCell>{item.imei}</TableCell>
+                      <TableCell className="font-mono text-sm">{item.imei}</TableCell>
                       <TableCell>{item.loja}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatCurrency(item.valorCusto)}
+                      </TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {formatCurrency(item.valorRecomendado)}
                       </TableCell>
@@ -1265,7 +1270,7 @@ export default function VendasNova() {
                     return (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">{item.produto}</TableCell>
-                        <TableCell className="font-mono text-sm">{item.imei}</TableCell>
+                        <TableCell className="font-mono text-sm">{displayIMEI(item.imei)}</TableCell>
                         <TableCell>
                           <Badge variant={isNovo ? 'default' : 'secondary'}>
                             {condicao}

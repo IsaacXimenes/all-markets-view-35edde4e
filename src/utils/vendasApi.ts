@@ -399,6 +399,207 @@ let vendas: Venda[] = [
     margem: -3.66,
     observacoes: 'Venda ML com taxa alta - prejuízo calculado',
     status: 'Concluída'
+  },
+  // ========== VENDAS FIADO ==========
+  {
+    id: 'VEN-2025-0050',
+    numero: 50,
+    dataHora: '2024-12-01T14:30:00',
+    lojaVenda: 'LOJA-001',
+    vendedor: 'COL-004',
+    clienteId: 'CLI-001',
+    clienteNome: 'João Silva',
+    clienteCpf: '123.456.789-00',
+    clienteTelefone: '(11) 99999-1111',
+    clienteEmail: 'joao@email.com',
+    clienteCidade: 'São Paulo',
+    origemVenda: 'Loja Física',
+    localRetirada: 'LOJA-001',
+    tipoRetirada: 'Retirada Balcão',
+    taxaEntrega: 0,
+    itens: [
+      {
+        id: 'ITEM-050',
+        produtoId: 'PROD-0050',
+        produto: 'iPhone 14',
+        imei: '352123456789050',
+        categoria: 'iPhone',
+        quantidade: 1,
+        valorRecomendado: 5500.00,
+        valorVenda: 5000.00,
+        valorCusto: 2800.00,
+        loja: 'Loja Centro'
+      }
+    ],
+    tradeIns: [],
+    pagamentos: [
+      { 
+        id: 'PAG-050', 
+        meioPagamento: 'Fiado', 
+        valor: 1500.00, 
+        contaDestino: 'Caixa Principal',
+        isFiado: true,
+        fiadoDataBase: 5,
+        fiadoNumeroParcelas: 3
+      }
+    ],
+    subtotal: 5000.00,
+    totalTradeIn: 0,
+    total: 1500.00,
+    lucro: 2200.00,
+    margem: 78.57,
+    observacoes: 'Venda parcelada no Fiado - 3x de R$ 500,00',
+    status: 'Concluída'
+  },
+  {
+    id: 'VEN-2025-0055',
+    numero: 55,
+    dataHora: '2024-12-15T10:00:00',
+    lojaVenda: 'LOJA-002',
+    vendedor: 'COL-004',
+    clienteId: 'CLI-005',
+    clienteNome: 'Carlos Oliveira',
+    clienteCpf: '567.890.123-44',
+    clienteTelefone: '(11) 99999-5555',
+    clienteEmail: 'carlos@email.com',
+    clienteCidade: 'São Paulo',
+    origemVenda: 'WhatsApp',
+    localRetirada: 'LOJA-002',
+    tipoRetirada: 'Retirada Balcão',
+    taxaEntrega: 0,
+    itens: [
+      {
+        id: 'ITEM-055',
+        produtoId: 'PROD-0055',
+        produto: 'iPhone 15',
+        imei: '352123456789055',
+        categoria: 'iPhone',
+        quantidade: 1,
+        valorRecomendado: 7500.00,
+        valorVenda: 7000.00,
+        valorCusto: 4200.00,
+        loja: 'Loja Norte'
+      }
+    ],
+    tradeIns: [],
+    pagamentos: [
+      { 
+        id: 'PAG-055', 
+        meioPagamento: 'Fiado', 
+        valor: 2000.00, 
+        contaDestino: 'Caixa Loja Norte',
+        isFiado: true,
+        fiadoDataBase: 10,
+        fiadoNumeroParcelas: 5
+      }
+    ],
+    subtotal: 7000.00,
+    totalTradeIn: 0,
+    total: 2000.00,
+    lucro: 2800.00,
+    margem: 66.67,
+    observacoes: 'Venda parcelada no Fiado - 5x de R$ 400,00',
+    status: 'Concluída'
+  },
+  {
+    id: 'VEN-2025-0060',
+    numero: 60,
+    dataHora: '2025-01-02T16:45:00',
+    lojaVenda: 'LOJA-003',
+    vendedor: 'COL-004',
+    clienteId: 'CLI-006',
+    clienteNome: 'Ana Paula Ferreira',
+    clienteCpf: '678.901.234-55',
+    clienteTelefone: '(11) 99999-6666',
+    clienteEmail: 'anapaula@email.com',
+    clienteCidade: 'São Paulo',
+    origemVenda: 'Indicação',
+    localRetirada: 'LOJA-003',
+    tipoRetirada: 'Retirada Balcão',
+    taxaEntrega: 0,
+    itens: [
+      {
+        id: 'ITEM-060',
+        produtoId: 'PROD-0060',
+        produto: 'iPhone 13 Pro',
+        imei: '352123456789060',
+        categoria: 'iPhone',
+        quantidade: 1,
+        valorRecomendado: 5200.00,
+        valorVenda: 4800.00,
+        valorCusto: 2600.00,
+        loja: 'Loja Sul'
+      }
+    ],
+    tradeIns: [],
+    pagamentos: [
+      { 
+        id: 'PAG-060', 
+        meioPagamento: 'Fiado', 
+        valor: 1500.00, 
+        contaDestino: 'Caixa Loja Sul',
+        isFiado: true,
+        fiadoDataBase: 8,
+        fiadoNumeroParcelas: 2
+      }
+    ],
+    subtotal: 4800.00,
+    totalTradeIn: 0,
+    total: 1500.00,
+    lucro: 2200.00,
+    margem: 84.62,
+    observacoes: 'Venda parcelada no Fiado - 2x de R$ 750,00',
+    status: 'Concluída'
+  },
+  {
+    id: 'VEN-2025-0062',
+    numero: 62,
+    dataHora: '2025-01-05T11:20:00',
+    lojaVenda: 'LOJA-001',
+    vendedor: 'COL-004',
+    clienteId: 'CLI-007',
+    clienteNome: 'Roberto Mendes',
+    clienteCpf: '789.012.345-66',
+    clienteTelefone: '(11) 99999-7777',
+    clienteEmail: 'roberto@email.com',
+    clienteCidade: 'São Paulo',
+    origemVenda: 'Loja Física',
+    localRetirada: 'LOJA-001',
+    tipoRetirada: 'Retirada Balcão',
+    taxaEntrega: 0,
+    itens: [
+      {
+        id: 'ITEM-062',
+        produtoId: 'PROD-0062',
+        produto: 'iPhone 12 Pro Max',
+        imei: '352123456789062',
+        categoria: 'iPhone',
+        quantidade: 1,
+        valorRecomendado: 4500.00,
+        valorVenda: 4200.00,
+        valorCusto: 2100.00,
+        loja: 'Loja Centro'
+      }
+    ],
+    tradeIns: [],
+    pagamentos: [
+      { 
+        id: 'PAG-062', 
+        meioPagamento: 'Fiado', 
+        valor: 1300.00, 
+        contaDestino: 'Caixa Principal',
+        isFiado: true,
+        fiadoDataBase: 11,
+        fiadoNumeroParcelas: 4
+      }
+    ],
+    subtotal: 4200.00,
+    totalTradeIn: 0,
+    total: 1300.00,
+    lucro: 2100.00,
+    margem: 100.00,
+    observacoes: 'Venda parcelada no Fiado - 4x de R$ 325,00',
+    status: 'Concluída'
   }
 ];
 

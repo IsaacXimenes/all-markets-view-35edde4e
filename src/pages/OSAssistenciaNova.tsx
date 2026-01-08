@@ -32,7 +32,7 @@ import {
   getProdutosCadastro,
   ProdutoCadastro
 } from '@/utils/cadastrosApi';
-import { Plus, Trash2, Search, AlertTriangle, Clock, User, History, ArrowLeft, Smartphone, Save } from 'lucide-react';
+import { Plus, Trash2, Search, AlertTriangle, Clock, User, History, ArrowLeft, Smartphone, Save, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { formatIMEI, applyIMEIMask } from '@/utils/imeiMask';
@@ -53,6 +53,14 @@ interface PecaForm {
   pecaNoEstoque: boolean;
   pecaDeFornecedor: boolean;
   nomeRespFornecedor: string;
+}
+
+interface SolicitacaoPecaForm {
+  peca: string;
+  quantidade: number;
+  justificativa: string;
+  modeloCompativel: string;
+  prioridade: 'Baixa' | 'Normal' | 'Alta' | 'Urgente';
 }
 
 interface PagamentoForm {
@@ -96,6 +104,16 @@ export default function OSAssistenciaNova() {
   const [pagamentos, setPagamentos] = useState<PagamentoForm[]>([
     { meio: '', valor: '', parcelas: '' }
   ]);
+
+  // Solicitações de Peças
+  const [solicitacoesPecas, setSolicitacoesPecas] = useState<SolicitacaoPecaForm[]>([]);
+  const [novaSolicitacao, setNovaSolicitacao] = useState<SolicitacaoPecaForm>({
+    peca: '',
+    quantidade: 1,
+    justificativa: '',
+    modeloCompativel: '',
+    prioridade: 'Normal'
+  });
 
   // Dialogs
   const [buscarClienteOpen, setBuscarClienteOpen] = useState(false);
@@ -304,6 +322,34 @@ export default function OSAssistenciaNova() {
     if (pagamentos.length > 1) {
       setPagamentos(pagamentos.filter((_, i) => i !== index));
     }
+  };
+
+  // Solicitações de peças handlers
+  const handleAddSolicitacao = () => {
+    if (!novaSolicitacao.peca || !novaSolicitacao.justificativa) {
+      toast({
+        title: 'Campos obrigatórios',
+        description: 'Preencha a peça e a justificativa',
+        variant: 'destructive'
+      });
+      return;
+    }
+    setSolicitacoesPecas([...solicitacoesPecas, { ...novaSolicitacao }]);
+    setNovaSolicitacao({
+      peca: '',
+      quantidade: 1,
+      justificativa: '',
+      modeloCompativel: modeloAparelho,
+      prioridade: 'Normal'
+    });
+    toast({
+      title: 'Solicitação adicionada',
+      description: `Peça "${novaSolicitacao.peca}" adicionada à lista`
+    });
+  };
+
+  const handleRemoveSolicitacao = (index: number) => {
+    setSolicitacoesPecas(solicitacoesPecas.filter((_, i) => i !== index));
   };
 
   const handleSelecionarCliente = (cliente: Cliente) => {
@@ -867,6 +913,138 @@ export default function OSAssistenciaNova() {
                 <Plus className="mr-2 h-4 w-4" />
                 Adicionar Peça/Serviço
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Solicitar Peças */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Solicitar Peças
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Formulário de nova solicitação */}
+              <div className="p-4 border rounded-lg bg-muted/30 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Nome da Peça *</Label>
+                    <Input
+                      value={novaSolicitacao.peca}
+                      onChange={e => setNovaSolicitacao({ ...novaSolicitacao, peca: e.target.value })}
+                      placeholder="Ex: Tela iPhone 14 Pro"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Quantidade</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={novaSolicitacao.quantidade}
+                      onChange={e => setNovaSolicitacao({ ...novaSolicitacao, quantidade: parseInt(e.target.value) || 1 })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Prioridade</Label>
+                    <Select 
+                      value={novaSolicitacao.prioridade} 
+                      onValueChange={(v) => setNovaSolicitacao({ ...novaSolicitacao, prioridade: v as any })}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Baixa">Baixa</SelectItem>
+                        <SelectItem value="Normal">Normal</SelectItem>
+                        <SelectItem value="Alta">Alta</SelectItem>
+                        <SelectItem value="Urgente">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Modelo Compatível</Label>
+                    <Select 
+                      value={novaSolicitacao.modeloCompativel} 
+                      onValueChange={(v) => setNovaSolicitacao({ ...novaSolicitacao, modeloCompativel: v })}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Selecione o modelo..." /></SelectTrigger>
+                      <SelectContent>
+                        {produtosCadastro.map(p => (
+                          <SelectItem key={p.id} value={p.produto}>{p.produto}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Justificativa *</Label>
+                    <Input
+                      value={novaSolicitacao.justificativa}
+                      onChange={e => setNovaSolicitacao({ ...novaSolicitacao, justificativa: e.target.value })}
+                      placeholder="Motivo da solicitação..."
+                    />
+                  </div>
+                </div>
+                <Button onClick={handleAddSolicitacao}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Adicionar Solicitação
+                </Button>
+              </div>
+
+              {/* Lista de solicitações */}
+              {solicitacoesPecas.length > 0 && (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Peça</TableHead>
+                        <TableHead className="text-center">Qtd</TableHead>
+                        <TableHead>Modelo Compatível</TableHead>
+                        <TableHead>Justificativa</TableHead>
+                        <TableHead>Prioridade</TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {solicitacoesPecas.map((sol, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">{sol.peca}</TableCell>
+                          <TableCell className="text-center">{sol.quantidade}</TableCell>
+                          <TableCell>{sol.modeloCompativel || '-'}</TableCell>
+                          <TableCell className="max-w-[200px] truncate">{sol.justificativa}</TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={sol.prioridade === 'Urgente' ? 'destructive' : sol.prioridade === 'Alta' ? 'default' : 'secondary'}
+                            >
+                              {sol.prioridade}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" onClick={() => handleRemoveSolicitacao(index)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {solicitacoesPecas.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhuma solicitação de peça adicionada. Adicione peças que precisam ser compradas para este serviço.
+                </p>
+              )}
+
+              {solicitacoesPecas.length > 0 && (
+                <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg text-sm text-yellow-700 dark:text-yellow-300 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Ao registrar a OS, as solicitações serão enviadas para aprovação do gestor. O status da OS será "Aguardando Aprovação do Gestor".
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

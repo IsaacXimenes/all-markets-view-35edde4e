@@ -120,6 +120,10 @@ export interface MaquinaCartao {
   cnpjVinculado: string; // ID da loja
   contaOrigem: string;   // ID da conta financeira
   status: 'Ativo' | 'Inativo';
+  taxas: {
+    credito: { [parcela: number]: number }; // Ex: { 1: 2, 2: 4, 3: 6, ... }
+    debito: number; // Taxa fixa
+  };
 }
 
 // Helper para calcular tipo de cliente
@@ -295,14 +299,54 @@ let contasFinanceiras: ContaFinanceira[] = [
   { id: 'CTA-008', nome: 'Caixa Shopping', tipo: 'Caixa', lojaVinculada: 'LOJA-004', banco: '-', agencia: '-', conta: '-', cnpj: '12.345.678/0004-04', saldoInicial: 8000, saldoAtual: 22000, status: 'Ativo', ultimoMovimento: '2025-01-20' },
   { id: 'CTA-009', nome: 'Santander PJ', tipo: 'Conta Bancária', lojaVinculada: 'Administrativo', banco: 'Santander', agencia: '4321', conta: '56789-0', cnpj: '12.345.678/0001-01', saldoInicial: 30000, saldoAtual: 95000, status: 'Ativo', ultimoMovimento: '2025-01-17' },
   { id: 'CTA-010', nome: 'Inter Digital', tipo: 'Conta Digital', lojaVinculada: 'Administrativo', banco: 'Inter', agencia: '0001', conta: '11223344-5', cnpj: '12.345.678/0001-01', saldoInicial: 5000, saldoAtual: 42000, status: 'Ativo', ultimoMovimento: '2025-01-16' },
+  { id: 'CTA-011', nome: 'Pessoal - Thiago', tipo: 'Conta Pessoal', lojaVinculada: 'Administrativo', banco: 'Nubank', agencia: '0001', conta: '99999999-9', cnpj: '12.345.678/0001-01', saldoInicial: 0, saldoAtual: 125000, status: 'Ativo', ultimoMovimento: '2025-01-20' },
 ];
 
 let maquinasCartao: MaquinaCartao[] = [
-  { id: 'MAQ-001', nome: 'Máquina Cartão Matriz', cnpjVinculado: 'LOJA-001', contaOrigem: 'CTA-002', status: 'Ativo' },
-  { id: 'MAQ-002', nome: 'Máquina Stone Shopping', cnpjVinculado: 'LOJA-004', contaOrigem: 'CTA-005', status: 'Ativo' },
-  { id: 'MAQ-003', nome: 'Máquina PagSeguro Centro', cnpjVinculado: 'LOJA-003', contaOrigem: 'CTA-003', status: 'Ativo' },
-  { id: 'MAQ-004', nome: 'Máquina Cielo Leste', cnpjVinculado: 'LOJA-006', contaOrigem: 'CTA-004', status: 'Ativo' },
-  { id: 'MAQ-005', nome: 'Máquina GetNet Sul', cnpjVinculado: 'LOJA-007', contaOrigem: 'CTA-002', status: 'Ativo' },
+  { 
+    id: 'MAQ-001', 
+    nome: 'Máquina Stone Shopping', 
+    cnpjVinculado: 'LOJA-004', 
+    contaOrigem: 'CTA-005', 
+    status: 'Ativo',
+    taxas: {
+      credito: { 1: 3, 2: 5, 3: 7, 4: 9, 5: 11, 6: 13, 7: 15, 8: 17, 9: 19, 10: 21, 11: 23, 12: 25 },
+      debito: 2
+    }
+  },
+  { 
+    id: 'MAQ-002', 
+    nome: 'Máquina PagSeguro Centro', 
+    cnpjVinculado: 'LOJA-003', 
+    contaOrigem: 'CTA-003', 
+    status: 'Ativo',
+    taxas: {
+      credito: { 1: 2, 2: 4, 3: 6, 4: 8, 5: 10, 6: 12, 7: 14, 8: 16, 9: 18, 10: 20, 11: 22, 12: 24 },
+      debito: 2
+    }
+  },
+  { 
+    id: 'MAQ-003', 
+    nome: 'Máquina Cielo Leste', 
+    cnpjVinculado: 'LOJA-006', 
+    contaOrigem: 'CTA-004', 
+    status: 'Ativo',
+    taxas: {
+      credito: { 1: 3, 2: 5, 3: 7, 4: 9, 5: 11, 6: 13, 7: 15, 8: 17, 9: 19, 10: 21, 11: 23, 12: 25 },
+      debito: 2
+    }
+  },
+  { 
+    id: 'MAQ-004', 
+    nome: 'Máquina GetNet Sul', 
+    cnpjVinculado: 'LOJA-007', 
+    contaOrigem: 'CTA-002', 
+    status: 'Ativo',
+    taxas: {
+      credito: { 1: 2, 2: 4, 3: 6, 4: 8, 5: 10, 6: 12, 7: 14, 8: 16, 9: 18, 10: 20, 11: 22, 12: 24 },
+      debito: 2
+    }
+  },
 ];
 
 // API Functions

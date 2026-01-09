@@ -97,14 +97,29 @@ export default function VendaDetalhes() {
   const totais = calcularTotais(venda);
   const isPrejuizo = totais.lucro < 0;
 
+  // Check if sale is Fiado
+  const isFiadoVenda = venda.pagamentos.some(p => p.isFiado === true);
+
   return (
     <PageLayout title={`Detalhes da Venda ${venda.id}`}>
       {/* Botões de ação */}
       <div className="flex justify-between items-center mb-6">
-        <Button variant="outline" onClick={() => navigate('/vendas')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Voltar
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={() => navigate('/vendas')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar
+          </Button>
+          {isFiadoVenda ? (
+            <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 text-sm px-3 py-1">
+              <CreditCard className="h-4 w-4 mr-1" />
+              Fiado
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-sm px-3 py-1">
+              Normal
+            </Badge>
+          )}
+        </div>
         <Button onClick={handleImprimir}>
           <Printer className="h-4 w-4 mr-2" />
           Imprimir Recibo

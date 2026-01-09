@@ -417,13 +417,147 @@ export default function VendaDetalhes() {
             </CardContent>
           </Card>
 
-          {/* Timeline de Edições */}
-          {venda.timelineEdicoes && venda.timelineEdicoes.length > 0 && (
+          {/* Timeline Completa */}
+          {venda.timeline && venda.timeline.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <History className="h-5 w-5" />
-                  Timeline de Edições
+                  Timeline Completa
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {venda.timeline.map((evento) => {
+                    const getIconeETema = () => {
+                      switch (evento.tipo) {
+                        case 'criacao':
+                          return { 
+                            icon: <ShoppingCart className="h-4 w-4" />, 
+                            bgColor: 'bg-green-500/10', 
+                            textColor: 'text-green-600',
+                            borderColor: 'border-green-500'
+                          };
+                        case 'edicao':
+                          return { 
+                            icon: <Pencil className="h-4 w-4" />, 
+                            bgColor: 'bg-blue-500/10', 
+                            textColor: 'text-blue-600',
+                            borderColor: 'border-blue-500'
+                          };
+                        case 'aprovacao_lancamento':
+                          return { 
+                            icon: <Clock className="h-4 w-4" />, 
+                            bgColor: 'bg-purple-500/10', 
+                            textColor: 'text-purple-600',
+                            borderColor: 'border-purple-500'
+                          };
+                        case 'recusa_gestor':
+                          return { 
+                            icon: <AlertTriangle className="h-4 w-4" />, 
+                            bgColor: 'bg-red-500/10', 
+                            textColor: 'text-red-600',
+                            borderColor: 'border-red-500'
+                          };
+                        case 'aprovacao_gestor':
+                          return { 
+                            icon: <Shield className="h-4 w-4" />, 
+                            bgColor: 'bg-indigo-500/10', 
+                            textColor: 'text-indigo-600',
+                            borderColor: 'border-indigo-500'
+                          };
+                        case 'devolucao_financeiro':
+                          return { 
+                            icon: <AlertTriangle className="h-4 w-4" />, 
+                            bgColor: 'bg-orange-500/10', 
+                            textColor: 'text-orange-600',
+                            borderColor: 'border-orange-500'
+                          };
+                        case 'aprovacao_financeiro':
+                        case 'finalizacao':
+                          return { 
+                            icon: <DollarSign className="h-4 w-4" />, 
+                            bgColor: 'bg-emerald-500/10', 
+                            textColor: 'text-emerald-600',
+                            borderColor: 'border-emerald-500'
+                          };
+                        default:
+                          return { 
+                            icon: <Clock className="h-4 w-4" />, 
+                            bgColor: 'bg-muted', 
+                            textColor: 'text-muted-foreground',
+                            borderColor: 'border-muted'
+                          };
+                      }
+                    };
+
+                    const tema = getIconeETema();
+
+                    return (
+                      <div key={evento.id} className={`border-l-2 ${tema.borderColor} pl-4 pb-4`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`h-8 w-8 rounded-full ${tema.bgColor} flex items-center justify-center ${tema.textColor}`}>
+                            {tema.icon}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {format(new Date(evento.dataHora), 'dd/MM/yyyy HH:mm')}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {evento.usuarioNome}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="ml-10 space-y-2">
+                          <p className={`text-sm font-medium ${tema.textColor}`}>
+                            {evento.descricao}
+                          </p>
+                          
+                          {/* Mostrar alterações se houver */}
+                          {evento.alteracoes && evento.alteracoes.length > 0 && (
+                            <div className="space-y-1 mt-2">
+                              {evento.alteracoes.map((alt, idx) => (
+                                <div key={idx} className="bg-muted/50 rounded-lg p-2 text-sm">
+                                  <span className="font-medium">{alt.campo}:</span>{' '}
+                                  <span className="text-red-500 line-through">
+                                    {typeof alt.valorAnterior === 'number' 
+                                      ? formatCurrency(alt.valorAnterior) 
+                                      : String(alt.valorAnterior)}
+                                  </span>
+                                  {' → '}
+                                  <span className="text-green-600 font-medium">
+                                    {typeof alt.valorNovo === 'number' 
+                                      ? formatCurrency(alt.valorNovo) 
+                                      : String(alt.valorNovo)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Mostrar motivo se houver */}
+                          {evento.motivo && (
+                            <div className="bg-red-50 dark:bg-red-950/30 p-2 rounded-lg text-sm">
+                              <span className="font-medium text-red-600">Motivo:</span>{' '}
+                              <span className="text-red-700 dark:text-red-400">{evento.motivo}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Timeline de Edições (legado) */}
+          {venda.timelineEdicoes && venda.timelineEdicoes.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Pencil className="h-5 w-5" />
+                  Edições do Gestor
                 </CardTitle>
               </CardHeader>
               <CardContent>

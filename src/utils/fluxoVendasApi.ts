@@ -73,16 +73,21 @@ export const getVendaComFluxo = (vendaId: string): VendaComFluxo | null => {
   const fluxoData = getFluxoData();
   const dadosFluxo = fluxoData[vendaId] || {};
 
+  // Prioridade: dadosFluxo.statusFluxo > venda.statusAtual > 'Finalizado'
+  const statusFluxo = dadosFluxo.statusFluxo || 
+    (venda as any).statusAtual || 
+    'Finalizado';
+
   return {
     ...venda,
-    statusFluxo: dadosFluxo.statusFluxo || 'Finalizado',
+    statusFluxo: statusFluxo as StatusVenda,
     aprovacaoLancamento: dadosFluxo.aprovacaoLancamento,
     aprovacaoGestor: dadosFluxo.aprovacaoGestor,
     recusaGestor: dadosFluxo.recusaGestor,
     devolucaoFinanceiro: dadosFluxo.devolucaoFinanceiro,
     aprovacaoFinanceiro: dadosFluxo.aprovacaoFinanceiro,
-    timelineFluxo: dadosFluxo.timelineFluxo || [],
-    bloqueadoParaEdicao: dadosFluxo.bloqueadoParaEdicao || false
+    timelineFluxo: dadosFluxo.timelineFluxo || (venda as any).timeline || [],
+    bloqueadoParaEdicao: dadosFluxo.bloqueadoParaEdicao || (venda as any).bloqueadoParaEdicao || false
   };
 };
 
@@ -93,16 +98,22 @@ export const getVendasComFluxo = (): VendaComFluxo[] => {
 
   return vendas.map(venda => {
     const dadosFluxo = fluxoData[venda.id] || {};
+    
+    // Prioridade: dadosFluxo.statusFluxo > venda.statusAtual > 'Finalizado'
+    const statusFluxo = dadosFluxo.statusFluxo || 
+      (venda as any).statusAtual || 
+      'Finalizado';
+    
     return {
       ...venda,
-      statusFluxo: dadosFluxo.statusFluxo || 'Finalizado',
+      statusFluxo: statusFluxo as StatusVenda,
       aprovacaoLancamento: dadosFluxo.aprovacaoLancamento,
       aprovacaoGestor: dadosFluxo.aprovacaoGestor,
       recusaGestor: dadosFluxo.recusaGestor,
       devolucaoFinanceiro: dadosFluxo.devolucaoFinanceiro,
       aprovacaoFinanceiro: dadosFluxo.aprovacaoFinanceiro,
-      timelineFluxo: dadosFluxo.timelineFluxo || [],
-      bloqueadoParaEdicao: dadosFluxo.bloqueadoParaEdicao || false
+      timelineFluxo: dadosFluxo.timelineFluxo || (venda as any).timeline || [],
+      bloqueadoParaEdicao: dadosFluxo.bloqueadoParaEdicao || (venda as any).bloqueadoParaEdicao || false
     };
   });
 };

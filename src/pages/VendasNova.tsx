@@ -701,7 +701,20 @@ export default function VendasNova() {
     });
     setAcessoriosEstoque(getAcessorios());
 
-    // Registrar venda
+    // Obter nome do vendedor para timeline
+    const vendedorNome = colaboradores.find(c => c.id === confirmVendedor)?.nome || 'Vendedor';
+
+    // Criar timeline inicial
+    const timelineInicial = [{
+      id: `timeline-${Date.now()}`,
+      dataHora: new Date().toISOString(),
+      tipo: 'criacao' as const,
+      usuarioId: confirmVendedor,
+      usuarioNome: vendedorNome,
+      descricao: `Venda criada por ${vendedorNome}`
+    }];
+
+    // Registrar venda com status "Aguardando Conferência"
     const venda = addVenda({
       dataHora: new Date().toISOString(),
       lojaVenda: confirmLoja,
@@ -726,19 +739,22 @@ export default function VendasNova() {
       lucro: lucroProjetado,
       margem: margemProjetada,
       observacoes,
-      status: 'Concluída'
+      status: 'Concluída',
+      statusAtual: 'Aguardando Conferência',
+      timeline: timelineInicial,
+      bloqueadoParaEdicao: false
     });
 
     // Limpar rascunho
     clearDraft();
 
     toast({
-      title: "Venda registrada com sucesso!",
-      description: `Venda ${venda.id} registrada com sucesso!`,
+      title: "Venda registrada!",
+      description: "Venda aguardando conferência do lançador.",
     });
 
     setShowConfirmacaoModal(false);
-    navigate('/vendas');
+    navigate('/vendas/conferencia-lancamento');
   };
 
   const getColaboradorNome = (id: string) => {

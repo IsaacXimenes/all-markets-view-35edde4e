@@ -56,6 +56,40 @@ export interface TimelineEdicaoVenda {
   descricao: string;
 }
 
+// Novo tipo para status do fluxo de vendas
+export type StatusVenda = 
+  | 'Aguardando Conferência'
+  | 'Conferência Gestor'
+  | 'Recusada - Gestor'
+  | 'Conferência Financeiro'
+  | 'Devolvido pelo Financeiro'
+  | 'Finalizado'
+  | 'Cancelada';
+
+// Interface de aprovação
+export interface RegistroAprovacao {
+  usuarioId: string;
+  usuarioNome: string;
+  dataHora: string;
+  motivo?: string;
+}
+
+// Interface de timeline do fluxo
+export interface TimelineVenda {
+  id: string;
+  dataHora: string;
+  tipo: 'criacao' | 'edicao' | 'aprovacao_lancamento' | 'recusa_gestor' | 'aprovacao_gestor' | 'devolucao_financeiro' | 'aprovacao_financeiro' | 'finalizacao';
+  usuarioId: string;
+  usuarioNome: string;
+  descricao: string;
+  alteracoes?: {
+    campo: string;
+    valorAnterior: any;
+    valorNovo: any;
+  }[];
+  motivo?: string;
+}
+
 export interface Venda {
   id: string;
   numero: number;
@@ -72,10 +106,10 @@ export interface Venda {
   localRetirada: string;
   tipoRetirada: 'Retirada Balcão' | 'Entrega' | 'Retirada em Outra Loja';
   taxaEntrega: number;
-  motoboyId?: string; // ID do motoboy para entregas
+  motoboyId?: string;
   itens: ItemVenda[];
   tradeIns: ItemTradeIn[];
-  acessorios?: VendaAcessorio[]; // Acessórios vendidos
+  acessorios?: VendaAcessorio[];
   pagamentos: Pagamento[];
   subtotal: number;
   totalTradeIn: number;
@@ -85,8 +119,18 @@ export interface Venda {
   observacoes: string;
   status: 'Concluída' | 'Cancelada' | 'Pendente';
   motivoCancelamento?: string;
-  comissaoVendedor?: number; // Comissão calculada no momento da venda
-  timelineEdicoes?: TimelineEdicaoVenda[]; // Histórico de edições pelo gestor
+  comissaoVendedor?: number;
+  timelineEdicoes?: TimelineEdicaoVenda[];
+  
+  // Campos do novo fluxo de vendas
+  statusAtual?: StatusVenda;
+  aprovacaoLancamento?: RegistroAprovacao;
+  aprovacaoGestor?: RegistroAprovacao;
+  recusaGestor?: RegistroAprovacao;
+  devolucaoFinanceiro?: RegistroAprovacao;
+  aprovacaoFinanceiro?: RegistroAprovacao;
+  timeline?: TimelineVenda[];
+  bloqueadoParaEdicao?: boolean;
 }
 
 export interface HistoricoCompraCliente {

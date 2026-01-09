@@ -68,11 +68,18 @@ export default function CadastrosMaquinas() {
       return;
     }
 
+    // Taxas padrão para novas máquinas
+    const defaultTaxas = {
+      credito: { 1: 2, 2: 4, 3: 6, 4: 8, 5: 10, 6: 12, 7: 14, 8: 16, 9: 18, 10: 20, 11: 22, 12: 24 },
+      debito: 2
+    };
+
     const maquinaData = {
       nome: form.nome,
       cnpjVinculado: form.cnpjVinculado,
       contaOrigem: form.contaOrigem,
-      status: form.status
+      status: form.status,
+      taxas: editingMaquina?.taxas || defaultTaxas
     };
 
     if (editingMaquina) {

@@ -17,11 +17,11 @@ import {
   User, Package, CreditCard, Truck, FileText, AlertTriangle, Check, Shield, Save,
   Headphones, ArrowLeftRight, Star
 } from 'lucide-react';
-import { format, addMonths } from 'date-fns';
+import { format, addMonths, addDays } from 'date-fns';
 
 import { 
   getLojas, getClientes, getColaboradores, getCargos, getOrigensVenda, 
-  getContasFinanceiras, getMotoboys, getLojaById, Loja, Cliente, Colaborador, Cargo, OrigemVenda, ContaFinanceira,
+  getContasFinanceiras, getMotoboys, getLojaById, getMaquinasCartao, Loja, Cliente, Colaborador, Cargo, OrigemVenda, ContaFinanceira, MaquinaCartao,
   addCliente
 } from '@/utils/cadastrosApi';
 import { getProdutos, Produto, updateProduto } from '@/utils/estoqueApi';
@@ -103,7 +103,8 @@ export default function VendasNova() {
   // Pagamentos
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [showPagamentoModal, setShowPagamentoModal] = useState(false);
-  const [novoPagamento, setNovoPagamento] = useState<Partial<Pagamento>>({});
+  const [novoPagamento, setNovoPagamento] = useState<Partial<Pagamento> & { maquinaId?: string; taxaCartao?: number; valorComTaxa?: number }>({});
+  const [maquinasCartao] = useState<MaquinaCartao[]>(getMaquinasCartao().filter(m => m.status === 'Ativo'));
   
   // Confirmação
   const [showConfirmacaoModal, setShowConfirmacaoModal] = useState(false);
@@ -189,6 +190,7 @@ export default function VendasNova() {
       setTradeIns(draft.tradeIns || []);
       setPagamentos(draft.pagamentos || []);
       setGarantiaItens(draft.garantiaItens || []);
+      setGarantiaExtendida(draft.garantiaExtendida || null);
       toast({ title: "Rascunho carregado", description: "Dados da venda anterior foram restaurados" });
     }
     setShowDraftModal(false);
@@ -209,7 +211,7 @@ export default function VendasNova() {
     const now = Date.now();
     if (now - lastSaveTime.current < 2000) return;
     
-    const hasData = lojaVenda || vendedor || clienteId || itens.length > 0 || acessoriosVenda.length > 0 || pagamentos.length > 0;
+    const hasData = lojaVenda || vendedor || clienteId || itens.length > 0 || acessoriosVenda.length > 0 || pagamentos.length > 0 || garantiaExtendida;
     if (!hasData) return;
 
     const timeout = setTimeout(() => {
@@ -232,13 +234,14 @@ export default function VendasNova() {
         acessoriosVenda,
         tradeIns,
         pagamentos,
-        garantiaItens
+        garantiaItens,
+        garantiaExtendida
       });
       lastSaveTime.current = Date.now();
     }, 2000);
 
     return () => clearTimeout(timeout);
-  }, [lojaVenda, vendedor, clienteId, clienteNome, origemVenda, localRetirada, tipoRetirada, taxaEntrega, motoboyId, observacoes, itens, acessoriosVenda, tradeIns, pagamentos, garantiaItens]);
+  }, [lojaVenda, vendedor, clienteId, clienteNome, origemVenda, localRetirada, tipoRetirada, taxaEntrega, motoboyId, observacoes, itens, acessoriosVenda, tradeIns, pagamentos, garantiaItens, garantiaExtendida]);
 
   // Timer effect
   useEffect(() => {
@@ -305,12 +308,13 @@ export default function VendasNova() {
     };
   };
   
-  // Calcular vigência da garantia extendida (sempre após 12 meses)
+  // Calcular vigência da garantia extendida (sempre inicia no dia seguinte ao término da garantia padrão de 12 meses)
   const calcularVigenciaExtendida = (plano: PlanoGarantia) => {
-    const dataInicio = addMonths(new Date(), 12);
-    const dataFim = addMonths(dataInicio, plano.meses);
+    const dataFimGarantiaPadrao = addMonths(new Date(), 12);
+    const dataInicioGarantiaExtendida = addDays(dataFimGarantiaPadrao, 1);
+    const dataFim = addMonths(dataInicioGarantiaExtendida, plano.meses);
     return { 
-      dataInicio: format(dataInicio, 'yyyy-MM-dd'), 
+      dataInicio: format(dataInicioGarantiaExtendida, 'yyyy-MM-dd'), 
       dataFim: format(dataFim, 'yyyy-MM-dd') 
     };
   };
@@ -1302,7 +1306,7 @@ export default function VendasNova() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {isNovo ? (
+                          {isNovo ? (
                               <Badge variant="outline">Garantia - Apple</Badge>
                             ) : (
                               <Select 
@@ -1328,7 +1332,7 @@ export default function VendasNova() {
                                   });
                                 }}
                               >
-                                <SelectTrigger className="w-[180px]">
+                                <SelectTrigger className="w-auto min-w-[200px]">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -2221,13 +2225,15 @@ export default function VendasNova() {
                 onValueChange={(v) => {
                   // Se for débito, sempre 1 parcela
                   if (v === 'Cartão Débito') {
-                    setNovoPagamento({ ...novoPagamento, meioPagamento: v, parcelas: 1, isFiado: false, fiadoDataBase: undefined, fiadoNumeroParcelas: undefined });
+                    setNovoPagamento({ ...novoPagamento, meioPagamento: v, parcelas: 1, isFiado: false, fiadoDataBase: undefined, fiadoNumeroParcelas: undefined, maquinaId: '', taxaCartao: undefined, valorComTaxa: undefined });
                   } else if (v === 'Cartão Crédito') {
-                    setNovoPagamento({ ...novoPagamento, meioPagamento: v, parcelas: novoPagamento.parcelas || 1, isFiado: false, fiadoDataBase: undefined, fiadoNumeroParcelas: undefined });
+                    setNovoPagamento({ ...novoPagamento, meioPagamento: v, parcelas: novoPagamento.parcelas || 1, isFiado: false, fiadoDataBase: undefined, fiadoNumeroParcelas: undefined, maquinaId: '', taxaCartao: undefined, valorComTaxa: undefined });
                   } else if (v === 'Fiado') {
-                    setNovoPagamento({ ...novoPagamento, meioPagamento: v, parcelas: undefined, isFiado: true, fiadoDataBase: 5, fiadoNumeroParcelas: 1 });
+                    // Auto-preencher conta "Pessoal - Thiago"
+                    const contaPessoal = contasFinanceiras.find(c => c.nome.toLowerCase().includes('pessoal') && c.nome.toLowerCase().includes('thiago'));
+                    setNovoPagamento({ ...novoPagamento, meioPagamento: v, parcelas: undefined, isFiado: true, fiadoDataBase: 5, fiadoNumeroParcelas: 1, contaDestino: contaPessoal?.id || '', maquinaId: undefined, taxaCartao: undefined, valorComTaxa: undefined });
                   } else {
-                    setNovoPagamento({ ...novoPagamento, meioPagamento: v, parcelas: undefined, isFiado: false, fiadoDataBase: undefined, fiadoNumeroParcelas: undefined });
+                    setNovoPagamento({ ...novoPagamento, meioPagamento: v, parcelas: undefined, isFiado: false, fiadoDataBase: undefined, fiadoNumeroParcelas: undefined, maquinaId: undefined, taxaCartao: undefined, valorComTaxa: undefined });
                   }
                 }}
               >
@@ -2245,7 +2251,7 @@ export default function VendasNova() {
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium">Valor *</label>
+              <label className="text-sm font-medium">Valor dos Produtos *</label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
                 <Input 
@@ -2253,7 +2259,21 @@ export default function VendasNova() {
                   value={novoPagamento.valor ? novoPagamento.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}
                   onChange={(e) => {
                     const value = e.target.value.replace(/\D/g, '');
-                    setNovoPagamento({ ...novoPagamento, valor: Number(value) / 100 });
+                    const valorNum = Number(value) / 100;
+                    // Recalcular taxa se tiver máquina selecionada
+                    if (novoPagamento.maquinaId) {
+                      const maquina = maquinasCartao.find(m => m.id === novoPagamento.maquinaId);
+                      if (maquina) {
+                        const parcelas = novoPagamento.parcelas || 1;
+                        const taxa = novoPagamento.meioPagamento === 'Cartão Débito' 
+                          ? maquina.taxas.debito 
+                          : (maquina.taxas.credito[parcelas] || parcelas * 2);
+                        const valorTaxa = valorNum * (taxa / 100);
+                        setNovoPagamento({ ...novoPagamento, valor: valorNum, taxaCartao: valorTaxa, valorComTaxa: valorNum + valorTaxa });
+                        return;
+                      }
+                    }
+                    setNovoPagamento({ ...novoPagamento, valor: valorNum });
                   }}
                   className="pl-10"
                   placeholder="0,00"
@@ -2261,34 +2281,95 @@ export default function VendasNova() {
               </div>
             </div>
             
+            {/* Seleção de Máquina para Cartão */}
+            {(novoPagamento.meioPagamento === 'Cartão Crédito' || novoPagamento.meioPagamento === 'Cartão Débito') && (
+              <div>
+                <label className="text-sm font-medium">Máquina de Cartão *</label>
+                <Select 
+                  value={novoPagamento.maquinaId || ''} 
+                  onValueChange={(v) => {
+                    const maquina = maquinasCartao.find(m => m.id === v);
+                    if (maquina && novoPagamento.valor) {
+                      const parcelas = novoPagamento.parcelas || 1;
+                      const taxa = novoPagamento.meioPagamento === 'Cartão Débito' 
+                        ? maquina.taxas.debito 
+                        : (maquina.taxas.credito[parcelas] || parcelas * 2);
+                      const valorTaxa = novoPagamento.valor * (taxa / 100);
+                      setNovoPagamento({ ...novoPagamento, maquinaId: v, taxaCartao: valorTaxa, valorComTaxa: novoPagamento.valor + valorTaxa });
+                    } else {
+                      setNovoPagamento({ ...novoPagamento, maquinaId: v });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a máquina" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {maquinasCartao.map(maq => (
+                      <SelectItem key={maq.id} value={maq.id}>{maq.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            
             {/* Parcelas - Cartão Crédito obrigatório, Débito sempre 1x */}
             {novoPagamento.meioPagamento === 'Cartão Crédito' && (
               <div>
                 <label className="text-sm font-medium">Número de Parcelas *</label>
                 <Select 
                   value={String(novoPagamento.parcelas || 1)} 
-                  onValueChange={(v) => setNovoPagamento({ ...novoPagamento, parcelas: Number(v) })}
+                  onValueChange={(v) => {
+                    const parcelas = Number(v);
+                    const maquina = maquinasCartao.find(m => m.id === novoPagamento.maquinaId);
+                    if (maquina && novoPagamento.valor) {
+                      const taxa = maquina.taxas.credito[parcelas] || parcelas * 2;
+                      const valorTaxa = novoPagamento.valor * (taxa / 100);
+                      setNovoPagamento({ ...novoPagamento, parcelas, taxaCartao: valorTaxa, valorComTaxa: novoPagamento.valor + valorTaxa });
+                    } else {
+                      setNovoPagamento({ ...novoPagamento, parcelas });
+                    }
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 18 }, (_, i) => i + 1).map(num => (
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(num => (
                       <SelectItem key={num} value={String(num)}>{num}x</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {novoPagamento.valor && novoPagamento.parcelas && novoPagamento.parcelas > 1 && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {novoPagamento.parcelas}x de {formatCurrency(novoPagamento.valor / novoPagamento.parcelas)}
+              </div>
+            )}
+            
+            {/* Exibir taxas calculadas */}
+            {(novoPagamento.meioPagamento === 'Cartão Crédito' || novoPagamento.meioPagamento === 'Cartão Débito') && novoPagamento.maquinaId && novoPagamento.valor && (
+              <div className="space-y-2 p-3 bg-muted rounded-lg">
+                <div className="flex justify-between text-sm">
+                  <span>Valor dos Produtos:</span>
+                  <span className="font-medium">{formatCurrency(novoPagamento.valor)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-orange-600">
+                  <span>Taxa da Máquina ({((novoPagamento.taxaCartao || 0) / novoPagamento.valor * 100).toFixed(1)}%):</span>
+                  <span className="font-medium">+{formatCurrency(novoPagamento.taxaCartao || 0)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between font-bold">
+                  <span>Valor Final para o Cliente:</span>
+                  <span className="text-primary">{formatCurrency(novoPagamento.valorComTaxa || novoPagamento.valor)}</span>
+                </div>
+                {novoPagamento.meioPagamento === 'Cartão Crédito' && novoPagamento.parcelas && novoPagamento.parcelas > 1 && (
+                  <p className="text-xs text-muted-foreground">
+                    {novoPagamento.parcelas}x de {formatCurrency((novoPagamento.valorComTaxa || novoPagamento.valor) / novoPagamento.parcelas)}
                   </p>
                 )}
               </div>
             )}
             
-            {novoPagamento.meioPagamento === 'Cartão Débito' && (
+            {novoPagamento.meioPagamento === 'Cartão Débito' && !novoPagamento.maquinaId && (
               <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
-                Cartão de Débito: pagamento à vista (1x)
+                Cartão de Débito: taxa de 2% aplicada automaticamente. Selecione a máquina.
               </div>
             )}
 

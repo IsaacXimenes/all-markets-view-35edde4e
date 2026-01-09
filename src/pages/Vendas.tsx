@@ -357,7 +357,6 @@ export default function Vendas() {
               <TableHeader>
                 <TableRow>
                   <TableHead>ID Venda</TableHead>
-                  <TableHead>Tipo</TableHead>
                   <TableHead>Data/Hora</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Modelo</TableHead>
@@ -372,7 +371,6 @@ export default function Vendas() {
                   <TableHead className="text-right">Margem %</TableHead>
                   <TableHead>Resp. Garantia</TableHead>
                   <TableHead>Data Fim Garantia</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -412,18 +410,6 @@ export default function Vendas() {
                   return (
                     <TableRow key={venda.id} className={getRowBgClass()}>
                       <TableCell className="font-medium">{venda.id}</TableCell>
-                      <TableCell>
-                        {vendaIsFiado ? (
-                          <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 whitespace-nowrap">
-                            <CreditCard className="h-3 w-3 mr-1" />
-                            Fiado
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="whitespace-nowrap text-xs">
-                            Normal
-                          </Badge>
-                        )}
-                      </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {new Date(venda.dataHora).toLocaleString('pt-BR')}
                       </TableCell>
@@ -468,9 +454,6 @@ export default function Vendas() {
                             {format(new Date(garantiaInfo.dataFimGarantia), 'dd/MM/yyyy')}
                           </Badge>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(statusConferencia)}
                       </TableCell>
                       <TableCell>
                         <Button 

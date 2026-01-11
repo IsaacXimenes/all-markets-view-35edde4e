@@ -48,6 +48,7 @@ export interface ProdutoPendente {
   notaOuVendaId?: string;
   valorCusto: number;
   valorCustoOriginal: number; // Valor original preservado (não soma custo assistência)
+  valorOrigem: number; // NOVO - Valor original de aquisição (nunca altera)
   saudeBateria: number;
   loja: string;
   dataEntrada: string;
@@ -75,6 +76,7 @@ let produtosPendentes: ProdutoPendente[] = [
     notaOuVendaId: 'NC-2025-0010',
     valorCusto: 3100.00,
     valorCustoOriginal: 3100.00,
+    valorOrigem: 3100.00,
     saudeBateria: 86,
     loja: 'Loja Centro',
     dataEntrada: '2025-12-13', // 1 dia atrás - SLA normal
@@ -104,6 +106,7 @@ let produtosPendentes: ProdutoPendente[] = [
     notaOuVendaId: 'VEN-2025-0050',
     valorCusto: 3500.00,
     valorCustoOriginal: 3500.00,
+    valorOrigem: 3500.00,
     saudeBateria: 91,
     loja: 'Loja Shopping',
     dataEntrada: '2025-12-10', // 4 dias atrás - SLA amarelo
@@ -133,6 +136,7 @@ let produtosPendentes: ProdutoPendente[] = [
     notaOuVendaId: 'NC-2025-0012',
     valorCusto: 1800.00,
     valorCustoOriginal: 1800.00,
+    valorOrigem: 1800.00,
     saudeBateria: 72,
     loja: 'Loja Norte',
     dataEntrada: '2025-12-08', // 6 dias atrás - SLA vermelho
@@ -163,6 +167,7 @@ let produtosPendentes: ProdutoPendente[] = [
     notaOuVendaId: 'VEN-2025-0045',
     valorCusto: 1500.00,
     valorCustoOriginal: 1500.00,
+    valorOrigem: 1500.00,
     saudeBateria: 78,
     loja: 'Loja Sul',
     dataEntrada: '2025-12-09', // 5 dias atrás - SLA vermelho
@@ -207,6 +212,7 @@ let produtosPendentes: ProdutoPendente[] = [
     notaOuVendaId: 'NC-2025-0015',
     valorCusto: 2200.00,
     valorCustoOriginal: 2200.00,
+    valorOrigem: 2200.00,
     saudeBateria: 82,
     loja: 'Loja Oeste',
     dataEntrada: '2025-12-11', // 3 dias atrás - SLA amarelo

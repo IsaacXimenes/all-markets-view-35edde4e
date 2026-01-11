@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,11 +32,15 @@ import {
   getProdutosCadastro,
   ProdutoCadastro
 } from '@/utils/cadastrosApi';
-import { Plus, Trash2, Search, AlertTriangle, Clock, User, History, ArrowLeft, Smartphone, Save, Package } from 'lucide-react';
+import { getVendaById } from '@/utils/vendasApi';
+import { getGarantiaById } from '@/utils/garantiasApi';
+import { getProdutoPendenteById } from '@/utils/osApi';
+import { Plus, Trash2, Search, AlertTriangle, Clock, User, History, ArrowLeft, Smartphone, Save, Package, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { formatIMEI, applyIMEIMask } from '@/utils/imeiMask';
 import { useDraftVenda } from '@/hooks/useDraftVenda';
+import { format } from 'date-fns';
 
 const TIMER_DURATION = 1800; // 30 minutos em segundos
 const DRAFT_KEY = 'draft_os_assistencia';
@@ -72,6 +76,13 @@ interface PagamentoForm {
 export default function OSAssistenciaNova() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  
+  // Parâmetros de origem
+  const vendaIdParam = searchParams.get('vendaId');
+  const garantiaIdParam = searchParams.get('garantiaId');
+  const produtoIdParam = searchParams.get('produtoId');
+  const itemIndexParam = searchParams.get('itemIndex');
   
   const [osInfo] = useState(getNextOSNumber());
   const [dataHora] = useState(new Date().toISOString());
@@ -81,6 +92,13 @@ export default function OSAssistenciaNova() {
   const tecnicos = getColaboradoresByPermissao('Assistência');
   const fornecedores = getFornecedores().filter(f => f.status === 'Ativo');
   const produtosCadastro = getProdutosCadastro();
+
+  // Pré-preenchimento e campos bloqueados
+  const [camposBloqueados, setCamposBloqueados] = useState<string[]>([]);
+  const [origemOS, setOrigemOS] = useState<'venda' | 'garantia' | 'estoque' | null>(null);
+  const [dadosOrigem, setDadosOrigem] = useState<any>(null);
+  const [showItemSelectionModal, setShowItemSelectionModal] = useState(false);
+  const [itensVenda, setItensVenda] = useState<any[]>([]);
 
   // Aparelho state
   const [origemAparelho, setOrigemAparelho] = useState<'Thiago Imports' | 'Externo' | ''>('');
@@ -165,13 +183,110 @@ export default function OSAssistenciaNova() {
     return c.nome.toLowerCase().includes(termo) || c.cpf.includes(termo);
   });
 
-  // Verificar se existe rascunho ao montar
+  // Verificar se existe rascunho ao montar (apenas se não houver origem)
   useEffect(() => {
-    if (hasDraft()) {
+    if (!vendaIdParam && !garantiaIdParam && !produtoIdParam && hasDraft()) {
       setDraftAge(getDraftAge());
       setShowDraftModal(true);
     }
   }, []);
+
+  // Pré-preencher dados da origem
+  useEffect(() => {
+    if (vendaIdParam) {
+      const venda = getVendaById(vendaIdParam);
+      if (venda) {
+        setOrigemOS('venda');
+        setDadosOrigem(venda);
+        
+        if (venda.itens.length > 1 && !itemIndexParam) {
+          // Múltiplos itens - mostrar modal de seleção
+          setItensVenda(venda.itens);
+          setShowItemSelectionModal(true);
+        } else {
+          // Item único ou já selecionado
+          const item = venda.itens[parseInt(itemIndexParam || '0')];
+          preencherDadosVenda(venda, item);
+        }
+      }
+    } else if (garantiaIdParam) {
+      const garantia = getGarantiaById(garantiaIdParam);
+      if (garantia) {
+        setOrigemOS('garantia');
+        setDadosOrigem(garantia);
+        preencherDadosGarantia(garantia);
+      }
+    } else if (produtoIdParam) {
+      const produto = getProdutoPendenteById(produtoIdParam);
+      if (produto) {
+        setOrigemOS('estoque');
+        setDadosOrigem(produto);
+        preencherDadosProduto(produto);
+      }
+    }
+  }, [vendaIdParam, garantiaIdParam, produtoIdParam, itemIndexParam]);
+
+  // Funções de pré-preenchimento
+  const preencherDadosVenda = (venda: any, item: any) => {
+    // Buscar cliente pelo nome
+    const cliente = clientes.find(c => c.nome === venda.clienteNome);
+    if (cliente) setClienteId(cliente.id);
+    
+    setModeloAparelho(item?.produto || '');
+    setImeiAparelho(item?.imei || '');
+    setOrigemAparelho('Thiago Imports');
+    
+    // Buscar loja pelo nome
+    const loja = lojas.find(l => l.nome === venda.lojaVenda || l.id === venda.lojaVenda);
+    if (loja) setLojaId(loja.id);
+    
+    setSetor('GARANTIA');
+    setCamposBloqueados(['clienteId', 'modeloAparelho', 'imeiAparelho', 'lojaId', 'origemAparelho']);
+    
+    toast({ title: 'Dados pré-preenchidos', description: `Origem: Venda ${venda.id}` });
+  };
+
+  const preencherDadosGarantia = (garantia: any) => {
+    // Buscar cliente pelo nome
+    const cliente = clientes.find(c => c.nome === garantia.clienteNome);
+    if (cliente) setClienteId(cliente.id);
+    
+    setModeloAparelho(garantia.modelo || '');
+    setImeiAparelho(garantia.imei || '');
+    setOrigemAparelho('Thiago Imports');
+    
+    // Buscar loja
+    const loja = lojas.find(l => l.nome === garantia.lojaVenda || l.id === garantia.lojaVenda);
+    if (loja) setLojaId(loja.id);
+    
+    setSetor('GARANTIA');
+    setCamposBloqueados(['clienteId', 'modeloAparelho', 'imeiAparelho', 'lojaId', 'origemAparelho']);
+    
+    toast({ title: 'Dados pré-preenchidos', description: `Origem: Garantia ${garantia.id}` });
+  };
+
+  const preencherDadosProduto = (produto: any) => {
+    setModeloAparelho(produto.modelo || '');
+    setImeiAparelho(produto.imei || '');
+    setOrigemAparelho('Thiago Imports');
+    
+    // Buscar loja pelo nome
+    const loja = lojas.find(l => l.nome === produto.loja || l.id === produto.loja);
+    if (loja) setLojaId(loja.id);
+    
+    setSetor(produto.origemEntrada === 'Base de Troca' ? 'TROCA' : 'ASSISTÊNCIA');
+    setCamposBloqueados(['modeloAparelho', 'imeiAparelho', 'lojaId', 'origemAparelho']);
+    
+    toast({ title: 'Dados pré-preenchidos', description: `Origem: Estoque ${produto.id}` });
+  };
+
+  const handleSelecionarItem = (index: number) => {
+    if (dadosOrigem) {
+      const item = dadosOrigem.itens[index];
+      preencherDadosVenda(dadosOrigem, item);
+      setShowItemSelectionModal(false);
+    }
+  };
 
   // Carregar rascunho
   const handleLoadDraft = () => {
@@ -559,6 +674,72 @@ export default function OSAssistenciaNova() {
           Voltar
         </Button>
       </div>
+
+      {/* Card de Contexto da Origem */}
+      {origemOS && dadosOrigem && (
+        <Card className="mb-6 border-primary/30 bg-primary/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Info className="h-5 w-5 text-primary" />
+              Origem: {origemOS === 'venda' ? 'Venda' : origemOS === 'garantia' ? 'Garantia' : 'Estoque'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              {origemOS === 'venda' && (
+                <>
+                  <div><span className="text-muted-foreground">ID Venda:</span> <strong>{dadosOrigem.id}</strong></div>
+                  <div><span className="text-muted-foreground">Cliente:</span> <strong>{dadosOrigem.clienteNome}</strong></div>
+                  <div><span className="text-muted-foreground">Data:</span> <strong>{format(new Date(dadosOrigem.dataHora), 'dd/MM/yyyy')}</strong></div>
+                </>
+              )}
+              {origemOS === 'garantia' && (
+                <>
+                  <div><span className="text-muted-foreground">ID Garantia:</span> <strong>{dadosOrigem.id}</strong></div>
+                  <div><span className="text-muted-foreground">Tipo:</span> <strong>{dadosOrigem.tipoGarantia}</strong></div>
+                  <div><span className="text-muted-foreground">Válida até:</span> <strong>{format(new Date(dadosOrigem.dataFimGarantia), 'dd/MM/yyyy')}</strong></div>
+                </>
+              )}
+              {origemOS === 'estoque' && (
+                <>
+                  <div><span className="text-muted-foreground">ID Produto:</span> <strong>{dadosOrigem.id}</strong></div>
+                  <div><span className="text-muted-foreground">Origem:</span> <strong>{dadosOrigem.origemEntrada}</strong></div>
+                  <div><span className="text-muted-foreground">Valor Origem:</span> <strong>{formatCurrency(dadosOrigem.valorOrigem || dadosOrigem.valorCusto)}</strong></div>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Modal de Seleção de Item */}
+      <Dialog open={showItemSelectionModal} onOpenChange={setShowItemSelectionModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Selecione o Item para a OS</DialogTitle>
+          </DialogHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Modelo</TableHead>
+                <TableHead>IMEI</TableHead>
+                <TableHead>Ação</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {itensVenda.map((item, index) => (
+                <TableRow key={item.id || index}>
+                  <TableCell className="font-medium">{item.produto}</TableCell>
+                  <TableCell className="font-mono text-xs">{formatIMEI(item.imei || '')}</TableCell>
+                  <TableCell>
+                    <Button size="sm" onClick={() => handleSelecionarItem(index)}>Selecionar</Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </DialogContent>
+      </Dialog>
 
       <div className="space-y-6">
         {/* Quadro Aparelho */}

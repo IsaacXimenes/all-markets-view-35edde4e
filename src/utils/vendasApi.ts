@@ -779,6 +779,7 @@ export const addVenda = (venda: Omit<Venda, 'id' | 'numero'>): Venda => {
         origemEntrada: 'Base de Troca',
         notaOuVendaId: newId,
         valorCusto: ti.valorCompraUsado,
+        valorOrigem: ti.valorCompraUsado, // Valor original de aquisição
         saudeBateria: 0, // Será definido na conferência
         loja: venda.lojaVenda,
         dataEntrada: new Date().toISOString()

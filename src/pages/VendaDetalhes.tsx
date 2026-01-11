@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Printer, ShoppingCart, User, Package, CreditCard, Truck, Clock, DollarSign, TrendingUp, AlertTriangle, Shield, History, Pencil } from 'lucide-react';
+import { ArrowLeft, Printer, ShoppingCart, User, Package, CreditCard, Truck, Clock, DollarSign, TrendingUp, AlertTriangle, Shield, History, Pencil, Wrench } from 'lucide-react';
 import { getVendaById, formatCurrency, Venda } from '@/utils/vendasApi';
 import { getColaboradores, getLojas, getContasFinanceiras } from '@/utils/cadastrosApi';
 import { getGarantiasByVendaId, calcularStatusExpiracao } from '@/utils/garantiasApi';
@@ -121,10 +121,26 @@ export default function VendaDetalhes() {
             </Badge>
           )}
         </div>
-        <Button onClick={handleImprimir}>
-          <Printer className="h-4 w-4 mr-2" />
-          Imprimir Recibo
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => {
+              if (venda.itens.length === 1) {
+                navigate(`/os/assistencia/nova?vendaId=${venda.id}&itemIndex=0`);
+              } else {
+                // Para múltiplos itens, navegar para seleção
+                navigate(`/os/assistencia/nova?vendaId=${venda.id}`);
+              }
+            }}
+          >
+            <Wrench className="h-4 w-4 mr-2" />
+            Abrir OS
+          </Button>
+          <Button onClick={handleImprimir}>
+            <Printer className="h-4 w-4 mr-2" />
+            Imprimir Recibo
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

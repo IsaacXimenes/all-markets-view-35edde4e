@@ -317,6 +317,7 @@ export default function EstoqueProdutosPendentes() {
                   <TableHead>Produto</TableHead>
                   <TableHead>Origem</TableHead>
                   <TableHead>Loja</TableHead>
+                  <TableHead>Valor Origem</TableHead>
                   <TableHead>SLA</TableHead>
                   <TableHead>Parecer Estoque</TableHead>
                   <TableHead>Parecer Assistência</TableHead>
@@ -326,7 +327,7 @@ export default function EstoqueProdutosPendentes() {
               <TableBody>
                 {filteredProdutos.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Nenhum produto pendente de conferência
                     </TableCell>
                   </TableRow>
@@ -343,6 +344,7 @@ export default function EstoqueProdutosPendentes() {
                       </TableCell>
                       <TableCell>{getOrigemBadge(produto.origemEntrada)}</TableCell>
                       <TableCell>{getLojaNome(produto.loja)}</TableCell>
+                      <TableCell className="font-medium text-primary">{formatCurrency(produto.valorOrigem || produto.valorCusto)}</TableCell>
                       <TableCell>{getSLABadge(produto.dataEntrada)}</TableCell>
                       <TableCell>{getStatusBadge(produto)}</TableCell>
                       <TableCell>
@@ -357,13 +359,24 @@ export default function EstoqueProdutosPendentes() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/estoque/produto-pendente/${produto.id}`)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1 justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/os/assistencia/nova?produtoId=${produto.id}`)}
+                            title="Encaminhar para Assistência"
+                          >
+                            <Wrench className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/estoque/produto-pendente/${produto.id}`)}
+                            title="Ver Detalhes"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

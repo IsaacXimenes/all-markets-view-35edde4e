@@ -221,11 +221,18 @@ export default function GarantiaDetalhes() {
 
   return (
     <PageLayout title={`Detalhes da Garantia ${garantia.id}`}>
-      {/* Botão Voltar */}
-      <div className="mb-6">
+      {/* Botão Voltar e Ações */}
+      <div className="mb-6 flex justify-between items-center">
         <Button variant="outline" onClick={() => navigate('/garantias/historico')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar
+        </Button>
+        <Button 
+          variant="outline"
+          onClick={() => navigate(`/os/assistencia/nova?garantiaId=${garantia.id}`)}
+        >
+          <Wrench className="h-4 w-4 mr-2" />
+          Encaminhar para Assistência
         </Button>
       </div>
       

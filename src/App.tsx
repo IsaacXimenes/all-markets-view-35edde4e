@@ -116,6 +116,7 @@ const App = () => (
           <Route path="/estoque/movimentacoes-acessorios" element={<EstoqueMovimentacoesAcessorios />} />
           <Route path="/estoque/acessorios" element={<EstoqueAcessorios />} />
           <Route path="/os/produtos-analise" element={<OSProdutosAnalise />} />
+          <Route path="/os/historico-assistencia" element={<OSHistoricoAssistencia />} />
           <Route path="/os/produto/:id" element={<OSProdutoDetalhes />} />
           <Route path="/os/assistencia" element={<OSAssistencia />} />
           <Route path="/os/assistencia/nova" element={<OSAssistenciaNova />} />
@@ -126,6 +127,8 @@ const App = () => (
           <Route path="/os/pecas" element={<OSPecas />} />
           <Route path="/financeiro/notas-assistencia" element={<FinanceiroNotasAssistencia />} />
           <Route path="/financeiro/extrato" element={<FinanceiroExtrato />} />
+          <Route path="/financeiro/lotes-pagamento" element={<FinanceiroLotesPagamento />} />
+          <Route path="/financeiro/execucao-lotes" element={<FinanceiroExecucaoLotes />} />
           <Route path="/cadastros" element={<Cadastros />} />
           <Route path="/cadastros/planos-garantia" element={<CadastrosPlanosGarantia />} />
           <Route path="/cadastros/lojas" element={<CadastrosLojas />} />

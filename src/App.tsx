@@ -71,6 +71,7 @@ import FinanceiroLotesPagamento from "./pages/FinanceiroLotesPagamento";
 import FinanceiroExecucaoLotes from "./pages/FinanceiroExecucaoLotes";
 import Relatorios from "./pages/Relatorios";
 import GarantiasNova from "./pages/GarantiasNova";
+import GarantiasNovaManual from "./pages/GarantiasNovaManual";
 import GarantiasEmAndamento from "./pages/GarantiasEmAndamento";
 import GarantiasHistorico from "./pages/GarantiasHistorico";
 import GarantiaDetalhes from "./pages/GarantiaDetalhes";
@@ -160,6 +161,7 @@ const App = () => (
           <Route path="/relatorios" element={<Relatorios />} />
           <Route path="/garantias" element={<GarantiasNova />} />
           <Route path="/garantias/nova" element={<GarantiasNova />} />
+          <Route path="/garantias/nova/manual" element={<GarantiasNovaManual />} />
           <Route path="/garantias/em-andamento" element={<GarantiasEmAndamento />} />
           <Route path="/garantias/contatos-ativos" element={<GarantiaContatosAtivos />} />
           <Route path="/garantias/contatos-ativos/novo" element={<GarantiaContatosAtivosNovo />} />

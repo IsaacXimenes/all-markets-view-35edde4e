@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GarantiasLayout } from '@/components/layout/GarantiasLayout';
 import { Button } from '@/components/ui/button';
@@ -9,10 +9,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Shield, User, Phone, Mail, Save, Search, Plus } from 'lucide-react';
+import { ArrowLeft, Shield, User, Phone, Mail, Save, Search, Plus, Award } from 'lucide-react';
 import { toast } from 'sonner';
 import { getLojas, getProdutosCadastro, getClientes, addCliente, Cliente } from '@/utils/cadastrosApi';
 import { addGarantia, addTimelineEntry } from '@/utils/garantiasApi';
+import { getPlanosPorModelo, PlanoGarantia, formatCurrency } from '@/utils/planosGarantiaApi';
 import { format, addMonths } from 'date-fns';
 import { formatIMEI, unformatIMEI } from '@/utils/imeiMask';
 
@@ -26,8 +27,11 @@ export default function GarantiasNovaManual() {
   const [formData, setFormData] = useState<{
     imei: string;
     modelo: string;
+    condicao: 'Novo' | 'Seminovo' | '';
+    planoGarantiaId: string;
     tipoGarantia: 'Garantia - Apple' | 'Garantia - Thiago Imports';
     mesesGarantia: number;
+    valorGarantia: number;
     dataInicioGarantia: string;
     lojaVenda: string;
     clienteId: string;
@@ -38,8 +42,11 @@ export default function GarantiasNovaManual() {
   }>({
     imei: '',
     modelo: '',
+    condicao: '',
+    planoGarantiaId: '',
     tipoGarantia: 'Garantia - Apple',
     mesesGarantia: 12,
+    valorGarantia: 0,
     dataInicioGarantia: format(new Date(), 'yyyy-MM-dd'),
     lojaVenda: '',
     clienteId: '',
@@ -48,6 +55,45 @@ export default function GarantiasNovaManual() {
     clienteEmail: '',
     observacoes: ''
   });
+
+  // Available warranty plans based on model and condition
+  const [planosDisponiveis, setPlanosDisponiveis] = useState<PlanoGarantia[]>([]);
+
+  // Update available plans when model or condition changes
+  useEffect(() => {
+    if (formData.modelo && formData.condicao) {
+      const planos = getPlanosPorModelo(formData.modelo, formData.condicao as 'Novo' | 'Seminovo');
+      setPlanosDisponiveis(planos);
+      // Reset selected plan when model/condition changes
+      setFormData(prev => ({ 
+        ...prev, 
+        planoGarantiaId: '', 
+        mesesGarantia: 12,
+        valorGarantia: 0,
+        tipoGarantia: 'Garantia - Apple'
+      }));
+    } else {
+      setPlanosDisponiveis([]);
+    }
+  }, [formData.modelo, formData.condicao]);
+
+  // Handle plan selection
+  const handleSelectPlano = (planoId: string) => {
+    const plano = planosDisponiveis.find(p => p.id === planoId);
+    if (plano) {
+      setFormData(prev => ({
+        ...prev,
+        planoGarantiaId: planoId,
+        mesesGarantia: plano.meses,
+        valorGarantia: plano.valor,
+        tipoGarantia: plano.tipo === 'Apple' ? 'Garantia - Apple' : 'Garantia - Thiago Imports'
+      }));
+    }
+  };
+
+  const planoSelecionado = useMemo(() => {
+    return planosDisponiveis.find(p => p.id === formData.planoGarantiaId);
+  }, [planosDisponiveis, formData.planoGarantiaId]);
 
   // Client modals
   const [showClienteModal, setShowClienteModal] = useState(false);
@@ -119,8 +165,13 @@ export default function GarantiasNovaManual() {
 
   const handleSalvar = () => {
     // Validations
-    if (!formData.imei || !formData.modelo || !formData.lojaVenda || !formData.clienteNome) {
-      toast.error('Preencha todos os campos obrigatórios (IMEI, Modelo, Loja e Cliente)');
+    if (!formData.imei || !formData.modelo || !formData.condicao || !formData.lojaVenda || !formData.clienteNome) {
+      toast.error('Preencha todos os campos obrigatórios (IMEI, Modelo, Condição, Loja e Cliente)');
+      return;
+    }
+
+    if (!formData.planoGarantiaId) {
+      toast.error('Selecione um plano de garantia');
       return;
     }
 
@@ -152,12 +203,13 @@ export default function GarantiasNovaManual() {
     });
 
     // Add timeline entry
+    const planoInfo = planoSelecionado ? `Plano: ${planoSelecionado.nome} - ${formatCurrency(planoSelecionado.valor)}` : '';
     addTimelineEntry({
       garantiaId: novaGarantia.id,
       dataHora: new Date().toISOString(),
       tipo: 'registro_venda',
       titulo: 'Garantia Registrada Manualmente',
-      descricao: formData.observacoes || 'Garantia registrada manualmente sem vínculo com venda',
+      descricao: `${formData.observacoes || 'Garantia registrada manualmente sem vínculo com venda'}. Condição: ${formData.condicao}. ${planoInfo}`,
       usuarioId: 'COL-001',
       usuarioNome: 'Usuário Sistema'
     });
@@ -194,7 +246,7 @@ export default function GarantiasNovaManual() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>IMEI *</Label>
                   <Input
@@ -222,44 +274,64 @@ export default function GarantiasNovaManual() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label>Condição *</Label>
+                  <Select 
+                    value={formData.condicao} 
+                    onValueChange={(v) => setFormData(prev => ({ ...prev, condicao: v as 'Novo' | 'Seminovo' }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a condição" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Novo">Novo</SelectItem>
+                      <SelectItem value="Seminovo">Seminovo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Resp. Garantia *</Label>
-                  <Select 
-                    value={formData.tipoGarantia} 
-                    onValueChange={(v) => setFormData(prev => ({ 
-                      ...prev, 
-                      tipoGarantia: v as 'Garantia - Apple' | 'Garantia - Thiago Imports' 
-                    }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Garantia - Apple">Garantia - Apple</SelectItem>
-                      <SelectItem value="Garantia - Thiago Imports">Garantia - Thiago Imports</SelectItem>
-                    </SelectContent>
-                  </Select>
+              {/* Warranty Plan Selection - Shows when model and condition are selected */}
+              {formData.modelo && formData.condicao && (
+                <div className="space-y-3 pt-2">
+                  <Label className="flex items-center gap-2">
+                    <Award className="h-4 w-4" />
+                    Plano de Garantia *
+                  </Label>
+                  {planosDisponiveis.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {planosDisponiveis.map((plano) => (
+                        <div
+                          key={plano.id}
+                          onClick={() => handleSelectPlano(plano.id)}
+                          className={`p-4 border-2 rounded-lg cursor-pointer transition-all hover:border-primary/50 ${
+                            formData.planoGarantiaId === plano.id
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border'
+                          }`}
+                        >
+                          <div className="font-semibold text-sm">{plano.nome}</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {plano.meses > 0 ? `${plano.meses} meses` : 'Sem garantia adicional'}
+                          </div>
+                          <div className="text-lg font-bold text-primary mt-2">
+                            {plano.valor > 0 ? formatCurrency(plano.valor) : 'Gratuito'}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {plano.tipo}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-muted/50 rounded-lg text-center text-muted-foreground">
+                      Nenhum plano de garantia disponível para este modelo e condição.
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label>Duração da Garantia *</Label>
-                  <Select 
-                    value={String(formData.mesesGarantia)} 
-                    onValueChange={(v) => setFormData(prev => ({ ...prev, mesesGarantia: Number(v) }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="3">3 meses</SelectItem>
-                      <SelectItem value="6">6 meses</SelectItem>
-                      <SelectItem value="12">12 meses</SelectItem>
-                      <SelectItem value="24">24 meses</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Data Início *</Label>
                   <Input
@@ -268,23 +340,22 @@ export default function GarantiasNovaManual() {
                     onChange={(e) => setFormData(prev => ({ ...prev, dataInicioGarantia: e.target.value }))}
                   />
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Loja *</Label>
-                <Select 
-                  value={formData.lojaVenda} 
-                  onValueChange={(v) => setFormData(prev => ({ ...prev, lojaVenda: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a loja" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {lojas.map(l => (
-                      <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <Label>Loja *</Label>
+                  <Select 
+                    value={formData.lojaVenda} 
+                    onValueChange={(v) => setFormData(prev => ({ ...prev, lojaVenda: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a loja" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lojas.map(l => (
+                        <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -371,12 +442,30 @@ export default function GarantiasNovaManual() {
                 <p className="font-medium">{formData.modelo || '-'}</p>
               </div>
               <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Condição</p>
+                <p className="font-medium">{formData.condicao || '-'}</p>
+              </div>
+              {planoSelecionado && (
+                <>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Plano</p>
+                    <p className="font-medium">{planoSelecionado.nome}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Valor</p>
+                    <p className="font-medium text-primary">
+                      {planoSelecionado.valor > 0 ? formatCurrency(planoSelecionado.valor) : 'Gratuito'}
+                    </p>
+                  </div>
+                </>
+              )}
+              <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Resp. Garantia</p>
                 <p className="font-medium">{formData.tipoGarantia}</p>
               </div>
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Duração</p>
-                <p className="font-medium">{formData.mesesGarantia} meses</p>
+                <p className="font-medium">{formData.mesesGarantia > 0 ? `${formData.mesesGarantia} meses` : '-'}</p>
               </div>
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Data Fim Garantia</p>

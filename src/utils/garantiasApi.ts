@@ -854,7 +854,7 @@ export const getRegistrosAnaliseGarantia = (): RegistroAnaliseGarantia[] => {
   return [...registrosAnaliseGarantia];
 };
 
-export const aprovarAnaliseGarantia = (id: string, dados: { tecnicoId: string; tecnicoNome: string; dataAprovacao: string; usuarioAprovacao: string }): void => {
+export const aprovarAnaliseGarantia = (id: string, dados: { tecnicoId: string; tecnicoNome: string; dataAprovacao: string; usuarioAprovacao: string }): RegistroAnaliseGarantia | null => {
   const index = registrosAnaliseGarantia.findIndex(r => r.id === id);
   if (index !== -1) {
     registrosAnaliseGarantia[index] = {
@@ -862,7 +862,9 @@ export const aprovarAnaliseGarantia = (id: string, dados: { tecnicoId: string; t
       status: 'Solicitação Aprovada',
       ...dados
     };
+    return registrosAnaliseGarantia[index];
   }
+  return null;
 };
 
 export const encaminharParaAnaliseGarantia = (origemId: string, origem: 'Garantia' | 'Estoque', descricao: string): void => {

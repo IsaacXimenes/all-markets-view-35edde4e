@@ -14,15 +14,17 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { getColaboradoresByPermissao } from '@/utils/cadastrosApi';
+import { getColaboradoresByPermissao, getLojas } from '@/utils/cadastrosApi';
 import { 
   getRegistrosAnaliseGarantia, aprovarAnaliseGarantia, 
   RegistroAnaliseGarantia 
 } from '@/utils/garantiasApi';
+import { addOrdemServico } from '@/utils/assistenciaApi';
 
 export default function OSAnaliseGarantia() {
   const [registros, setRegistros] = useState<RegistroAnaliseGarantia[]>(getRegistrosAnaliseGarantia());
   const tecnicos = getColaboradoresByPermissao('Assistência');
+  const lojas = getLojas();
   
   // Filtros
   const [filtroOrigem, setFiltroOrigem] = useState<string>('todos');
@@ -112,16 +114,43 @@ export default function OSAnaliseGarantia() {
     }
 
     const tecnico = tecnicos.find(t => t.id === tecnicoSelecionado);
-    aprovarAnaliseGarantia(registroSelecionado.id, {
+    const registroAprovado = aprovarAnaliseGarantia(registroSelecionado.id, {
       tecnicoId: tecnicoSelecionado,
       tecnicoNome: tecnico?.nome || '',
       dataAprovacao: dataHoraAprovacao,
       usuarioAprovacao: 'Usuário Sistema'
     });
 
+    // Criar OS na tela de Assistência
+    if (registroAprovado) {
+      const primeiraLoja = lojas[0];
+      
+      addOrdemServico({
+        dataHora: new Date().toISOString(),
+        clienteId: '',
+        setor: registroAprovado.origem === 'Garantia' ? 'GARANTIA' : 'ASSISTÊNCIA',
+        tecnicoId: tecnicoSelecionado,
+        lojaId: primeiraLoja?.id || '',
+        status: 'Em serviço',
+        pecas: [],
+        pagamentos: [],
+        descricao: `Origem: ${registroAprovado.origem} - ${registroAprovado.clienteDescricao}`,
+        timeline: [{
+          data: new Date().toISOString(),
+          tipo: 'registro',
+          descricao: `OS criada a partir de Análise de Tratativas (${registroAprovado.id})`,
+          responsavel: tecnico?.nome || 'Sistema'
+        }],
+        valorTotal: 0,
+        custoTotal: 0,
+        origemOS: registroAprovado.origem === 'Garantia' ? 'Garantia' : 'Estoque',
+        garantiaId: registroAprovado.origem === 'Garantia' ? registroAprovado.origemId : undefined
+      });
+    }
+
     setRegistros(getRegistrosAnaliseGarantia());
     setShowAprovarModal(false);
-    toast.success('Solicitação aprovada com sucesso!');
+    toast.success('Solicitação aprovada e OS criada na Assistência!');
   };
 
   // Stats

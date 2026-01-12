@@ -60,6 +60,7 @@ import OSProdutoDetalhes from "./pages/OSProdutoDetalhes";
 import OSAssistencia from "./pages/OSAssistencia";
 import OSAssistenciaNova from "./pages/OSAssistenciaNova";
 import OSAssistenciaDetalhes from "./pages/OSAssistenciaDetalhes";
+import OSAssistenciaEditar from "./pages/OSAssistenciaEditar";
 import OSSolicitacoesPecas from "./pages/OSSolicitacoesPecas";
 import OSHistoricoNotas from "./pages/OSHistoricoNotas";
 import OSPecas from "./pages/OSPecas";
@@ -121,6 +122,7 @@ const App = () => (
           <Route path="/os/assistencia" element={<OSAssistencia />} />
           <Route path="/os/assistencia/nova" element={<OSAssistenciaNova />} />
           <Route path="/os/assistencia/:id" element={<OSAssistenciaDetalhes />} />
+          <Route path="/os/assistencia/:id/editar" element={<OSAssistenciaEditar />} />
           <Route path="/os/solicitacoes-pecas" element={<OSSolicitacoesPecas />} />
           <Route path="/os/historico-notas" element={<OSHistoricoNotas />} />
           <Route path="/os/analise-garantia" element={<OSAnaliseGarantia />} />

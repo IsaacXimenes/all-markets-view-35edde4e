@@ -26,6 +26,7 @@ import {
 } from '@/utils/cadastrosApi';
 import { getProdutos, Produto, updateProduto } from '@/utils/estoqueApi';
 import { addVenda, getNextVendaNumber, getHistoricoComprasCliente, ItemVenda, ItemTradeIn, Pagamento } from '@/utils/vendasApi';
+import { inicializarVendaNoFluxo } from '@/utils/fluxoVendasApi';
 import { getAcessorios, Acessorio, subtrairEstoqueAcessorio, VendaAcessorio } from '@/utils/acessoriosApi';
 import { calcularComissaoVenda, getComissaoColaborador } from '@/utils/comissoesApi';
 import { getProdutosCadastro, ProdutoCadastro, calcularTipoPessoa } from '@/utils/cadastrosApi';
@@ -702,6 +703,9 @@ export default function VendasNova() {
       timeline: timelineInicial,
       bloqueadoParaEdicao: false
     });
+
+    // Inicializar venda no fluxo de conferência (registra no localStorage)
+    inicializarVendaNoFluxo(venda.id, confirmVendedor, vendedorNome);
 
     // Limpar rascunho
     clearDraft();

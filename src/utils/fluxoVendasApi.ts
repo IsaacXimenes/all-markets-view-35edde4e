@@ -158,15 +158,45 @@ export const inicializarVendaNoFluxo = (
 };
 
 // Aprovar lançamento (Lançador -> Gestor)
+// CORREÇÃO: Se não existir dadosFluxo mas a venda tiver statusAtual válido, cria automaticamente
 export const aprovarLancamento = (
   vendaId: string,
   usuarioId: string,
   usuarioNome: string
 ): VendaComFluxo | null => {
   const fluxoData = getFluxoData();
-  const dadosFluxo = fluxoData[vendaId];
+  let dadosFluxo = fluxoData[vendaId];
   
-  if (!dadosFluxo || dadosFluxo.statusFluxo !== 'Aguardando Conferência' && dadosFluxo.statusFluxo !== 'Recusada - Gestor') {
+  // Se não existir dadosFluxo, verificar se a venda tem statusAtual válido e criar automaticamente
+  if (!dadosFluxo) {
+    const venda = getVendaById(vendaId);
+    if (venda) {
+      const vendaAny = venda as any;
+      const statusAtual = vendaAny.statusAtual;
+      
+      // Aceitar vendas que estão aguardando conferência ou foram recusadas pelo gestor
+      if (statusAtual === 'Aguardando Conferência' || statusAtual === 'Recusada - Gestor') {
+        // Criar registro de fluxo automaticamente (retrocompatibilidade)
+        dadosFluxo = {
+          statusFluxo: statusAtual as StatusVenda,
+          timelineFluxo: vendaAny.timeline || [],
+          bloqueadoParaEdicao: vendaAny.bloqueadoParaEdicao || false
+        };
+        fluxoData[vendaId] = dadosFluxo;
+        console.log(`[Fluxo Vendas] Registro de fluxo criado automaticamente para venda ${vendaId}`);
+      } else {
+        console.log(`[Fluxo Vendas] Venda ${vendaId} com statusAtual inválido: ${statusAtual}`);
+        return null;
+      }
+    } else {
+      console.log(`[Fluxo Vendas] Venda ${vendaId} não encontrada`);
+      return null;
+    }
+  }
+  
+  // Validar status permitido
+  if (dadosFluxo.statusFluxo !== 'Aguardando Conferência' && dadosFluxo.statusFluxo !== 'Recusada - Gestor') {
+    console.log(`[Fluxo Vendas] Status inválido para aprovar: ${dadosFluxo.statusFluxo}`);
     return null;
   }
 

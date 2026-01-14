@@ -32,6 +32,7 @@ import {
 import { PagamentoQuadro } from '@/components/vendas/PagamentoQuadro';
 import { getProdutos, Produto, updateProduto } from '@/utils/estoqueApi';
 import { addVenda, getHistoricoComprasCliente, ItemVenda, ItemTradeIn, Pagamento, formatCurrency as formatCurrencyVendas } from '@/utils/vendasApi';
+import { inicializarVendaNoFluxo } from '@/utils/fluxoVendasApi';
 import { getProdutosCadastro, ProdutoCadastro } from '@/utils/cadastrosApi';
 import { getProdutosPendentes, ProdutoPendente } from '@/utils/osApi';
 import { getAcessorios, Acessorio, VendaAcessorio } from '@/utils/acessoriosApi';
@@ -531,7 +532,7 @@ export default function VendasFinalizarDigital() {
     });
 
     // Registrar venda
-    addVenda({
+    const vendaRegistrada = addVenda({
       dataHora: new Date().toISOString(),
       lojaVenda,
       vendedor: venda.responsavelVendaId,
@@ -554,8 +555,14 @@ export default function VendasFinalizarDigital() {
       lucro: lucroProjetado,
       margem: margemProjetada,
       observacoes,
-      status: 'Concluída'
+      status: 'Concluída',
+      statusAtual: 'Aguardando Conferência',
+      bloqueadoParaEdicao: false
     });
+
+    // Inicializar venda no fluxo de conferência
+    const vendedorNome = colaboradores.find(c => c.id === venda.responsavelVendaId)?.nome || 'Vendedor';
+    inicializarVendaNoFluxo(vendaRegistrada.id, venda.responsavelVendaId, vendedorNome);
 
     // Atualizar status da venda digital
     finalizarVendaDigital(

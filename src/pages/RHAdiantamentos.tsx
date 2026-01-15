@@ -417,12 +417,12 @@ const RHAdiantamentos: React.FC = () => {
           <div className="grid gap-4 md:grid-cols-5">
             <div>
               <Label>Colaborador</Label>
-              <Select value={filtroColaborador} onValueChange={setFiltroColaborador}>
+              <Select value={filtroColaborador || "all"} onValueChange={v => setFiltroColaborador(v === "all" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {colaboradores.map(col => (
                     <SelectItem key={col.id} value={col.id}>{col.nome}</SelectItem>
                   ))}
@@ -432,12 +432,12 @@ const RHAdiantamentos: React.FC = () => {
             
             <div>
               <Label>Loja</Label>
-              <Select value={filtroLoja} onValueChange={setFiltroLoja}>
+              <Select value={filtroLoja || "all"} onValueChange={v => setFiltroLoja(v === "all" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value="all">Todas</SelectItem>
                   {lojas.map(loja => (
                     <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
                   ))}
@@ -465,12 +465,12 @@ const RHAdiantamentos: React.FC = () => {
             
             <div>
               <Label>Competência</Label>
-              <Select value={filtroCompetencia} onValueChange={setFiltroCompetencia}>
+              <Select value={filtroCompetencia || "all"} onValueChange={v => setFiltroCompetencia(v === "all" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value="all">Todas</SelectItem>
                   {mesesDisponiveis.slice(0, 12).map(mes => (
                     <SelectItem key={mes} value={mes}>{mes}</SelectItem>
                   ))}

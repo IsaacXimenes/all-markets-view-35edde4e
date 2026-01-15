@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { cn } from '@/lib/utils';
-import { Users, MessageSquareWarning, DollarSign, Store, Percent } from 'lucide-react';
+import { Users, MessageSquareWarning, DollarSign, Store, Percent, CreditCard, Wallet } from 'lucide-react';
 
 interface RHLayoutProps {
   children: React.ReactNode;
@@ -15,6 +15,8 @@ const tabs = [
   { name: 'Salários - Comissões', href: '/rh/comissoes', icon: DollarSign },
   { name: 'Comissão por Loja', href: '/rh/comissao-por-loja', icon: Store },
   { name: 'Salário - Colaborador', href: '/rh/salario-colaborador', icon: Percent },
+  { name: 'Vales', href: '/rh/vales', icon: CreditCard },
+  { name: 'Adiantamentos', href: '/rh/adiantamentos', icon: Wallet },
 ];
 
 export const RHLayout: React.FC<RHLayoutProps> = ({ children, title }) => {

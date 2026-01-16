@@ -68,7 +68,7 @@ export default function VendasConferenciaLancamento() {
   const [filtroDataFim, setFiltroDataFim] = useState('');
   const [filtroCliente, setFiltroCliente] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('todos');
-  const [filtroVendedor, setFiltroVendedor] = useState(isGestorOuFinanceiro ? 'todos' : usuarioLogado.id);
+  const [filtroVendedor, setFiltroVendedor] = useState('todos');
   
   // Modal de aprovação
   const [modalAprovar, setModalAprovar] = useState(false);
@@ -84,10 +84,8 @@ export default function VendasConferenciaLancamento() {
   const vendasFiltradas = useMemo(() => {
     let resultado = [...vendas];
 
-    // Filtro automático por vendedor se não for gestor/financeiro
-    if (!isGestorOuFinanceiro) {
-      resultado = resultado.filter(v => v.vendedor === usuarioLogado.id);
-    } else if (filtroVendedor !== 'todos') {
+    // Filtro por vendedor (opcional - permite ver todas ou filtrar por vendedor específico)
+    if (filtroVendedor !== 'todos') {
       resultado = resultado.filter(v => v.vendedor === filtroVendedor);
     }
 

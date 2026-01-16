@@ -52,6 +52,8 @@ export default function EstoqueNotaDetalhes() {
   const [timelineOpen, setTimelineOpen] = useState(true);
   const [fornecedores, setFornecedores] = useState<ReturnType<typeof getFornecedores>>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [motivoRecusa, setMotivoRecusa] = useState('');
+  const [dialogRecusaOpen, setDialogRecusaOpen] = useState(false);
   
   // Estado de edição
   const [editData, setEditData] = useState({
@@ -316,8 +318,6 @@ export default function EstoqueNotaDetalhes() {
     toast.success('Nota enviada para o financeiro com sucesso!');
   };
 
-  const [motivoRecusa, setMotivoRecusa] = useState('');
-  const [dialogRecusaOpen, setDialogRecusaOpen] = useState(false);
 
   const handleRecusarNota = () => {
     if (!nota || !motivoRecusa.trim()) {

@@ -24,7 +24,7 @@ import {
   getContasFinanceiras, getMotoboys, getLojaById, Loja, Cliente, Colaborador, Cargo, OrigemVenda, ContaFinanceira,
   addCliente
 } from '@/utils/cadastrosApi';
-import { getProdutos, Produto, updateProduto } from '@/utils/estoqueApi';
+import { getProdutos, Produto, updateProduto, bloquearProdutosEmVenda } from '@/utils/estoqueApi';
 import { addVenda, getNextVendaNumber, getHistoricoComprasCliente, ItemVenda, ItemTradeIn, Pagamento } from '@/utils/vendasApi';
 import { inicializarVendaNoFluxo } from '@/utils/fluxoVendasApi';
 import { getAcessorios, Acessorio, subtrairEstoqueAcessorio, VendaAcessorio } from '@/utils/acessoriosApi';
@@ -618,7 +618,22 @@ export default function VendasNova() {
     return tradeIns.some(t => !t.imeiValidado);
   }, [tradeIns]);
 
-  // Validar venda
+  // Verificar se tem pagamento Sinal
+  const temPagamentoSinal = useMemo(() => {
+    return pagamentos.some(p => p.meioPagamento === 'Sinal');
+  }, [pagamentos]);
+
+  // Calcular valor do sinal e valor pendente do sinal
+  const valorSinal = useMemo(() => {
+    const pagSinal = pagamentos.find(p => p.meioPagamento === 'Sinal');
+    return pagSinal?.valor || 0;
+  }, [pagamentos]);
+
+  const valorPendenteSinal = useMemo(() => {
+    return total - valorSinal;
+  }, [total, valorSinal]);
+
+  // Validar venda normal (pagamento completo)
   const canSubmit = useMemo(() => {
     // Se for entrega, motoboy é obrigatório
     const motoboyValido = tipoRetirada !== 'Entrega' || !!motoboyId;
@@ -632,9 +647,29 @@ export default function VendasNova() {
       (itens.length > 0 || acessoriosVenda.length > 0) &&
       valorPendente <= 0 &&
       !tradeInNaoValidado &&
+      motoboyValido &&
+      !temPagamentoSinal // Não permite registrar venda normal se tem sinal
+    );
+  }, [lojaVenda, vendedor, clienteId, origemVenda, localRetirada, itens.length, acessoriosVenda.length, valorPendente, tradeInNaoValidado, tipoRetirada, motoboyId, temPagamentoSinal]);
+
+  // Validar se pode salvar com sinal
+  const canSubmitSinal = useMemo(() => {
+    const motoboyValido = tipoRetirada !== 'Entrega' || !!motoboyId;
+    
+    return (
+      lojaVenda &&
+      vendedor &&
+      clienteId &&
+      origemVenda &&
+      localRetirada &&
+      (itens.length > 0 || acessoriosVenda.length > 0) &&
+      temPagamentoSinal &&
+      valorSinal > 0 &&
+      valorSinal < total &&
+      !tradeInNaoValidado &&
       motoboyValido
     );
-  }, [lojaVenda, vendedor, clienteId, origemVenda, localRetirada, itens.length, acessoriosVenda.length, valorPendente, tradeInNaoValidado, tipoRetirada, motoboyId]);
+  }, [lojaVenda, vendedor, clienteId, origemVenda, localRetirada, itens.length, acessoriosVenda.length, temPagamentoSinal, valorSinal, total, tradeInNaoValidado, tipoRetirada, motoboyId]);
 
   // Registrar venda
   const handleRegistrarVenda = () => {
@@ -642,6 +677,76 @@ export default function VendasNova() {
     setConfirmVendedor(vendedor);
     setConfirmLoja(lojaVenda);
     setShowConfirmacaoModal(true);
+  };
+
+  // Salvar com sinal (pré-cadastro)
+  const handleSalvarComSinal = () => {
+    if (!canSubmitSinal) return;
+    
+    // Obter nome do vendedor
+    const vendedorNome = colaboradores.find(c => c.id === vendedor)?.nome || 'Vendedor';
+
+    // Criar timeline inicial
+    const timelineInicial = [{
+      id: `timeline-${Date.now()}`,
+      dataHora: new Date().toISOString(),
+      tipo: 'criacao' as const,
+      usuarioId: vendedor,
+      usuarioNome: vendedorNome,
+      descricao: `Venda com sinal criada por ${vendedorNome}. Valor do sinal: ${formatCurrency(valorSinal)}. Valor pendente: ${formatCurrency(valorPendenteSinal)}`
+    }];
+
+    // Registrar venda com status "Feito Sinal"
+    const venda = addVenda({
+      dataHora: new Date().toISOString(),
+      lojaVenda,
+      vendedor,
+      clienteId,
+      clienteNome,
+      clienteCpf,
+      clienteTelefone,
+      clienteEmail,
+      clienteCidade,
+      origemVenda,
+      localRetirada,
+      tipoRetirada,
+      taxaEntrega,
+      motoboyId: tipoRetirada === 'Entrega' ? motoboyId : undefined,
+      itens,
+      tradeIns,
+      pagamentos,
+      subtotal,
+      totalTradeIn,
+      total,
+      lucro: lucroProjetado,
+      margem: margemProjetada,
+      observacoes,
+      status: 'Pendente',
+      statusAtual: 'Feito Sinal' as any,
+      timeline: timelineInicial,
+      bloqueadoParaEdicao: false,
+      valorSinal,
+      valorPendenteSinal,
+      dataSinal: new Date().toISOString(),
+      observacaoSinal: pagamentos.find(p => p.meioPagamento === 'Sinal')?.descricao || ''
+    });
+
+    // Inicializar venda no fluxo com status "Feito Sinal"
+    inicializarVendaNoFluxo(venda.id, vendedor, vendedorNome, 'Feito Sinal');
+
+    // Bloquear produtos no estoque
+    const produtoIds = itens.map(item => item.produtoId);
+    bloquearProdutosEmVenda(venda.id, produtoIds);
+
+    // Limpar rascunho
+    clearDraft();
+
+    toast({
+      title: "Venda com sinal salva!",
+      description: `Produtos bloqueados. Valor pendente: ${formatCurrency(valorPendenteSinal)}`,
+    });
+
+    navigate('/vendas/conferencia-lancamento');
   };
 
   // Confirmar venda
@@ -1638,6 +1743,29 @@ export default function VendasNova() {
                 <p className="text-lg font-bold text-destructive">-{formatCurrency(prejuizoAcessorios)}</p>
               </div>
             )}
+
+            {/* Card de informação quando há Sinal */}
+            {temPagamentoSinal && (
+              <div className="mt-4 p-4 bg-red-100 dark:bg-red-900/30 rounded-lg border border-red-200 dark:border-red-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                  <span className="font-medium text-red-700 dark:text-red-300">Venda com Sinal</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Valor do Sinal</p>
+                    <p className="font-bold text-red-600">{formatCurrency(valorSinal)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Valor Pendente</p>
+                    <p className="font-bold text-red-600">{formatCurrency(valorPendenteSinal)}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-2">
+                  Os produtos serão bloqueados até o pagamento do valor restante.
+                </p>
+              </div>
+            )}
             
             <Button 
               className="w-full mt-4" 
@@ -1656,13 +1784,29 @@ export default function VendasNova() {
           <Button variant="outline" onClick={() => navigate('/vendas')}>
             Cancelar
           </Button>
-          <Button 
-            onClick={handleRegistrarVenda}
-            disabled={!canSubmit}
-          >
-            <Check className="h-4 w-4 mr-2" />
-            Registrar Venda
-          </Button>
+          
+          {/* Botão Salvar com Sinal - aparece quando tem pagamento Sinal */}
+          {temPagamentoSinal && (
+            <Button 
+              onClick={handleSalvarComSinal}
+              disabled={!canSubmitSinal}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Salvar Registro (Sinal)
+            </Button>
+          )}
+          
+          {/* Botão Registrar Venda normal - só aparece se não tem sinal */}
+          {!temPagamentoSinal && (
+            <Button 
+              onClick={handleRegistrarVenda}
+              disabled={!canSubmit}
+            >
+              <Check className="h-4 w-4 mr-2" />
+              Registrar Venda
+            </Button>
+          )}
         </div>
       </div>
 

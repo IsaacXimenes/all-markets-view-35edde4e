@@ -15,7 +15,7 @@ import { Download, Eye, CheckCircle, XCircle, Package, DollarSign, AlertTriangle
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { formatIMEI } from '@/utils/imeiMask';
+import { formatIMEI, unformatIMEI } from '@/utils/imeiMask';
 
 import { formatCurrency, exportToCSV } from '@/utils/formatUtils';
 
@@ -53,7 +53,7 @@ export default function EstoqueProdutos() {
   const produtosFiltrados = produtos.filter(p => {
     if (lojaFilter !== 'todas' && p.loja !== lojaFilter) return false;
     if (modeloFilter && !p.modelo.toLowerCase().includes(modeloFilter.toLowerCase())) return false;
-    if (imeiFilter && !p.imei.toLowerCase().includes(imeiFilter.toLowerCase())) return false;
+    if (imeiFilter && !unformatIMEI(p.imei).includes(unformatIMEI(imeiFilter))) return false;
     if (somenteNaoConferidos && (p.estoqueConferido && p.assistenciaConferida)) return false;
     return true;
   });

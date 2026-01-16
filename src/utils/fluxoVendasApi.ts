@@ -132,12 +132,20 @@ export const getVendasPorStatus = (status: StatusVenda | StatusVenda[]): VendaCo
 export const inicializarVendaNoFluxo = (
   vendaId: string,
   vendedorId: string,
-  vendedorNome: string
+  vendedorNome: string,
+  statusInicial?: StatusVenda
 ): VendaComFluxo | null => {
   const venda = getVendaById(vendaId);
   if (!venda) return null;
 
   const fluxoData = getFluxoData();
+  
+  // Determinar status baseado na venda (se tem sinal, usa "Feito Sinal")
+  const status: StatusVenda = statusInicial || 
+    (venda as any).statusAtual || 
+    'Aguardando Conferência';
+  
+  const isSinal = status === 'Feito Sinal';
   
   const timelineInicial: TimelineVenda = {
     id: `TL-${Date.now()}`,
@@ -145,11 +153,13 @@ export const inicializarVendaNoFluxo = (
     tipo: 'criacao',
     usuarioId: vendedorId,
     usuarioNome: vendedorNome,
-    descricao: `Venda criada por ${vendedorNome}. Aguardando conferência do lançador.`
+    descricao: isSinal 
+      ? `Venda com sinal criada por ${vendedorNome}. Produtos bloqueados aguardando pagamento restante.`
+      : `Venda criada por ${vendedorNome}. Aguardando conferência do lançador.`
   };
 
   fluxoData[vendaId] = {
-    statusFluxo: 'Aguardando Conferência',
+    statusFluxo: status,
     timelineFluxo: [timelineInicial],
     bloqueadoParaEdicao: false
   };

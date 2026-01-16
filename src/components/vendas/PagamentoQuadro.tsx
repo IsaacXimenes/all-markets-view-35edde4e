@@ -502,6 +502,7 @@ export function PagamentoQuadro({
                   <SelectItem value="Cartão Crédito">Cartão Crédito</SelectItem>
                   <SelectItem value="Cartão Débito">Cartão Débito</SelectItem>
                   <SelectItem value="Transferência">Transferência</SelectItem>
+                  <SelectItem value="Sinal">Sinal</SelectItem>
                   <SelectItem value="Fiado">Fiado</SelectItem>
                 </SelectContent>
               </Select>
@@ -660,6 +661,20 @@ export function PagamentoQuadro({
                   As parcelas serão geradas automaticamente na tela "Conferências - Fiado" no módulo Financeiro.
                 </div>
               </>
+            )}
+
+            {/* Campos específicos para Sinal */}
+            {novoPagamento.meioPagamento === 'Sinal' && (
+              <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg space-y-2">
+                <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-sm font-medium">Pagamento de Sinal</span>
+                </div>
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  O valor do sinal deve ser menor que o valor total da venda. 
+                  Os produtos ficarão bloqueados até a finalização do pagamento.
+                </p>
+              </div>
             )}
             
             <div>

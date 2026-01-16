@@ -31,6 +31,7 @@ import { getProdutosCadastro, ProdutoCadastro } from '@/utils/cadastrosApi';
 import { getPlanosPorModelo, PlanoGarantia } from '@/utils/planosGarantiaApi';
 import { formatarMoeda } from '@/utils/formatUtils';
 import { PagamentoQuadro } from '@/components/vendas/PagamentoQuadro';
+import { displayIMEI } from '@/utils/imeiMask';
 
 const formatCurrency = formatarMoeda;
 
@@ -711,50 +712,36 @@ export default function VendasEditar() {
           </CardContent>
         </Card>
 
-        {/* Cliente */}
+        {/* Cliente - Bloqueado na edição */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
               Cliente
+              <Badge variant="outline" className="ml-2">Bloqueado</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  <Input 
-                    value={clienteNome} 
-                    placeholder="Nome do Cliente"
-                    className="flex-1"
-                    readOnly
-                  />
-                  <Button onClick={() => setShowClienteModal(true)}>
-                    <Search className="h-4 w-4 mr-2" />
-                    Alterar
-                  </Button>
-                </div>
-                
-                {clienteId && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm text-muted-foreground">CPF</label>
-                      <p className="font-medium">{clienteCpf}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground">Telefone</label>
-                      <p className="font-medium">{clienteTelefone}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground">E-mail</label>
-                      <p className="font-medium">{clienteEmail}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground">Cidade</label>
-                      <p className="font-medium">{clienteCidade}</p>
-                    </div>
-                  </div>
-                )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Nome</label>
+                <Input value={clienteNome} disabled className="bg-muted" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">CPF</label>
+                <Input value={clienteCpf} disabled className="bg-muted" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Telefone</label>
+                <Input value={clienteTelefone} disabled className="bg-muted" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">E-mail</label>
+                <Input value={clienteEmail || '-'} disabled className="bg-muted" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Cidade</label>
+                <Input value={clienteCidade} disabled className="bg-muted" />
               </div>
             </div>
 
@@ -825,8 +812,8 @@ export default function VendasEditar() {
                   {itens.map(item => (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.produto}</TableCell>
-                      <TableCell className="font-mono text-sm">{item.imei}</TableCell>
-                      <TableCell>{item.loja}</TableCell>
+                      <TableCell className="font-mono text-sm">{displayIMEI(item.imei)}</TableCell>
+                      <TableCell>{getLojaNome(item.loja)}</TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {formatCurrency(item.valorCusto)}
                       </TableCell>

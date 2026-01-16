@@ -122,8 +122,8 @@ const App = () => (
           <Route path="/estoque/produtos-pendentes" element={<EstoqueProdutosPendentes />} />
           <Route path="/estoque/produto-pendente/:id" element={<EstoqueProdutoPendenteDetalhes />} />
           <Route path="/estoque/notas-compra" element={<EstoqueNotasCompra />} />
-          <Route path="/estoque/nota/:id" element={<EstoqueNotaDetalhes />} />
           <Route path="/estoque/nota/cadastrar" element={<EstoqueNotaCadastrar />} />
+          <Route path="/estoque/nota/:id" element={<EstoqueNotaDetalhes />} />
           <Route path="/estoque/movimentacoes" element={<EstoqueMovimentacoes />} />
           <Route path="/estoque/movimentacoes-acessorios" element={<EstoqueMovimentacoesAcessorios />} />
           <Route path="/estoque/acessorios" element={<EstoqueAcessorios />} />
@@ -182,7 +182,6 @@ const App = () => (
           <Route path="/garantias/extendida/:id" element={<GarantiaExtendidaDetalhes />} />
           <Route path="/garantias/:id" element={<GarantiaDetalhes />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

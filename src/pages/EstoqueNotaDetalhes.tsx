@@ -44,11 +44,11 @@ const usuarioLogado = { id: 'COL-003', nome: 'Carlos Estoque' };
 export default function EstoqueNotaDetalhes() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const fornecedores = getFornecedores();
   
   const [nota, setNota] = useState<NotaCompraExtendida | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(true);
+  const [fornecedores, setFornecedores] = useState<ReturnType<typeof getFornecedores>>([]);
   
   // Estado de edição
   const [editData, setEditData] = useState({
@@ -56,6 +56,16 @@ export default function EstoqueNotaDetalhes() {
     fornecedor: '',
     observacoes: ''
   });
+  
+  // Carregar fornecedores no mount
+  useEffect(() => {
+    try {
+      const data = getFornecedores();
+      setFornecedores(data);
+    } catch (error) {
+      console.error('Erro ao carregar fornecedores:', error);
+    }
+  }, []);
 
   useEffect(() => {
     const notaBase = getNotasCompra().find(n => n.id === id);

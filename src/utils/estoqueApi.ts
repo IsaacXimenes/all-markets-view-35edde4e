@@ -587,7 +587,8 @@ let movimentacoes: Movimentacao[] = [
     origem: 'Loja Centro',
     destino: 'Loja Shopping',
     responsavel: 'João Silva',
-    motivo: 'Transferência de estoque'
+    motivo: 'Transferência de estoque',
+    status: 'Pendente'
   },
   {
     id: 'MOV-2025-0002',
@@ -598,7 +599,8 @@ let movimentacoes: Movimentacao[] = [
     origem: 'Loja Norte',
     destino: 'Loja Sul',
     responsavel: 'Maria Santos',
-    motivo: 'Solicitação do gerente'
+    motivo: 'Solicitação do gerente',
+    status: 'Pendente'
   }
 ];
 

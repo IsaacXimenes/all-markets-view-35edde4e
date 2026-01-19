@@ -16,10 +16,11 @@ import {
   User, Package, CreditCard, Truck, FileText, AlertTriangle, Check, Save 
 } from 'lucide-react';
 import { 
-  getLojas, getClientes, getColaboradores, getCargos, getOrigensVenda, 
-  getContasFinanceiras, Loja, Cliente, Colaborador, Cargo, OrigemVenda, ContaFinanceira,
+  getClientes, getOrigensVenda, 
+  getContasFinanceiras, Cliente, OrigemVenda, ContaFinanceira,
   addCliente
 } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
 import { getNextVendaNumber, getHistoricoComprasCliente, formatCurrency, Pagamento } from '@/utils/vendasApi';
 import { 
   getAcessorios, 
@@ -35,12 +36,12 @@ const DRAFT_KEY = 'draft_venda_acessorios';
 
 export default function VendasAcessorios() {
   const navigate = useNavigate();
+  const { obterLojasAtivas, obterVendedores, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   
-  // Dados do cadastros
-  const [lojas] = useState<Loja[]>(getLojas());
+  // Dados do cadastros - usando Zustand store
+  const lojas = obterLojasAtivas();
+  const vendedoresDisponiveis = obterVendedores();
   const [clientes, setClientes] = useState<Cliente[]>(getClientes());
-  const [colaboradores] = useState<Colaborador[]>(getColaboradores());
-  const [cargos] = useState<Cargo[]>(getCargos());
   const [origensVenda] = useState<OrigemVenda[]>(getOrigensVenda());
   const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceiras());
   const [acessoriosEstoque, setAcessoriosEstoque] = useState<Acessorio[]>(getAcessorios());
@@ -95,12 +96,6 @@ export default function VendasAcessorios() {
   const [draftAge, setDraftAge] = useState<number | null>(null);
   const isLoadingDraft = useRef(false);
   const lastSaveTime = useRef<number>(0);
-
-  // Vendedores com permissão de vendas
-  const vendedoresDisponiveis = useMemo(() => {
-    const cargosVendas = cargos.filter(c => c.permissoes.includes('Vendas')).map(c => c.id);
-    return colaboradores.filter(col => cargosVendas.includes(col.cargo));
-  }, [colaboradores, cargos]);
 
   // Verificar se existe rascunho ao montar
   useEffect(() => {
@@ -391,15 +386,8 @@ export default function VendasAcessorios() {
     navigate('/vendas');
   };
 
-  const getColaboradorNome = (id: string) => {
-    const col = colaboradores.find(c => c.id === id);
-    return col?.nome || id;
-  };
-
-  const getLojaNome = (id: string) => {
-    const loja = lojas.find(l => l.id === id);
-    return loja?.nome || id;
-  };
+  const getColaboradorNome = (colId: string) => obterNomeColaborador(colId);
+  const getLojaNome = (lojaId: string) => obterNomeLoja(lojaId);
 
   const getContaNome = (id: string) => {
     const conta = contasFinanceiras.find(c => c.id === id);
@@ -449,7 +437,7 @@ export default function VendasAcessorios() {
                     <SelectValue placeholder="Selecione a loja" />
                   </SelectTrigger>
                   <SelectContent>
-                    {lojas.filter(l => l.status === 'Ativo').map(loja => (
+                    {lojas.filter(l => l.ativa).map(loja => (
                       <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
                     ))}
                   </SelectContent>

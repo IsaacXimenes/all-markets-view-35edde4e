@@ -42,7 +42,7 @@ import {
   StatusVenda
 } from '@/utils/fluxoVendasApi';
 import { formatCurrency } from '@/utils/formatUtils';
-import { getLojas, getColaboradores } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
 import { toast } from 'sonner';
 
 // Mock do usuário logado (gestor)
@@ -65,12 +65,13 @@ interface ObservacaoGestor {
 
 export default function VendasConferenciaGestor() {
   const navigate = useNavigate();
+  const { obterLojasAtivas, obterColaboradoresAtivos, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   const { vendas, recarregar } = useFluxoVendas({
     status: ['Conferência Gestor', 'Devolvido pelo Financeiro', 'Conferência Financeiro', 'Finalizado']
   });
   
-  const lojas = getLojas();
-  const colaboradores = getColaboradores();
+  const lojas = obterLojasAtivas();
+  const colaboradores = obterColaboradoresAtivos();
   
   // Filtros
   const [filtroDataInicio, setFiltroDataInicio] = useState('');

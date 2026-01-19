@@ -19,10 +19,11 @@ import {
 import { format, addMonths, addDays } from 'date-fns';
 
 import { 
-  getLojas, getClientes, getColaboradores, getCargos, getOrigensVenda, 
-  getContasFinanceiras, getMotoboys, getLojaById, Loja, Cliente, Colaborador, Cargo, OrigemVenda, ContaFinanceira,
+  getClientes, getOrigensVenda, 
+  getContasFinanceiras, Cliente, OrigemVenda, ContaFinanceira,
   addCliente
 } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
 import { getProdutos, Produto, bloquearProdutosEmVenda, desbloquearProdutosDeVenda } from '@/utils/estoqueApi';
 import { getVendaById, updateVenda, registrarEdicaoVenda, ItemVenda, ItemTradeIn, Pagamento, Venda } from '@/utils/vendasApi';
 import { getVendaComFluxo, registrarEdicaoFluxo, VendaComFluxo } from '@/utils/fluxoVendasApi';
@@ -51,17 +52,17 @@ interface GarantiaItemVenda {
 export default function VendasEditar() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { obterLojasAtivas, obterVendedores, obterMotoboys, obterLojaById, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   
-  // Dados de cadastros
-  const [lojas] = useState<Loja[]>(getLojas());
+  // Dados de cadastros - usando Zustand store
+  const lojas = obterLojasAtivas();
+  const vendedoresDisponiveis = obterVendedores();
+  const motoboys = obterMotoboys();
   const [clientes, setClientes] = useState<Cliente[]>(getClientes());
-  const [colaboradores] = useState<Colaborador[]>(getColaboradores());
-  const [cargos] = useState<Cargo[]>(getCargos());
   const [origensVenda] = useState<OrigemVenda[]>(getOrigensVenda());
   const [produtosEstoque] = useState<Produto[]>(getProdutos());
   const [produtosCadastro] = useState<ProdutoCadastro[]>(getProdutosCadastro());
   const [acessoriosEstoque, setAcessoriosEstoque] = useState<Acessorio[]>(getAcessorios());
-  const [motoboys] = useState(getMotoboys());
   
   // Venda original (para comparação)
   const [vendaOriginal, setVendaOriginal] = useState<Venda | null>(null);
@@ -135,12 +136,6 @@ export default function VendasEditar() {
   
   // Loading
   const [loading, setLoading] = useState(true);
-
-  // Vendedores com permissão de vendas
-  const vendedoresDisponiveis = useMemo(() => {
-    const cargosVendas = cargos.filter(c => c.permissoes.includes('Vendas')).map(c => c.id);
-    return colaboradores.filter(col => cargosVendas.includes(col.cargo));
-  }, [colaboradores, cargos]);
 
   // Carregar venda existente
   useEffect(() => {
@@ -628,15 +623,8 @@ export default function VendasEditar() {
     navigate(-1);
   };
 
-  const getColaboradorNome = (id: string) => {
-    const col = colaboradores.find(c => c.id === id);
-    return col?.nome || id;
-  };
-
-  const getLojaNome = (id: string) => {
-    const loja = lojas.find(l => l.id === id);
-    return loja?.nome || id;
-  };
+  const getColaboradorNome = (colId: string) => obterNomeColaborador(colId);
+  const getLojaNome = (lojaId: string) => obterNomeLoja(lojaId);
 
   if (loading) {
     return (
@@ -766,7 +754,7 @@ export default function VendasEditar() {
                     <SelectValue placeholder="Selecione o local" />
                   </SelectTrigger>
                   <SelectContent>
-                    {lojas.filter(l => l.status === 'Ativo').map(loja => (
+                    {lojas.filter(l => l.ativa).map(loja => (
                       <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1151,10 +1139,10 @@ export default function VendasEditar() {
                       </SelectTrigger>
                       <SelectContent>
                         {motoboys.map(motoboy => {
-                          const loja = getLojaById(motoboy.loja);
+                          const lojaNome = obterNomeLoja(motoboy.loja_id);
                           return (
                             <SelectItem key={motoboy.id} value={motoboy.id}>
-                              {motoboy.nome} - {loja?.nome || motoboy.loja}
+                              {motoboy.nome} - {lojaNome}
                             </SelectItem>
                           );
                         })}

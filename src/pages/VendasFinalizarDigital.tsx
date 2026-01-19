@@ -25,10 +25,11 @@ import {
   VendaDigital 
 } from '@/utils/vendasDigitalApi';
 import { 
-  getLojas, getClientes, getColaboradores, getCargos, getOrigensVenda, 
-  getContasFinanceiras, Loja, Cliente, Colaborador, Cargo, OrigemVenda, ContaFinanceira,
+  getClientes, getOrigensVenda, 
+  getContasFinanceiras, Cliente, OrigemVenda, ContaFinanceira,
   addCliente
 } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
 import { PagamentoQuadro } from '@/components/vendas/PagamentoQuadro';
 import { getProdutos, Produto, updateProduto } from '@/utils/estoqueApi';
 import { addVenda, getHistoricoComprasCliente, ItemVenda, ItemTradeIn, Pagamento, formatCurrency as formatCurrencyVendas } from '@/utils/vendasApi';
@@ -43,15 +44,15 @@ const TIMER_DURATION = 1800; // 30 minutos em segundos
 export default function VendasFinalizarDigital() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { obterLojasAtivas, obterVendedores, obterLojaById, obterNomeLoja, obterNomeColaborador, obterColaboradorById } = useCadastroStore();
   
   // Dados do pré-cadastro
   const [venda, setVenda] = useState<VendaDigital | null>(null);
   
-  // Dados do cadastros
-  const [lojas] = useState<Loja[]>(getLojas());
+  // Dados do cadastros - usando Zustand store
+  const lojas = obterLojasAtivas();
+  const vendedoresDisponiveis = obterVendedores();
   const [clientes, setClientes] = useState<Cliente[]>(getClientes());
-  const [colaboradores] = useState<Colaborador[]>(getColaboradores());
-  const [cargos] = useState<Cargo[]>(getCargos());
   const [origensVenda] = useState<OrigemVenda[]>(getOrigensVenda());
   const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceiras());
   const [produtosEstoque] = useState<Produto[]>(getProdutos());
@@ -561,14 +562,17 @@ export default function VendasFinalizarDigital() {
     });
 
     // Inicializar venda no fluxo de conferência
-    const vendedorNome = colaboradores.find(c => c.id === venda.responsavelVendaId)?.nome || 'Vendedor';
+    const vendedorNome = obterNomeColaborador(venda.responsavelVendaId);
     inicializarVendaNoFluxo(vendaRegistrada.id, venda.responsavelVendaId, vendedorNome);
+
+    // Obter finalizador atual (usar o gestor logado como mock)
+    const finalizadorLogado = vendedoresDisponiveis[0] || { id: 'MOCK-FIN', nome: 'Finalizador' };
 
     // Atualizar status da venda digital
     finalizarVendaDigital(
       venda.id,
-      'COL-010',
-      'Lucas Finalizador',
+      finalizadorLogado.id,
+      finalizadorLogado.nome,
       clienteId,
       {
         itens,
@@ -591,8 +595,8 @@ export default function VendasFinalizarDigital() {
     navigate('/vendas/pendentes-digitais');
   };
 
-  const getColaboradorNome = (id: string) => colaboradores.find(c => c.id === id)?.nome || id;
-  const getLojaNome = (id: string) => lojas.find(l => l.id === id)?.nome || id;
+  const getColaboradorNome = (colId: string) => obterNomeColaborador(colId);
+  const getLojaNome = (lojaId: string) => obterNomeLoja(lojaId);
 
   if (!venda) {
     return (
@@ -675,7 +679,7 @@ export default function VendasFinalizarDigital() {
                     <SelectValue placeholder="Selecione a loja" />
                   </SelectTrigger>
                   <SelectContent>
-                    {lojas.filter(l => l.status === 'Ativo').map(loja => (
+                    {lojas.filter(l => l.ativa).map(loja => (
                       <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
                     ))}
                   </SelectContent>
@@ -692,7 +696,7 @@ export default function VendasFinalizarDigital() {
                     <SelectValue placeholder="Selecione o local" />
                   </SelectTrigger>
                   <SelectContent>
-                    {lojas.filter(l => l.status === 'Ativo').map(loja => (
+                    {lojas.filter(l => l.ativa).map(loja => (
                       <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
                     ))}
                   </SelectContent>

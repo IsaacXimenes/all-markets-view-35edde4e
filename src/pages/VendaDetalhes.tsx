@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Printer, ShoppingCart, User, Package, CreditCard, Truck, Clock, DollarSign, TrendingUp, AlertTriangle, Shield, History, Pencil, Wrench } from 'lucide-react';
 import { getVendaById, formatCurrency, Venda } from '@/utils/vendasApi';
-import { getColaboradores, getLojas, getContasFinanceiras } from '@/utils/cadastrosApi';
+import { getContasFinanceiras } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
 import { getGarantiasByVendaId, calcularStatusExpiracao } from '@/utils/garantiasApi';
 import { calcularComissaoVenda, getComissaoColaborador } from '@/utils/comissoesApi';
 import { format, addMonths } from 'date-fns';
@@ -17,11 +18,10 @@ import QRCode from 'qrcode';
 export default function VendaDetalhes() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   const [venda, setVenda] = useState<Venda | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   
-  const colaboradores = getColaboradores();
-  const lojas = getLojas();
   const contasFinanceiras = getContasFinanceiras();
 
   useEffect(() => {
@@ -51,15 +51,8 @@ export default function VendaDetalhes() {
     }
   };
 
-  const getColaboradorNome = (id: string) => {
-    const col = colaboradores.find(c => c.id === id);
-    return col?.nome || id;
-  };
-
-  const getLojaNome = (id: string) => {
-    const loja = lojas.find(l => l.id === id);
-    return loja?.nome || id;
-  };
+  const getColaboradorNome = (colId: string) => obterNomeColaborador(colId);
+  const getLojaNome = (lojaId: string) => obterNomeLoja(lojaId);
 
   const getContaNome = (id: string) => {
     const conta = contasFinanceiras.find(c => c.id === id);

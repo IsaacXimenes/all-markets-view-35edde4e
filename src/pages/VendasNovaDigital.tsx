@@ -11,13 +11,14 @@ import { Send, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
   criarPreCadastro, 
-  getColaboradoresDigital,
   formatCurrency 
 } from '@/utils/vendasDigitalApi';
+import { useCadastroStore } from '@/store/cadastroStore';
 
 export default function VendasNovaDigital() {
   const navigate = useNavigate();
-  const colaboradoresDigital = getColaboradoresDigital();
+  const { obterVendedores } = useCadastroStore();
+  const colaboradoresDigital = obterVendedores();
   
   const [responsavelId, setResponsavelId] = useState('');
   const [clienteNome, setClienteNome] = useState('');

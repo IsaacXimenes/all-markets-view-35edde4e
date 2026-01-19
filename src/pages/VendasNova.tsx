@@ -20,10 +20,11 @@ import {
 import { format, addMonths, addDays } from 'date-fns';
 
 import { 
-  getLojas, getClientes, getColaboradores, getCargos, getOrigensVenda, 
-  getContasFinanceiras, getMotoboys, getLojaById, Loja, Cliente, Colaborador, Cargo, OrigemVenda, ContaFinanceira,
+  getClientes, getOrigensVenda, 
+  getContasFinanceiras, Cliente, OrigemVenda, ContaFinanceira,
   addCliente
 } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
 import { getProdutos, Produto, updateProduto, bloquearProdutosEmVenda } from '@/utils/estoqueApi';
 import { addVenda, getNextVendaNumber, getHistoricoComprasCliente, ItemVenda, ItemTradeIn, Pagamento } from '@/utils/vendasApi';
 import { inicializarVendaNoFluxo } from '@/utils/fluxoVendasApi';
@@ -45,12 +46,13 @@ const DRAFT_KEY = 'draft_venda_nova';
 
 export default function VendasNova() {
   const navigate = useNavigate();
+  const { obterLojasAtivas, obterVendedores, obterMotoboys, obterLojaById, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   
-  // Dados do cadastros
-  const [lojas] = useState<Loja[]>(getLojas());
+  // Dados do cadastros - usando Zustand store
+  const lojas = obterLojasAtivas();
+  const vendedoresDisponiveis = obterVendedores();
+  const motoboys = obterMotoboys();
   const [clientes, setClientes] = useState<Cliente[]>(getClientes());
-  const [colaboradores] = useState<Colaborador[]>(getColaboradores());
-  const [cargos] = useState<Cargo[]>(getCargos());
   const [origensVenda] = useState<OrigemVenda[]>(getOrigensVenda());
   const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceiras());
   const [produtosEstoque] = useState<Produto[]>(getProdutos());
@@ -82,7 +84,6 @@ export default function VendasNova() {
   const [tipoRetirada, setTipoRetirada] = useState<'Retirada Balcão' | 'Entrega' | 'Retirada em Outra Loja'>('Retirada Balcão');
   const [taxaEntrega, setTaxaEntrega] = useState(0);
   const [motoboyId, setMotoboyId] = useState('');
-  const [motoboys] = useState(getMotoboys());
   const [observacoes, setObservacoes] = useState('');
   
   // Itens da venda
@@ -155,12 +156,6 @@ export default function VendasNova() {
   const [draftAge, setDraftAge] = useState<number | null>(null);
   const isLoadingDraft = useRef(false);
   const lastSaveTime = useRef<number>(0);
-
-  // Vendedores com permissão de vendas
-  const vendedoresDisponiveis = useMemo(() => {
-    const cargosVendas = cargos.filter(c => c.permissoes.includes('Vendas')).map(c => c.id);
-    return colaboradores.filter(col => cargosVendas.includes(col.cargo));
-  }, [colaboradores, cargos]);
 
   // Verificar se existe rascunho ao montar
   useEffect(() => {
@@ -699,7 +694,7 @@ export default function VendasNova() {
     if (!canSubmitSinal) return;
     
     // Obter nome do vendedor
-    const vendedorNome = colaboradores.find(c => c.id === vendedor)?.nome || 'Vendedor';
+    const vendedorNome = obterNomeColaborador(vendedor);
 
     // Criar timeline inicial
     const timelineInicial = [{
@@ -781,7 +776,7 @@ export default function VendasNova() {
     setAcessoriosEstoque(getAcessorios());
 
     // Obter nome do vendedor para timeline
-    const vendedorNome = colaboradores.find(c => c.id === confirmVendedor)?.nome || 'Vendedor';
+    const vendedorNome = obterNomeColaborador(confirmVendedor);
 
     // Criar timeline inicial
     const timelineInicial = [{
@@ -839,15 +834,8 @@ export default function VendasNova() {
     navigate('/vendas/conferencia-lancamento');
   };
 
-  const getColaboradorNome = (id: string) => {
-    const col = colaboradores.find(c => c.id === id);
-    return col?.nome || id;
-  };
-
-  const getLojaNome = (id: string) => {
-    const loja = lojas.find(l => l.id === id);
-    return loja?.nome || id;
-  };
+  const getColaboradorNome = (colId: string) => obterNomeColaborador(colId);
+  const getLojaNome = (lojaId: string) => obterNomeLoja(lojaId);
 
 
   return (
@@ -895,7 +883,7 @@ export default function VendasNova() {
                     <SelectValue placeholder="Selecione a loja" />
                   </SelectTrigger>
                   <SelectContent>
-                    {lojas.filter(l => l.status === 'Ativo').map(loja => (
+                    {lojas.filter(l => l.ativa).map(loja => (
                       <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1038,7 +1026,7 @@ export default function VendasNova() {
                     <SelectValue placeholder="Selecione o local" />
                   </SelectTrigger>
                   <SelectContent>
-                    {lojas.filter(l => l.status === 'Ativo').map(loja => (
+                    {lojas.filter(l => l.ativa).map(loja => (
                       <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1627,10 +1615,10 @@ export default function VendasNova() {
                       </SelectTrigger>
                       <SelectContent>
                         {motoboys.map(motoboy => {
-                          const loja = getLojaById(motoboy.loja);
+                          const lojaNome = obterNomeLoja(motoboy.loja_id);
                           return (
                             <SelectItem key={motoboy.id} value={motoboy.id}>
-                              {motoboy.nome} - {loja?.nome || motoboy.loja}
+                              {motoboy.nome} - {lojaNome}
                             </SelectItem>
                           );
                         })}
@@ -1648,7 +1636,7 @@ export default function VendasNova() {
                       <SelectValue placeholder="Selecione a loja" />
                     </SelectTrigger>
                     <SelectContent>
-                      {lojas.filter(l => l.status === 'Ativo').map(loja => (
+                      {lojas.filter(l => l.ativa).map(loja => (
                         <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
                       ))}
                     </SelectContent>
@@ -2318,7 +2306,7 @@ export default function VendasNova() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {lojas.filter(l => l.status === 'Ativo').map(loja => (
+                  {lojas.filter(l => l.ativa).map(loja => (
                     <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
                   ))}
                 </SelectContent>

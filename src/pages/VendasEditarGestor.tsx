@@ -25,12 +25,11 @@ import {
   Pagamento 
 } from '@/utils/vendasApi';
 import { 
-  getLojas, 
-  getColaboradores, 
   getContasFinanceiras,
   getMaquinasCartao,
   MaquinaCartao
 } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
 import { calcularComissaoVenda, getComissaoColaborador } from '@/utils/comissoesApi';
 import { displayIMEI } from '@/utils/imeiMask';
 import { formatCurrency, moedaMask, parseMoeda } from '@/utils/formatUtils';
@@ -38,6 +37,7 @@ import { formatCurrency, moedaMask, parseMoeda } from '@/utils/formatUtils';
 export default function VendasEditarGestor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   
   const [vendaOriginal, setVendaOriginal] = useState<Venda | null>(null);
   const [itens, setItens] = useState<ItemVenda[]>([]);
@@ -47,8 +47,6 @@ export default function VendasEditarGestor() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [alteracoesDetectadas, setAlteracoesDetectadas] = useState<{ campo: string; valorAnterior: any; valorNovo: any }[]>([]);
   
-  const lojas = getLojas();
-  const colaboradores = getColaboradores();
   const contasFinanceiras = getContasFinanceiras();
   const maquinasCartao = getMaquinasCartao().filter(m => m.status === 'Ativo');
 
@@ -64,9 +62,9 @@ export default function VendasEditarGestor() {
     }
   }, [id]);
 
-  const getLojaNome = (id: string) => lojas.find(l => l.id === id)?.nome || id;
-  const getColaboradorNome = (id: string) => colaboradores.find(c => c.id === id)?.nome || id;
-  const getContaNome = (id: string) => contasFinanceiras.find(c => c.id === id)?.nome || id;
+  const getLojaNome = (lojaId: string) => obterNomeLoja(lojaId);
+  const getColaboradorNome = (colId: string) => obterNomeColaborador(colId);
+  const getContaNome = (contaId: string) => contasFinanceiras.find(c => c.id === contaId)?.nome || contaId;
 
   // Cálculos
   const subtotal = useMemo(() => itens.reduce((acc, item) => acc + item.valorVenda, 0), [itens]);

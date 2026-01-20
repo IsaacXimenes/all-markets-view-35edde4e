@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { RHLayout } from '@/components/layout/RHLayout';
+import { useUrlTabs } from '@/hooks/useUrlTabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

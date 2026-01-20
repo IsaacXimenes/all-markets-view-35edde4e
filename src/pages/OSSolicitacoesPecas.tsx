@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUrlTabs } from '@/hooks/useUrlTabs';
 import { OSLayout } from '@/components/layout/OSLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 export default function OSSolicitacoesPecas() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useUrlTabs('solicitacoes');
   const [solicitacoes, setSolicitacoes] = useState(getSolicitacoes());
   const [lotes, setLotes] = useState(getLotes());
   const lojas = getLojas();
@@ -352,7 +354,7 @@ export default function OSSolicitacoesPecas() {
         </div>
       </div>
 
-      <Tabs defaultValue="solicitacoes" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="solicitacoes">Solicitações</TabsTrigger>
           <TabsTrigger value="lotes">Lotes Pendentes ({lotesPendentes.length})</TabsTrigger>

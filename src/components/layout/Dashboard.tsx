@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -14,10 +14,11 @@ import { getColaboradores } from '@/utils/cadastrosApi';
 import { formatCurrency } from '@/utils/formatUtils';
 import { getGarantiasExpirandoEm7Dias, getGarantiasExpirandoEm30Dias } from '@/utils/garantiasApi';
 import { getPercentualComissao, LOJA_ONLINE_ID } from '@/utils/calculoComissaoVenda';
+import { useSidebarState } from '@/hooks/useSidebarState';
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, toggleSidebar] = useSidebarState();
   
   // Dados reais do sistema
   const vendas = getVendas();
@@ -53,10 +54,6 @@ export function Dashboard() {
     const percentualMedio = (0.8 * 10 + 0.2 * 6);
     return lucroEstimadoHoje * (percentualMedio / 100);
   }, [receitaHoje]);
-  
-  const toggleSidebar = () => {
-    setIsSidebarCollapsed(prev => !prev);
-  };
   
   return (
     <div className="min-h-screen flex">

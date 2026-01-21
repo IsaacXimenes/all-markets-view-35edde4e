@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { cn } from '@/lib/utils';
 import { Store, Users, UserCog, Truck, ShoppingCart, Package, Percent, Briefcase, CreditCard, Building2, Wrench, Headphones, Shield, Palette, MapPinned } from 'lucide-react';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 interface CadastrosLayoutProps {
   children: React.ReactNode;
@@ -33,27 +34,30 @@ export function CadastrosLayout({ children, title }: CadastrosLayoutProps) {
   return (
     <PageLayout title={title}>
       <div className="mb-6 border-b border-border">
-        <nav className="flex gap-1 overflow-x-auto pb-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = location.pathname === tab.href;
-            return (
-              <Link
-                key={tab.href}
-                to={tab.href}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap",
-                  isActive
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted"
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {tab.name}
-              </Link>
-            );
-          })}
-        </nav>
+        <ScrollArea className="w-full whitespace-nowrap">
+          <nav className="flex gap-1 pb-3">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = location.pathname === tab.href;
+              return (
+                <Link
+                  key={tab.href}
+                  to={tab.href}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap",
+                    isActive
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {tab.name}
+                </Link>
+              );
+            })}
+          </nav>
+          <ScrollBar orientation="horizontal" className="h-2" />
+        </ScrollArea>
       </div>
       {children}
     </PageLayout>

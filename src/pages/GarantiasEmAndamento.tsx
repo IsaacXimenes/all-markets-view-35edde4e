@@ -24,7 +24,7 @@ import { format, differenceInDays } from 'date-fns';
 
 export default function GarantiasEmAndamento() {
   const navigate = useNavigate();
-  const { obterNomeLoja } = useCadastroStore();
+  const { obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   
   // Dados
   const garantiasEmAndamento = getGarantiasEmAndamento();
@@ -310,6 +310,7 @@ export default function GarantiasEmAndamento() {
                     <TableHead>Data Abertura</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Loja</TableHead>
+                    <TableHead>Vendedor</TableHead>
                     <TableHead>Modelo</TableHead>
                     <TableHead>IMEI</TableHead>
                     <TableHead>Tipo Tratativa</TableHead>
@@ -320,7 +321,7 @@ export default function GarantiasEmAndamento() {
                 <TableBody>
                   {dadosFiltrados.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                         Nenhuma garantia em andamento
                       </TableCell>
                     </TableRow>
@@ -333,6 +334,7 @@ export default function GarantiasEmAndamento() {
                           </TableCell>
                           <TableCell>{garantia.clienteNome}</TableCell>
                           <TableCell className="text-sm">{obterNomeLoja(garantia.lojaVenda)}</TableCell>
+                          <TableCell className="text-sm">{obterNomeColaborador(garantia.vendedorId)}</TableCell>
                           <TableCell>{garantia.modelo}</TableCell>
                           <TableCell className="font-mono text-xs">{garantia.imei}</TableCell>
                           <TableCell>

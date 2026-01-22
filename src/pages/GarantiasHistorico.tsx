@@ -172,6 +172,7 @@ export default function GarantiasHistorico() {
                     <TableHead>Data Venda</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Loja</TableHead>
+                    <TableHead>Vendedor</TableHead>
                     <TableHead>Modelo</TableHead>
                     <TableHead>IMEI</TableHead>
                     <TableHead>Resp. Garantia</TableHead>
@@ -184,7 +185,7 @@ export default function GarantiasHistorico() {
                 <TableBody>
                   {garantiasFiltradas.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                         Nenhuma garantia encontrada
                       </TableCell>
                     </TableRow>
@@ -199,6 +200,7 @@ export default function GarantiasHistorico() {
                           <TableCell>{format(new Date(garantia.dataInicioGarantia), 'dd/MM/yyyy')}</TableCell>
                           <TableCell>{garantia.clienteNome}</TableCell>
                           <TableCell className="text-sm">{obterNomeLoja(garantia.lojaVenda)}</TableCell>
+                          <TableCell className="text-sm">{obterNomeColaborador(garantia.vendedorId)}</TableCell>
                           <TableCell>{garantia.modelo}</TableCell>
                           <TableCell className="font-mono text-xs">{garantia.imei}</TableCell>
                           <TableCell>

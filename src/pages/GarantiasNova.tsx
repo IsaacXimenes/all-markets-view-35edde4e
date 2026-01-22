@@ -135,6 +135,7 @@ export default function GarantiasNova() {
         dataFimGarantia: dataFimCalc,
         status: 'Ativa',
         lojaVenda: venda.lojaVenda,
+        vendedorId: venda.vendedor || '',
         clienteId: venda.clienteId,
         clienteNome: venda.clienteNome,
         clienteTelefone: venda.clienteTelefone,

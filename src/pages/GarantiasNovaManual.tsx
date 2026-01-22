@@ -274,6 +274,7 @@ export default function GarantiasNovaManual() {
       dataFimGarantia: dataFimCalc,
       status: tipoTratativa ? 'Em Tratativa' : 'Ativa',
       lojaVenda: formData.lojaVenda,
+      vendedorId: '',
       clienteId: formData.clienteId,
       clienteNome: formData.clienteNome,
       clienteTelefone: formData.clienteTelefone,

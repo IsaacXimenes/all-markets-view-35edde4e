@@ -101,16 +101,6 @@
       "data_criacao": "2024-01-01"
     },
     {
-      "id": "11a1d7d3",
-      "nome": "Loja - Acessórios",
-      "tipo": "Loja",
-      "endereco": "Endereço da Loja - Acessórios",
-      "telefone": "(61) 3000-0000",
-      "email": "loja___acessórios@empresa.com",
-      "ativa": true,
-      "data_criacao": "2024-01-01"
-    },
-    {
       "id": "db894e7d",
       "nome": "Loja - JK Shopping",
       "tipo": "Loja",

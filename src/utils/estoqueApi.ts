@@ -102,7 +102,6 @@ const LOJAS_IDS = {
   ONLINE: 'fcc78c1a',            // Loja - Online (COMPARTILHA ESTOQUE COM MATRIZ)
   SHOPPING_SUL: '5b9446d5',      // Loja - Shopping Sul
   AGUAS_LINDAS: '0d06e7db',      // Loja - Águas Lindas Shopping
-  ACESSORIOS: '11a1d7d3',        // Loja - Acessórios
 };
 
 // Constantes para compartilhamento de estoque

@@ -303,6 +303,13 @@ export default function VendasNova() {
   }, [isDowngrade, totalTradeIn, valorProdutos, taxaEntrega]);
   const hasValidDowngrade = isDowngrade && saldoDevolver > 0;
   
+  // Validação de Upgrade inválido (trade-in > produtos)
+  const isUpgradeInvalido = useMemo(() => {
+    if (tipoOperacaoTroca !== 'Upgrade') return false;
+    // Em modo Upgrade, trade-in não pode exceder valor dos produtos
+    return totalTradeIn > valorProdutos && tradeIns.length > 0;
+  }, [tipoOperacaoTroca, totalTradeIn, valorProdutos, tradeIns.length]);
+  
   // Total considera Downgrade
   const total = useMemo(() => {
     if (isDowngrade) {
@@ -696,9 +703,10 @@ export default function VendasNova() {
       valorPendente <= 0 &&
       !tradeInNaoValidado &&
       motoboyValido &&
-      !temPagamentoSinal // Não permite registrar venda normal se tem sinal
+      !temPagamentoSinal && // Não permite registrar venda normal se tem sinal
+      !isUpgradeInvalido // Bloqueia se Upgrade com trade-in > produtos
     );
-  }, [lojaVenda, vendedor, clienteId, origemVenda, itens.length, acessoriosVenda.length, valorPendente, tradeInNaoValidado, tipoRetirada, motoboyId, temPagamentoSinal]);
+  }, [lojaVenda, vendedor, clienteId, origemVenda, itens.length, acessoriosVenda.length, valorPendente, tradeInNaoValidado, tipoRetirada, motoboyId, temPagamentoSinal, isUpgradeInvalido]);
 
   // Validar se pode salvar com sinal
   const canSubmitSinal = useMemo(() => {
@@ -1431,6 +1439,19 @@ export default function VendasNova() {
               <div className="mt-4 p-3 bg-destructive/10 rounded-lg flex items-center gap-2 text-destructive">
                 <AlertTriangle className="h-5 w-5" />
                 <span className="font-medium">Há item de troca com IMEI NÃO validado! Registrar venda desabilitado.</span>
+              </div>
+            )}
+            
+            {/* Alerta de Upgrade Inválido */}
+            {isUpgradeInvalido && (
+              <div className="mt-4 p-4 bg-destructive/10 rounded-lg border-2 border-destructive flex items-center gap-3">
+                <AlertTriangle className="h-6 w-6 text-destructive flex-shrink-0" />
+                <div>
+                  <p className="font-bold text-destructive">Valor de Trade-in maior que produtos!</p>
+                  <p className="text-sm text-muted-foreground">
+                    Altere para a aba "DOWNGRADE" ou ajuste os valores. Registrar venda desabilitado.
+                  </p>
+                </div>
               </div>
             )}
             

@@ -31,7 +31,7 @@ import {
   DialogFooter,
   DialogDescription
 } from '@/components/ui/dialog';
-import { Eye, Download, Filter, X, Pencil, Check, XCircle, AlertTriangle, Clock, Undo2, CreditCard, Banknote, Smartphone, Wallet, ChevronRight, Lock, MessageSquare } from 'lucide-react';
+import { Eye, Download, Filter, X, Pencil, Check, XCircle, AlertTriangle, Clock, Undo2, CreditCard, Banknote, Smartphone, Wallet, ChevronRight, Lock, MessageSquare, ArrowLeftRight } from 'lucide-react';
 import { useFluxoVendas } from '@/hooks/useFluxoVendas';
 import { 
   aprovarGestor, 
@@ -219,14 +219,10 @@ export default function VendasConferenciaGestor() {
     
     setValidacoesPagamento(validacoes);
     
-    // Carregar observação do gestor
-    const storedObservacao = localStorage.getItem(`observacao_gestor_${venda.id}`);
-    if (storedObservacao) {
-      const obs: ObservacaoGestor = JSON.parse(storedObservacao);
-      setObservacaoGestor(obs.texto);
-    } else {
-      setObservacaoGestor('');
-    }
+    // SEMPRE iniciar observação vazia para nova conferência
+    // Não carregar observação do localStorage para evitar cache
+    setObservacaoGestor('');
+    setMotivoRecusa('');
   };
 
   const handleFecharPainelLateral = () => {
@@ -762,6 +758,33 @@ export default function VendasConferenciaGestor() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4 pt-4">
+                {/* Card Downgrade - Visual destacado igual Nova Venda */}
+                {(vendaSelecionada as any).tipoOperacao === 'Downgrade' && (vendaSelecionada as any).saldoDevolver > 0 && (
+                  <div className="p-4 rounded-lg bg-destructive/10 border-2 border-destructive">
+                    <div className="flex items-center gap-2 mb-3">
+                      <ArrowLeftRight className="h-5 w-5 text-destructive" />
+                      <Badge className="bg-orange-500 text-white border-orange-500">DOWNGRADE</Badge>
+                      <span className="text-sm text-muted-foreground">Operação de Devolução</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Valor Trade-In</p>
+                        <p className="text-lg font-bold text-green-600">{formatCurrency((vendaSelecionada as any).totalTradeIn || 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Valor Produtos</p>
+                        <p className="text-lg font-bold">{formatCurrency(vendaSelecionada.subtotal || 0)}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-destructive/30">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-destructive">PIX a Devolver ao Cliente:</span>
+                        <span className="text-2xl font-bold text-destructive">{formatCurrency((vendaSelecionada as any).saldoDevolver)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Informações da venda */}
                 <div className="grid grid-cols-2 gap-3 p-3 bg-muted rounded-lg text-sm">
                   <div>
@@ -804,10 +827,6 @@ export default function VendasConferenciaGestor() {
                       <span className="font-medium text-lg">{formatCurrency(vendaSelecionada.total)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Valor Total:</span>
-                      <span className="font-medium text-lg">{formatCurrency(vendaSelecionada.total)}</span>
-                    </div>
-                    <div className="flex justify-between">
                       <span className="text-muted-foreground">Lucro Residual:</span>
                       <span className={`font-medium ${vendaSelecionada.lucro >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {formatCurrency(vendaSelecionada.lucro)}
@@ -820,18 +839,20 @@ export default function VendasConferenciaGestor() {
                   </div>
                 </div>
 
-                {/* Pagamentos */}
-                <div>
-                  <h4 className="font-semibold text-sm mb-2">Pagamentos</h4>
-                  <div className="space-y-1">
-                    {vendaSelecionada.pagamentos?.map((pag, idx) => (
-                      <div key={idx} className="text-xs p-2 bg-muted/50 rounded flex justify-between">
-                        <span>{pag.meioPagamento}</span>
-                        <span className="font-medium">{formatCurrency(pag.valor)}</span>
-                      </div>
-                    ))}
+                {/* Pagamentos - Oculto para Downgrade */}
+                {!((vendaSelecionada as any).tipoOperacao === 'Downgrade' && (vendaSelecionada as any).saldoDevolver > 0) && (
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2">Pagamentos</h4>
+                    <div className="space-y-1">
+                      {vendaSelecionada.pagamentos?.map((pag, idx) => (
+                        <div key={idx} className="text-xs p-2 bg-muted/50 rounded flex justify-between">
+                          <span>{pag.meioPagamento}</span>
+                          <span className="font-medium">{formatCurrency(pag.valor)}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Validação de Pagamentos - Checkboxes */}
                 {validacoesPagamento.length > 0 && podeAprovarOuRecusar(vendaSelecionada.statusFluxo as StatusVenda) && (

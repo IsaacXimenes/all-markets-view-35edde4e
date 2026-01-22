@@ -380,9 +380,25 @@ export const finalizarVenda = (
   usuarioNome: string
 ): VendaComFluxo | null => {
   const fluxoData = getFluxoData();
-  const dadosFluxo = fluxoData[vendaId];
+  let dadosFluxo = fluxoData[vendaId];
   
-  if (!dadosFluxo || dadosFluxo.statusFluxo !== 'Conferência Financeiro') {
+  // Se não tem dados no fluxo, verificar se a venda tem statusAtual diretamente
+  if (!dadosFluxo) {
+    const venda = getVendaById(vendaId);
+    if (venda && (venda as any).statusAtual === 'Conferência Financeiro') {
+      // Inicializar dados de fluxo para venda mockada
+      dadosFluxo = {
+        statusFluxo: 'Conferência Financeiro',
+        timelineFluxo: (venda as any).timeline || [],
+        bloqueadoParaEdicao: false
+      };
+      fluxoData[vendaId] = dadosFluxo;
+    } else {
+      return null;
+    }
+  }
+  
+  if (dadosFluxo.statusFluxo !== 'Conferência Financeiro') {
     return null;
   }
 

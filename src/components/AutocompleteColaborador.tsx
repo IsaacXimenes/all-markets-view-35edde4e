@@ -97,6 +97,18 @@ export function AutocompleteColaborador({
       );
     }
     
+    // Ordenar: Vendedores primeiro, depois Gestores, depois outros, alfabético dentro de cada grupo
+    resultado.sort((a, b) => {
+      // Vendedores primeiro
+      if (a.eh_vendedor && !b.eh_vendedor) return -1;
+      if (!a.eh_vendedor && b.eh_vendedor) return 1;
+      // Depois gestores
+      if (a.eh_gestor && !b.eh_gestor) return -1;
+      if (!a.eh_gestor && b.eh_gestor) return 1;
+      // Ordem alfabética
+      return a.nome.localeCompare(b.nome);
+    });
+    
     return resultado;
   }, [colaboradores, filtro, filtrarPorCargo, filtrarPorTipo, filtrarPorLoja, apenasAtivos, obterGestores, obterVendedores, obterEstoquistas, obterTecnicos, obterMotoboys]);
 

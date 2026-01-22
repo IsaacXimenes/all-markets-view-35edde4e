@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { CreditCard, Plus, X, AlertTriangle, DollarSign, TrendingUp, Percent, Store } from 'lucide-react';
 import { getContasFinanceiras, getMaquinasCartao, ContaFinanceira, MaquinaCartao } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
 import { Pagamento } from '@/utils/vendasApi';
 import { formatarMoeda, moedaMask, parseMoeda } from '@/utils/formatUtils';
 import { calcularValoresVenda, getTaxaCredito, TAXA_DEBITO, MAX_PARCELAS } from '@/config/taxasCartao';
@@ -76,6 +77,9 @@ export function PagamentoQuadro({
   const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceiras());
   const [maquinasCartao] = useState<MaquinaCartao[]>(getMaquinasCartao().filter(m => m.status === 'Ativo'));
   
+  // Importar store para obter nome da loja
+  const { obterNomeLoja } = useCadastroStore();
+  
   const [pagamentos, setPagamentos] = useState<Pagamento[]>(pagamentosIniciais);
   const [showPagamentoModal, setShowPagamentoModal] = useState(false);
   const [novoPagamento, setNovoPagamento] = useState<NovoPagamentoState>({});
@@ -129,7 +133,10 @@ export function PagamentoQuadro({
 
   const getContaNome = (id: string) => {
     const conta = contasFinanceiras.find(c => c.id === id);
-    return conta?.nome || id;
+    if (!conta) return id;
+    // Concatenar Loja + Nome da Conta
+    const lojaNome = conta.lojaVinculada ? obterNomeLoja(conta.lojaVinculada) : '';
+    return lojaNome ? `${lojaNome} - ${conta.nome}` : conta.nome;
   };
 
   const handleOpenPagamentoModal = () => {
@@ -529,20 +536,23 @@ export function PagamentoQuadro({
               </Select>
             </div>
             
-            <div>
-              <label className="text-sm font-medium">Valor Final (Bruto) *</label>
-              <p className="text-xs text-muted-foreground mb-1">Valor efetivamente pago pelo cliente (taxa será descontada)</p>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
-                <Input 
-                  type="text"
-                  value={novoPagamento.valor ? moedaMask(novoPagamento.valor) : ''}
-                  onChange={(e) => handleValorChange(e.target.value)}
-                  className="pl-10"
-                  placeholder="0,00"
-                />
+            {/* Valor Final (Bruto) - NÃO exibir para Boleto */}
+            {novoPagamento.meioPagamento !== 'Boleto' && (
+              <div>
+                <label className="text-sm font-medium">Valor Final (Bruto) *</label>
+                <p className="text-xs text-muted-foreground mb-1">Valor efetivamente pago pelo cliente (taxa será descontada)</p>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                  <Input 
+                    type="text"
+                    value={novoPagamento.valor ? moedaMask(novoPagamento.valor) : ''}
+                    onChange={(e) => handleValorChange(e.target.value)}
+                    className="pl-10"
+                    placeholder="0,00"
+                  />
+                </div>
               </div>
-            </div>
+            )}
             
             {/* Seleção de Máquina para Cartão */}
             {(novoPagamento.meioPagamento === 'Cartão Crédito' || novoPagamento.meioPagamento === 'Cartão Débito') && (
@@ -805,9 +815,13 @@ export function PagamentoQuadro({
                   <SelectValue placeholder="Selecione a conta" />
                 </SelectTrigger>
                 <SelectContent>
-                  {contasFinanceiras.filter(c => c.status === 'Ativo').map(conta => (
-                    <SelectItem key={conta.id} value={conta.id}>{conta.nome}</SelectItem>
-                  ))}
+                  {contasFinanceiras.filter(c => c.status === 'Ativo').map(conta => {
+                    const lojaNome = conta.lojaVinculada ? obterNomeLoja(conta.lojaVinculada) : '';
+                    const displayName = lojaNome ? `${lojaNome} - ${conta.nome}` : conta.nome;
+                    return (
+                      <SelectItem key={conta.id} value={conta.id}>{displayName}</SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>

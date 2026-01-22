@@ -14,6 +14,7 @@ export interface GarantiaItem {
   dataFimGarantia: string;
   status: 'Ativa' | 'Expirada' | 'Em Tratativa' | 'Concluída';
   lojaVenda: string;
+  vendedorId: string;
   clienteId: string;
   clienteNome: string;
   clienteTelefone?: string;
@@ -181,6 +182,7 @@ let garantias: GarantiaItem[] = [
     dataFimGarantia: '2026-03-15',
     status: 'Ativa',
     lojaVenda: 'LOJA-001',
+    vendedorId: 'COL-001',
     clienteId: 'CLI-001',
     clienteNome: 'João Silva',
     clienteTelefone: '(11) 99999-1111',
@@ -199,6 +201,7 @@ let garantias: GarantiaItem[] = [
     dataFimGarantia: '2026-04-10',
     status: 'Concluída',
     lojaVenda: 'LOJA-002',
+    vendedorId: 'COL-002',
     clienteId: 'CLI-002',
     clienteNome: 'Maria Santos',
     clienteTelefone: '(11) 99999-2222',
@@ -218,6 +221,7 @@ let garantias: GarantiaItem[] = [
     dataFimGarantia: format(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
     status: 'Ativa',
     lojaVenda: 'LOJA-004',
+    vendedorId: 'COL-003',
     clienteId: 'CLI-003',
     clienteNome: 'Pedro Oliveira',
     clienteTelefone: '(11) 99999-3333',
@@ -237,6 +241,7 @@ let garantias: GarantiaItem[] = [
     dataFimGarantia: format(new Date(Date.now() + 20 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
     status: 'Ativa',
     lojaVenda: 'LOJA-003',
+    vendedorId: 'COL-004',
     clienteId: 'CLI-004',
     clienteNome: 'Ana Costa',
     clienteTelefone: '(11) 99999-4444',
@@ -256,6 +261,7 @@ let garantias: GarantiaItem[] = [
     dataFimGarantia: '2025-12-15',
     status: 'Em Tratativa',
     lojaVenda: 'LOJA-005',
+    vendedorId: 'COL-005',
     clienteId: 'CLI-001',
     clienteNome: 'João Silva',
     clienteTelefone: '(11) 99999-1111',
@@ -274,6 +280,7 @@ let garantias: GarantiaItem[] = [
     dataFimGarantia: '2025-11-20',
     status: 'Concluída',
     lojaVenda: 'LOJA-002',
+    vendedorId: 'COL-006',
     clienteId: 'CLI-005',
     clienteNome: 'Carlos Lima',
     clienteTelefone: '(11) 99999-5555',
@@ -293,6 +300,7 @@ let garantias: GarantiaItem[] = [
     dataFimGarantia: '2025-06-05',
     status: 'Em Tratativa',
     lojaVenda: 'LOJA-003',
+    vendedorId: 'COL-007',
     clienteId: 'CLI-002',
     clienteNome: 'Maria Santos',
     clienteTelefone: '(11) 99999-2222',
@@ -311,6 +319,7 @@ let garantias: GarantiaItem[] = [
     dataFimGarantia: '2025-03-05',
     status: 'Ativa',
     lojaVenda: 'LOJA-001',
+    vendedorId: 'COL-008',
     clienteId: 'CLI-003',
     clienteNome: 'Pedro Oliveira',
     clienteTelefone: '(11) 99999-3333',
@@ -330,6 +339,7 @@ let garantias: GarantiaItem[] = [
     dataFimGarantia: format(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
     status: 'Ativa',
     lojaVenda: 'LOJA-001',
+    vendedorId: 'COL-001',
     clienteId: 'CLI-001',
     clienteNome: 'João Silva',
     clienteTelefone: '(11) 99999-1111',
@@ -349,6 +359,7 @@ let garantias: GarantiaItem[] = [
     dataFimGarantia: format(new Date(Date.now() + 25 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
     status: 'Ativa',
     lojaVenda: 'LOJA-002',
+    vendedorId: 'COL-002',
     clienteId: 'CLI-002',
     clienteNome: 'Maria Santos',
     clienteTelefone: '(11) 99999-2222',
@@ -368,6 +379,7 @@ let garantias: GarantiaItem[] = [
     dataFimGarantia: format(new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
     status: 'Expirada',
     lojaVenda: 'LOJA-003',
+    vendedorId: 'COL-003',
     clienteId: 'CLI-004',
     clienteNome: 'Ana Costa',
     clienteTelefone: '(11) 99999-4444',
@@ -387,6 +399,7 @@ let garantias: GarantiaItem[] = [
     dataFimGarantia: format(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
     status: 'Expirada',
     lojaVenda: 'LOJA-004',
+    vendedorId: 'COL-004',
     clienteId: 'CLI-005',
     clienteNome: 'Carlos Lima',
     clienteTelefone: '(11) 99999-5555',

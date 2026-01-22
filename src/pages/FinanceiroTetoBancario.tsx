@@ -13,6 +13,7 @@ import {
 import { getContasFinanceiras, ContaFinanceira } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { formatarMoeda } from '@/utils/formatUtils';
+import { getVendasPorStatus } from '@/utils/fluxoVendasApi';
 
 const formatCurrency = formatarMoeda;
 
@@ -22,6 +23,44 @@ const ALERTA_LIMITE = 100000; // R$ 100.000
 
 // Dados mockados de vendas finalizadas por conta e período
 const vendasFinalizadasMock = [
+  // Outubro 2025
+  { contaDestinoId: 'CTA-001', valor: 45000, data: '2025-10-05', vendaId: 'V-OUT-001' },
+  { contaDestinoId: 'CTA-001', valor: 32000, data: '2025-10-12', vendaId: 'V-OUT-002' },
+  { contaDestinoId: 'CTA-002', valor: 58000, data: '2025-10-08', vendaId: 'V-OUT-003' },
+  { contaDestinoId: 'CTA-002', valor: 47000, data: '2025-10-18', vendaId: 'V-OUT-004' },
+  { contaDestinoId: 'CTA-003', valor: 22000, data: '2025-10-15', vendaId: 'V-OUT-005' },
+  { contaDestinoId: 'CTA-003', valor: 38000, data: '2025-10-22', vendaId: 'V-OUT-006' },
+  { contaDestinoId: 'CTA-004', valor: 75000, data: '2025-10-10', vendaId: 'V-OUT-007' },
+  { contaDestinoId: 'CTA-005', valor: 28000, data: '2025-10-25', vendaId: 'V-OUT-008' },
+  { contaDestinoId: 'CTA-006', valor: 41000, data: '2025-10-20', vendaId: 'V-OUT-009' },
+  { contaDestinoId: 'CTA-007', valor: 35000, data: '2025-10-28', vendaId: 'V-OUT-010' },
+  { contaDestinoId: 'CTA-008', valor: 52000, data: '2025-10-14', vendaId: 'V-OUT-011' },
+
+  // Novembro 2025
+  { contaDestinoId: 'CTA-001', valor: 68000, data: '2025-11-03', vendaId: 'V-NOV-001' },
+  { contaDestinoId: 'CTA-001', valor: 42000, data: '2025-11-15', vendaId: 'V-NOV-002' },
+  { contaDestinoId: 'CTA-002', valor: 85000, data: '2025-11-08', vendaId: 'V-NOV-003' },
+  { contaDestinoId: 'CTA-002', valor: 25000, data: '2025-11-22', vendaId: 'V-NOV-004' },
+  { contaDestinoId: 'CTA-003', valor: 105000, data: '2025-11-12', vendaId: 'V-NOV-005' }, // Em alerta!
+  { contaDestinoId: 'CTA-004', valor: 48000, data: '2025-11-18', vendaId: 'V-NOV-006' },
+  { contaDestinoId: 'CTA-004', valor: 62000, data: '2025-11-25', vendaId: 'V-NOV-007' },
+  { contaDestinoId: 'CTA-005', valor: 95000, data: '2025-11-10', vendaId: 'V-NOV-008' },
+  { contaDestinoId: 'CTA-006', valor: 55000, data: '2025-11-20', vendaId: 'V-NOV-009' },
+  { contaDestinoId: 'CTA-007', valor: 38000, data: '2025-11-28', vendaId: 'V-NOV-010' },
+  { contaDestinoId: 'CTA-008', valor: 72000, data: '2025-11-16', vendaId: 'V-NOV-011' },
+
+  // Dezembro 2025
+  { contaDestinoId: 'CTA-001', valor: 88000, data: '2025-12-02', vendaId: 'V-DEZ-001' },
+  { contaDestinoId: 'CTA-001', valor: 35000, data: '2025-12-12', vendaId: 'V-DEZ-002' },
+  { contaDestinoId: 'CTA-002', valor: 125000, data: '2025-12-05', vendaId: 'V-DEZ-003' }, // Atingiu teto!
+  { contaDestinoId: 'CTA-003', valor: 78000, data: '2025-12-08', vendaId: 'V-DEZ-004' },
+  { contaDestinoId: 'CTA-003', valor: 45000, data: '2025-12-18', vendaId: 'V-DEZ-005' },
+  { contaDestinoId: 'CTA-004', valor: 92000, data: '2025-12-10', vendaId: 'V-DEZ-006' },
+  { contaDestinoId: 'CTA-005', valor: 115000, data: '2025-12-15', vendaId: 'V-DEZ-007' }, // Em alerta!
+  { contaDestinoId: 'CTA-006', valor: 68000, data: '2025-12-20', vendaId: 'V-DEZ-008' },
+  { contaDestinoId: 'CTA-007', valor: 82000, data: '2025-12-22', vendaId: 'V-DEZ-009' },
+  { contaDestinoId: 'CTA-008', valor: 58000, data: '2025-12-28', vendaId: 'V-DEZ-010' },
+
   // Janeiro 2026
   { contaDestinoId: 'CTA-001', valor: 35000, data: '2026-01-05', vendaId: 'V001' },
   { contaDestinoId: 'CTA-001', valor: 42000, data: '2026-01-12', vendaId: 'V002' },
@@ -91,44 +130,69 @@ export default function FinanceiroTetoBancario() {
   const { obterNomeLoja } = useCadastroStore();
   const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceiras());
   
-  // Estados para filtro de período
-  const [mesSelecionado, setMesSelecionado] = useState<number>(0); // Janeiro
-  const [anoSelecionado, setAnoSelecionado] = useState<number>(2026);
+  // Estados para filtro de período - iniciar em Outubro/2025 para mostrar dados mockados
+  const [mesSelecionado, setMesSelecionado] = useState<number>(9); // Outubro
+  const [anoSelecionado, setAnoSelecionado] = useState<number>(2025);
 
-  // Calcular saldos filtrados por período (APENAS vendas, sem saldo inicial)
-  const saldosPorConta = useMemo(() => {
+  // Calcular saldos e quantidade de vendas - combina dados mock + vendas reais finalizadas
+  const { saldosPorConta, qtdVendasPorConta } = useMemo(() => {
     const saldos: Record<string, number> = {};
-    
-    // Filtrar vendas pelo período selecionado
-    const vendasFiltradas = vendasFinalizadasMock.filter(venda => {
-      const dataVenda = new Date(venda.data);
-      return dataVenda.getMonth() === mesSelecionado && 
-             dataVenda.getFullYear() === anoSelecionado;
-    });
-    
-    // Agrupar por conta
-    vendasFiltradas.forEach(venda => {
-      saldos[venda.contaDestinoId] = (saldos[venda.contaDestinoId] || 0) + venda.valor;
-    });
-    
-    return saldos;
-  }, [mesSelecionado, anoSelecionado]);
-
-  // Contar quantidade de vendas por conta no período
-  const qtdVendasPorConta = useMemo(() => {
     const qtd: Record<string, number> = {};
     
-    const vendasFiltradas = vendasFinalizadasMock.filter(venda => {
-      const dataVenda = new Date(venda.data);
-      return dataVenda.getMonth() === mesSelecionado && 
-             dataVenda.getFullYear() === anoSelecionado;
-    });
+    // 1. Processar dados mockados (histórico)
+    vendasFinalizadasMock
+      .filter(venda => {
+        const dataVenda = new Date(venda.data);
+        return dataVenda.getMonth() === mesSelecionado && 
+               dataVenda.getFullYear() === anoSelecionado;
+      })
+      .forEach(venda => {
+        saldos[venda.contaDestinoId] = (saldos[venda.contaDestinoId] || 0) + venda.valor;
+        qtd[venda.contaDestinoId] = (qtd[venda.contaDestinoId] || 0) + 1;
+      });
     
-    vendasFiltradas.forEach(venda => {
-      qtd[venda.contaDestinoId] = (qtd[venda.contaDestinoId] || 0) + 1;
-    });
+    // 2. Processar vendas reais finalizadas do localStorage
+    try {
+      const vendasFinalizadas = getVendasPorStatus('Finalizado');
+      
+      vendasFinalizadas.forEach(venda => {
+        // Buscar data de finalização
+        const dataFinalizacaoRaw = localStorage.getItem(`data_finalizacao_${venda.id}`);
+        if (!dataFinalizacaoRaw) return;
+        
+        const dataFinalizacao = new Date(dataFinalizacaoRaw);
+        
+        // Filtrar pelo período selecionado
+        if (dataFinalizacao.getMonth() !== mesSelecionado || 
+            dataFinalizacao.getFullYear() !== anoSelecionado) {
+          return;
+        }
+        
+        // Buscar validações de pagamentos
+        const validacaoRaw = localStorage.getItem(`validacao_pagamentos_financeiro_${venda.id}`);
+        const historicoRaw = localStorage.getItem(`historico_conferencias_${venda.id}`);
+        
+        if (validacaoRaw && historicoRaw) {
+          const validacoes = JSON.parse(validacaoRaw);
+          const historico = JSON.parse(historicoRaw);
+          
+          historico.forEach((conf: any) => {
+            const validacao = validacoes.find(
+              (v: any) => v.metodoPagamento === conf.metodoPagamento && v.validadoFinanceiro
+            );
+            
+            if (validacao?.contaDestinoId) {
+              saldos[validacao.contaDestinoId] = (saldos[validacao.contaDestinoId] || 0) + conf.valor;
+              qtd[validacao.contaDestinoId] = (qtd[validacao.contaDestinoId] || 0) + 1;
+            }
+          });
+        }
+      });
+    } catch (e) {
+      console.error('Erro ao processar vendas reais:', e);
+    }
     
-    return qtd;
+    return { saldosPorConta: saldos, qtdVendasPorConta: qtd };
   }, [mesSelecionado, anoSelecionado]);
 
   // Separar contas por tipo de máquina

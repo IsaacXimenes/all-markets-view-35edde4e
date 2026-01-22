@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Eye, FileText, Plus, Download } from 'lucide-react';
 import { getVendas, Venda } from '@/utils/vendasApi';
-import { getLojas, getColaboradores, getColaboradorById } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
 import { 
   getGarantiasByVendaId, addGarantia, addTimelineEntry, calcularStatusExpiracao
 } from '@/utils/garantiasApi';
@@ -21,12 +21,12 @@ import { exportToCSV } from '@/utils/formatUtils';
 
 export default function GarantiasNova() {
   const navigate = useNavigate();
-  const lojas = getLojas();
   const vendas = getVendas();
-  const colaboradores = getColaboradores().filter(c => c.status === 'Ativo');
   
-  // Filtra apenas vendedores (cargo de vendedor)
-  const vendedores = colaboradores.filter(c => c.cargo === 'CARGO-004');
+  // Store centralizado
+  const { obterLojasTipoLoja, obterVendedores, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
+  const lojas = obterLojasTipoLoja();
+  const vendedores = obterVendedores();
   
   // Estados
   const [buscaImei, setBuscaImei] = useState('');
@@ -35,13 +35,6 @@ export default function GarantiasNova() {
   const [buscaVendedor, setBuscaVendedor] = useState('');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
-  
-  // Helpers
-  const getLojaName = (id: string) => lojas.find(l => l.id === id)?.nome || id;
-  const getVendedorNome = (id: string) => {
-    const colaborador = getColaboradorById(id);
-    return colaborador?.nome || id;
-  };
   
   // Flatten vendas para exibir uma linha por item (IMEI)
   const vendasComItens = useMemo(() => {
@@ -178,8 +171,8 @@ export default function GarantiasNova() {
     const dataExport = vendasFiltradas.map(({ venda, item }) => ({
       'ID Venda': venda.id,
       'Data': format(new Date(venda.dataHora), 'dd/MM/yyyy'),
-      'Loja': getLojaName(venda.lojaVenda),
-      'Vendedor': getVendedorNome(venda.vendedor),
+      'Loja': obterNomeLoja(venda.lojaVenda),
+      'Vendedor': obterNomeColaborador(venda.vendedor),
       'Cliente': venda.clienteNome,
       'Modelo': item.produto,
       'IMEI': displayIMEI(item.imei),
@@ -303,8 +296,8 @@ export default function GarantiasNova() {
                       <TableRow key={`${venda.id}-${item.id}-${index}`} className="cursor-pointer hover:bg-muted/50">
                         <TableCell className="font-medium">{venda.id}</TableCell>
                         <TableCell>{format(new Date(venda.dataHora), 'dd/MM/yyyy')}</TableCell>
-                        <TableCell>{getLojaName(venda.lojaVenda)}</TableCell>
-                        <TableCell>{getVendedorNome(venda.vendedor)}</TableCell>
+                        <TableCell>{obterNomeLoja(venda.lojaVenda)}</TableCell>
+                        <TableCell>{obterNomeColaborador(venda.vendedor)}</TableCell>
                         <TableCell>{venda.clienteNome}</TableCell>
                         <TableCell>{item.produto}</TableCell>
                         <TableCell className="font-mono text-xs">{displayIMEI(item.imei)}</TableCell>

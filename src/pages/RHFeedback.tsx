@@ -23,7 +23,10 @@ import {
   User,
   Lock,
   Plus,
-  Eye
+  Eye,
+  Trash2,
+  Upload,
+  FileText
 } from 'lucide-react';
 import {
   getFeedbacks,
@@ -50,6 +53,7 @@ export default function RHFeedback() {
     texto: ''
   });
   const [refreshKey, setRefreshKey] = useState(0);
+  const [arquivoFeedback, setArquivoFeedback] = useState<File | null>(null);
 
   const usuarioLogado = getUsuarioLogado();
   const lojas = getLojas();
@@ -93,6 +97,7 @@ export default function RHFeedback() {
   const handleOpenRegistrar = () => {
     setSelectedColaborador(null);
     setFeedbackForm({ tipo: 'Advertência', texto: '' });
+    setArquivoFeedback(null);
     setIsRegistrarDialogOpen(true);
   };
 
@@ -131,6 +136,13 @@ export default function RHFeedback() {
     const feedbacksAnteriores = getFeedbacksByColaborador(selectedColaborador.id);
     const ultimoFeedback = feedbacksAnteriores[0];
 
+    // Preparar arquivo se existir
+    const arquivoData = arquivoFeedback ? {
+      nome: arquivoFeedback.name,
+      tipo: arquivoFeedback.type,
+      url: URL.createObjectURL(arquivoFeedback)
+    } : undefined;
+
     addFeedback({
       colaboradorId: selectedColaborador.id,
       tipo: feedbackForm.tipo,
@@ -138,12 +150,14 @@ export default function RHFeedback() {
       gestorId: usuarioLogado.id,
       gestorNome: usuarioLogado.nome,
       dataHora: new Date(),
-      referenciaAnterior: ultimoFeedback?.id
+      referenciaAnterior: ultimoFeedback?.id,
+      arquivo: arquivoData
     });
 
     toast({ title: 'Sucesso', description: 'Feedback registrado com sucesso' });
     setIsRegistrarDialogOpen(false);
     setSelectedColaborador(null);
+    setArquivoFeedback(null);
     setRefreshKey(prev => prev + 1);
   };
 
@@ -409,6 +423,25 @@ export default function RHFeedback() {
                       </div>
                     )}
                   </div>
+                  
+                  {/* Arquivo anexado */}
+                  {selectedFeedback?.arquivo && (
+                    <div className="pt-2 border-t">
+                      <Label className="text-muted-foreground text-xs">Documento Anexado</Label>
+                      <div className="flex items-center gap-2 mt-1 p-2 bg-muted rounded-lg">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm flex-1 truncate">{selectedFeedback.arquivo.nome}</span>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => window.open(selectedFeedback.arquivo?.url, '_blank')}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Visualizar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -584,6 +617,41 @@ export default function RHFeedback() {
                         placeholder="Descreva detalhadamente o motivo do feedback..."
                         rows={4}
                       />
+                    </div>
+
+                    {/* Upload de Arquivo */}
+                    <div className="space-y-2">
+                      <Label>Anexar Documento (PDF ou Imagem)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => setArquivoFeedback(e.target.files?.[0] || null)}
+                          className="flex-1"
+                        />
+                      </div>
+                      {arquivoFeedback && (
+                        <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm flex-1 truncate">{arquivoFeedback.name}</span>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            type="button"
+                            onClick={() => window.open(URL.createObjectURL(arquivoFeedback), '_blank')}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            type="button"
+                            onClick={() => setArquivoFeedback(null)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">

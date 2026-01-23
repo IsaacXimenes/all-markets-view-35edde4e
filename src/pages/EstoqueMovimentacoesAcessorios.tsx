@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { getAcessorios, Acessorio } from '@/utils/acessoriosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
-import { Download, Plus, CheckCircle, Clock, Eye, Edit, Package } from 'lucide-react';
+import { Download, Plus, CheckCircle, Clock, Eye, Edit, Package, X } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -301,6 +301,17 @@ export default function EstoqueMovimentacoesAcessorios() {
               ))}
             </SelectContent>
           </Select>
+
+          <Button 
+            variant="ghost" 
+            onClick={() => {
+              setOrigemFilter('todas');
+              setDestinoFilter('todas');
+            }}
+          >
+            <X className="mr-2 h-4 w-4" />
+            Limpar
+          </Button>
 
           <div className="ml-auto flex gap-2">
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

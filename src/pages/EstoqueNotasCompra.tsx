@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { getNotasCompra, addNotaCompra } from '@/utils/estoqueApi';
 import { getFornecedores } from '@/utils/cadastrosApi';
 import { exportToCSV, formatCurrency, moedaMask, parseMoeda } from '@/utils/formatUtils';
-import { Download, Plus, Eye, FileText, DollarSign, CheckCircle, Clock, Zap } from 'lucide-react';
+import { Download, Plus, Eye, FileText, DollarSign, CheckCircle, Clock, Zap, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
 
@@ -165,6 +165,18 @@ export default function EstoqueNotasCompra() {
           </Select>
 
           <div className="ml-auto flex gap-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => {
+                setFornecedorFilter('');
+                setStatusFilter('todos');
+                setDataInicio('');
+                setDataFim('');
+              }}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Limpar
+            </Button>
             <Button variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/30" onClick={() => {
               setUrgenciaId(gerarIdUrgencia());
               setShowUrgenciaModal(true);

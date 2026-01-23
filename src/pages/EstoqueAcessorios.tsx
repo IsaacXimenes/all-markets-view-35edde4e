@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 
 import { toast } from 'sonner';
-import { Download, Package, Edit, AlertTriangle, DollarSign, Layers, Hash, TrendingUp } from 'lucide-react';
+import { Download, Package, Edit, AlertTriangle, DollarSign, Layers, Hash, TrendingUp, X } from 'lucide-react';
 import { 
   getAcessorios, 
   getCategoriasAcessorios, 
@@ -265,7 +265,18 @@ export default function EstoqueAcessorios() {
                   placeholder="Todas as lojas"
                 />
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end gap-2">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => {
+                    setFiltroCategoria('');
+                    setFiltroLoja('');
+                    setFiltroDescricao('');
+                  }}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Limpar
+                </Button>
                 <Button onClick={handleExportCSV} variant="outline" className="gap-2">
                   <Download className="h-4 w-4" />
                   Exportar CSV

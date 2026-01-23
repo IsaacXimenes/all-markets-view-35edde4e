@@ -10,7 +10,7 @@ import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { exportToCSV } from '@/utils/formatUtils';
 import { formatIMEI } from '@/utils/imeiMask';
-import { Download, Plus, CheckCircle, Clock, Search, Package, Eye, Edit } from 'lucide-react';
+import { Download, Plus, CheckCircle, Clock, Search, Package, Eye, Edit, X } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -310,6 +310,18 @@ export default function EstoqueMovimentacoes() {
             </SelectContent>
           </Select>
 
+          <Button 
+            variant="ghost" 
+            onClick={() => {
+              setOrigemFilter('todas');
+              setDestinoFilter('todas');
+              setStatusFilter('todos');
+            }}
+          >
+            <X className="mr-2 h-4 w-4" />
+            Limpar
+          </Button>
+
           <div className="ml-auto flex gap-2">
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
@@ -470,7 +482,13 @@ export default function EstoqueMovimentacoes() {
             </TableHeader>
             <TableBody>
               {movimentacoesFiltradas.map(mov => (
-                <TableRow key={mov.id} className={mov.status === 'Pendente' ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''}>
+                <TableRow 
+                  key={mov.id} 
+                  className={cn(
+                    mov.status === 'Pendente' && 'bg-yellow-500/10',
+                    mov.status === 'Recebido' && 'bg-green-500/10'
+                  )}
+                >
                   <TableCell className="font-mono text-xs">{mov.id}</TableCell>
                   <TableCell className="font-mono text-xs">{formatIMEI(mov.imei)}</TableCell>
                   <TableCell>{mov.produto}</TableCell>

@@ -21,21 +21,19 @@ import {
   Acessorio,
   HistoricoValorRecomendadoAcessorio
 } from '@/utils/acessoriosApi';
-import { getLojas, getLojaById, Loja } from '@/utils/cadastrosApi';
-import { getColaboradores, getCargos } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
+import { AutocompleteLoja } from '@/components/AutocompleteLoja';
+import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 
 export default function EstoqueAcessorios() {
+  const { obterLojasAtivas, obterColaboradoresAtivos, obterNomeLoja, obterEstoquistas } = useCadastroStore();
   const [acessorios, setAcessorios] = useState<Acessorio[]>(getAcessorios());
   const [categorias] = useState<string[]>(getCategoriasAcessorios());
-  const [lojas] = useState<Loja[]>(getLojas());
-  const [colaboradores] = useState(getColaboradores());
-  const [cargos] = useState(getCargos());
+  const lojas = obterLojasAtivas();
+  const colaboradores = obterColaboradoresAtivos();
 
   // Colaboradores com permissão de estoque
-  const colaboradoresEstoque = colaboradores.filter(col => {
-    const cargo = cargos.find(c => c.id === col.cargo);
-    return cargo?.permissoes.includes('Estoque') || cargo?.permissoes.includes('Admin');
-  });
+  const colaboradoresEstoque = colaboradores.filter(col => col.eh_estoquista || col.eh_gestor);
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroLoja, setFiltroLoja] = useState('');
   const [filtroDescricao, setFiltroDescricao] = useState('');
@@ -49,10 +47,7 @@ export default function EstoqueAcessorios() {
   const [colaboradorSelecionado, setColaboradorSelecionado] = useState('');
 
   // Helper para obter nome da loja
-  const getLojaNome = (lojaId: string) => {
-    const loja = getLojaById(lojaId);
-    return loja?.nome || lojaId;
-  };
+  const getLojaNome = (lojaId: string) => obterNomeLoja(lojaId);
 
   // Agrupa acessórios por ID/Descrição
   const acessoriosAgrupados = useMemo(() => {
@@ -264,17 +259,11 @@ export default function EstoqueAcessorios() {
               </div>
               <div>
                 <Label>Loja</Label>
-                <Select value={filtroLoja} onValueChange={setFiltroLoja}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas as lojas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">Todas</SelectItem>
-                    {lojas.map(loja => (
-                      <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AutocompleteLoja
+                  value={filtroLoja}
+                  onChange={setFiltroLoja}
+                  placeholder="Todas as lojas"
+                />
               </div>
               <div className="flex items-end">
                 <Button onClick={handleExportCSV} variant="outline" className="gap-2">
@@ -453,16 +442,12 @@ export default function EstoqueAcessorios() {
 
                 <div className="space-y-2">
                   <Label htmlFor="colaborador">Usuário que Informou *</Label>
-                  <Select value={colaboradorSelecionado} onValueChange={setColaboradorSelecionado}>
-                    <SelectTrigger id="colaborador">
-                      <SelectValue placeholder="Selecione o colaborador" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {colaboradoresEstoque.map(col => (
-                        <SelectItem key={col.id} value={col.id}>{col.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <AutocompleteColaborador
+                    value={colaboradorSelecionado}
+                    onChange={setColaboradorSelecionado}
+                    placeholder="Selecione o colaborador"
+                    filtrarPorTipo="estoquistas"
+                  />
                 </div>
 
                 {acessorioSelecionado.historicoValorRecomendado && acessorioSelecionado.historicoValorRecomendado.length > 0 && (

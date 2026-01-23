@@ -11,12 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { addNotaCompra, getNotasCompra } from '@/utils/estoqueApi';
-import { getProdutosCadastro, getFornecedores } from '@/utils/cadastrosApi';
+import { getProdutosCadastro } from '@/utils/cadastrosApi';
 import { getCores } from '@/utils/coresApi';
 import { getAcessorios } from '@/utils/acessoriosApi';
 import { toast } from 'sonner';
 import { InputComMascara } from '@/components/ui/InputComMascara';
 import { formatIMEI, unformatIMEI } from '@/utils/imeiMask';
+import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
 
 interface ProdutoLinha {
   tipoProduto: 'Aparelho' | 'Acessório';
@@ -42,7 +43,6 @@ const gerarNumeroNota = (notasExistentes: number): string => {
 
 export default function EstoqueNotaCadastrar() {
   const navigate = useNavigate();
-  const fornecedores = getFornecedores();
   const produtosCadastro = getProdutosCadastro();
   const coresCadastradas = getCores();
   const acessoriosCadastrados = getAcessorios();
@@ -271,16 +271,11 @@ export default function EstoqueNotaCadastrar() {
               </div>
               <div>
                 <Label htmlFor="fornecedor">Fornecedor *</Label>
-                <Select value={fornecedor} onValueChange={setFornecedor}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {fornecedores.filter(f => f.status === 'Ativo').map(f => (
-                      <SelectItem key={f.id} value={f.nome}>{f.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AutocompleteFornecedor
+                  value={fornecedor}
+                  onChange={setFornecedor}
+                  placeholder="Selecione um fornecedor"
+                />
               </div>
             </div>
           </CardContent>

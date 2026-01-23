@@ -29,7 +29,8 @@ import {
 } from '@/components/ui/dialog';
 import { getNotasCompra, NotaCompra } from '@/utils/estoqueApi';
 import { migrarProdutosNotaParaPendentes } from '@/utils/osApi';
-import { getLojas, getColaboradores, getCargos } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
+import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { getCores } from '@/utils/coresApi';
 import { Clock, AlertTriangle, AlertCircle, Plus, Trash2, Package, CheckCircle, Zap } from 'lucide-react';
 import { toast } from 'sonner';
@@ -56,16 +57,10 @@ interface ProdutoInserido {
 
 export default function EstoqueNotasUrgenciaPendentes() {
   const [notasBase] = useState(getNotasCompra());
-  const lojas = getLojas().filter(l => l.status === 'Ativo');
+  const { obterLojasTipoLoja, obterEstoquistas, obterColaboradoresAtivos, obterNomeLoja } = useCadastroStore();
+  const lojas = obterLojasTipoLoja();
   const cores = getCores();
-  const colaboradores = getColaboradores();
-  const cargos = getCargos();
-
-  // Colaboradores com permissão de estoque
-  const colaboradoresEstoque = colaboradores.filter(col => {
-    const cargo = cargos.find(c => c.id === col.cargo);
-    return cargo?.permissoes.includes('Estoque') || cargo?.permissoes.includes('Admin');
-  });
+  const colaboradoresEstoque = obterEstoquistas();
 
   // Notas de urgência que estão aguardando produtos
   const notasUrgencia: NotaUrgenciaExtendida[] = useMemo(() => {

@@ -235,13 +235,13 @@ export default function EstoqueProdutosPendentes() {
   return (
     <EstoqueLayout title="Produtos Pendentes">
       {/* Card de Somatório Valor Origem */}
-      <Card className="mb-4 bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-950/50 dark:to-emerald-900/30 border-green-200 dark:border-green-800">
+      <Card className="mb-4 bg-gradient-to-br from-red-50 to-rose-100 dark:from-red-950/50 dark:to-rose-900/30 border-red-200 dark:border-red-800">
         <CardContent className="pt-6">
           <div className="flex items-center gap-3">
-            <DollarSign className="h-8 w-8 text-green-600 opacity-70" />
+            <DollarSign className="h-8 w-8 text-red-600 opacity-70" />
             <div>
-              <p className="text-sm text-green-700 dark:text-green-300">Valor Total de Origem (Pendentes)</p>
-              <p className="text-3xl font-bold text-green-800 dark:text-green-200">{formatCurrency(totalValorOrigem)}</p>
+              <p className="text-sm text-red-700 dark:text-red-300">Valor Total de Origem (Pendentes)</p>
+              <p className="text-3xl font-bold text-red-800 dark:text-red-200">{formatCurrency(totalValorOrigem)}</p>
             </div>
           </div>
         </CardContent>

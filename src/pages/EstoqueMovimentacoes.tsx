@@ -6,6 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { getMovimentacoes, addMovimentacao, getProdutos, Produto, confirmarRecebimentoMovimentacao, Movimentacao } from '@/utils/estoqueApi';
 import { useCadastroStore } from '@/store/cadastroStore';
+import { AutocompleteLoja } from '@/components/AutocompleteLoja';
+import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { exportToCSV } from '@/utils/formatUtils';
 import { formatIMEI } from '@/utils/imeiMask';
 import { Download, Plus, CheckCircle, Clock, Search, Package, Eye, Edit } from 'lucide-react';
@@ -285,29 +287,17 @@ export default function EstoqueMovimentacoes() {
     <EstoqueLayout title="Movimentações - Aparelhos">
       <div className="space-y-4">
         <div className="flex flex-wrap gap-4">
-          <Select value={origemFilter} onValueChange={setOrigemFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Origem" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todas">Todas as origens</SelectItem>
-              {lojas.map(loja => (
-                <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AutocompleteLoja
+            value={origemFilter === 'todas' ? '' : origemFilter}
+            onChange={(v) => setOrigemFilter(v || 'todas')}
+            placeholder="Todas as origens"
+          />
 
-          <Select value={destinoFilter} onValueChange={setDestinoFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Destino" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todas">Todos os destinos</SelectItem>
-              {lojas.map(loja => (
-                <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AutocompleteLoja
+            value={destinoFilter === 'todas' ? '' : destinoFilter}
+            onChange={(v) => setDestinoFilter(v || 'todas')}
+            placeholder="Todos os destinos"
+          />
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[150px]">
@@ -373,19 +363,12 @@ export default function EstoqueMovimentacoes() {
                   {/* 2. Responsável */}
                   <div>
                     <Label htmlFor="responsavel">Responsável *</Label>
-                    <Select 
+                    <AutocompleteColaborador
                       value={formData.responsavel}
-                      onValueChange={(v) => setFormData(prev => ({ ...prev, responsavel: v }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o colaborador" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {colaboradoresComPermissao.map(col => (
-                          <SelectItem key={col.id} value={col.id}>{col.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(v) => setFormData(prev => ({ ...prev, responsavel: v }))}
+                      placeholder="Selecione o colaborador"
+                      filtrarPorTipo="estoquistas"
+                    />
                   </div>
 
                   {/* 3. Data da Movimentação */}
@@ -418,21 +401,12 @@ export default function EstoqueMovimentacoes() {
 
                     <div>
                       <Label htmlFor="destino">Destino *</Label>
-                      <Select 
+                      <AutocompleteLoja
                         value={formData.destino}
-                        onValueChange={(v) => setFormData(prev => ({ ...prev, destino: v }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {lojas
-                            .filter(loja => !produtoSelecionado || loja.id !== produtoSelecionado.loja)
-                            .map(loja => (
-                              <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
+                        onChange={(v) => setFormData(prev => ({ ...prev, destino: v }))}
+                        placeholder="Selecione o destino"
+                        apenasLojasTipoLoja
+                      />
                     </div>
                   </div>
 

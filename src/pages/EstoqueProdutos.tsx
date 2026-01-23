@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { getProdutos, getEstoqueStats, updateValorRecomendado, updateProdutoLoja, Produto } from '@/utils/estoqueApi';
 import { useCadastroStore } from '@/store/cadastroStore';
+import { AutocompleteLoja } from '@/components/AutocompleteLoja';
+import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { Download, Eye, CheckCircle, XCircle, Package, DollarSign, AlertTriangle, FileWarning, AlertCircle, Edit, Wrench, ArrowRightLeft, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -195,17 +197,11 @@ export default function EstoqueProdutos() {
 
           <div>
             <p className="text-xs text-muted-foreground mb-1">Loja</p>
-            <Select value={lojaFilter} onValueChange={setLojaFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Todas as lojas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todas">Todas as lojas</SelectItem>
-                {lojasEstoque.map(loja => (
-                  <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <AutocompleteLoja
+              value={lojaFilter === 'todas' ? '' : lojaFilter}
+              onChange={(v) => setLojaFilter(v || 'todas')}
+              placeholder="Todas as lojas"
+            />
           </div>
 
           <div>
@@ -447,16 +443,12 @@ export default function EstoqueProdutos() {
 
               <div className="space-y-2">
                 <Label htmlFor="usuario">Usuário que Informou *</Label>
-                <Select value={usuarioSelecionado} onValueChange={setUsuarioSelecionado}>
-                  <SelectTrigger id="usuario">
-                    <SelectValue placeholder="Selecione o colaborador" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {colaboradoresEstoque.map(col => (
-                      <SelectItem key={col.id} value={col.id}>{col.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AutocompleteColaborador
+                  value={usuarioSelecionado}
+                  onChange={setUsuarioSelecionado}
+                  placeholder="Selecione o colaborador"
+                  filtrarPorTipo="estoquistas"
+                />
               </div>
 
               {produtoSelecionado.historicoValorRecomendado && produtoSelecionado.historicoValorRecomendado.length > 0 && (

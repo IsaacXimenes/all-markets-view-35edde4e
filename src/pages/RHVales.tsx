@@ -13,7 +13,9 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Pencil, Trash2, History, Download, X, Users, DollarSign, CreditCard, Calendar } from 'lucide-react';
 import { formatCurrency, formatDateTime, exportToCSV } from '@/utils/formatUtils';
-import { getLojas, getColaboradores } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
+import { AutocompleteLoja } from '@/components/AutocompleteLoja';
+import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { 
   getVales, 
   addVale, 
@@ -28,9 +30,10 @@ import {
 
 const RHVales: React.FC = () => {
   const { toast } = useToast();
+  const { obterLojasAtivas, obterColaboradoresAtivos, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   const [vales, setVales] = useState<Vale[]>(getVales());
-  const [lojas] = useState(getLojas().filter(l => l.status === 'Ativo'));
-  const [colaboradores] = useState(getColaboradores().filter(c => c.status === 'Ativo'));
+  const lojas = obterLojasAtivas();
+  const colaboradores = obterColaboradoresAtivos();
   
   // Modais
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -128,8 +131,8 @@ const RHVales: React.FC = () => {
   }, [valesFiltrados]);
   
   // Helpers
-  const getColaboradorNome = (id: string) => colaboradores.find(c => c.id === id)?.nome || id;
-  const getLojaNome = (id: string) => lojas.find(l => l.id === id)?.nome || id;
+  const getColaboradorNome = (id: string) => obterNomeColaborador(id);
+  const getLojaNome = (id: string) => obterNomeLoja(id);
   
   const resetForm = () => {
     setFormData({
@@ -423,32 +426,21 @@ const RHVales: React.FC = () => {
           <div className="grid gap-4 md:grid-cols-5">
             <div>
               <Label>Colaborador</Label>
-              <Select value={filtroColaborador || "all"} onValueChange={v => setFiltroColaborador(v === "all" ? "" : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {colaboradores.map(col => (
-                    <SelectItem key={col.id} value={col.id}>{col.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AutocompleteColaborador
+                value={filtroColaborador}
+                onChange={setFiltroColaborador}
+                placeholder="Todos os colaboradores"
+              />
             </div>
             
             <div>
               <Label>Loja</Label>
-              <Select value={filtroLoja || "all"} onValueChange={v => setFiltroLoja(v === "all" ? "" : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {lojas.map(loja => (
-                    <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AutocompleteLoja
+                value={filtroLoja}
+                onChange={setFiltroLoja}
+                placeholder="Todas as lojas"
+                apenasLojasTipoLoja
+              />
             </div>
             
             <div>
@@ -618,30 +610,21 @@ const RHVales: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Loja *</Label>
-                <Select value={formData.lojaId} onValueChange={v => setFormData(prev => ({ ...prev, lojaId: v }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {lojas.map(loja => (
-                      <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AutocompleteLoja
+                  value={formData.lojaId}
+                  onChange={v => setFormData(prev => ({ ...prev, lojaId: v }))}
+                  placeholder="Selecione uma loja"
+                  apenasLojasTipoLoja
+                />
               </div>
               
               <div>
                 <Label>Colaborador *</Label>
-                <Select value={formData.colaboradorId} onValueChange={v => setFormData(prev => ({ ...prev, colaboradorId: v }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {colaboradores.map(col => (
-                      <SelectItem key={col.id} value={col.id}>{col.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AutocompleteColaborador
+                  value={formData.colaboradorId}
+                  onChange={v => setFormData(prev => ({ ...prev, colaboradorId: v }))}
+                  placeholder="Selecione um colaborador"
+                />
               </div>
             </div>
             

@@ -13,6 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Store, Percent, Plus, Pencil, Trash2, History, Download, Users, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { useCadastroStore } from '@/store/cadastroStore';
+import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { 
   getComissoesPorLoja, 
   addComissaoPorLoja, 
@@ -22,13 +24,14 @@ import {
   ComissaoPorLoja,
   HistoricoComissaoPorLoja
 } from '@/utils/comissaoPorLojaApi';
-import { getLojas, getCargos, getLojaById, getCargoNome } from '@/utils/cadastrosApi';
+import { getLojaById, getCargoNome, getCargos } from '@/utils/cadastrosApi';
 import { exportToCSV } from '@/utils/formatUtils';
 
 export default function RHComissaoPorLoja() {
   const [activeTab, setActiveTab] = useUrlTabs('tabela');
+  const { obterLojasTipoLoja, obterNomeLoja } = useCadastroStore();
   const [comissoes, setComissoes] = useState<ComissaoPorLoja[]>([]);
-  const [lojas] = useState(() => getLojas().filter(l => l.status === 'Ativo'));
+  const lojas = obterLojasTipoLoja();
   const [cargos] = useState(() => getCargos());
   
   // Filtros
@@ -257,17 +260,12 @@ export default function RHComissaoPorLoja() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Loja</Label>
-              <Select value={filtroLoja || 'all'} onValueChange={v => setFiltroLoja(v === 'all' ? '' : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as Lojas</SelectItem>
-                  {lojas.map(loja => (
-                    <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AutocompleteLoja
+                value={filtroLoja}
+                onChange={setFiltroLoja}
+                placeholder="Todas as lojas"
+                apenasLojasTipoLoja
+              />
             </div>
             <div className="space-y-2">
               <Label>Cargo</Label>
@@ -471,22 +469,13 @@ export default function RHComissaoPorLoja() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Loja *</Label>
-              <Select 
-                value={form.lojaId} 
-                onValueChange={v => setForm({ ...form, lojaId: v })}
+              <AutocompleteLoja
+                value={form.lojaId}
+                onChange={v => setForm({ ...form, lojaId: v })}
+                placeholder="Selecione uma loja"
+                apenasLojasTipoLoja
                 disabled={!!editingId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma loja" />
-                </SelectTrigger>
-                <SelectContent>
-                  {lojas.map(loja => (
-                    <SelectItem key={loja.id} value={loja.id}>
-                      {loja.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
             
             <div className="space-y-2">

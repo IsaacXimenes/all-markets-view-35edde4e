@@ -13,13 +13,12 @@ import {
   getGarantias, getTratativasByGarantiaId, exportGarantiasToCSV
 } from '@/utils/garantiasApi';
 import { useCadastroStore } from '@/store/cadastroStore';
-import { getLojas } from '@/utils/cadastrosApi';
 import { format } from 'date-fns';
+import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 
 export default function GarantiasHistorico() {
   const navigate = useNavigate();
   const { obterNomeLoja, obterNomeColaborador } = useCadastroStore();
-  const lojas = getLojas();
   const garantias = getGarantias();
   
   // Filtros
@@ -104,17 +103,12 @@ export default function GarantiasHistorico() {
               </div>
               <div>
                 <Label>Loja</Label>
-                <Select value={lojaFiltro || 'all'} onValueChange={(v) => setLojaFiltro(v === 'all' ? '' : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as Lojas</SelectItem>
-                    {lojas.map(l => (
-                      <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AutocompleteLoja
+                  value={lojaFiltro}
+                  onChange={(v) => setLojaFiltro(v)}
+                  placeholder="Todas as Lojas"
+                  apenasLojasTipoLoja={true}
+                />
               </div>
               <div>
                 <Label>Tipo Tratativa</Label>

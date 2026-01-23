@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { getFornecedores, Fornecedor } from '@/utils/cadastrosApi';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Building2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -102,8 +101,8 @@ export function AutocompleteFornecedor({
       />
       
       {aberto && fornecedoresFiltrados.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md">
-          <ScrollArea className="max-h-60">
+        <div className="absolute z-[100] w-full mt-1 bg-popover border rounded-md shadow-lg overflow-hidden">
+          <div className="max-h-64 overflow-y-auto">
             {fornecedoresFiltrados.map(fornecedor => (
               <div
                 key={fornecedor.id}
@@ -114,12 +113,12 @@ export function AutocompleteFornecedor({
                 <span className="text-xs text-muted-foreground">{fornecedor.cnpj}</span>
               </div>
             ))}
-          </ScrollArea>
+          </div>
         </div>
       )}
       
       {aberto && fornecedoresFiltrados.length === 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md p-3 text-sm text-muted-foreground">
+        <div className="absolute z-[100] w-full mt-1 bg-popover border rounded-md shadow-lg p-3 text-sm text-muted-foreground">
           Nenhum fornecedor encontrado
         </div>
       )}

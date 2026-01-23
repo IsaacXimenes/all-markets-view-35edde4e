@@ -45,6 +45,8 @@ import {
 import { formatCurrency } from '@/utils/formatUtils';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { toast } from 'sonner';
+import { AutocompleteLoja } from '@/components/AutocompleteLoja';
+import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 
 // Mock do usuário logado (gestor)
 const usuarioLogado = { id: 'COL-001', nome: 'João Gestor' };
@@ -584,31 +586,21 @@ export default function VendasConferenciaGestor() {
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Loja</label>
-                  <Select value={filtroLoja} onValueChange={setFiltroLoja}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todas as lojas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todas">Todas as lojas</SelectItem>
-                      {lojas.filter(l => l.tipo === 'Loja').map(loja => (
-                        <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <AutocompleteLoja
+                    value={filtroLoja === 'todas' ? '' : filtroLoja}
+                    onChange={(v) => setFiltroLoja(v || 'todas')}
+                    placeholder="Todas as lojas"
+                    apenasLojasTipoLoja={true}
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Responsável pela Venda</label>
-                  <Select value={filtroResponsavel} onValueChange={setFiltroResponsavel}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos</SelectItem>
-                      {colaboradores.map(col => (
-                        <SelectItem key={col.id} value={col.id}>{col.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <AutocompleteColaborador
+                    value={filtroResponsavel === 'todos' ? '' : filtroResponsavel}
+                    onChange={(v) => setFiltroResponsavel(v || 'todos')}
+                    placeholder="Todos"
+                    filtrarPorTipo="vendedoresEGestores"
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Status</label>

@@ -13,6 +13,7 @@ import { getFornecedores } from '@/utils/cadastrosApi';
 import { formatCurrency } from '@/utils/assistenciaApi';
 import { Download, Eye, FileText, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
 
 interface NotaHistorico {
   id: string;
@@ -255,15 +256,11 @@ export default function OSHistoricoNotas() {
             </div>
             <div className="space-y-2">
               <Label>Fornecedor</Label>
-              <Select value={filtroFornecedor} onValueChange={setFiltroFornecedor}>
-                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  {fornecedores.map(f => (
-                    <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AutocompleteFornecedor
+                value={filtroFornecedor === 'todos' ? '' : filtroFornecedor}
+                onChange={(v) => setFiltroFornecedor(v || 'todos')}
+                placeholder="Todos os Fornecedores"
+              />
             </div>
             <div className="space-y-2">
               <Label>Status</Label>

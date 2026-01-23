@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Eye, FileText, Plus, Download } from 'lucide-react';
 import { getVendas, Venda } from '@/utils/vendasApi';
@@ -18,6 +17,8 @@ import {
 import { format, addMonths } from 'date-fns';
 import { formatIMEI, displayIMEI } from '@/utils/imeiMask';
 import { exportToCSV } from '@/utils/formatUtils';
+import { AutocompleteLoja } from '@/components/AutocompleteLoja';
+import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 
 export default function GarantiasNova() {
   const navigate = useNavigate();
@@ -229,31 +230,21 @@ export default function GarantiasNova() {
               </div>
               <div>
                 <Label>Loja</Label>
-                <Select value={buscaLoja || 'all'} onValueChange={(v) => setBuscaLoja(v === 'all' ? '' : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas as Lojas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as Lojas</SelectItem>
-                    {lojas.map(l => (
-                      <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AutocompleteLoja
+                  value={buscaLoja}
+                  onChange={(v) => setBuscaLoja(v)}
+                  placeholder="Todas as Lojas"
+                  apenasLojasTipoLoja={true}
+                />
               </div>
               <div>
                 <Label>Vendedor</Label>
-                <Select value={buscaVendedor || 'all'} onValueChange={(v) => setBuscaVendedor(v === 'all' ? '' : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos os Vendedores" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os Vendedores</SelectItem>
-                    {vendedores.map(v => (
-                      <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AutocompleteColaborador
+                  value={buscaVendedor}
+                  onChange={(v) => setBuscaVendedor(v)}
+                  placeholder="Todos os Vendedores"
+                  filtrarPorTipo="vendedoresEGestores"
+                />
               </div>
               <div>
                 <Label>Data Início</Label>

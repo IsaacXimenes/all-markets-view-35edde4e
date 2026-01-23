@@ -14,12 +14,13 @@ import {
   addMaquinaCartao, 
   updateMaquinaCartao, 
   deleteMaquinaCartao, 
-  getLojas, 
   getContasFinanceiras,
   getLojaById,
   getContaFinanceiraById,
   MaquinaCartao 
 } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
+import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { exportToCSV } from '@/utils/formatUtils';
 import { toast } from 'sonner';
 
@@ -54,7 +55,8 @@ const getParcelamentoPadrao = (): Parcelamento[] => {
 
 export default function CadastrosMaquinas() {
   const [maquinas, setMaquinas] = useState(getMaquinasCartao());
-  const lojas = getLojas().filter(l => l.status === 'Ativo');
+  const { obterLojasAtivas, obterLojaById } = useCadastroStore();
+  const lojas = obterLojasAtivas();
   const contasFinanceiras = getContasFinanceiras().filter(c => c.status === 'Ativo');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMaquina, setEditingMaquina] = useState<MaquinaCartao | null>(null);
@@ -300,18 +302,12 @@ export default function CadastrosMaquinas() {
                     </div>
                     <div>
                       <Label>Loja Vinculada (CNPJ) *</Label>
-                      <Select value={form.cnpjVinculado} onValueChange={(value) => setForm({ ...form, cnpjVinculado: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a loja..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {lojas.map(loja => (
-                            <SelectItem key={loja.id} value={loja.id}>
-                              {loja.nome} - {loja.cnpj}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <AutocompleteLoja
+                        value={form.cnpjVinculado}
+                        onChange={(value) => setForm({ ...form, cnpjVinculado: value })}
+                        placeholder="Selecione a loja..."
+                        apenasAtivas={true}
+                      />
                     </div>
                     <div>
                       <Label>Conta de Origem *</Label>

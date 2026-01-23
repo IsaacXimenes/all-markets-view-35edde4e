@@ -40,6 +40,7 @@ import {
 import { formatCurrency } from '@/utils/formatUtils';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { toast } from 'sonner';
+import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 
 // Mock do usuário logado
 const usuarioLogado = { id: 'COL-007', nome: 'Carlos Lançador', cargo: 'Vendedor' };
@@ -508,19 +509,12 @@ export default function VendasConferenciaLancamento() {
             {isGestorOuFinanceiro && (
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Filtrar por Vendedor</label>
-                <Select value={filtroVendedor} onValueChange={setFiltroVendedor}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos os Vendedores" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os Vendedores</SelectItem>
-                    {vendedoresDisponiveis.map(vendedor => (
-                      <SelectItem key={vendedor.id} value={vendedor.id}>
-                        {vendedor.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AutocompleteColaborador
+                  value={filtroVendedor === 'todos' ? '' : filtroVendedor}
+                  onChange={(v) => setFiltroVendedor(v || 'todos')}
+                  placeholder="Todos os Vendedores"
+                  filtrarPorTipo="vendedoresEGestores"
+                />
               </div>
             )}
             <div>

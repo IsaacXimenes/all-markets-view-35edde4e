@@ -11,6 +11,11 @@ export interface FeedbackRegistro {
   gestorNome: string;
   dataHora: Date;
   referenciaAnterior?: string;
+  arquivo?: {
+    nome: string;
+    tipo: string;
+    url: string;
+  };
 }
 
 export interface ColaboradorFeedback {

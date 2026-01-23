@@ -37,6 +37,7 @@ import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
 import { getVendaById } from '@/utils/vendasApi';
 import { getGarantiaById } from '@/utils/garantiasApi';
 import { getProdutoPendenteById } from '@/utils/osApi';
+import { getPecas, Peca } from '@/utils/pecasApi';
 import { Plus, Trash2, Search, AlertTriangle, Clock, User, History, ArrowLeft, Smartphone, Save, Package, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -50,7 +51,7 @@ const DRAFT_KEY = 'draft_os_assistencia';
 
 interface PecaForm {
   peca: string;
-  imei: string;
+  pecaEstoqueId: string;
   valor: string;
   percentual: string;
   servicoTerceirizado: boolean;
@@ -119,8 +120,11 @@ export default function OSAssistenciaNova() {
 
   // Peças
   const [pecas, setPecas] = useState<PecaForm[]>([
-    { peca: '', imei: '', valor: '', percentual: '', servicoTerceirizado: false, descricaoTerceirizado: '', fornecedorId: '', unidadeServico: '', pecaNoEstoque: false, pecaDeFornecedor: false, nomeRespFornecedor: '' }
+    { peca: '', pecaEstoqueId: '', valor: '', percentual: '', servicoTerceirizado: false, descricaoTerceirizado: '', fornecedorId: '', unidadeServico: '', pecaNoEstoque: false, pecaDeFornecedor: false, nomeRespFornecedor: '' }
   ]);
+
+  // Peças do estoque (carregadas dinamicamente)
+  const pecasEstoque = getPecas().filter(p => p.status === 'Disponível');
 
   // Pagamentos
   const [pagamentos, setPagamentos] = useState<PagamentoForm[]>([
@@ -306,7 +310,7 @@ export default function OSAssistenciaNova() {
       setClienteId(draft.clienteId || '');
       setDescricao(draft.descricao || '');
       setStatus(draft.status || 'Em serviço');
-      setPecas(draft.pecas || [{ peca: '', imei: '', valor: '', percentual: '', servicoTerceirizado: false, descricaoTerceirizado: '', fornecedorId: '', unidadeServico: '', pecaNoEstoque: false, pecaDeFornecedor: false, nomeRespFornecedor: '' }]);
+      setPecas(draft.pecas || [{ peca: '', pecaEstoqueId: '', valor: '', percentual: '', servicoTerceirizado: false, descricaoTerceirizado: '', fornecedorId: '', unidadeServico: '', pecaNoEstoque: false, pecaDeFornecedor: false, nomeRespFornecedor: '' }]);
       setPagamentos(draft.pagamentos || [{ meio: '', valor: '', parcelas: '' }]);
       toast({ title: "Rascunho carregado", description: "Dados da OS anterior foram restaurados" });
     }
@@ -418,7 +422,7 @@ export default function OSAssistenciaNova() {
   };
 
   const addPeca = () => {
-    setPecas([...pecas, { peca: '', imei: '', valor: '', percentual: '', servicoTerceirizado: false, descricaoTerceirizado: '', fornecedorId: '', unidadeServico: '', pecaNoEstoque: false, pecaDeFornecedor: false, nomeRespFornecedor: '' }]);
+    setPecas([...pecas, { peca: '', pecaEstoqueId: '', valor: '', percentual: '', servicoTerceirizado: false, descricaoTerceirizado: '', fornecedorId: '', unidadeServico: '', pecaNoEstoque: false, pecaDeFornecedor: false, nomeRespFornecedor: '' }]);
   };
 
   const removePeca = (index: number) => {
@@ -511,17 +515,16 @@ export default function OSAssistenciaNova() {
   };
 
   const validarIMEIs = () => {
-    for (const peca of pecas) {
-      if (peca.imei) {
-        const osAtiva = verificarIMEIEmOSAtiva(peca.imei);
-        if (osAtiva) {
-          toast({
-            title: 'IMEI em OS Aberta',
-            description: `O IMEI ${peca.imei} já está em uma OS aberta (${osAtiva.id}). Não é permitido registrar.`,
-            variant: 'destructive'
-          });
-          return false;
-        }
+    // Validação de IMEI do aparelho
+    if (imeiAparelho) {
+      const osAtiva = verificarIMEIEmOSAtiva(imeiAparelho);
+      if (osAtiva) {
+        toast({
+          title: 'IMEI em OS Aberta',
+          description: `O IMEI ${imeiAparelho} já está em uma OS aberta (${osAtiva.id}). Não é permitido registrar.`,
+          variant: 'destructive'
+        });
+        return false;
       }
     }
     return true;
@@ -586,7 +589,7 @@ export default function OSAssistenciaNova() {
     const pecasFormatadas: PecaServico[] = pecas.map((p, i) => ({
       id: `PC-${Date.now()}-${i}`,
       peca: p.peca,
-      imei: p.imei || undefined,
+      pecaEstoqueId: p.pecaEstoqueId || undefined,
       valor: parseFloat(p.valor.replace(/\D/g, '')) / 100 || 0,
       percentual: parseFloat(p.percentual) || 0,
       valorTotal: calcularValorTotalPeca(p),
@@ -757,7 +760,7 @@ export default function OSAssistenciaNova() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Origem da Compra *</Label>
+                <Label className={!origemAparelho ? 'text-destructive' : ''}>Origem da Compra *</Label>
                 <Select value={origemAparelho} onValueChange={(v) => {
                   setOrigemAparelho(v as any);
                   if (!timerStart) {
@@ -765,7 +768,7 @@ export default function OSAssistenciaNova() {
                     setTimer(TIMER_DURATION);
                   }
                 }}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectTrigger className={!origemAparelho ? 'border-destructive' : ''}><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Thiago Imports">Compra realizada na Thiago Imports</SelectItem>
                     <SelectItem value="Externo">Aparelho adquirido fora</SelectItem>
@@ -773,9 +776,9 @@ export default function OSAssistenciaNova() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Modelo do Aparelho *</Label>
+                <Label className={!modeloAparelho ? 'text-destructive' : ''}>Modelo do Aparelho *</Label>
                 <Select value={modeloAparelho} onValueChange={setModeloAparelho}>
-                  <SelectTrigger><SelectValue placeholder="Selecione o modelo..." /></SelectTrigger>
+                  <SelectTrigger className={!modeloAparelho ? 'border-destructive' : ''}><SelectValue placeholder="Selecione o modelo..." /></SelectTrigger>
                   <SelectContent>
                     {produtosCadastro.map(p => (
                       <SelectItem key={p.id} value={p.produto}>{p.produto}</SelectItem>
@@ -951,24 +954,57 @@ export default function OSAssistenciaNova() {
           <CardContent>
             <div className="space-y-4">
               {pecas.map((peca, index) => (
-                <div key={index} className="p-4 border rounded-lg space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div key={index} className="p-4 border rounded-lg space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-2 md:col-span-2">
                       <Label>Peça/Serviço</Label>
-                      <Input
-                        value={peca.peca}
-                        onChange={e => handlePecaChange(index, 'peca', e.target.value)}
-                        placeholder="Descrição da peça ou serviço"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>IMEI (se aplicável)</Label>
-                      <Input
-                        value={peca.imei}
-                        onChange={e => handlePecaChange(index, 'imei', applyIMEIMask(e.target.value))}
-                        placeholder="WW-XXXXXX-YYYYYY-Z"
-                        maxLength={18}
-                      />
+                      {peca.pecaNoEstoque ? (
+                        <div className="space-y-2">
+                          <Select
+                            value={peca.pecaEstoqueId}
+                            onValueChange={(v) => {
+                              const pecaSelecionada = pecasEstoque.find(p => p.id === v);
+                              handlePecaChange(index, 'pecaEstoqueId', v);
+                              if (pecaSelecionada) {
+                                handlePecaChange(index, 'peca', pecaSelecionada.descricao);
+                                handlePecaChange(index, 'valor', formatCurrencyInput(String(pecaSelecionada.valorRecomendado * 100)));
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione a peça do estoque..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {pecasEstoque
+                                .filter(p => !lojaId || p.lojaId === lojaId)
+                                .map(p => (
+                                  <SelectItem key={p.id} value={p.id}>
+                                    <div className="flex items-center gap-2">
+                                      <span>{p.descricao}</span>
+                                      <Badge variant="outline" className="ml-2">
+                                        {p.quantidade} un.
+                                      </Badge>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                          {peca.pecaEstoqueId && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Package className="h-4 w-4" />
+                              <span>
+                                Estoque atual: {pecasEstoque.find(p => p.id === peca.pecaEstoqueId)?.quantidade || 0} unidades
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <Input
+                          value={peca.peca}
+                          onChange={e => handlePecaChange(index, 'peca', e.target.value)}
+                          placeholder="Descrição da peça ou serviço"
+                        />
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>Valor (R$)</Label>
@@ -1325,11 +1361,21 @@ export default function OSAssistenciaNova() {
         {/* Alerta de Campos Obrigatórios */}
         {(() => {
           const camposFaltando: string[] = [];
+          if (!origemAparelho) camposFaltando.push('Origem da Compra');
+          if (!modeloAparelho) camposFaltando.push('Modelo do Aparelho');
           if (!lojaId) camposFaltando.push('Loja');
           if (!tecnicoId) camposFaltando.push('Técnico');
           if (!setor) camposFaltando.push('Setor');
           if (!clienteId) camposFaltando.push('Cliente');
           if (!status) camposFaltando.push('Status');
+          
+          // Verificar serviço terceirizado sem responsável
+          const pecasSemResp = pecas.filter(p => 
+            p.servicoTerceirizado && !p.nomeRespFornecedor
+          );
+          if (pecasSemResp.length > 0) {
+            camposFaltando.push('Nome do Responsável (Serviço Terceirizado)');
+          }
           
           if (camposFaltando.length > 0) {
             return (

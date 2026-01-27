@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Home, 
@@ -16,7 +16,7 @@ import {
   Search
 } from 'lucide-react';
 import {
-  CommandDialog,
+  Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
@@ -24,6 +24,11 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -137,135 +142,146 @@ export function GlobalSearch() {
                      filteredColaboradores.length > 0;
 
   return (
-    <>
-      <Button
-        variant="outline"
-        className="relative h-9 w-full justify-start rounded-md bg-muted/50 text-sm text-muted-foreground hover:bg-muted/80 md:w-64 lg:w-80"
-        onClick={() => setOpen(true)}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className="relative h-9 w-full justify-start rounded-md bg-muted/50 text-sm text-muted-foreground hover:bg-muted/80 md:w-64 lg:w-80"
+        >
+          <Search className="mr-2 h-4 w-4" />
+          <span className="hidden lg:inline-flex">Buscar no sistema...</span>
+          <span className="inline-flex lg:hidden">Buscar...</span>
+          <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent 
+        className="w-[400px] p-0 border border-border shadow-lg bg-popover" 
+        align="start"
+        sideOffset={8}
       >
-        <Search className="mr-2 h-4 w-4" />
-        <span className="hidden lg:inline-flex">Buscar no sistema...</span>
-        <span className="inline-flex lg:hidden">Buscar...</span>
-        <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
-          <span className="text-xs">⌘</span>K
-        </kbd>
-      </Button>
+        <Command className="bg-popover">
+          <CommandInput 
+            placeholder="Buscar módulos, ações, lojas..." 
+            value={search}
+            onValueChange={setSearch}
+            className="border-0"
+          />
+          <CommandList className="max-h-[320px]">
+            {!hasResults && (
+              <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
+                Nenhum resultado encontrado.
+              </CommandEmpty>
+            )}
 
-      <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput 
-          placeholder="Buscar módulos, ações, lojas, colaboradores..." 
-          value={search}
-          onValueChange={setSearch}
-        />
-        <CommandList>
-          {!hasResults && (
-            <CommandEmpty className="py-8 text-center text-muted-foreground">
-              Nenhum resultado encontrado.
-            </CommandEmpty>
-          )}
-
-          {/* Navegação */}
-          {filteredNavigation.length > 0 && (
-            <CommandGroup heading="Navegação">
-              {filteredNavigation.map((item) => (
-                <CommandItem
-                  key={item.href}
-                  value={item.name}
-                  onSelect={() => handleSelect(item.href)}
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-                    <item.icon className="h-4 w-4 text-foreground" />
-                  </div>
-                  <span className="font-medium">{item.name}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          )}
-
-          {/* Ações Rápidas */}
-          {filteredActions.length > 0 && (
-            <>
-              <CommandSeparator className="my-2" />
-              <CommandGroup heading="Ações Rápidas">
-                {filteredActions.map((item) => (
+            {/* Navegação */}
+            {filteredNavigation.length > 0 && (
+              <CommandGroup heading="Navegação">
+                {filteredNavigation.map((item) => (
                   <CommandItem
                     key={item.href}
                     value={item.name}
                     onSelect={() => handleSelect(item.href)}
+                    className="flex items-center gap-3 px-3 py-2 cursor-pointer"
                   >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                      <item.icon className="h-4 w-4 text-primary" />
+                    <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted">
+                      <item.icon className="h-4 w-4 text-foreground" />
                     </div>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{item.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {item.description}
-                      </span>
-                    </div>
+                    <span className="font-medium text-sm">{item.name}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>
-            </>
-          )}
+            )}
 
-          {/* Lojas */}
-          {filteredLojas.length > 0 && (
-            <>
-              <CommandSeparator className="my-2" />
-              <CommandGroup heading="Lojas">
-                {filteredLojas.map((loja) => (
-                  <CommandItem
-                    key={loja.id}
-                    value={`loja-${loja.nome}`}
-                    onSelect={() => handleSelect('/cadastros/lojas')}
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-                      <Store className="h-4 w-4 text-foreground" />
-                    </div>
-                    <div className="flex flex-1 items-center justify-between gap-2">
-                      <span className="font-medium">{loja.nome}</span>
-                      <Badge 
-                        variant="outline" 
-                        className={cn("text-xs shrink-0", getTipoBadgeColor(loja.tipo))}
-                      >
-                        {loja.tipo}
-                      </Badge>
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </>
-          )}
-
-          {/* Colaboradores */}
-          {filteredColaboradores.length > 0 && (
-            <>
-              <CommandSeparator className="my-2" />
-              <CommandGroup heading="Colaboradores">
-                {filteredColaboradores.map((col) => (
-                  <CommandItem
-                    key={col.id}
-                    value={`colaborador-${col.nome}`}
-                    onSelect={() => handleSelect(`/rh/funcionario/${col.id}`)}
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-                      <User className="h-4 w-4 text-foreground" />
-                    </div>
-                    <div className="flex flex-1 flex-col min-w-0">
-                      <span className="font-medium truncate">{col.nome}</span>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="truncate">{col.cargo}</span>
-                        <span className="text-border">•</span>
-                        <span className="truncate">{obterNomeLoja(col.loja_id)}</span>
+            {/* Ações Rápidas */}
+            {filteredActions.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading="Ações Rápidas">
+                  {filteredActions.map((item) => (
+                    <CommandItem
+                      key={item.href}
+                      value={item.name}
+                      onSelect={() => handleSelect(item.href)}
+                      className="flex items-center gap-3 px-3 py-2 cursor-pointer"
+                    >
+                      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10">
+                        <item.icon className="h-4 w-4 text-primary" />
                       </div>
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </>
-          )}
-        </CommandList>
-      </CommandDialog>
-    </>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-sm">{item.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {item.description}
+                        </span>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+
+            {/* Lojas */}
+            {filteredLojas.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading="Lojas">
+                  {filteredLojas.map((loja) => (
+                    <CommandItem
+                      key={loja.id}
+                      value={`loja-${loja.nome}`}
+                      onSelect={() => handleSelect('/cadastros/lojas')}
+                      className="flex items-center gap-3 px-3 py-2 cursor-pointer"
+                    >
+                      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted">
+                        <Store className="h-4 w-4 text-foreground" />
+                      </div>
+                      <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
+                        <span className="font-medium text-sm truncate">{loja.nome}</span>
+                        <Badge 
+                          variant="outline" 
+                          className={cn("text-xs shrink-0", getTipoBadgeColor(loja.tipo))}
+                        >
+                          {loja.tipo}
+                        </Badge>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+
+            {/* Colaboradores */}
+            {filteredColaboradores.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading="Colaboradores">
+                  {filteredColaboradores.map((col) => (
+                    <CommandItem
+                      key={col.id}
+                      value={`colaborador-${col.nome}`}
+                      onSelect={() => handleSelect(`/rh/funcionario/${col.id}`)}
+                      className="flex items-center gap-3 px-3 py-2 cursor-pointer"
+                    >
+                      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted">
+                        <User className="h-4 w-4 text-foreground" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-medium text-sm truncate">{col.nome}</span>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="truncate">{col.cargo}</span>
+                          <span>•</span>
+                          <span className="truncate">{obterNomeLoja(col.loja_id)}</span>
+                        </div>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

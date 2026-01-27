@@ -1,275 +1,243 @@
 
-# Plano: Exibir Pendências Financeiras no Módulo Estoque (com Edição e Sincronização Automática)
 
-## Visão Geral
+# Plano: Adicionar Botoes de Navegacao (Setas) nas Abas dos Modulos
 
-Este plano adiciona visibilidade das pendências financeiras no módulo de Estoque, permitindo que a equipe de estoque acompanhe o status de conferência e pagamento das notas, edite notas pendentes, e tenha **sincronização automática bidirecional** com o Financeiro.
+## Visao Geral
 
----
-
-## Arquitetura de Sincronização
-
-A sincronização entre Estoque e Financeiro já está implementada na codebase:
-
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        FLUXO DE SINCRONIZAÇÃO                               │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ESTOQUE                              FINANCEIRO                            │
-│  ┌──────────────────┐                 ┌──────────────────┐                 │
-│  │ Valida aparelho  │ ───────────────>│ Atualiza pendência│                │
-│  │ (50% → 60%)      │  automatico     │ (valorConferido)  │                │
-│  └──────────────────┘                 └──────────────────┘                 │
-│           │                                    │                            │
-│           ▼                                    ▼                            │
-│  ┌──────────────────┐                 ┌──────────────────┐                 │
-│  │ estoqueApi.ts    │                 │ pendenciasFinan- │                 │
-│  │ validarAparelho  │ ───────────────>│ ceiraApi.ts      │                 │
-│  │ NotaEmLote()     │                 │ atualizarPend()  │                 │
-│  └──────────────────┘                 └──────────────────┘                 │
-│           │                                    │                            │
-│           └──────── Ambos módulos veem ────────┘                           │
-│                     os mesmos dados                                         │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-A sincronização acontece através de:
-1. `validarAparelhoNota()` - Valida um aparelho e chama `atualizarPendencia()`
-2. `validarAparelhosEmLote()` - Valida múltiplos aparelhos de uma vez
-3. `getPendencias()` / `getPendenciaPorNota()` - Ambos os módulos leem a mesma fonte
+Este plano implementa botoes de navegacao com setas para esquerda e direita em todos os menus de abas dos modulos, facilitando a navegacao horizontal sem depender apenas da rolagem com scroll.
 
 ---
 
-## O que será implementado
+## Layouts a Modificar
 
-### 1. Nova Aba no Estoque Layout
+Existem **8 layouts** que precisam ser atualizados:
 
-**Arquivo:** `src/components/layout/EstoqueLayout.tsx`
-
-Adicionar nova aba entre "Notas de Compra" e "Notas Urgência":
-
-```text
-Tabs do Estoque:
-┌──────────┬───────────┬───────────┬───────────────────┬──────────────────┬───────────────┬─────────────────┬───────────────────┐
-│Dashboard │ Aparelhos │ Acessórios│ Aparelhos Pend.   │ Notas de Compra  │ Notas - Pend. │ Notas Urgência  │ Movimentações...  │
-└──────────┴───────────┴───────────┴───────────────────┴──────────────────┴───────────────┴─────────────────┴───────────────────┘
-                                                                          ▲
-                                                                    NOVA ABA
-```
-
-**Detalhes:**
-- Nome: "Notas - Pendências"
-- Icone: `Wallet`
-- Rota: `/estoque/notas-pendencias`
+| Layout | Arquivo | Quantidade de Abas |
+|--------|---------|-------------------|
+| Cadastros | `src/components/layout/CadastrosLayout.tsx` | 16 abas |
+| Estoque | `src/components/layout/EstoqueLayout.tsx` | 9 abas |
+| Financeiro | `src/components/layout/FinanceiroLayout.tsx` | 13 abas |
+| Vendas | `src/components/layout/VendasLayout.tsx` | 7 abas |
+| Garantias | `src/components/layout/GarantiasLayout.tsx` | 5 abas |
+| OS | `src/components/layout/OSLayout.tsx` | 7 abas |
+| RH | `src/components/layout/RHLayout.tsx` | 6 abas |
+| Assistencia | `src/components/layout/AssistenciaLayout.tsx` | 7 abas |
 
 ---
 
-### 2. Nova Página: EstoqueNotasPendencias.tsx
-
-**Arquivo:** `src/pages/EstoqueNotasPendencias.tsx`
-
-Layout da página:
-
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  ESTOQUE > NOTAS - PENDÊNCIAS                                               │
-├───────────────┬───────────────┬───────────────┬─────────────────────────────┤
-│ Em Conferência│ Valor Pend.   │ Valor Conferido│ Alertas SLA               │
-│ [8]           │ [R$ 45.000]   │ [R$ 32.000]   │ [2 críticos]               │
-├───────────────┴───────────────┴───────────────┴─────────────────────────────┤
-│  FILTROS                                                                    │
-│  [Data Início] [Data Fim] [Fornecedor ▼] [Status Conferência ▼] [Limpar]   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  Nº Nota │ Fornec. │ Valor │ Conferido │ % Conf │ Conf │ Pgto │ SLA │ Ações │
-│  NC-0008 │ iStore  │ 19.2k │ ████░░ 8k │  42%   │ EmCf │ Agrd │ ⚠3  │ ✏️ 👁 │
-│  NC-0007 │ FastCel │ 5.0k  │ █████ 5k  │ 100%   │ Cmpl │ Agrd │ ✓2  │ ✏️ 👁 │
-│  URG-023 │ TechSup │ 3.2k  │ ██░░░ 1k  │  31%   │ EmCf │ Pago │ ✓1  │ ✏️ 👁 │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-### 3. Coluna de Ações: Editar e Visualizar
-
-| Ícone | Ação | Descrição |
-|-------|------|-----------|
-| ✏️ (Pencil) | Editar | Navega para `/estoque/nota/:id` para edição completa |
-| 👁️ (Eye) | Ver Detalhes | Abre modal somente leitura com progresso e timeline |
-
-**Lógica do botão Editar:**
-- Visível para notas com `statusPagamento !== 'Pago'`
-- Permite editar a nota e validar aparelhos
-
----
-
-### 4. Sincronização Automática
-
-Quando o Estoque edita uma nota e valida aparelhos:
-
-1. **Estoque valida +10% dos aparelhos**
-   - Chama `validarAparelhoNota()` ou `validarAparelhosEmLote()`
-   - Atualiza `valorConferido` na nota
-
-2. **Sistema sincroniza automaticamente**
-   - `atualizarPendencia()` é chamada internamente
-   - Atualiza `percentualConferencia`, `valorConferido`, `valorPendente`
-   - Registra na timeline compartilhada
-
-3. **Financeiro vê a alteração**
-   - Ao acessar a tela de pendências, vê o novo percentual
-   - Timeline mostra: "Aparelho X validado por [Responsável do Estoque]"
-   - Notificação automática para o Financeiro
-
-**Exemplo de fluxo:**
+## Design Visual
 
 ```text
 ANTES:
-┌─────────────────────────────────────────┐
-│ NC-2025-0008                            │
-│ Conferidos: 2/5 (40%)                   │
-│ Valor Conferido: R$ 8.000               │
-│ Valor Pendente: R$ 12.000               │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  [Lojas] [Clientes] [Colaboradores] [Fornecedores] [Origens...] ...        │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-ESTOQUE VALIDA MAIS 1 APARELHO (R$ 4.000)
+DEPOIS:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ [<] [Lojas] [Clientes] [Colaboradores] [Fornecedores] [Origens...] ... [>] │
+└─────────────────────────────────────────────────────────────────────────────┘
+     │                                                                    │
+     └── Botao Esquerda                                  Botao Direita ──┘
+```
 
-DEPOIS (reflete em ambos os módulos):
-┌─────────────────────────────────────────┐
-│ NC-2025-0008                            │
-│ Conferidos: 3/5 (60%)                   │
-│ Valor Conferido: R$ 12.000              │
-│ Valor Pendente: R$ 8.000                │
-└─────────────────────────────────────────┘
+**Caracteristicas dos botoes:**
+- Icones `ChevronLeft` e `ChevronRight` do lucide-react
+- Fundo com hover state sutil
+- Desabilitados quando nao ha mais conteudo para rolar
+- Posicionados nas extremidades da barra de abas
+
+---
+
+## Componente Reutilizavel: TabsNavigation
+
+Para evitar duplicacao de codigo, vamos criar um componente reutilizavel:
+
+**Novo arquivo:** `src/components/layout/TabsNavigation.tsx`
+
+```typescript
+interface Tab {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+}
+
+interface TabsNavigationProps {
+  tabs: Tab[];
+  size?: 'sm' | 'default';
+}
+
+export function TabsNavigation({ tabs, size = 'default' }: TabsNavigationProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const location = useLocation();
+
+  // Detectar se pode rolar
+  const checkScroll = () => {
+    if (!scrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+    setCanScrollLeft(scrollLeft > 0);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
+  };
+
+  // Funcoes de scroll
+  const scrollLeft = () => {
+    scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
+  };
+
+  const scrollRight = () => {
+    scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="relative flex items-center gap-1">
+      {/* Botao Esquerda */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className={cn(
+          "h-8 w-8 shrink-0",
+          !canScrollLeft && "opacity-30 cursor-not-allowed"
+        )}
+        onClick={scrollLeft}
+        disabled={!canScrollLeft}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+
+      {/* Area de Scroll */}
+      <div
+        ref={scrollRef}
+        onScroll={checkScroll}
+        className="flex gap-1 overflow-x-auto scrollbar-hide"
+      >
+        {tabs.map((tab) => (...))}
+      </div>
+
+      {/* Botao Direita */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className={cn(
+          "h-8 w-8 shrink-0",
+          !canScrollRight && "opacity-30 cursor-not-allowed"
+        )}
+        onClick={scrollRight}
+        disabled={!canScrollRight}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
 ```
 
 ---
 
-### 5. Modal de Detalhes (Somente Leitura)
+## Logica de Navegacao
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│  DETALHES - NOTA NC-2025-0008                                  │
-├─────────────────────────────────────────────────────────────────┤
-│  INFORMAÇÕES GERAIS                                             │
-│  ┌──────────────┬──────────────┬──────────────┐                │
-│  │ Fornecedor   │ Data Entrada │ Dias         │                │
-│  │ iStore       │ 25/01/2026   │ 3 dias       │                │
-│  └──────────────┴──────────────┴──────────────┘                │
-├─────────────────────────────────────────────────────────────────┤
-│  PROGRESSO DE CONFERÊNCIA                                       │
-│  ████████░░░░░░░░░░░░ 60%                                       │
-│  3/5 aparelhos conferidos                                       │
-├─────────────────────────────────────────────────────────────────┤
-│  VALORES                                                        │
-│  ┌────────────────┬────────────────┬────────────────┐          │
-│  │ Total          │ Conferido      │ Pendente       │          │
-│  │ R$ 20.000,00   │ R$ 12.000,00   │ R$ 8.000,00    │          │
-│  └────────────────┴────────────────┴────────────────┘          │
-├─────────────────────────────────────────────────────────────────┤
-│  STATUS FINANCEIRO                                              │
-│  Pagamento: [Aguardando Conferência]                           │
-│  Data Pagamento: —                                              │
-├─────────────────────────────────────────────────────────────────┤
-│  APARELHOS                                                      │
-│  ┌──────────────┬────────────┬─────────┬─────────────┐         │
-│  │ IMEI         │ Modelo     │ Valor   │ Status      │         │
-│  │ 352...012    │ iPhone 15  │ R$ 4.0k │ ✓ Conferido │         │
-│  │ 352...013    │ iPhone 15  │ R$ 4.0k │ ✓ Conferido │         │
-│  │ 352...014    │ iPhone 14  │ R$ 4.0k │ ✓ Conferido │         │
-│  │ 352...015    │ iPhone 14  │ R$ 4.0k │ ⏳ Pendente │         │
-│  │ 352...016    │ iPhone 13  │ R$ 4.0k │ ⏳ Pendente │         │
-│  └──────────────┴────────────┴─────────┴─────────────┘         │
-├─────────────────────────────────────────────────────────────────┤
-│  TIMELINE (compartilhada com Financeiro)                        │
-│  ● 27/01 10:30 - iPhone 352...014 validado (Ana Costa)          │
-│  ● 26/01 14:30 - iPhone 352...012 validado (Pedro Lima)         │
-│  ● 26/01 10:15 - iPhone 352...013 validado (Pedro Lima)         │
-│  ● 25/01 09:00 - Nota recebida no sistema                       │
-├─────────────────────────────────────────────────────────────────┤
-│                              [Editar Nota] [Fechar]             │
-└─────────────────────────────────────────────────────────────────┘
+**Estados controlados:**
+- `canScrollLeft` - boolean indicando se ha conteudo a esquerda
+- `canScrollRight` - boolean indicando se ha conteudo a direita
+
+**Eventos monitorados:**
+- `onScroll` - atualiza os estados ao rolar
+- `useEffect` com `ResizeObserver` - recalcula ao redimensionar a tela
+
+**Comportamento:**
+- Scroll suave de 200px por clique
+- Botoes desabilitados quando nao ha mais conteudo
+- Opacidade reduzida para indicar estado desabilitado
+
+---
+
+## Estilo CSS
+
+Adicionar classe utilitaria para esconder a scrollbar nativa:
+
+**Arquivo:** `src/index.css`
+
+```css
+/* Esconder scrollbar mas manter funcionalidade */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
 ```
 
 ---
 
 ## Arquivos a Criar/Modificar
 
-| Arquivo | Ação | Descrição |
+| Arquivo | Acao | Descricao |
 |---------|------|-----------|
-| `src/pages/EstoqueNotasPendencias.tsx` | **Criar** | Nova página de pendências para o Estoque |
-| `src/components/layout/EstoqueLayout.tsx` | Modificar | Adicionar nova aba "Notas - Pendências" |
-| `src/App.tsx` | Modificar | Adicionar rota `/estoque/notas-pendencias` |
+| `src/components/layout/TabsNavigation.tsx` | **Criar** | Componente reutilizavel com botoes de navegacao |
+| `src/index.css` | Modificar | Adicionar classe `.scrollbar-hide` |
+| `src/components/layout/CadastrosLayout.tsx` | Modificar | Usar TabsNavigation |
+| `src/components/layout/EstoqueLayout.tsx` | Modificar | Usar TabsNavigation |
+| `src/components/layout/FinanceiroLayout.tsx` | Modificar | Usar TabsNavigation |
+| `src/components/layout/VendasLayout.tsx` | Modificar | Usar TabsNavigation |
+| `src/components/layout/GarantiasLayout.tsx` | Modificar | Usar TabsNavigation |
+| `src/components/layout/OSLayout.tsx` | Modificar | Usar TabsNavigation |
+| `src/components/layout/RHLayout.tsx` | Modificar | Usar TabsNavigation |
+| `src/components/layout/AssistenciaLayout.tsx` | Modificar | Usar TabsNavigation |
 
 ---
 
-## Funcionalidades da Nova Página
+## Exemplo de Uso nos Layouts
 
-### Cards de Resumo
-1. **Em Conferência** - Quantidade de notas em processo de conferência
-2. **Valor Pendente de Conferência** - Soma dos valores ainda não conferidos
-3. **Valor Conferido** - Soma dos valores já validados
-4. **Alertas SLA** - Notas com mais de 3 dias sem progresso
+Cada layout sera simplificado para usar o novo componente:
 
-### Filtros
-- Data Início / Data Fim
-- Fornecedor (Select)
-- Status Conferência (Em Conferência / Completa / Discrepância)
-- Botão Limpar Filtros
+**Antes (CadastrosLayout):**
+```typescript
+<div className="relative mb-6 border-b border-border">
+  <div className="absolute left-0 ...gradient..." />
+  <ScrollArea className="w-full whitespace-nowrap" type="always">
+    <nav className="flex gap-1 pb-2 px-1">
+      {tabs.map((tab) => (...))}
+    </nav>
+    <ScrollBar orientation="horizontal" />
+  </ScrollArea>
+  <div className="absolute right-0 ...gradient..." />
+</div>
+```
 
-### Tabela
-| Coluna | Descrição |
-|--------|-----------|
-| Nº Nota | ID da nota (NC-XXXX ou URG-XXXX) |
-| Fornecedor | Nome do fornecedor |
-| Valor Total | Valor total da nota |
-| Valor Conferido | Com barra de progresso visual |
-| % Conferência | Percentual de aparelhos conferidos |
-| Status Conferência | Badge (Em Conf. / Completa / Discrepância) |
-| Status Pagamento | Badge (Aguardando / Pago) - somente visualização |
-| SLA | Indicador de dias (verde/amarelo/vermelho) |
-| Ações | Botões Editar (caneta) + Ver Detalhes (olho) |
+**Depois (CadastrosLayout):**
+```typescript
+<div className="mb-6 border-b border-border">
+  <TabsNavigation tabs={tabs} size="sm" />
+</div>
+```
 
 ---
 
-## Comparativo: Estoque vs Financeiro
+## Acessibilidade
 
-| Aspecto | Financeiro | Estoque |
-|---------|------------|---------|
-| Botão "Finalizar Pagamento" | Sim | Não |
-| Botão "Editar Nota" | Não | Sim (caneta) |
-| Botão "Ver Detalhes" | Sim | Sim |
-| Validar aparelhos | Não | Sim (via página de edição) |
-| Timeline de eventos | Sim | Sim (mesma fonte) |
-| Foco dos filtros | Status Pagamento | Status Conferência |
-| Card de destaque | Valor Pendente Pgto | Em Conferência |
+- Botoes com `aria-label` descritivo
+- Suporte a navegacao por teclado (Tab + Enter)
+- Estados visuais claros para habilitado/desabilitado
 
 ---
 
-## Detalhes Técnicos
+## Responsividade
 
-### Fonte de Dados Única
-Ambos os módulos consomem `getPendencias()` de `pendenciasFinanceiraApi.ts`, garantindo que vejam os mesmos dados.
-
-### Sincronização em Tempo Real
-A sincronização acontece automaticamente quando:
-1. Estoque valida um aparelho via `validarAparelhoNota()`
-2. Estoque valida em lote via `validarAparelhosEmLote()`
-3. Financeiro finaliza pagamento via `finalizarPagamentoPendencia()`
-
-### Notificações Automáticas
-Ao atingir marcos importantes, o sistema dispara notificações:
-- 50% conferido: Notifica Financeiro
-- 100% conferido: Notifica Financeiro (pronto para pagamento)
-- Discrepância detectada: Notifica Financeiro + Gestor
-- Pagamento finalizado: Notifica Estoque
+- Em telas pequenas: botoes ficam mais relevantes
+- Em telas grandes: botoes podem ficar ocultos se todo conteudo couber
+- Detecta automaticamente via `ResizeObserver`
 
 ---
 
-## Benefícios
+## Resultado Esperado
 
-1. **Visibilidade Cross-Module** - Estoque acompanha status financeiro sem trocar de módulo
-2. **Edição Rápida** - Botão de caneta leva direto para edição da nota
-3. **Sincronização Automática** - Alterações no Estoque refletem instantaneamente no Financeiro
-4. **Timeline Unificada** - Histórico completo de todas as tratativas em um único lugar
-5. **SLA Compartilhado** - Ambos os times veem alertas de notas atrasadas
+Apos implementacao:
+
+1. Todos os 8 layouts terao botoes de navegacao
+2. Navegacao fluida com scroll suave de 200px por clique
+3. Feedback visual claro quando nao ha mais conteudo
+4. Codigo centralizado em um componente reutilizavel
+5. Manutencao simplificada para futuras alteracoes
+

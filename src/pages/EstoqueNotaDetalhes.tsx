@@ -76,8 +76,11 @@ export default function EstoqueNotaDetalhes() {
   const [responsavelConferencia, setResponsavelConferencia] = useState('');
   
   // Colaboradores e helper do store centralizado (Zustand)
-  const colaboradores = useCadastroStore(state => state.colaboradores.filter(c => c.ativo));
+  const todosColaboradores = useCadastroStore(state => state.colaboradores);
   const obterNomeLoja = useCadastroStore(state => state.obterNomeLoja);
+  
+  // Filtrar colaboradores ativos (memoizado para evitar re-renders)
+  const colaboradores = useMemo(() => todosColaboradores.filter(c => c.ativo), [todosColaboradores]);
   
   // Estado de edição
   const [editData, setEditData] = useState({
@@ -864,7 +867,7 @@ export default function EstoqueNotaDetalhes() {
                   <SelectTrigger id="responsavel">
                     <SelectValue placeholder="Selecione o colaborador" />
                   </SelectTrigger>
-                  <SelectContent className="z-[100] max-h-64 overflow-y-auto">
+                  <SelectContent className="z-[100]">
                     {colaboradores.map(c => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.nome} - {c.cargo} ({obterNomeLoja(c.loja_id)})

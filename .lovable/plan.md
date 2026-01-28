@@ -1,356 +1,241 @@
 
-# Plano: Extensao Completa do Fluxo Estoque-Financeiro para Notas de Compra
+# Plano: Implementar Pendências Restantes do Fluxo Estoque-Financeiro
 
-## Analise do Estado Atual
+## Resumo das 3 Implementações
 
-Apos analise detalhada do codigo, identifiquei que **grande parte da estrutura ja existe**:
-
-### Ja Implementado
-- Interface `NotaCompra` em `estoqueApi.ts` (linhas 72-106) com campos de conferencia
-- Interface `TimelineEntry` em `estoqueApi.ts` e `osApi.ts` com tipos corretos
-- Interface `PendenciaFinanceira` em `pendenciasFinanceiraApi.ts` completa
-- Funcao `validarAparelhoNota()` em `estoqueApi.ts` (linhas 1149-1245)
-- Funcao `verificarConferenciaNota()` em `estoqueApi.ts` (linhas 1249-1272)
-- Funcao `validarAparelhosEmLote()` em `estoqueApi.ts` (linhas 1276-1305)
-- Pagina `FinanceiroNotasPendencias.tsx` com cards, filtros e modal de pagamento
-- Pagina `EstoqueNotasPendencias.tsx` para visualizacao do Estoque
-- Pagina `EstoqueNotaDetalhes.tsx` com conferencia individual de produtos
-- Sincronizacao bidirecional via `atualizarPendencia()`
-
-### Pendente de Implementacao
-1. Campo `tipoPagamento` na interface NotaCompra
-2. Status `Finalizada com Pendencia` na conferencia
-3. Individualizacao automatica de registros (quantidade > 1)
-4. Modal de detalhes de pendencia com timeline visual
-5. Componente `ModalFinalizarPagamento.tsx` separado
-6. Validacao de comprovante (tipo/tamanho)
-7. Notificacoes automaticas completas
-8. Coluna "Nota de Origem" em Produtos Pendentes
+| # | Funcionalidade | Arquivo | Descrição |
+|---|----------------|---------|-----------|
+| 1 | Individualização Automática | EstoqueNotaCadastrar.tsx | Expandir produtos com quantidade > 1 em N registros individuais |
+| 2 | Exibir tipoPagamento | EstoqueNotaDetalhes.tsx | Mostrar tipo de pagamento selecionado na página de detalhes |
+| 3 | Coluna Nota de Origem | EstoqueProdutosPendentes.tsx | Melhorar badge colorido para Urgência vs Entrada Normal |
 
 ---
 
-## Arquivos a Modificar
-
-| Arquivo | Acao | Descricao |
-|---------|------|-----------|
-| `src/utils/estoqueApi.ts` | Modificar | Adicionar `tipoPagamento`, `Finalizada com Pendencia`, individualizacao |
-| `src/utils/pendenciasFinanceiraApi.ts` | Modificar | Adicionar funcao `forcarFinalizacao()` |
-| `src/pages/EstoqueNotaDetalhes.tsx` | Modificar | Melhorar conferencia com selecao de tipoPagamento |
-| `src/pages/EstoqueNotaCadastrar.tsx` | Modificar | Adicionar individualizacao automatica |
-| `src/pages/FinanceiroNotasPendencias.tsx` | Modificar | Melhorar modal de detalhes com timeline |
-| `src/pages/EstoqueProdutosPendentes.tsx` | Modificar | Adicionar coluna "Nota de Origem" |
-| `src/components/estoque/ModalDetalhePendencia.tsx` | Criar | Componente reutilizavel para detalhes |
-| `src/components/estoque/ModalFinalizarPagamento.tsx` | Criar | Componente separado para pagamento |
-
----
-
-## Etapa 1: Estender Interface NotaCompra
-
-**Arquivo**: `src/utils/estoqueApi.ts`
-
-Adicionar campo `tipoPagamento`:
-
-```typescript
-export interface NotaCompra {
-  // ... campos existentes ...
-  tipoPagamento?: 'Parcial' | '100% Antecipado' | 'Pos-Conferencia';
-  statusConferencia?: 'Em Conferência' | 'Conferência Completa' | 'Discrepância Detectada' | 'Finalizada com Pendência';
-  // ... resto dos campos ...
-}
-```
-
----
-
-## Etapa 2: Adicionar Individualizacao Automatica
+## Etapa 1: Individualização Automática de Produtos
 
 **Arquivo**: `src/pages/EstoqueNotaCadastrar.tsx`
 
-Quando usuario cadastrar nota com `quantidade > 1` para um modelo, o sistema deve gerar N registros individuais automaticamente:
+Adicionar função `expandirProdutos()` que transforma produtos com `quantidade > 1` em N registros individuais:
 
 ```typescript
-// Ao salvar nota, expandir produtos com quantidade > 1
-const expandirProdutos = (produtos: ProdutoNota[]): ProdutoNota[] => {
-  return produtos.flatMap(prod => {
-    if (prod.quantidade <= 1) return [prod];
-    
-    // Gerar N registros individuais
-    return Array.from({ length: prod.quantidade }, (_, i) => ({
-      ...prod,
-      id: `PROD-${nota.id}-${String(i + 1).padStart(3, '0')}`,
-      quantidade: 1,
-      valorTotal: prod.valorUnitario,
-      imei: '', // A ser preenchido na conferencia
-      statusConferencia: 'Pendente'
-    }));
+// Função para expandir produtos com quantidade > 1 em registros individuais
+const expandirProdutos = (produtosOriginais: ProdutoLinha[], notaId: string) => {
+  const produtosExpandidos = [];
+
+  produtosOriginais.forEach((p, prodIndex) => {
+    if (p.tipoProduto === 'Aparelho' || p.quantidade <= 1) {
+      // Aparelhos sempre têm quantidade 1 com IMEI específico
+      produtosExpandidos.push({
+        id: `PROD-${notaId}-${String(prodIndex + 1).padStart(3, '0')}`,
+        marca: p.marca,
+        modelo: p.modelo,
+        cor: p.cor,
+        imei: p.imei || '',
+        tipo: p.categoria,
+        tipoProduto: p.tipoProduto,
+        quantidade: 1,
+        valorUnitario: p.custoUnitario,
+        valorTotal: p.custoUnitario,
+        saudeBateria: p.categoria === 'Novo' ? 100 : 85,
+        statusConferencia: 'Pendente'
+      });
+    } else {
+      // Acessórios com quantidade > 1: gerar N registros individuais
+      for (let i = 0; i < p.quantidade; i++) {
+        produtosExpandidos.push({
+          id: `PROD-${notaId}-${String(prodIndex + 1).padStart(3, '0')}-${String(i + 1).padStart(3, '0')}`,
+          marca: p.marca,
+          modelo: p.modelo,
+          cor: p.cor,
+          imei: '', // Acessórios não têm IMEI
+          tipo: p.categoria,
+          tipoProduto: p.tipoProduto,
+          quantidade: 1,
+          valorUnitario: p.custoUnitario,
+          valorTotal: p.custoUnitario,
+          saudeBateria: 100,
+          statusConferencia: 'Pendente'
+        });
+      }
+    }
   });
+
+  return produtosExpandidos;
+};
+```
+
+**Modificar handleSalvar()** para usar a função de expansão e exibir mensagem informativa:
+
+```typescript
+const handleSalvar = () => {
+  // ... validações existentes ...
+
+  // Gerar ID temporário para expansão
+  const tempNotaId = `NC-${new Date().getFullYear()}-${String(notasExistentes.length + 1).padStart(5, '0')}`;
+  
+  // Expandir produtos com quantidade > 1
+  const produtosExpandidos = expandirProdutos(produtos, tempNotaId);
+
+  const novaNota = addNotaCompra({
+    // ... dados existentes ...
+    produtos: produtosExpandidos,
+  });
+
+  // Mensagem informativa sobre individualização
+  if (produtosExpandidos.length > produtos.length) {
+    toast.success(`Nota ${novaNota.id} cadastrada!`, {
+      description: `${produtosExpandidos.length} registros individuais criados. Tipo: ${tipoPagamento}`
+    });
+  } else {
+    toast.success(`Nota ${novaNota.id} cadastrada. Tipo: ${tipoPagamento}`);
+  }
 };
 ```
 
 ---
 
-## Etapa 3: Selecao de Tipo de Pagamento
+## Etapa 2: Exibir tipoPagamento na Página de Detalhes
 
 **Arquivo**: `src/pages/EstoqueNotaDetalhes.tsx`
 
-Adicionar campo de selecao `tipoPagamento` antes de enviar para o Financeiro:
+Adicionar campo visual na seção de informações da nota (grid de 3 colunas):
 
 ```typescript
-<div className="space-y-2">
-  <Label>Tipo de Pagamento</Label>
-  <Select value={tipoPagamento} onValueChange={setTipoPagamento}>
-    <SelectTrigger>
-      <SelectValue placeholder="Selecione o tipo..." />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="Pos-Conferencia">Pos-Conferencia (padrao)</SelectItem>
-      <SelectItem value="Parcial">Parcial (pagamento adiantado)</SelectItem>
-      <SelectItem value="100% Antecipado">100% Antecipado</SelectItem>
-    </SelectContent>
-  </Select>
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {/* ... campos existentes ... */}
+  
+  <div>
+    <Label>Tipo de Pagamento</Label>
+    <div className="mt-1">
+      {nota.tipoPagamento ? (
+        <Badge 
+          variant="outline" 
+          className={
+            nota.tipoPagamento === 'Pós-Conferência' 
+              ? 'bg-blue-500/10 text-blue-600 border-blue-500/30'
+              : nota.tipoPagamento === 'Parcial'
+              ? 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+              : 'bg-green-500/10 text-green-600 border-green-500/30'
+          }
+        >
+          {nota.tipoPagamento}
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="bg-gray-500/10">
+          Não definido
+        </Badge>
+      )}
+    </div>
+    <p className="text-xs text-muted-foreground mt-1">
+      {nota.tipoPagamento === 'Pós-Conferência' && 'Pagamento após validação do estoque'}
+      {nota.tipoPagamento === 'Parcial' && 'Pagamento adiantado + restante após conferência'}
+      {nota.tipoPagamento === '100% Antecipado' && 'Pagamento total antes da conferência'}
+    </p>
+  </div>
+  
+  <div>
+    <Label>Valor Total</Label>
+    <Input value={formatCurrency(nota.valorTotal)} disabled className="font-semibold" />
+  </div>
 </div>
 ```
 
 ---
 
-## Etapa 4: Criar Componente ModalDetalhePendencia
-
-**Arquivo**: `src/components/estoque/ModalDetalhePendencia.tsx`
-
-Componente reutilizavel para exibir detalhes completos de uma pendencia:
-
-```typescript
-interface ModalDetalhePendenciaProps {
-  pendencia: PendenciaFinanceira | null;
-  open: boolean;
-  onClose: () => void;
-  showPaymentButton?: boolean;
-  onPayment?: () => void;
-}
-
-// Secoes:
-// 1. Informacoes Gerais (Nota, Fornecedor, Datas)
-// 2. Valores (Total, Conferido, Pendente, Discrepancia)
-// 3. Aparelhos (Tabela com status de cada um)
-// 4. Timeline visual com icones por tipo de evento
-// 5. Botao "Finalizar Pagamento" (se habilitado e 100% conferido)
-```
-
----
-
-## Etapa 5: Criar Componente ModalFinalizarPagamento
-
-**Arquivo**: `src/components/estoque/ModalFinalizarPagamento.tsx`
-
-Componente separado para finalizar pagamento:
-
-```typescript
-interface ModalFinalizarPagamentoProps {
-  pendencia: PendenciaFinanceira;
-  open: boolean;
-  onClose: () => void;
-  onConfirm: (dados: DadosPagamento) => void;
-}
-
-// Campos:
-// - Conta de Pagamento (Select - obrigatorio)
-// - Forma de Pagamento (Select - obrigatorio)
-// - Parcelas (Input - visivel se Cartao/Boleto)
-// - Data de Vencimento (Date - opcional)
-// - Upload de Comprovante (obrigatorio, max 5MB, PDF/JPG/PNG)
-// - Observacoes (Textarea - opcional)
-// - Responsavel (Select - obrigatorio)
-
-// Validacoes:
-// - Todos os campos obrigatorios preenchidos
-// - Comprovante: tipo e tamanho validados
-```
-
----
-
-## Etapa 6: Adicionar Funcao Forcar Finalizacao
-
-**Arquivo**: `src/utils/pendenciasFinanceiraApi.ts`
-
-Permitir Financeiro finalizar nota mesmo sem 100% de conferencia:
-
-```typescript
-export const forcarFinalizacaoPendencia = (
-  notaId: string,
-  pagamento: DadosPagamento,
-  observacoes: string
-): PendenciaFinanceira | null => {
-  const pendencia = pendenciasFinanceiras.find(p => p.notaId === notaId);
-  if (!pendencia) return null;
-  
-  // Marcar como "Finalizada com Pendencia"
-  pendencia.statusConferencia = 'Finalizada com Pendência';
-  pendencia.statusPagamento = 'Pago';
-  
-  // Registrar valor pendente nao conferido
-  const valorNaoConferido = pendencia.valorTotal - pendencia.valorConferido;
-  
-  // Adicionar timeline
-  pendencia.timeline.unshift({
-    id: `TL-${notaId}-${Date.now()}`,
-    data: new Date().toISOString(),
-    tipo: 'pagamento',
-    titulo: 'Finalizada com Pendencia',
-    descricao: `Pagamento forcado. Valor nao conferido: ${formatCurrency(valorNaoConferido)}. ${observacoes}`,
-    responsavel: pagamento.responsavel
-  });
-  
-  return pendencia;
-};
-```
-
----
-
-## Etapa 7: Adicionar Coluna "Nota de Origem"
+## Etapa 3: Melhorar Coluna "Nota de Origem" com Badges Coloridos
 
 **Arquivo**: `src/pages/EstoqueProdutosPendentes.tsx`
 
-Adicionar coluna na tabela e tag visual para urgencias:
+Atualizar a célula da coluna "Nota de Origem" para badges mais visuais:
 
 ```typescript
-<TableHead>Nota de Origem</TableHead>
-
-// Na celula:
 <TableCell>
-  <div className="flex items-center gap-2">
-    <span className="font-mono text-xs">{produto.notaOuVendaId}</span>
-    {produto.notaOuVendaId?.startsWith('URG-') && (
-      <Badge className="bg-orange-500/20 text-orange-600 text-xs">
-        Urgencia
-      </Badge>
-    )}
-  </div>
+  {(produto as any).notaOrigemId ? (
+    <div className="space-y-1">
+      {/* Badge colorido baseado no tipo de nota */}
+      {(produto as any).notaOrigemId.startsWith('URG') ? (
+        <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/30 font-medium">
+          🚨 Urgência
+        </Badge>
+      ) : (produto as any).notaOrigemId.startsWith('NC-') ? (
+        <div className="flex items-center gap-1">
+          <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30">
+            Entrada
+          </Badge>
+          <span className="font-mono text-xs text-muted-foreground">
+            {(produto as any).notaOrigemId}
+          </span>
+        </div>
+      ) : (
+        <span className="font-mono text-xs">{(produto as any).notaOrigemId}</span>
+      )}
+      
+      {/* Barra de progresso de conferência com cores dinâmicas */}
+      {(() => {
+        const progresso = getNotaProgresso((produto as any).notaOrigemId);
+        if (progresso) {
+          return (
+            <div className="space-y-1 mt-1">
+              <Progress 
+                value={progresso.percentual} 
+                className={`h-1.5 ${
+                  progresso.percentual === 100 
+                    ? '[&>div]:bg-green-500' 
+                    : progresso.percentual >= 50 
+                    ? '[&>div]:bg-blue-500' 
+                    : '[&>div]:bg-yellow-500'
+                }`} 
+              />
+              <span className="text-xs text-muted-foreground">
+                {progresso.conferidos}/{progresso.total} ({progresso.percentual}%)
+              </span>
+            </div>
+          );
+        }
+        return null;
+      })()}
+    </div>
+  ) : (
+    <span className="text-muted-foreground">—</span>
+  )}
 </TableCell>
 ```
 
 ---
 
-## Etapa 8: Adicionar Filtro por Tipo de Nota
+## Resumo Visual das Mudanças
 
-**Arquivo**: `src/pages/EstoqueProdutosPendentes.tsx`
+### EstoqueNotaCadastrar.tsx
+- Nova função `expandirProdutos()` (linhas 189-245)
+- Modificação do `handleSalvar()` para usar expansão
+- Toast informativo mostrando quantidade de registros criados
 
-Adicionar filtro de tipo de nota:
+### EstoqueNotaDetalhes.tsx
+- Grid expandido para 3 colunas (linhas 519-580)
+- Novo campo "Tipo de Pagamento" com badge colorido
+- Descrição explicativa do tipo selecionado
 
-```typescript
-const [tipoNotaFilter, setTipoNotaFilter] = useState<string>('todos');
-
-// Filtrar:
-if (tipoNotaFilter === 'urgencia') {
-  filtered = filtered.filter(p => p.notaOuVendaId?.startsWith('URG-'));
-} else if (tipoNotaFilter === 'normal') {
-  filtered = filtered.filter(p => p.notaOuVendaId?.startsWith('NC-'));
-}
-```
-
----
-
-## Etapa 9: Melhorar Modal de Detalhes no Financeiro
-
-**Arquivo**: `src/pages/FinanceiroNotasPendencias.tsx`
-
-Substituir dialog simples pelo novo `ModalDetalhePendencia`:
-
-```typescript
-import { ModalDetalhePendencia } from '@/components/estoque/ModalDetalhePendencia';
-import { ModalFinalizarPagamento } from '@/components/estoque/ModalFinalizarPagamento';
-
-// Usar componentes reutilizaveis:
-<ModalDetalhePendencia
-  pendencia={pendenciaSelecionada}
-  open={dialogDetalhes}
-  onClose={() => setDialogDetalhes(false)}
-  showPaymentButton={true}
-  onPayment={() => {
-    setDialogDetalhes(false);
-    setDialogPagamento(true);
-  }}
-/>
-
-<ModalFinalizarPagamento
-  pendencia={pendenciaSelecionada}
-  open={dialogPagamento}
-  onClose={() => setDialogPagamento(false)}
-  onConfirm={handleFinalizarPagamento}
-/>
-```
+### EstoqueProdutosPendentes.tsx
+- Badge "🚨 Urgência" (laranja) para notas URG-
+- Badge "Entrada" (azul) + ID para notas NC-
+- Barra de progresso com cores dinâmicas (verde 100%, azul >= 50%, amarelo < 50%)
+- Percentual numérico junto ao progresso
 
 ---
 
-## Etapa 10: Notificacoes Automaticas
+## Fluxo de Teste Recomendado
 
-**Arquivo**: `src/utils/pendenciasFinanceiraApi.ts`
+1. **Testar Individualização**:
+   - Cadastrar nota com acessório quantidade = 5
+   - Verificar que 5 registros individuais foram criados
+   - Cada registro deve ter ID único (PROD-NC-XXX-001, PROD-NC-XXX-002, etc.)
 
-Adicionar notificacoes em pontos-chave (ja existem algumas, completar):
+2. **Testar Tipo de Pagamento**:
+   - Selecionar "Parcial" no cadastro
+   - Abrir detalhes da nota
+   - Verificar badge amarelo com descrição correta
 
-```typescript
-// Notificacao 1: Nota Criada
-addNotification({
-  type: 'nota_pendencia',
-  title: 'Nova pendencia financeira',
-  description: `Nota ${nota.id} de ${nota.fornecedor} aguardando conferencia`,
-  targetUsers: ['financeiro', 'gestor']
-});
-
-// Notificacao 2: Aparelho Validado (ja existe em atualizarPendencia)
-
-// Notificacao 3: 100% Conferido
-if (statusConferencia === 'Conferência Completa') {
-  addNotification({
-    type: 'conferencia_completa',
-    title: 'Nota pronta para pagamento',
-    description: `Nota ${notaId} com 100% dos aparelhos conferidos`,
-    targetUsers: ['financeiro']
-  });
-}
-
-// Notificacao 4: SLA Alerta (ja existe em verificarSLAPendencias)
-
-// Notificacao 5: Pagamento Confirmado (ja existe em finalizarPagamentoPendencia)
-```
-
----
-
-## Resumo das Mudancas
-
-### Novos Componentes
-1. `ModalDetalhePendencia.tsx` - Modal reutilizavel com timeline visual
-2. `ModalFinalizarPagamento.tsx` - Modal de pagamento com validacoes
-
-### Interfaces Atualizadas
-- `NotaCompra`: +tipoPagamento, +statusConferencia (Finalizada com Pendencia)
-- `ProdutoNota`: ja tem todos os campos necessarios
-
-### Funcoes Novas
-- `forcarFinalizacaoPendencia()` - Finalizar nota sem 100% conferencia
-- `expandirProdutos()` - Individualizar registros quantidade > 1
-
-### Paginas Modificadas
-- `EstoqueNotaCadastrar.tsx` - Individualizacao automatica
-- `EstoqueNotaDetalhes.tsx` - Selecao de tipoPagamento
-- `EstoqueProdutosPendentes.tsx` - Coluna Nota de Origem + filtro
-- `FinanceiroNotasPendencias.tsx` - Usar novos componentes
-
-### Validacoes Adicionadas
-- Comprovante: tipo (PDF/JPG/PNG) e tamanho (max 5MB)
-- Campos obrigatorios no pagamento
-- Logica de discrepancia com tolerancia 0.1%
-
----
-
-## Ordem de Implementacao
-
-1. ✅ Atualizar interface NotaCompra - Adicionado tipoPagamento, statusConferencia expandido
-2. ✅ Atualizar interface ProdutoNota - Adicionado capacidade e percentualBateria
-3. ✅ Atualizar interface PendenciaFinanceira - Status "Finalizada com Pendência"
-4. ✅ Criar ModalDetalhePendencia - Componente reutilizável com timeline visual
-5. ✅ Criar ModalFinalizarPagamento - Componente com validação de comprovante
-6. ✅ Modificar EstoqueProdutosPendentes - Filtro por tipo de nota (Urgência/Normal)
-7. ✅ Modificar FinanceiroNotasPendencias - Usar novos modais reutilizáveis
-8. ✅ Adicionar função forcarFinalizacaoPendencia - Permite finalizar sem 100% conferência
-9. ✅ Completar notificações automáticas - Já existiam, mantidas
-
-## Status: IMPLEMENTADO ✅
+3. **Testar Badges de Origem**:
+   - Acessar Produtos Pendentes
+   - Verificar badges "Urgência" (laranja) e "Entrada" (azul)
+   - Verificar cores dinâmicas na barra de progresso

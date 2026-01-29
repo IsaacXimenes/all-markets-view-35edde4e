@@ -1,280 +1,370 @@
 
+# Plano: Reformulação Completa do Fluxo de Notas de Entrada de Produtos
 
-# Plano: Implementar Funções de API Pendentes para Fluxo Estoque-Financeiro
+## Resumo Executivo
 
-## Análise do Estado Atual
-
-Após análise completa do código, identifiquei que **a maior parte das funcionalidades já foi implementada**:
-
-### Já Implementado
-
-| Função | Arquivo | Status |
-|--------|---------|--------|
-| `validarAparelhoNota()` | estoqueApi.ts (linhas 1153-1249) | Completa |
-| `verificarConferenciaNota()` | estoqueApi.ts (linhas 1252-1276) | Completa |
-| `validarAparelhosEmLote()` | estoqueApi.ts (linhas 1279-1309) | Completa |
-| `criarPendenciaFinanceira()` | pendenciasFinanceiraApi.ts (linhas 58-119) | Completa |
-| `atualizarPendencia()` | pendenciasFinanceiraApi.ts (linhas 122-206) | Completa |
-| `finalizarPagamentoPendencia()` | pendenciasFinanceiraApi.ts (linhas 209-271) | Completa |
-| `forcarFinalizacaoPendencia()` | pendenciasFinanceiraApi.ts (linhas 321-389) | Completa |
-| `verificarSLAPendencias()` | pendenciasFinanceiraApi.ts (linhas 292-318) | Completa (gera alertas SLA) |
-| `FinanceiroNotasPendencias.tsx` | Página completa | Com modais integrados |
-| `ModalDetalhePendencia.tsx` | Componente | Com timeline visual |
-| `ModalFinalizarPagamento.tsx` | Componente | Com validações de comprovante |
-
-### Pendente de Implementação
-
-| Função/Recurso | Arquivo | Descrição |
-|----------------|---------|-----------|
-| `criarNotaComPendencia()` | estoqueApi.ts | Criar nota e automaticamente criar pendência no Financeiro |
-| `atualizarStatusPagamento()` | estoqueApi.ts | Atualizar status de pagamento da nota |
-| Colunas extras na tabela | EstoqueNotasCompra.tsx | Valor Conferido, Status Conferência, Status Pagamento |
-| Botão "Ver Progresso" | EstoqueNotasCompra.tsx | Modal com barra de progresso e timeline |
-| Botão "Ver Pendência" | FinanceiroConferenciaNotas.tsx | Abrir modal de detalhes da pendência |
+Este plano reformula o sistema de Notas de Entrada para seguir rigorosamente um novo fluxo baseado em **STATUS + TIPO DE PAGAMENTO** como regras mestras. O layout visual existente sera mantido, mas a logica de comportamento dos campos, transicoes de status e integracao entre modulos sera completamente reestruturada.
 
 ---
 
-## Arquivos a Modificar
+## 1. Novos Status da Nota (Arquivo: estoqueApi.ts)
 
-| Arquivo | Ação | Descrição |
-|---------|------|-----------|
-| `src/utils/estoqueApi.ts` | Modificar | Adicionar `criarNotaComPendencia()` e `atualizarStatusPagamento()` |
-| `src/pages/EstoqueNotasCompra.tsx` | Modificar | Adicionar colunas e modal de progresso |
-| `src/pages/FinanceiroConferenciaNotas.tsx` | Modificar | Adicionar botão "Ver Pendência" |
+Substituir os status atuais (`Pendente | Concluido`) por uma maquina de estados completa:
+
+| Status | Descricao | Proximo Status Possivel |
+|--------|-----------|-------------------------|
+| `Criada` | Nota recem cadastrada | Aguardando Pagamento Inicial, Aguardando Conferencia |
+| `Aguardando Pagamento Inicial` | Nota esperando pagamento (Antecipado/Parcial) | Pagamento Parcial Realizado, Pagamento Concluido |
+| `Pagamento Parcial Realizado` | Primeiro pagamento feito (Parcial) | Aguardando Conferencia |
+| `Pagamento Concluido` | 100% pago (antes de conferir) | Aguardando Conferencia |
+| `Aguardando Conferencia` | Produtos a conferir | Conferencia Parcial |
+| `Conferencia Parcial` | Parte dos aparelhos conferida | Conferencia Concluida, Com Divergencia |
+| `Conferencia Concluida` | 100% conferido | Aguardando Pagamento Final, Finalizada |
+| `Aguardando Pagamento Final` | Conferencia ok, falta pagar (Parcial/Pos) | Finalizada |
+| `Com Divergencia` | Discrepancia detectada | Aguardando Pagamento Final (apos resolucao) |
+| `Finalizada` | Nota encerrada (somente leitura) | - |
 
 ---
 
-## Etapa 1: Adicionar Função `criarNotaComPendencia()`
-
-**Arquivo**: `src/utils/estoqueApi.ts`
-
-Criar função que combina criação de nota + criação de pendência financeira:
+## 2. Interface NotaCompra Atualizada
 
 ```typescript
-import { criarPendenciaFinanceira } from './pendenciasFinanceiraApi';
+export interface NotaCompra {
+  id: string;
+  numeroNota: string;
+  data: string;
+  fornecedor: string;
+  
+  // Novo sistema de status
+  status: 'Criada' | 'Aguardando Pagamento Inicial' | 'Pagamento Parcial Realizado' | 
+          'Pagamento Concluido' | 'Aguardando Conferencia' | 'Conferencia Parcial' |
+          'Conferencia Concluida' | 'Aguardando Pagamento Final' | 'Com Divergencia' | 'Finalizada';
+  
+  // Tipo de pagamento (imutavel apos primeiro pagamento)
+  tipoPagamento: 'Antecipado' | 'Parcial' | 'Pos';
+  tipoPagamentoBloqueado: boolean;
+  
+  // Quantidades
+  qtdInformada: number;           // Quantidade de aparelhos informada na nota
+  qtdCadastrada: number;          // Quantidade de produtos cadastrados
+  qtdConferida: number;           // Quantidade de produtos conferidos
+  
+  // Valores
+  valorTotal: number;
+  valorPago: number;
+  valorPendente: number;
+  valorConferido: number;
+  
+  // Produtos
+  produtos: ProdutoNota[];
+  
+  // Timeline imutavel
+  timeline: TimelineEntry[];
+  
+  // Alertas
+  alertas: AlertaNota[];
+}
 
-// Criar nota de compra e automaticamente criar pendência no Financeiro
-export const criarNotaComPendencia = (nota: Omit<NotaCompra, 'id' | 'status'>): NotaCompra => {
-  // Criar a nota normalmente
-  const novaNota = addNotaCompra(nota);
+export interface ProdutoNota {
+  id: string;
+  tipoProduto: 'Aparelho' | 'Acessorio';
+  marca: string;
+  modelo: string;
+  imei?: string;              // Preenchido apenas apos recebimento
+  cor?: string;               // Preenchido apenas apos recebimento
+  categoria?: string;         // Preenchido apenas apos recebimento
+  quantidade: number;
+  custoUnitario: number;
+  custoTotal: number;
   
-  // Inicializar valores de conferência
-  novaNota.valorConferido = 0;
-  novaNota.valorPendente = novaNota.valorTotal;
-  novaNota.statusConferencia = 'Em Conferência';
-  novaNota.statusPagamento = 'Aguardando Conferência';
-  
-  // Criar pendência financeira automaticamente
-  criarPendenciaFinanceira(novaNota);
-  
-  // Marcar como enviada para financeiro
-  localStorage.setItem(`nota_status_${novaNota.id}`, 'Enviado para Financeiro');
-  
-  return novaNota;
+  // Status do produto
+  statusRecebimento: 'Pendente' | 'Recebido';
+  statusConferencia: 'Pendente' | 'Conferido';
+  dataRecebimento?: string;
+  dataConferencia?: string;
+  responsavelConferencia?: string;
+}
+
+export interface TimelineEntry {
+  id: string;
+  dataHora: string;
+  usuario: string;
+  perfil: 'Estoque' | 'Financeiro' | 'Sistema';
+  acao: string;
+  statusAnterior: string;
+  statusNovo: string;
+  impactoFinanceiro?: number;
+}
+
+export interface AlertaNota {
+  id: string;
+  tipo: 'divergencia_valor' | 'conferencia_parcial_longa' | 'qtd_excedida' | 
+        'imei_ausente' | 'status_critico';
+  mensagem: string;
+  dataGeracao: string;
+  visto: boolean;
+}
+```
+
+---
+
+## 3. Arquivos a Modificar
+
+### 3.1 estoqueApi.ts
+- Atualizar interface `NotaCompra` com novos campos
+- Criar funcoes de transicao de status validadas
+- Implementar regras de bloqueio de campos por status
+- Adicionar funcao `registrarTimelineEntry()` imutavel
+- Criar funcoes de alerta automatico
+
+### 3.2 EstoqueNotaCadastrar.tsx (Tela Full-Page)
+- Adicionar campo `Quantidade de Aparelhos Informada` (opcional)
+- Tornar produtos opcionais (nota pode ser criada vazia)
+- Remover campos IMEI e Cor do cadastro inicial
+- Manter Categoria visivel mas desabilitada
+- Status inicial: `Criada`
+- Redirecionar para `Notas Pendentes` apos salvar
+
+### 3.3 EstoqueNotasPendencias.tsx (Aba Reformulada)
+- Adicionar colunas: Tipo Pagamento, Qtd Informada/Cadastrada/Conferida
+- Acoes por linha: Cadastrar Produtos, Continuar Cadastro, Realizar Conferencia
+- Cada acao abre tela full-page (sem modal)
+- Filtros por status completo
+
+### 3.4 EstoqueNotaDetalhes.tsx (Tela Full-Page Unificada)
+- Unificar cadastro de produtos, conferencia e visualizacao
+- Campos habilitados/desabilitados conforme status + recebimento
+- Exibir timeline imutavel sempre visivel
+- Secao de alertas em destaque
+- Bloqueio total quando `Finalizada`
+
+### 3.5 FinanceiroNotasPendencias.tsx
+- Filtrar notas por status de pagamento
+- Mostrar Valor Nota, Valor Pago, Valor Pendente
+- Bloquear pagamento Pos antes de conferencia concluida
+- Bloquear pagamento final sem 100% conferencia
+
+### 3.6 pendenciasFinanceiraApi.ts
+- Adaptar interface para novos status
+- Validar regras de pagamento por tipo
+
+---
+
+## 4. Novas Paginas Full-Page a Criar
+
+### 4.1 EstoqueNotaCadastrarProdutos.tsx
+- Rota: `/estoque/nota/:id/cadastrar-produtos`
+- Quadro de produtos identico ao cadastro inicial
+- Campos: Tipo Produto, Marca, Modelo, Qtd, Custo Unitario, Custo Total
+- Campos bloqueados: IMEI, Cor, Categoria
+- Validacao: nao permitir Qtd Cadastrada > Qtd Informada
+- Ao salvar: atualizar nota e redirecionar para pendencias
+
+### 4.2 EstoqueNotaConferencia.tsx
+- Rota: `/estoque/nota/:id/conferencia`
+- Lista de produtos para conferir individualmente
+- Campos habilitados ao conferir: IMEI, Cor, Categoria
+- IMEI obrigatorio para Aparelho, validacao de unicidade
+- Ao conferir cada produto: atualizar status, timeline, valores
+- Barra de progresso: Qtd Conferida / Qtd Cadastrada
+
+---
+
+## 5. Fluxos por Tipo de Pagamento
+
+### 5.1 Antecipado (100% antes)
+```
+Criada 
+  -> Aguardando Pagamento Inicial (vai p/ Financeiro)
+    -> Pagamento Concluido (Financeiro paga 100%)
+      -> Aguardando Conferencia (volta p/ Estoque)
+        -> Conferencia Parcial -> Conferencia Concluida
+          -> Finalizada
+```
+
+### 5.2 Parcial
+```
+Criada 
+  -> Aguardando Pagamento Inicial (vai p/ Financeiro)
+    -> Pagamento Parcial Realizado (Financeiro paga X%)
+      -> Aguardando Conferencia (Estoque pode conferir em paralelo)
+        -> Conferencia Parcial -> Conferencia Concluida
+          -> Aguardando Pagamento Final (Financeiro paga restante)
+            -> Finalizada
+```
+
+### 5.3 Pos (100% apos conferencia)
+```
+Criada 
+  -> Aguardando Conferencia (fica no Estoque)
+    -> Conferencia Parcial -> Conferencia Concluida
+      -> Aguardando Pagamento Final (vai p/ Financeiro)
+        -> Finalizada (apos pagamento 100%)
+```
+
+---
+
+## 6. Regras de Campos por Status
+
+| Campo | Antes Recebimento | Apos Recebimento | Nota Finalizada |
+|-------|-------------------|------------------|-----------------|
+| Tipo Produto | Editavel | Bloqueado | Bloqueado |
+| Marca | Editavel | Bloqueado | Bloqueado |
+| Modelo | Editavel | Bloqueado | Bloqueado |
+| IMEI | Desabilitado | Obrigatorio (Aparelho) | Bloqueado |
+| Cor | Desabilitado | Obrigatorio | Bloqueado |
+| Categoria | Desabilitado | Obrigatorio | Bloqueado |
+| Quantidade | Editavel | Bloqueado | Bloqueado |
+| Custo Unitario | Editavel | Bloqueado | Bloqueado |
+| Custo Total | Calculado | Calculado | Calculado |
+
+---
+
+## 7. Sistema de Alertas Automaticos
+
+Criar funcao `verificarAlertasNota(nota)` que retorna alertas:
+
+| Condicao | Tipo Alerta | Mensagem |
+|----------|-------------|----------|
+| Valor Pago != Valor Conferido | `divergencia_valor` | "Divergencia: pago R$ X, conferido R$ Y" |
+| Conferencia Parcial > 5 dias | `conferencia_parcial_longa` | "Nota parada ha X dias em conferencia parcial" |
+| Qtd Cadastrada > Qtd Informada | `qtd_excedida` | "Quantidade de produtos excede o informado" |
+| Aparelho recebido sem IMEI | `imei_ausente` | "Aparelho X aguardando IMEI" |
+| Status critico > 3 dias | `status_critico` | "Nota parada em status critico" |
+
+Quando divergencia detectada: Status -> `Com Divergencia`
+
+---
+
+## 8. Timeline Imutavel
+
+Toda acao registra entrada na timeline:
+
+```typescript
+const registrarTimeline = (
+  nota: NotaCompra,
+  usuario: string,
+  perfil: 'Estoque' | 'Financeiro' | 'Sistema',
+  acao: string,
+  statusNovo: string,
+  impactoFinanceiro?: number
+) => {
+  const entry: TimelineEntry = {
+    id: `TL-${nota.id}-${String(nota.timeline.length + 1).padStart(4, '0')}`,
+    dataHora: new Date().toISOString(),
+    usuario,
+    perfil,
+    acao,
+    statusAnterior: nota.status,
+    statusNovo,
+    impactoFinanceiro
+  };
+  nota.timeline.push(entry);
+  // Timeline nunca pode ser editada ou removida
 };
 ```
 
 ---
 
-## Etapa 2: Adicionar Função `atualizarStatusPagamento()`
+## 9. Regras de Finalizacao
 
-**Arquivo**: `src/utils/estoqueApi.ts`
+Nota so pode ser `Finalizada` quando:
+- `qtdConferida === qtdInformada`
+- `valorPago === valorTotal`
+- `valorConferido === valorTotal` (tolerancia 0,01%)
+- Sem alertas de divergencia ativos
+
+Apos Finalizada:
+- Todos os campos somente leitura
+- Nenhuma acao operacional permitida
+- Apenas visualizacao e exportacao
+
+---
+
+## 10. Rotas Necessarias
 
 ```typescript
-// Atualizar status de pagamento da nota
-export const atualizarStatusPagamento = (
-  notaId: string, 
-  status: 'Aguardando Conferência' | 'Pago' | 'Parcialmente Pago'
-): NotaCompra | null => {
-  const nota = notasCompra.find(n => n.id === notaId);
-  if (!nota) return null;
-  
-  nota.statusPagamento = status;
-  
-  // Se pago, atualizar status geral
-  if (status === 'Pago') {
-    nota.status = 'Concluído';
-    localStorage.setItem(`nota_status_${notaId}`, 'Concluído');
-  }
-  
-  // Adicionar entrada na timeline
-  if (!nota.timeline) nota.timeline = [];
-  nota.timeline.unshift({
-    id: `TL-${notaId}-${String(nota.timeline.length + 1).padStart(3, '0')}`,
-    data: new Date().toISOString(),
-    tipo: 'pagamento',
-    titulo: 'Status de Pagamento Atualizado',
-    descricao: `Status alterado para: ${status}`,
-    responsavel: 'Sistema'
-  });
-  
-  return nota;
-};
+// Novas rotas em App.tsx
+<Route path="/estoque/nota/:id/cadastrar-produtos" element={<EstoqueNotaCadastrarProdutos />} />
+<Route path="/estoque/nota/:id/conferencia" element={<EstoqueNotaConferencia />} />
 ```
 
 ---
 
-## Etapa 3: Melhorar Tabela EstoqueNotasCompra.tsx
+## 11. Ordem de Implementacao
 
-**Arquivo**: `src/pages/EstoqueNotasCompra.tsx`
+1. **estoqueApi.ts** - Atualizar interfaces e funcoes base
+2. **timelineApi.ts** - Criar funcao de registro imutavel
+3. **EstoqueNotaCadastrar.tsx** - Adaptar cadastro inicial
+4. **EstoqueNotasPendencias.tsx** - Reformular aba com novas colunas
+5. **EstoqueNotaCadastrarProdutos.tsx** - Criar nova pagina
+6. **EstoqueNotaConferencia.tsx** - Criar nova pagina
+7. **EstoqueNotaDetalhes.tsx** - Unificar visualizacao
+8. **FinanceiroNotasPendencias.tsx** - Adaptar para novos status
+9. **pendenciasFinanceiraApi.ts** - Atualizar regras de pagamento
 
-Adicionar colunas extras na tabela:
+---
 
-```typescript
-// Importar componentes necessários
-import { Progress } from '@/components/ui/progress';
-import { Dialog } from '@/components/ui/dialog';
-import { getPendenciaPorNota } from '@/utils/pendenciasFinanceiraApi';
+## 12. Resumo Visual do Fluxo
 
-// Novas colunas na tabela
-<TableHead>Valor Conferido</TableHead>
-<TableHead>Status Conf.</TableHead>
-<TableHead>Status Pag.</TableHead>
-
-// Células com dados
-<TableCell>
-  <div className="flex items-center gap-2">
-    <Progress value={getProgressoNota(nota.id)} className="w-16 h-2" />
-    <span className="text-xs">
-      {formatCurrency(nota.valorConferido || 0)}
-    </span>
-  </div>
-</TableCell>
-<TableCell>
-  <Badge variant="outline" className={getConferenciaBadgeClass(nota.statusConferencia)}>
-    {nota.statusConferencia || 'Pendente'}
-  </Badge>
-</TableCell>
-<TableCell>
-  <Badge variant="outline" className={getPagamentoBadgeClass(nota.statusPagamento)}>
-    {nota.statusPagamento || 'Aguardando'}
-  </Badge>
-</TableCell>
+```text
+                           +-----------------+
+                           |     CRIADA      |
+                           +--------+--------+
+                                    |
+             +----------------------+----------------------+
+             |                      |                      |
+             v                      v                      v
+    [Tipo: Antecipado]     [Tipo: Parcial]         [Tipo: Pos]
+             |                      |                      |
+             v                      v                      |
+    +--------+--------+    +--------+--------+             |
+    | AGUARD. PAG.    |    | AGUARD. PAG.    |             |
+    | INICIAL         |    | INICIAL         |             |
+    +--------+--------+    +--------+--------+             |
+             |                      |                      |
+             v                      v                      |
+    +--------+--------+    +--------+--------+             |
+    | PAGAMENTO       |    | PAG. PARCIAL    |             |
+    | CONCLUIDO       |    | REALIZADO       |             |
+    +--------+--------+    +--------+--------+             |
+             |                      |                      |
+             +-----------+----------+----------------------+
+                         |
+                         v
+               +--------+--------+
+               | AGUARD.         |
+               | CONFERENCIA     |
+               +--------+--------+
+                         |
+                         v
+               +--------+--------+
+               | CONFERENCIA     |<----+
+               | PARCIAL         |     |
+               +--------+--------+     | (produtos
+                         |             |  pendentes)
+                         v             |
+               +--------+--------+-----+
+               | CONFERENCIA     |
+               | CONCLUIDA       |
+               +--------+--------+
+                         |
+          +--------------+--------------+
+          |              |              |
+          v              v              v
+    [Antecipado]   [Parcial]        [Pos]
+    (ja pago)      (pagar rest)     (pagar 100%)
+          |              |              |
+          |              v              v
+          |     +--------+--------+--------+
+          |     | AGUARD. PAG.             |
+          |     | FINAL                    |
+          |     +--------+-----------------+
+          |              |
+          +--------------+
+                         |
+                         v
+               +--------+--------+
+               |   FINALIZADA    |
+               +-----------------+
 ```
-
-Adicionar botão "Ver Progresso":
-
-```typescript
-<Button 
-  variant="ghost" 
-  size="sm"
-  onClick={() => handleVerProgresso(nota)}
->
-  <BarChart className="h-4 w-4" />
-</Button>
-
-// Modal de progresso
-<Dialog open={progressoModalOpen} onOpenChange={setProgressoModalOpen}>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>Progresso de Conferência - {notaSelecionada?.id}</DialogTitle>
-    </DialogHeader>
-    <div className="space-y-4">
-      <Progress value={progressoNota} className="h-3" />
-      <p className="text-center font-medium">
-        {progressoNota}% conferido
-      </p>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>Valor Total</Label>
-          <p>{formatCurrency(notaSelecionada?.valorTotal)}</p>
-        </div>
-        <div>
-          <Label>Valor Conferido</Label>
-          <p className="text-green-600">{formatCurrency(notaSelecionada?.valorConferido)}</p>
-        </div>
-      </div>
-      {/* Timeline de validações */}
-      <div className="max-h-48 overflow-auto">
-        {notaSelecionada?.timeline?.map(entry => (
-          <div key={entry.id} className="border-l-2 pl-3 py-2">
-            <p className="text-sm font-medium">{entry.titulo}</p>
-            <p className="text-xs text-muted-foreground">{entry.descricao}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  </DialogContent>
-</Dialog>
-```
-
----
-
-## Etapa 4: Adicionar Botão "Ver Pendência" no FinanceiroConferenciaNotas.tsx
-
-**Arquivo**: `src/pages/FinanceiroConferenciaNotas.tsx`
-
-```typescript
-// Importar componentes
-import { ModalDetalhePendencia } from '@/components/estoque/ModalDetalhePendencia';
-import { getPendenciaPorNota } from '@/utils/pendenciasFinanceiraApi';
-
-// Estado para modal
-const [pendenciaSelecionada, setPendenciaSelecionada] = useState(null);
-const [dialogPendencia, setDialogPendencia] = useState(false);
-
-// Função para ver pendência
-const handleVerPendencia = (nota) => {
-  const pendencia = getPendenciaPorNota(nota.id);
-  if (pendencia) {
-    setPendenciaSelecionada(pendencia);
-    setDialogPendencia(true);
-  } else {
-    toast.info('Pendência não encontrada para esta nota');
-  }
-};
-
-// Botão na tabela (ao lado do botão existente)
-<Button 
-  variant="ghost" 
-  size="sm"
-  onClick={() => handleVerPendencia(nota)}
-  title="Ver Pendência"
->
-  <FileSearch className="h-4 w-4" />
-</Button>
-
-// Modal no final do componente
-<ModalDetalhePendencia
-  pendencia={pendenciaSelecionada}
-  open={dialogPendencia}
-  onClose={() => setDialogPendencia(false)}
-  showPaymentButton={false}
-/>
-```
-
----
-
-## Resumo das Mudanças
-
-### Funções Novas em estoqueApi.ts
-1. `criarNotaComPendencia()` - Cria nota + pendência automaticamente
-2. `atualizarStatusPagamento()` - Atualiza status de pagamento
-
-### Melhorias em EstoqueNotasCompra.tsx
-- 3 colunas extras: Valor Conferido, Status Conferência, Status Pagamento
-- Botão "Ver Progresso" com modal de detalhes
-- Barra de progresso visual na tabela
-
-### Melhorias em FinanceiroConferenciaNotas.tsx
-- Botão "Ver Pendência" em cada linha
-- Integração com ModalDetalhePendencia
-
----
-
-## Ordem de Implementação
-
-1. Adicionar funções em estoqueApi.ts
-2. Modificar EstoqueNotasCompra.tsx (colunas + modal)
-3. Modificar FinanceiroConferenciaNotas.tsx (botão ver pendência)
-4. Testar fluxo completo
-
----
-
-## Observações Técnicas
-
-- As funções `validarAparelhoNota`, `verificarConferenciaNota` e demais já existem e funcionam corretamente
-- A sincronização entre Estoque e Financeiro via `atualizarPendencia()` já está implementada
-- Os componentes `ModalDetalhePendencia` e `ModalFinalizarPagamento` já existem e podem ser reutilizados
-- A página `FinanceiroNotasPendencias.tsx` já está completa com todas as funcionalidades solicitadas
-

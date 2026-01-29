@@ -293,13 +293,19 @@ export default function EstoqueProdutos() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {produtosFiltrados.map(produto => (
+              {produtosFiltrados.map(produto => {
+                // Cores baseadas na saúde da bateria seguindo o padrão do sistema
+                const getRowClassByBattery = (saudeBateria: number) => {
+                  if (saudeBateria >= 90) return 'bg-green-500/10'; // Excelente - verde
+                  if (saudeBateria >= 80) return ''; // Normal - sem cor
+                  if (saudeBateria >= 70) return 'bg-yellow-500/10'; // Atenção - amarelo
+                  return 'bg-destructive/10'; // Crítico - vermelho
+                };
+                
+                return (
                 <TableRow 
                   key={produto.id}
-                  className={cn(
-                    produto.saudeBateria < 70 ? 'bg-destructive/20' :
-                    produto.saudeBateria < 80 ? 'bg-orange-500/20' : ''
-                  )}
+                  className={getRowClassByBattery(produto.saudeBateria)}
                 >
                   <TableCell className="font-mono text-xs">{produto.id}</TableCell>
                   <TableCell className="font-mono text-xs">{formatIMEI(produto.imei)}</TableCell>
@@ -416,7 +422,8 @@ export default function EstoqueProdutos() {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </div>

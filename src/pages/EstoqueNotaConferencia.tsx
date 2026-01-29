@@ -52,8 +52,9 @@ export default function EstoqueNotaConferencia() {
     percentualBateria: 100
   });
   
-  const coresCadastradas = getCores();
-  const colaboradores = useCadastroStore(state => state.colaboradores.filter(c => c.ativo));
+  const coresCadastradas = useMemo(() => getCores(), []);
+  const allColaboradores = useCadastroStore(state => state.colaboradores);
+  const colaboradores = useMemo(() => allColaboradores.filter(c => c.ativo), [allColaboradores]);
 
   useEffect(() => {
     if (id) {

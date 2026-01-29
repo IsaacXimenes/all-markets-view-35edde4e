@@ -24,21 +24,14 @@ import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
 import { formatCurrency } from '@/utils/formatUtils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-// Gerar número de nota automático
-const gerarNumeroNota = (notasExistentes: number): string => {
-  const ano = new Date().getFullYear();
-  const sequencial = String(notasExistentes + 1).padStart(5, '0');
-  return `NE-${ano}-${sequencial}`;
-};
+// Número da nota será gerado automaticamente pela API
 
 export default function EstoqueNotaCadastrar() {
   const navigate = useNavigate();
-  const notasExistentes = getNotasCompra();
   
   // Informações da Nota
   const [fornecedor, setFornecedor] = useState('');
   const [dataEntrada, setDataEntrada] = useState('');
-  const [numeroNota, setNumeroNota] = useState('');
   const [qtdInformada, setQtdInformada] = useState<number>(0);
   const [valorTotal, setValorTotal] = useState<number>(0);
   
@@ -50,10 +43,14 @@ export default function EstoqueNotaCadastrar() {
   // Atuação Atual (somente leitura, calculado automaticamente)
   const [atuacaoAtual, setAtuacaoAtual] = useState<AtuacaoAtual | ''>('');
 
-  // Gerar número da nota automaticamente
+  // Atualizar atuação automaticamente quando tipo de pagamento muda
   useEffect(() => {
-    setNumeroNota(gerarNumeroNota(notasExistentes.length));
-  }, [notasExistentes.length]);
+    if (tipoPagamento) {
+      setAtuacaoAtual(definirAtuacaoInicial(tipoPagamento));
+    } else {
+      setAtuacaoAtual('');
+    }
+  }, [tipoPagamento]);
 
   // Atualizar atuação automaticamente quando tipo de pagamento muda
   useEffect(() => {
@@ -74,7 +71,6 @@ export default function EstoqueNotaCadastrar() {
     
     if (!fornecedor) camposFaltando.push('Fornecedor');
     if (!dataEntrada) camposFaltando.push('Data de Entrada');
-    if (!numeroNota) camposFaltando.push('Número da Nota');
     if (!tipoPagamento) camposFaltando.push('Tipo de Pagamento');
     
     return camposFaltando;
@@ -103,10 +99,10 @@ export default function EstoqueNotaCadastrar() {
     }
 
     // Criar nota via nova API (LANÇAMENTO INICIAL - sem produtos)
+    // O número da nota será gerado automaticamente pela API
     const novaNota = criarNotaEntrada({
-      numeroNota,
       data: dataEntrada,
-      fornecedor,
+      fornecedor, // Passa o nome do fornecedor diretamente
       tipoPagamento: tipoPagamento as TipoPagamentoNota,
       qtdInformada: qtdInformada || undefined,
       valorTotal: valorTotal || undefined,
@@ -166,17 +162,7 @@ export default function EstoqueNotaCadastrar() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="numeroNota">Nº da Nota *</Label>
-                <Input 
-                  id="numeroNota" 
-                  value={numeroNota}
-                  onChange={(e) => setNumeroNota(e.target.value)}
-                  placeholder="Ex: NE-2026-00001"
-                />
-                <p className="text-xs text-muted-foreground mt-1">Gerado automaticamente, editável</p>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="dataEntrada">Data de Entrada *</Label>
                 <Input 
@@ -194,6 +180,12 @@ export default function EstoqueNotaCadastrar() {
                   placeholder="Selecione um fornecedor"
                 />
               </div>
+            </div>
+            
+            <div className="p-3 rounded-lg bg-muted/50 border">
+              <p className="text-sm text-muted-foreground">
+                <strong>Nº da Nota:</strong> Será gerado automaticamente ao salvar (formato: NE-{new Date().getFullYear()}-XXXXX)
+              </p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

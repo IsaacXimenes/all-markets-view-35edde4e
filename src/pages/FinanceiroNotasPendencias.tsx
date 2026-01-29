@@ -1,51 +1,40 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FinanceiroLayout } from '@/components/layout/FinanceiroLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   getNotasParaFinanceiro, 
-  converterNotaParaPendencia,
   registrarPagamento,
-  PendenciaFinanceiraConvertida
+  NotaEntrada,
+  podeEditarNota
 } from '@/utils/notaEntradaFluxoApi';
 import { getFornecedores } from '@/utils/cadastrosApi';
 import { formatCurrency } from '@/utils/formatUtils';
+import { TabelaNotasPendencias } from '@/components/estoque/TabelaNotasPendencias';
 import { ModalDetalhePendencia, PendenciaModalData } from '@/components/estoque/ModalDetalhePendencia';
 import { ModalFinalizarPagamento, DadosPagamento, PendenciaPagamentoData } from '@/components/estoque/ModalFinalizarPagamento';
 import { 
-  Eye, 
-  CreditCard, 
   Download, 
   Filter, 
   X, 
-  Clock, 
   AlertTriangle, 
-  AlertCircle,
   CheckCircle,
   FileText,
   DollarSign,
-  Warehouse,
-  Landmark,
-  Lock
+  Landmark
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function FinanceiroNotasPendencias() {
-  // Consumir novo sistema de notas
-  const carregarPendencias = () => {
-    const notas = getNotasParaFinanceiro();
-    return notas.map(converterNotaParaPendencia);
-  };
-
-  const [pendencias, setPendencias] = useState<PendenciaFinanceiraConvertida[]>(carregarPendencias());
-  const [pendenciaSelecionada, setPendenciaSelecionada] = useState<PendenciaFinanceiraConvertida | null>(null);
+  const navigate = useNavigate();
+  
+  // Consumir novo sistema de notas diretamente
+  const [notas, setNotas] = useState<NotaEntrada[]>(getNotasParaFinanceiro());
+  const [notaSelecionada, setNotaSelecionada] = useState<NotaEntrada | null>(null);
   const [dialogDetalhes, setDialogDetalhes] = useState(false);
   const [dialogPagamento, setDialogPagamento] = useState(false);
   
@@ -56,172 +45,80 @@ export default function FinanceiroNotasPendencias() {
     dataInicio: '',
     dataFim: '',
     fornecedor: 'todos',
-    statusPagamento: 'todos',
     tipoPagamento: 'todos',
     atuacaoAtual: 'todos',
     palavraChave: ''
   });
 
-  // Filtrar pendências
-  const pendenciasFiltradas = useMemo(() => {
-    let filtered = pendencias.filter(p => {
-      if (filters.dataInicio && p.dataCriacao < filters.dataInicio) return false;
-      if (filters.dataFim && p.dataCriacao > filters.dataFim) return false;
-      if (filters.fornecedor !== 'todos' && p.fornecedor !== filters.fornecedor) return false;
-      if (filters.statusPagamento !== 'todos' && p.statusPagamento !== filters.statusPagamento) return false;
-      if (filters.tipoPagamento !== 'todos' && p.tipoPagamento !== filters.tipoPagamento) return false;
-      if (filters.atuacaoAtual !== 'todos' && p.atuacaoAtual !== filters.atuacaoAtual) return false;
+  // Filtrar notas
+  const notasFiltradas = useMemo(() => {
+    let filtered = notas.filter(n => {
+      if (filters.dataInicio && n.data < filters.dataInicio) return false;
+      if (filters.dataFim && n.data > filters.dataFim) return false;
+      if (filters.fornecedor !== 'todos' && n.fornecedor !== filters.fornecedor) return false;
+      if (filters.tipoPagamento !== 'todos' && n.tipoPagamento !== filters.tipoPagamento) return false;
+      if (filters.atuacaoAtual !== 'todos' && n.atuacaoAtual !== filters.atuacaoAtual) return false;
       if (filters.palavraChave && 
-          !p.notaId.toLowerCase().includes(filters.palavraChave.toLowerCase()) &&
-          !p.fornecedor.toLowerCase().includes(filters.palavraChave.toLowerCase())) return false;
+          !n.numeroNota.toLowerCase().includes(filters.palavraChave.toLowerCase()) &&
+          !n.fornecedor.toLowerCase().includes(filters.palavraChave.toLowerCase())) return false;
       return true;
     });
 
-    // Ordenar: SLA crítico primeiro, depois por data
+    // Ordenar: notas com atuação Financeiro primeiro, depois por data
     return filtered.sort((a, b) => {
-      // Prioridade: alertas SLA primeiro
-      if (a.slaStatus === 'critico' && b.slaStatus !== 'critico') return -1;
-      if (a.slaStatus !== 'critico' && b.slaStatus === 'critico') return 1;
-      if (a.slaStatus === 'aviso' && b.slaStatus === 'normal') return -1;
-      if (a.slaStatus === 'normal' && b.slaStatus === 'aviso') return 1;
-      // Depois por status de pagamento (não pagos primeiro)
-      if (a.statusPagamento !== 'Pago' && b.statusPagamento === 'Pago') return -1;
-      if (a.statusPagamento === 'Pago' && b.statusPagamento !== 'Pago') return 1;
-      // Por fim, por data
-      return new Date(b.dataCriacao).getTime() - new Date(a.dataCriacao).getTime();
+      if (a.atuacaoAtual === 'Financeiro' && b.atuacaoAtual !== 'Financeiro') return -1;
+      if (a.atuacaoAtual !== 'Financeiro' && b.atuacaoAtual === 'Financeiro') return 1;
+      return new Date(a.data).getTime() - new Date(b.data).getTime();
     });
-  }, [pendencias, filters]);
+  }, [notas, filters]);
+
+  const calcularDiasDecorridos = (data: string): number => {
+    const dataInicio = new Date(data);
+    const hoje = new Date();
+    return Math.ceil((hoje.getTime() - dataInicio.getTime()) / (1000 * 60 * 60 * 24));
+  };
 
   // Cards de resumo
   const resumo = useMemo(() => {
-    const total = pendenciasFiltradas.length;
-    const valorPendente = pendenciasFiltradas
-      .filter(p => p.statusPagamento !== 'Pago')
-      .reduce((acc, p) => acc + p.valorPendente, 0);
-    const valorConferido = pendenciasFiltradas.reduce((acc, p) => acc + p.valorConferido, 0);
-    const alertasSLA = pendenciasFiltradas.filter(p => p.slaAlerta && p.statusPagamento !== 'Pago').length;
-    const aguardandoFinanceiro = pendenciasFiltradas.filter(p => p.atuacaoAtual === 'Financeiro').length;
+    const total = notasFiltradas.length;
+    const aguardandoFinanceiro = notasFiltradas.filter(n => n.atuacaoAtual === 'Financeiro').length;
+    const valorPendente = notasFiltradas.reduce((acc, n) => acc + n.valorPendente, 0);
+    const valorConferido = notasFiltradas.reduce((acc, n) => acc + n.valorConferido, 0);
+    const alertasSLA = notasFiltradas.filter(n => {
+      const dias = calcularDiasDecorridos(n.data);
+      return dias >= 5 && n.atuacaoAtual !== 'Encerrado';
+    }).length;
     
-    return { total, valorPendente, valorConferido, alertasSLA, aguardandoFinanceiro };
-  }, [pendenciasFiltradas]);
+    return { total, aguardandoFinanceiro, valorPendente, valorConferido, alertasSLA };
+  }, [notasFiltradas]);
 
-  const getSLABadge = (pendencia: PendenciaFinanceiraConvertida) => {
-    if (pendencia.statusPagamento === 'Pago') {
-      return <Badge variant="outline" className="bg-green-500/10 text-green-600">Pago</Badge>;
-    }
-    
-    switch (pendencia.slaStatus) {
-      case 'critico':
-        return (
-          <div className="flex items-center gap-1 bg-red-500/20 text-red-600 px-2 py-1 rounded text-xs font-medium">
-            <AlertCircle className="h-3 w-3" />
-            {pendencia.diasDecorridos}d
-          </div>
-        );
-      case 'aviso':
-        return (
-          <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-600 px-2 py-1 rounded text-xs font-medium">
-            <AlertTriangle className="h-3 w-3" />
-            {pendencia.diasDecorridos}d
-          </div>
-        );
-      default:
-        return (
-          <div className="flex items-center gap-1 text-muted-foreground text-xs">
-            <Clock className="h-3 w-3" />
-            {pendencia.diasDecorridos}d
-          </div>
-        );
-    }
-  };
-
-  const getStatusPagamentoBadge = (status: string) => {
-    switch (status) {
-      case 'Pago':
-        return <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30">Pago</Badge>;
-      case 'Parcial':
-        return <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30">Parcial</Badge>;
-      default:
-        return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/30">Aguardando</Badge>;
-    }
-  };
-
-  const getTipoPagamentoBadge = (tipo: string) => {
-    switch (tipo) {
-      case 'Pagamento 100% Antecipado':
-        return <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/30">100% Antec.</Badge>;
-      case 'Pagamento Parcial':
-        return <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30">Parcial</Badge>;
-      case 'Pagamento Pos':
-        return <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/30">Pós</Badge>;
-      default:
-        return <Badge variant="outline">{tipo}</Badge>;
-    }
-  };
-
-  const getAtuacaoAtualBadge = (atuacao: string) => {
-    switch (atuacao) {
-      case 'Financeiro':
-        return (
-          <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30">
-            <Landmark className="h-3 w-3 mr-1" />
-            Financeiro
-          </Badge>
-        );
-      case 'Estoque':
-        return (
-          <Badge variant="outline" className="bg-gray-500/10 text-gray-600 border-gray-500/30">
-            <Warehouse className="h-3 w-3 mr-1" />
-            Estoque
-          </Badge>
-        );
-      case 'Encerrado':
-        return (
-          <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Encerrado
-          </Badge>
-        );
-      default:
-        return <Badge variant="outline">{atuacao}</Badge>;
-    }
-  };
-
-  const getRowClass = (pendencia: PendenciaFinanceiraConvertida) => {
-    if (pendencia.statusPagamento === 'Pago') return 'bg-green-500/10';
-    if (pendencia.slaStatus === 'critico') return 'bg-red-500/10';
-    if (pendencia.slaStatus === 'aviso') return 'bg-yellow-500/10';
-    if (pendencia.atuacaoAtual === 'Financeiro') return 'bg-blue-500/10';
-    return '';
-  };
-
-  const handleVerDetalhes = (pendencia: PendenciaFinanceiraConvertida) => {
-    setPendenciaSelecionada(pendencia);
+  const handleVerDetalhes = (nota: NotaEntrada) => {
+    setNotaSelecionada(nota);
     setDialogDetalhes(true);
   };
 
-  const handleAbrirPagamento = (pendencia: PendenciaFinanceiraConvertida) => {
-    setPendenciaSelecionada(pendencia);
+  const handleAbrirPagamento = (nota: NotaEntrada) => {
+    setNotaSelecionada(nota);
     setDialogPagamento(true);
   };
 
   const handleFinalizarPagamento = (dados: DadosPagamento) => {
-    if (!pendenciaSelecionada) return;
+    if (!notaSelecionada) return;
     
     // Usar novo sistema de pagamento
-    const resultado = registrarPagamento(pendenciaSelecionada.notaId, {
-      valor: pendenciaSelecionada.valorPendente,
+    const resultado = registrarPagamento(notaSelecionada.id, {
+      valor: notaSelecionada.valorPendente,
       formaPagamento: dados.formaPagamento,
       contaPagamento: dados.contaPagamento,
       comprovante: dados.comprovante,
       responsavel: dados.responsavel || 'Usuário Financeiro',
-      tipo: pendenciaSelecionada.valorPago > 0 ? 'final' : 'inicial'
+      tipo: notaSelecionada.valorPago > 0 ? 'final' : 'inicial'
     });
 
     if (resultado) {
-      toast.success(`Pagamento da nota ${pendenciaSelecionada.notaId} confirmado!`);
-      // Recarregar dados do novo sistema
-      setPendencias(carregarPendencias());
+      toast.success(`Pagamento da nota ${notaSelecionada.id} confirmado!`);
+      // Recarregar dados
+      setNotas(getNotasParaFinanceiro());
       setDialogPagamento(false);
       setDialogDetalhes(false);
     } else {
@@ -230,21 +127,19 @@ export default function FinanceiroNotasPendencias() {
   };
 
   const handleExport = () => {
-    const dataToExport = pendenciasFiltradas.map(p => ({
-      'Nº Nota': p.notaId,
-      Fornecedor: p.fornecedor,
-      'Tipo Pagamento': p.tipoPagamento,
-      'Atuação Atual': p.atuacaoAtual,
-      'Valor Total': formatCurrency(p.valorTotal),
-      'Valor Pago': formatCurrency(p.valorPago),
-      'Valor Pendente': formatCurrency(p.valorPendente),
-      'Qtd Informada': p.qtdInformada,
-      'Qtd Cadastrada': p.qtdCadastrada,
-      'Qtd Conferida': p.qtdConferida,
-      '% Conferência': `${p.percentualConferencia}%`,
-      'Status Pagamento': p.statusPagamento,
-      'Dias Decorridos': p.diasDecorridos,
-      SLA: p.slaStatus
+    const dataToExport = notasFiltradas.map(n => ({
+      'Nº Nota': n.numeroNota,
+      Fornecedor: n.fornecedor,
+      'Tipo Pagamento': n.tipoPagamento,
+      'Atuação Atual': n.atuacaoAtual,
+      Status: n.status,
+      'Qtd Informada': n.qtdInformada,
+      'Qtd Cadastrada': n.qtdCadastrada,
+      'Qtd Conferida': n.qtdConferida,
+      'Valor Total': formatCurrency(n.valorTotal),
+      'Valor Pago': formatCurrency(n.valorPago),
+      'Valor Pendente': formatCurrency(n.valorPendente),
+      'Dias Decorridos': calcularDiasDecorridos(n.data)
     }));
     
     const csvContent = Object.keys(dataToExport[0] || {}).join(';') + '\n' +
@@ -253,7 +148,7 @@ export default function FinanceiroNotasPendencias() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `pendencias-financeiras-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `notas-pendencias-financeiro-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     
     toast.success('Dados exportados com sucesso!');
@@ -264,31 +159,39 @@ export default function FinanceiroNotasPendencias() {
       dataInicio: '',
       dataFim: '',
       fornecedor: 'todos',
-      statusPagamento: 'todos',
       tipoPagamento: 'todos',
       atuacaoAtual: 'todos',
       palavraChave: ''
     });
   };
 
+  const handleRefresh = () => {
+    setNotas(getNotasParaFinanceiro());
+    toast.success('Dados atualizados!');
+  };
+
   // Converter para formato compatível com modal existente
-  const pendenciaParaModalDetalhes: PendenciaModalData | null = pendenciaSelecionada ? {
-    id: pendenciaSelecionada.id,
-    notaId: pendenciaSelecionada.notaId,
-    fornecedor: pendenciaSelecionada.fornecedor,
-    valorTotal: pendenciaSelecionada.valorTotal,
-    valorConferido: pendenciaSelecionada.valorConferido,
-    valorPendente: pendenciaSelecionada.valorPendente,
-    percentualConferencia: pendenciaSelecionada.percentualConferencia,
-    statusPagamento: pendenciaSelecionada.statusPagamento,
-    statusConferencia: pendenciaSelecionada.statusConferencia,
-    dataCriacao: pendenciaSelecionada.dataCriacao,
-    diasDecorridos: pendenciaSelecionada.diasDecorridos,
-    slaStatus: pendenciaSelecionada.slaStatus,
-    slaAlerta: pendenciaSelecionada.slaAlerta,
-    aparelhosTotal: pendenciaSelecionada.qtdInformada,
-    aparelhosConferidos: pendenciaSelecionada.qtdConferida,
-    timeline: pendenciaSelecionada.timeline.map(t => ({
+  const notaParaModalDetalhes: PendenciaModalData | null = notaSelecionada ? {
+    id: notaSelecionada.id,
+    notaId: notaSelecionada.id,
+    fornecedor: notaSelecionada.fornecedor,
+    valorTotal: notaSelecionada.valorTotal,
+    valorConferido: notaSelecionada.valorConferido,
+    valorPendente: notaSelecionada.valorPendente,
+    percentualConferencia: notaSelecionada.qtdInformada > 0 
+      ? Math.round((notaSelecionada.qtdConferida / notaSelecionada.qtdInformada) * 100) 
+      : 0,
+    statusPagamento: notaSelecionada.valorPago >= notaSelecionada.valorTotal ? 'Pago' : 
+                      notaSelecionada.valorPago > 0 ? 'Parcial' : 'Aguardando',
+    statusConferencia: notaSelecionada.status,
+    dataCriacao: notaSelecionada.dataCriacao.split('T')[0],
+    diasDecorridos: calcularDiasDecorridos(notaSelecionada.data),
+    slaStatus: calcularDiasDecorridos(notaSelecionada.data) >= 7 ? 'critico' :
+               calcularDiasDecorridos(notaSelecionada.data) >= 5 ? 'aviso' : 'normal',
+    slaAlerta: calcularDiasDecorridos(notaSelecionada.data) >= 5,
+    aparelhosTotal: notaSelecionada.qtdInformada,
+    aparelhosConferidos: notaSelecionada.qtdConferida,
+    timeline: notaSelecionada.timeline.map(t => ({
       id: t.id,
       dataHora: t.dataHora,
       acao: t.acao,
@@ -298,14 +201,16 @@ export default function FinanceiroNotasPendencias() {
     produtos: []
   } : null;
 
-  const pendenciaParaModalPagamento: PendenciaPagamentoData | null = pendenciaSelecionada ? {
-    id: pendenciaSelecionada.id,
-    notaId: pendenciaSelecionada.notaId,
-    valorTotal: pendenciaSelecionada.valorTotal,
-    valorPendente: pendenciaSelecionada.valorPendente,
-    percentualConferencia: pendenciaSelecionada.percentualConferencia,
-    qtdInformada: pendenciaSelecionada.qtdInformada,
-    qtdConferida: pendenciaSelecionada.qtdConferida
+  const notaParaModalPagamento: PendenciaPagamentoData | null = notaSelecionada ? {
+    id: notaSelecionada.id,
+    notaId: notaSelecionada.id,
+    valorTotal: notaSelecionada.valorTotal,
+    valorPendente: notaSelecionada.valorPendente,
+    percentualConferencia: notaSelecionada.qtdInformada > 0 
+      ? Math.round((notaSelecionada.qtdConferida / notaSelecionada.qtdInformada) * 100) 
+      : 0,
+    qtdInformada: notaSelecionada.qtdInformada,
+    qtdConferida: notaSelecionada.qtdConferida
   } : null;
 
   return (
@@ -317,7 +222,7 @@ export default function FinanceiroNotasPendencias() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total de Pendências</p>
+                  <p className="text-sm text-muted-foreground">Total de Notas</p>
                   <p className="text-2xl font-bold">{resumo.total}</p>
                 </div>
                 <FileText className="h-10 w-10 text-muted-foreground opacity-50" />
@@ -329,9 +234,9 @@ export default function FinanceiroNotasPendencias() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Aguardando Financeiro</p>
-                  <p className="text-2xl font-bold text-blue-600">{resumo.aguardandoFinanceiro}</p>
+                  <p className="text-2xl font-bold text-primary">{resumo.aguardandoFinanceiro}</p>
                 </div>
-                <Landmark className="h-10 w-10 text-blue-500 opacity-50" />
+                <Landmark className="h-10 w-10 text-primary opacity-50" />
               </div>
             </CardContent>
           </Card>
@@ -340,9 +245,9 @@ export default function FinanceiroNotasPendencias() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Valor Pendente</p>
-                  <p className="text-2xl font-bold text-orange-600">{formatCurrency(resumo.valorPendente)}</p>
+                  <p className="text-2xl font-bold text-destructive">{formatCurrency(resumo.valorPendente)}</p>
                 </div>
-                <DollarSign className="h-10 w-10 text-orange-500 opacity-50" />
+                <DollarSign className="h-10 w-10 text-destructive opacity-50" />
               </div>
             </CardContent>
           </Card>
@@ -351,9 +256,9 @@ export default function FinanceiroNotasPendencias() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Valor Conferido</p>
-                  <p className="text-2xl font-bold text-green-600">{formatCurrency(resumo.valorConferido)}</p>
+                  <p className="text-2xl font-bold text-primary">{formatCurrency(resumo.valorConferido)}</p>
                 </div>
-                <CheckCircle className="h-10 w-10 text-green-500 opacity-50" />
+                <CheckCircle className="h-10 w-10 text-primary opacity-50" />
               </div>
             </CardContent>
           </Card>
@@ -362,9 +267,9 @@ export default function FinanceiroNotasPendencias() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Alertas SLA</p>
-                  <p className="text-2xl font-bold text-red-600">{resumo.alertasSLA}</p>
+                  <p className="text-2xl font-bold text-destructive">{resumo.alertasSLA}</p>
                 </div>
-                <AlertTriangle className="h-10 w-10 text-red-500 opacity-50" />
+                <AlertTriangle className="h-10 w-10 text-destructive opacity-50" />
               </div>
             </CardContent>
           </Card>
@@ -379,7 +284,7 @@ export default function FinanceiroNotasPendencias() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               <div>
                 <Label htmlFor="dataInicio">Data Início</Label>
                 <Input
@@ -420,9 +325,9 @@ export default function FinanceiroNotasPendencias() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="Pagamento Pos">Pós-Conferência</SelectItem>
-                    <SelectItem value="Pagamento Parcial">Parcial</SelectItem>
                     <SelectItem value="Pagamento 100% Antecipado">100% Antecipado</SelectItem>
+                    <SelectItem value="Pagamento Parcial">Parcial</SelectItem>
+                    <SelectItem value="Pagamento Pos">Pós</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -436,20 +341,6 @@ export default function FinanceiroNotasPendencias() {
                     <SelectItem value="todos">Todos</SelectItem>
                     <SelectItem value="Financeiro">Financeiro</SelectItem>
                     <SelectItem value="Estoque">Estoque</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="statusPagamento">Status Pagamento</Label>
-                <Select value={filters.statusPagamento} onValueChange={(value) => setFilters({ ...filters, statusPagamento: value })}>
-                  <SelectTrigger id="statusPagamento">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="Aguardando">Aguardando</SelectItem>
-                    <SelectItem value="Parcial">Parcial</SelectItem>
-                    <SelectItem value="Pago">Pago</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -472,144 +363,47 @@ export default function FinanceiroNotasPendencias() {
           </CardContent>
         </Card>
 
-        {/* Tabela de Pendências */}
+        {/* Tabela de Notas - Usando componente reutilizável */}
         <Card>
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <CardTitle>Pendências Financeiras</CardTitle>
-              <Button onClick={handleExport} variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar CSV
-              </Button>
+              <CardTitle>Notas Pendentes</CardTitle>
+              <div className="flex gap-2">
+                <Button onClick={handleRefresh} variant="outline">
+                  Atualizar
+                </Button>
+                <Button onClick={handleExport} variant="outline">
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar CSV
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nº Nota</TableHead>
-                    <TableHead>Fornecedor</TableHead>
-                    <TableHead>Tipo Pag.</TableHead>
-                    <TableHead>Atuação</TableHead>
-                    <TableHead>Valor Total</TableHead>
-                    <TableHead>Pago</TableHead>
-                    <TableHead>Qtd</TableHead>
-                    <TableHead>% Conf.</TableHead>
-                    <TableHead>Pagamento</TableHead>
-                    <TableHead>SLA</TableHead>
-                    <TableHead>Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendenciasFiltradas.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                        Nenhuma pendência encontrada
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    pendenciasFiltradas.map(pendencia => (
-                      <TableRow key={pendencia.id} className={getRowClass(pendencia)}>
-                        <TableCell className="font-mono text-xs">{pendencia.notaId}</TableCell>
-                        <TableCell>{pendencia.fornecedor}</TableCell>
-                        <TableCell>{getTipoPagamentoBadge(pendencia.tipoPagamento)}</TableCell>
-                        <TableCell>{getAtuacaoAtualBadge(pendencia.atuacaoAtual)}</TableCell>
-                        <TableCell>{formatCurrency(pendencia.valorTotal)}</TableCell>
-                        <TableCell>{formatCurrency(pendencia.valorPago)}</TableCell>
-                        <TableCell>
-                          <span className="text-xs text-muted-foreground">
-                            {pendencia.qtdCadastrada}/{pendencia.qtdInformada}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress value={pendencia.percentualConferencia} className="w-12 h-2" />
-                            <Badge variant="outline" className={
-                              pendencia.percentualConferencia === 100 
-                                ? 'bg-green-500/10 text-green-600' 
-                                : pendencia.percentualConferencia >= 50 
-                                  ? 'bg-blue-500/10 text-blue-600'
-                                  : 'bg-yellow-500/10 text-yellow-600'
-                            }>
-                              {pendencia.percentualConferencia}%
-                            </Badge>
-                          </div>
-                        </TableCell>
-                        <TableCell>{getStatusPagamentoBadge(pendencia.statusPagamento)}</TableCell>
-                        <TableCell>{getSLABadge(pendencia)}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleVerDetalhes(pendencia)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {pendencia.statusPagamento !== 'Pago' && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm"
-                                        className={pendencia.podeEditar 
-                                          ? "text-green-600 hover:text-green-700" 
-                                          : "text-gray-400 cursor-not-allowed"
-                                        }
-                                        onClick={() => pendencia.podeEditar && handleAbrirPagamento(pendencia)}
-                                        disabled={!pendencia.podeEditar}
-                                      >
-                                        {pendencia.podeEditar ? (
-                                          <CreditCard className="h-4 w-4" />
-                                        ) : (
-                                          <Lock className="h-4 w-4" />
-                                        )}
-                                      </Button>
-                                    </span>
-                                  </TooltipTrigger>
-                                  {!pendencia.podeEditar && (
-                                    <TooltipContent>
-                                      <p>Atuação atual: {pendencia.atuacaoAtual}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {pendencia.atuacaoAtual === 'Estoque' 
-                                          ? 'Aguardando cadastro/conferência do Estoque'
-                                          : 'Nota encerrada'
-                                        }
-                                      </p>
-                                    </TooltipContent>
-                                  )}
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            <TabelaNotasPendencias 
+              notas={notasFiltradas}
+              modulo="Financeiro"
+              onVerDetalhes={handleVerDetalhes}
+              onPagar={handleAbrirPagamento}
+            />
           </CardContent>
         </Card>
 
-        {/* Modal de Detalhes - Usando componente reutilizável */}
+        {/* Modal de Detalhes */}
         <ModalDetalhePendencia
-          pendencia={pendenciaParaModalDetalhes}
+          pendencia={notaParaModalDetalhes}
           open={dialogDetalhes}
           onClose={() => setDialogDetalhes(false)}
-          showPaymentButton={pendenciaSelecionada?.podeEditar && pendenciaSelecionada?.statusPagamento !== 'Pago'}
+          showPaymentButton={notaSelecionada ? podeEditarNota(notaSelecionada, 'Financeiro') && notaSelecionada.valorPago < notaSelecionada.valorTotal : false}
           onPayment={() => {
             setDialogDetalhes(false);
             setDialogPagamento(true);
           }}
         />
 
-        {/* Modal de Pagamento - Usando componente reutilizável */}
+        {/* Modal de Pagamento */}
         <ModalFinalizarPagamento
-          pendencia={pendenciaParaModalPagamento}
+          pendencia={notaParaModalPagamento}
           open={dialogPagamento}
           onClose={() => setDialogPagamento(false)}
           onConfirm={handleFinalizarPagamento}

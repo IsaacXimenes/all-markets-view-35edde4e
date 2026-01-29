@@ -140,6 +140,15 @@ export interface NotaEntrada {
 let notasEntrada: NotaEntrada[] = [];
 let notaCounter = 0;
 
+// Função para gerar número de nota auto-incremental
+export const gerarNumeroNotaAutoIncremental = (): string => {
+  const ano = new Date().getFullYear();
+  // Contar notas existentes para o ano atual + 1
+  const notasAnoAtual = notasEntrada.filter(n => n.numeroNota.includes(`NE-${ano}`)).length;
+  const sequencial = String(notasAnoAtual + notaCounter + 1).padStart(5, '0');
+  return `NE-${ano}-${sequencial}`;
+};
+
 // ============= MÁQUINA DE ESTADOS - TRANSIÇÕES VÁLIDAS =============
 
 const transicoesValidas: Record<NotaEntradaStatus, NotaEntradaStatus[]> = {
@@ -296,7 +305,7 @@ export const definirAtuacaoInicial = (tipoPagamento: TipoPagamentoNota): Atuacao
 
 // LANÇAMENTO INICIAL: Nota criada SEM produtos
 export const criarNotaEntrada = (dados: {
-  numeroNota: string;
+  numeroNota?: string; // Agora opcional - será gerado automaticamente se não fornecido
   data: string;
   fornecedor: string;
   tipoPagamento: TipoPagamentoNota;
@@ -308,6 +317,9 @@ export const criarNotaEntrada = (dados: {
 }): NotaEntrada => {
   notaCounter++;
   const id = `NE-${new Date().getFullYear()}-${String(notaCounter).padStart(5, '0')}`;
+  
+  // Gerar número da nota automaticamente se não fornecido
+  const numeroNotaFinal = dados.numeroNota || gerarNumeroNotaAutoIncremental();
   
   // LANÇAMENTO INICIAL: Nenhum produto cadastrado
   // Produtos serão adicionados posteriormente via Notas Pendências
@@ -330,7 +342,7 @@ export const criarNotaEntrada = (dados: {
   
   const novaNota: NotaEntrada = {
     id,
-    numeroNota: dados.numeroNota,
+    numeroNota: numeroNotaFinal,
     data: dados.data,
     fornecedor: dados.fornecedor,
     status: statusInicial,

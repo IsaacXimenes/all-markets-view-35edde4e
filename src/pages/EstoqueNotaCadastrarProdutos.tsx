@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, Plus, Trash2, AlertTriangle, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, AlertTriangle, Save, CheckCircle, Clock } from 'lucide-react';
 import { 
   getNotaEntradaById, 
   cadastrarProdutosNota, 
@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { InputComMascara } from '@/components/ui/InputComMascara';
 import { formatCurrency } from '@/utils/formatUtils';
 import { getCores } from '@/utils/coresApi';
+import { formatIMEI } from '@/utils/imeiMask';
 
 const categoriasAparelho = ['Novo', 'Seminovo'];
 
@@ -289,6 +290,83 @@ export default function EstoqueNotaCadastrarProdutos() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Produtos Já Cadastrados */}
+        {nota.produtos.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Produtos Já Cadastrados ({nota.produtos.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Marca</TableHead>
+                      <TableHead>Modelo</TableHead>
+                      <TableHead>IMEI</TableHead>
+                      <TableHead>Cor</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Qtd</TableHead>
+                      <TableHead>Custo Unit.</TableHead>
+                      <TableHead>Custo Total</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {nota.produtos.map(produto => (
+                      <TableRow key={produto.id} className="bg-muted/30">
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {produto.tipoProduto}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{produto.marca}</TableCell>
+                        <TableCell className="font-medium">{produto.modelo}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {produto.imei ? formatIMEI(produto.imei) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {produto.cor ? (
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-3 h-3 rounded-full border border-border" 
+                                style={{ backgroundColor: cores.find(c => c.nome === produto.cor)?.hexadecimal || '#888' }}
+                              />
+                              <span className="text-sm">{produto.cor}</span>
+                            </div>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={produto.categoria === 'Novo' ? 'default' : 'secondary'} className="text-xs">
+                            {produto.categoria || '-'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">{produto.quantidade}</TableCell>
+                        <TableCell>{formatCurrency(produto.custoUnitario)}</TableCell>
+                        <TableCell className="font-medium">{formatCurrency(produto.custoTotal)}</TableCell>
+                        <TableCell className="text-center">
+                          {produto.statusConferencia === 'Conferido' ? (
+                            <CheckCircle className="h-5 w-5 text-primary mx-auto" />
+                          ) : (
+                            <Clock className="h-5 w-5 text-muted-foreground mx-auto" />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="mt-4 pt-4 border-t flex justify-end">
+                <p className="text-lg">
+                  <span className="text-muted-foreground">Total já cadastrado: </span>
+                  <span className="font-bold">{formatCurrency(nota.produtos.reduce((acc, p) => acc + p.custoTotal, 0))}</span>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Alerta de quantidade */}
         {nota.qtdInformada > 0 && qtdRestante <= 0 && (

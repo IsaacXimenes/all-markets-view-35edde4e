@@ -321,3 +321,27 @@
 .responsive-filter-grid .col-span-full {
   grid-column: 1 / -1;
 }
+
+/* ============================================
+   Container Query para Layout Principal
+   Resolve o problema do Mobile Preview
+   ============================================ */
+
+.page-layout-wrapper {
+  container-type: inline-size;
+  width: 100%;
+}
+
+/* Quando o container é estreito, remover margem da sidebar */
+@container (max-width: 768px) {
+  .page-main-content {
+    margin-left: 0 !important;
+  }
+}
+
+/* Ocultar sidebar fixa em containers estreitos */
+@container (max-width: 768px) {
+  .page-layout-wrapper aside:not([class*="Sheet"]) {
+    display: none;
+  }
+}

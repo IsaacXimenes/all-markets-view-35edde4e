@@ -16,32 +16,34 @@ export function PageLayout({ children, title }: PageLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   return (
-    <div className="min-h-screen flex">
-      <Sidebar 
-        isCollapsed={isSidebarCollapsed} 
-        onToggle={toggleSidebar}
-        isMobile={isMobile}
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-      />
-      
-      <div className={cn(
-        "flex-1 flex flex-col transition-all duration-300",
-        isMobile ? "ml-0" : (isSidebarCollapsed ? "ml-16" : "ml-64 xl:ml-72")
-      )}>
-        <Navbar 
+    <div className="page-layout-wrapper">
+      <div className="min-h-screen flex overflow-x-hidden">
+        <Sidebar 
+          isCollapsed={isSidebarCollapsed} 
+          onToggle={toggleSidebar}
           isMobile={isMobile}
-          onMenuClick={() => setIsSidebarOpen(true)}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
         />
         
-        <main className="flex-1 transition-all duration-300">
-          <div className="w-full max-w-full p-3 sm:p-4 lg:p-6 xl:p-8 2xl:p-10 animate-fade-in">
-            <div className="bg-muted/30 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 text-center border border-border">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold">{title}</h1>
+        <div className={cn(
+          "page-main-content flex-1 flex flex-col transition-all duration-300 min-w-0",
+          isMobile ? "ml-0" : (isSidebarCollapsed ? "ml-16" : "ml-64 xl:ml-72")
+        )}>
+          <Navbar 
+            isMobile={isMobile}
+            onMenuClick={() => setIsSidebarOpen(true)}
+          />
+          
+          <main className="flex-1 transition-all duration-300 overflow-x-hidden">
+            <div className="w-full max-w-full p-3 sm:p-4 lg:p-6 xl:p-8 2xl:p-10 animate-fade-in">
+              <div className="bg-muted/30 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 text-center border border-border">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold">{title}</h1>
+              </div>
+              {children}
             </div>
-            {children}
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
     </div>
   );

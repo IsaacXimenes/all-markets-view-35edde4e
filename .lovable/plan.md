@@ -1,129 +1,241 @@
 
-# Plano: Containers Responsivos Reutilizáveis
+# Plano: Layout Verdadeiramente Responsivo (Container-Based)
 
-## Diagnóstico do Problema
+## Diagnóstico do Problema Real
 
-### Por que o Painel funciona e o Estoque não:
+### Por que os breakpoints não funcionam no Mobile Preview:
 
-1. **Dashboard (Painel)**:
-   - Usa breakpoints explícitos: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-5`
-   - Em viewport < 640px: **sempre 1 coluna** (sem depender do tamanho do container)
-   - O conteúdo nunca ultrapassa o container
+```text
+┌─────────────────────────────────────────────┐
+│  Seu Monitor (viewport 1920px)              │
+│  ┌───────────────────────────────────────┐  │
+│  │  Lovable Interface                    │  │
+│  │  ┌─────────────────────────────────┐  │  │
+│  │  │  Mobile Preview (iframe ~400px) │  │  │
+│  │  │                                 │  │  │
+│  │  │  Tailwind vê: viewport=1920px   │  │  │
+│  │  │  Aplica: lg:grid-cols-4 ❌      │  │  │
+│  │  │                                 │  │  │
+│  │  └─────────────────────────────────┘  │  │
+│  └───────────────────────────────────────┘  │
+└─────────────────────────────────────────────┘
+```
 
-2. **EstoqueProdutos**:
-   - Usa `auto-fit + minmax(240px, 1fr)`
-   - Se o container tiver 390px, tenta encaixar 1 item de 240px
-   - **Problema**: se o container real for menor que 240px (por causa de padding/margin), o conteúdo **vaza para fora**
-   - O Grid CSS não consegue reduzir abaixo do `minmax` definido
+O Tailwind usa **media queries de viewport**, não do container. Por isso `sm:`, `lg:`, `xl:` **ignoram** o tamanho real do container no Mobile Preview.
 
-### Conclusão:
-O `auto-fit + minmax` é bom quando o container sempre tem pelo menos o tamanho mínimo. Mas no Mobile Preview ou quando há sidebar/padding, o espaço real pode ser menor e causa o "corte".
+### Solução: CSS Container Queries
 
----
+CSS Container Queries permitem que elementos respondam ao tamanho do **container pai**, não do viewport:
 
-## Solução: Containers Responsivos Reutilizáveis
-
-Vamos criar 3 componentes de container que garantem responsividade em qualquer situação:
-
-### 1. `ResponsiveCardGrid` - Para cards de estatísticas
-- Em telas pequenas: **1 coluna** (empilhados)
-- Em telas médias: **2 colunas**
-- Em telas grandes: **flexível até N colunas**
-- Usa breakpoints explícitos (não depende do container)
-
-### 2. `ResponsiveFilterGrid` - Para filtros
-- Em telas pequenas: **1 coluna** (filtros empilhados)
-- Em telas médias: **2-3 colunas**
-- Em telas grandes: **auto-fit** flexível
-- Botões sempre ocupam largura total em mobile
-
-### 3. `ResponsiveTableContainer` - Para tabelas
-- Scroll horizontal **sempre visível**
-- Barra de scroll com contraste alto
-- Container com largura limitada ao espaço disponível
+```text
+┌─────────────────────────────────────────────┐
+│  Container pai (400px)                      │
+│  Container Query: @container (max-width:400px) │
+│  Resultado: 1 coluna ✅                     │
+└─────────────────────────────────────────────┘
+```
 
 ---
 
-## Arquivos a Criar
+## Mudanças Planejadas
 
-### `src/components/ui/ResponsiveContainers.tsx`
+### 1. Atualizar `ResponsiveContainers.tsx` com Container Queries
+
+Vou reescrever os 3 componentes para usar container queries nativas do CSS (suportadas em todos os navegadores modernos desde 2023):
+
+**ResponsiveCardGrid:**
+- Container pai com `container-type: inline-size`
+- Regras CSS com `@container` ao invés de media queries
+- Fallback: se container query não suportado, usa 1 coluna
+
+**ResponsiveFilterGrid:**
+- Mesmo approach
+- Filtros empilham automaticamente quando container < 500px
+
+**ResponsiveTableContainer:**
+- Scroll horizontal nativo sempre visível
+- Barra com alto contraste
+
+### 2. Adicionar CSS de Container Queries em `index.css`
+
+```css
+/* Container Queries para grids responsivos */
+.responsive-card-container {
+  container-type: inline-size;
+}
+
+.responsive-card-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr; /* default: 1 coluna */
+}
+
+@container (min-width: 500px) {
+  .responsive-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@container (min-width: 768px) {
+  .responsive-card-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@container (min-width: 1024px) {
+  .responsive-card-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+```
+
+### 3. Atualizar `EstoqueProdutos.tsx`
+
+- Usar os novos containers atualizados
+- Garantir que o wrapper principal não corta conteúdo
+- Filtros em layout flexível com wrap
+
+### 4. Corrigir margem direita no `PageLayout.tsx`
+
+O problema de margem cortada vem do padding do container + overflow. Vou:
+- Garantir `max-w-full` no container
+- Remover qualquer `overflow-hidden` desnecessário nos wrappers
+
+---
+
+## Detalhes Técnicos
+
+### Novo `ResponsiveContainers.tsx`
 
 ```tsx
-// ResponsiveCardGrid - Para cards de estatísticas
-// Props: cols (máximo de colunas em desktop)
-// Breakpoints: 1 col → 2 cols → 3 cols → N cols
-
-// ResponsiveFilterGrid - Para área de filtros
-// Props: minWidth (largura mínima de cada filtro)
-// Breakpoints: 1 col → 2 cols → 3 cols → auto-fit
-
-// ResponsiveTableContainer - Para tabelas com scroll
-// Garante scroll horizontal sempre visível
-// Não depende do componente Table interno
-```
-
----
-
-## Implementação Detalhada
-
-### ResponsiveCardGrid
-```text
-Classes:
-- grid gap-3
-- grid-cols-1 (mobile - sempre 1 coluna)
-- sm:grid-cols-2 (tablet - 2 colunas)
-- lg:grid-cols-3 (desktop médio - 3 colunas)
-- xl:grid-cols-4 (desktop grande - 4 colunas)
-```
-
-### ResponsiveFilterGrid
-```text
-Classes:
-- grid gap-3
-- grid-cols-1 (mobile - sempre 1 coluna, filtros empilhados)
-- sm:grid-cols-2 (tablet - 2 colunas)
-- lg:grid-cols-3 (desktop - 3 colunas)
-- xl:grid-cols-4 (desktop grande - 4 colunas)
-```
-
-### ResponsiveTableContainer
-```text
-Estrutura:
-<div className="w-full overflow-hidden rounded-lg border">
-  <div className="overflow-x-auto scrollbar-visible">
-    {children} // a tabela vai aqui
-  </div>
-</div>
-
-CSS adicional em index.css:
-.scrollbar-visible::-webkit-scrollbar {
-  height: 12px;
+// ResponsiveCardGrid - Usa container queries
+export function ResponsiveCardGrid({ children, className, cols = 4 }) {
+  return (
+    <div className="responsive-card-container w-full">
+      <div className={cn(
+        "responsive-card-grid", 
+        `responsive-card-grid--cols-${cols}`,
+        className
+      )}>
+        {children}
+      </div>
+    </div>
+  )
 }
+
+// ResponsiveFilterGrid - Usa container queries  
+export function ResponsiveFilterGrid({ children, className }) {
+  return (
+    <div className="responsive-filter-container w-full">
+      <div className={cn("responsive-filter-grid", className)}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// ResponsiveTableContainer - Scroll nativo sempre visível
+export function ResponsiveTableContainer({ children, className }) {
+  return (
+    <div className={cn("w-full overflow-hidden rounded-lg border", className)}>
+      <div className="overflow-x-auto scrollbar-visible -webkit-overflow-scrolling-touch">
+        {children}
+      </div>
+    </div>
+  )
+}
+```
+
+### CSS em `index.css`
+
+```css
+/* Container Queries - Cards */
+.responsive-card-container {
+  container-type: inline-size;
+  width: 100%;
+}
+
+.responsive-card-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+@container (min-width: 480px) {
+  .responsive-card-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@container (min-width: 720px) {
+  .responsive-card-grid--cols-3,
+  .responsive-card-grid--cols-4,
+  .responsive-card-grid--cols-5,
+  .responsive-card-grid--cols-6 { 
+    grid-template-columns: repeat(3, 1fr); 
+  }
+}
+
+@container (min-width: 960px) {
+  .responsive-card-grid--cols-4,
+  .responsive-card-grid--cols-5,
+  .responsive-card-grid--cols-6 { 
+    grid-template-columns: repeat(4, 1fr); 
+  }
+}
+
+/* Container Queries - Filtros */
+.responsive-filter-container {
+  container-type: inline-size;
+  width: 100%;
+}
+
+.responsive-filter-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+@container (min-width: 400px) {
+  .responsive-filter-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@container (min-width: 640px) {
+  .responsive-filter-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@container (min-width: 880px) {
+  .responsive-filter-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* Itens que ocupam linha inteira */
+.responsive-filter-grid .col-span-full {
+  grid-column: 1 / -1;
+}
+
+/* Scrollbar sempre visível para tabelas */
+.scrollbar-visible {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: auto;
+}
+
+.scrollbar-visible::-webkit-scrollbar {
+  height: 14px;
+  display: block !important;
+}
+
 .scrollbar-visible::-webkit-scrollbar-track {
   background: hsl(var(--muted));
+  border-radius: 7px;
 }
+
 .scrollbar-visible::-webkit-scrollbar-thumb {
   background: hsl(var(--muted-foreground) / 0.5);
-  border-radius: 6px;
+  border-radius: 7px;
+  border: 2px solid hsl(var(--muted));
 }
-```
 
----
-
-## Aplicação no EstoqueProdutos
-
-### Antes:
-```tsx
-<div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
-  {/* Cards */}
-</div>
-```
-
-### Depois:
-```tsx
-<ResponsiveCardGrid cols={4}>
-  {/* Cards */}
-</ResponsiveCardGrid>
+.scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.7);
+}
 ```
 
 ---
@@ -132,44 +244,47 @@ CSS adicional em index.css:
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/ui/ResponsiveContainers.tsx` | **Criar** - 3 componentes de container |
-| `src/index.css` | **Modificar** - Adicionar estilos de scrollbar visível |
-| `src/pages/EstoqueProdutos.tsx` | **Modificar** - Usar os novos containers |
+| `src/components/ui/ResponsiveContainers.tsx` | **Reescrever** - Usar container queries |
+| `src/index.css` | **Adicionar** - CSS de container queries |
+| `src/pages/EstoqueProdutos.tsx` | **Ajustar** - Usar novos containers + corrigir estrutura |
 
 ---
 
 ## Resultado Esperado
 
-### Mobile (390px):
-- **4 cards**: 1 por linha, empilhados verticalmente
-- **Filtros**: 1 por linha, todos visíveis
-- **Tabela**: scroll horizontal com barra visível
+### Mobile Preview (~400px):
+- **4 cards**: 1 por linha, empilhados verticalmente ✅
+- **Filtros**: 1-2 por linha, todos visíveis ✅
+- **Botão Limpar**: Visível, ocupando largura total ✅
+- **Tabela**: Scroll horizontal com barra visível ✅
+- **Margem direita**: Sem corte ✅
 
-### Tablet (768px):
-- **4 cards**: 2 por linha
-- **Filtros**: 2 por linha
-- **Tabela**: scroll se necessário
+### Tablet (~768px):
+- **4 cards**: 2-3 por linha
+- **Filtros**: 2-3 por linha
+- **Tabela**: Scroll se necessário
 
-### Desktop (1280px+):
+### Desktop (~1280px+):
 - **4 cards**: 4 por linha
-- **Filtros**: 4 por linha
-- **Tabela**: visível sem scroll ou com scroll conforme largura
+- **Filtros**: 4+ por linha
+- **Tabela**: Visível ou scroll conforme largura
 
 ---
 
-## Vantagem dos Containers Reutilizáveis
+## Vantagem das Container Queries
 
-1. **Consistência**: Todas as páginas terão o mesmo comportamento responsivo
-2. **Manutenção**: Ajustes em um lugar afetam todo o sistema
-3. **Previsibilidade**: Breakpoints explícitos sempre funcionam (não dependem de container query)
-4. **Aplicação fácil**: Basta trocar o wrapper nas páginas existentes
+1. **Funciona no Mobile Preview**: Responde ao tamanho real do container, não do viewport
+2. **Verdadeiramente responsivo**: Ao redimensionar a janela, adapta imediatamente
+3. **Independente de pixel específico**: Não depende de breakpoints fixos
+4. **Compatibilidade**: Suportado em Chrome 105+, Firefox 110+, Safari 16+ (desde 2023)
+5. **Fallback seguro**: Se não suportado, mostra 1 coluna (funcional)
 
 ---
 
 ## Próximos Passos após Aprovação
 
-1. Criar `ResponsiveContainers.tsx` com os 3 componentes
-2. Adicionar CSS de scrollbar em `index.css`
+1. Reescrever `ResponsiveContainers.tsx` com container queries
+2. Adicionar CSS de container queries em `index.css`
 3. Atualizar `EstoqueProdutos.tsx` para usar os novos containers
 4. Testar no Mobile Preview
-5. Se funcionar, aplicar em todas as outras páginas do sistema
+5. Se funcionar, documentar e aplicar em todo o sistema

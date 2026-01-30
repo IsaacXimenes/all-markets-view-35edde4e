@@ -72,30 +72,42 @@ export function RankingVendedores() {
               <div 
                 key={seller.id}
                 className={cn(
-                  "p-3 lg:p-4 rounded-lg border-2 transition-all hover:shadow-md",
+                  "p-3 lg:p-4 rounded-lg border-2 transition-all hover:shadow-md overflow-hidden",
                   position === 1 && "bg-yellow-500/10 border-yellow-500/50",
                   position === 2 && "bg-gray-400/10 border-gray-400/50",
                   position === 3 && "bg-amber-600/10 border-amber-600/50"
                 )}
               >
-                <div className="flex items-center gap-2 lg:gap-3">
-                  <div className="flex items-center justify-center w-8 flex-shrink-0">
-                    {getMedalIcon(position)}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
+                  {/* Left side: medal + avatar + name/store */}
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="flex items-center justify-center w-8 flex-shrink-0">
+                      {getMedalIcon(position)}
+                    </div>
+                    <Avatar className="h-10 w-10 lg:h-12 lg:w-12 flex-shrink-0">
+                      <AvatarFallback className="text-base lg:text-lg font-bold">
+                        {getInitials(seller.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold truncate text-sm lg:text-base">{seller.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {store?.nome.replace('Thiago Imports - ', '')}
+                      </p>
+                    </div>
                   </div>
-                  <Avatar className="h-10 w-10 lg:h-12 lg:w-12 flex-shrink-0">
-                    <AvatarFallback className="text-base lg:text-lg font-bold">
-                      {getInitials(seller.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold truncate text-sm lg:text-base">{seller.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {store?.nome.replace('Thiago Imports - ', '')}
+                  {/* Right side: values (stacks below on narrow screens) */}
+                  <div className="w-full sm:w-auto sm:ml-auto text-left sm:text-right min-w-0">
+                    <p 
+                      className="font-bold text-success text-sm lg:text-base truncate"
+                      title={formatCurrency(seller.sales)}
+                    >
+                      {formatCurrency(seller.sales)}
                     </p>
-                  </div>
-                  <div className="text-right min-w-0 flex-shrink-0">
-                    <p className="font-bold text-success text-sm lg:text-base truncate">{formatCurrency(seller.sales)}</p>
-                    <p className="text-[10px] lg:text-xs text-purple-600 font-medium truncate">
+                    <p 
+                      className="text-[10px] lg:text-xs text-purple-600 font-medium truncate"
+                      title={`${formatCurrency(seller.commission)} (${seller.percentualComissao}%)`}
+                    >
                       {formatCurrency(seller.commission)} ({seller.percentualComissao}%)
                     </p>
                   </div>

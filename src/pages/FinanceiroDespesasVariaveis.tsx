@@ -7,16 +7,40 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, Plus, Trash2 } from 'lucide-react';
-import { getDespesas, addDespesa, deleteDespesa } from '@/utils/financeApi';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Download, Plus, Trash2, Calendar } from 'lucide-react';
+import { getDespesas, addDespesa, deleteDespesa, updateDespesa } from '@/utils/financeApi';
 import { getContasFinanceiras } from '@/utils/cadastrosApi';
 import { toast } from 'sonner';
 import { InputComMascara } from '@/components/ui/InputComMascara';
 import { formatCurrency, exportToCSV, parseMoeda } from '@/utils/formatUtils';
 
+// Helper para gerar lista de competências (meses)
+const gerarListaCompetencias = () => {
+  const meses = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+  const anoAtual = new Date().getFullYear();
+  const competencias: string[] = [];
+  
+  // Gera competências do ano anterior ao próximo ano
+  for (let ano = anoAtual - 1; ano <= anoAtual + 1; ano++) {
+    for (const mes of meses) {
+      competencias.push(`${mes}-${ano}`);
+    }
+  }
+  
+  return competencias;
+};
+
 export default function FinanceiroDespesasVariaveis() {
   const [despesas, setDespesas] = useState(getDespesas());
   const contasFinanceiras = getContasFinanceiras().filter(c => c.status === 'Ativo');
+  const competencias = useMemo(() => gerarListaCompetencias(), []);
+
+  // Estado para modal de alteração em lote
+  const [dialogLoteOpen, setDialogLoteOpen] = useState(false);
+  const [selectedDespesas, setSelectedDespesas] = useState<string[]>([]);
+  const [novaCompetenciaLote, setNovaCompetenciaLote] = useState('');
 
   const [form, setForm] = useState({
     descricao: '',
@@ -79,6 +103,39 @@ export default function FinanceiroDespesasVariaveis() {
     toast.success('Despesas Variáveis exportadas!');
   };
 
+  // Handler para seleção de despesas
+  const handleSelectDespesa = (id: string) => {
+    setSelectedDespesas(prev => 
+      prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedDespesas.length === despesasVariaveis.length) {
+      setSelectedDespesas([]);
+    } else {
+      setSelectedDespesas(despesasVariaveis.map(d => d.id));
+    }
+  };
+
+  // Handler para alteração em lote
+  const handleAlterarCompetenciaLote = () => {
+    if (!novaCompetenciaLote) {
+      toast.error('Selecione a nova competência');
+      return;
+    }
+
+    selectedDespesas.forEach(id => {
+      updateDespesa(id, { competencia: novaCompetenciaLote });
+    });
+
+    setDespesas(getDespesas());
+    setDialogLoteOpen(false);
+    setSelectedDespesas([]);
+    setNovaCompetenciaLote('');
+    toast.success(`Competência alterada para ${selectedDespesas.length} despesa(s)`);
+  };
+
   return (
     <FinanceiroLayout title="Lançar Despesas Variáveis">
       <div className="space-y-6">
@@ -115,11 +172,16 @@ export default function FinanceiroDespesasVariaveis() {
               </div>
               <div>
                 <Label>Competência *</Label>
-                <Input
-                  value={form.competencia}
-                  onChange={(e) => setForm({ ...form, competencia: e.target.value })}
-                  placeholder="Ex: JAN-2025"
-                />
+                <Select value={form.competencia} onValueChange={(value) => setForm({ ...form, competencia: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {competencias.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="md:col-span-2">
                 <Label>Conta de Origem *</Label>
@@ -161,16 +223,30 @@ export default function FinanceiroDespesasVariaveis() {
         <Card>
           <CardHeader className="flex flex-row justify-between items-center">
             <CardTitle>Despesas Variáveis Lançadas</CardTitle>
-            <Button size="sm" variant="outline" onClick={handleExport}>
-              <Download className="h-4 w-4 mr-2" />
-              Exportar CSV
-            </Button>
+            <div className="flex gap-2">
+              {selectedDespesas.length > 0 && (
+                <Button size="sm" variant="outline" onClick={() => setDialogLoteOpen(true)}>
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Mudar Competência ({selectedDespesas.length})
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={handleExport}>
+                <Download className="h-4 w-4 mr-2" />
+                Exportar CSV
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]">
+                      <Checkbox 
+                        checked={selectedDespesas.length === despesasVariaveis.length && despesasVariaveis.length > 0}
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </TableHead>
                     <TableHead>ID</TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Descrição</TableHead>
@@ -183,6 +259,12 @@ export default function FinanceiroDespesasVariaveis() {
                 <TableBody>
                   {despesasVariaveis.map(d => (
                     <TableRow key={d.id}>
+                      <TableCell>
+                        <Checkbox 
+                          checked={selectedDespesas.includes(d.id)}
+                          onCheckedChange={() => handleSelectDespesa(d.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-mono text-xs">{d.id}</TableCell>
                       <TableCell>{new Date(d.data).toLocaleDateString('pt-BR')}</TableCell>
                       <TableCell>{d.descricao}</TableCell>
@@ -204,6 +286,37 @@ export default function FinanceiroDespesasVariaveis() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Modal Alteração de Competência em Lote */}
+        <Dialog open={dialogLoteOpen} onOpenChange={setDialogLoteOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Alterar Competência em Lote</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <p className="text-sm text-muted-foreground">
+                Selecione a nova competência para as {selectedDespesas.length} despesa(s) selecionada(s).
+              </p>
+              <div className="space-y-2">
+                <Label>Nova Competência *</Label>
+                <Select value={novaCompetenciaLote} onValueChange={setNovaCompetenciaLote}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {competencias.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogLoteOpen(false)}>Cancelar</Button>
+              <Button onClick={handleAlterarCompetenciaLote}>Alterar Competência</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </FinanceiroLayout>
   );

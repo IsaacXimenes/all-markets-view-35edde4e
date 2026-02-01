@@ -13,15 +13,16 @@ export interface AcessorioCadastro {
   marca: string;
   categoria: string;
   produto: string;
+  limiteMinimo: number;
 }
 
 // Mock data
 let acessoriosCadastro: AcessorioCadastro[] = [
-  { id: 'AC-001', marca: 'Apple', categoria: 'Cabos', produto: 'Cabo USB-C Lightning' },
-  { id: 'AC-002', marca: 'Samsung', categoria: 'Capas', produto: 'Capa Galaxy S23 Ultra Silicone' },
-  { id: 'AC-003', marca: 'Apple', categoria: 'Películas', produto: 'Película Vidro iPhone 14 Pro Max' },
-  { id: 'AC-004', marca: 'JBL', categoria: 'Fones', produto: 'Fone Bluetooth JBL Tune 510' },
-  { id: 'AC-005', marca: 'Anker', categoria: 'Carregadores', produto: 'Carregador USB-C 20W' },
+  { id: 'AC-001', marca: 'Apple', categoria: 'Cabos', produto: 'Cabo USB-C Lightning', limiteMinimo: 10 },
+  { id: 'AC-002', marca: 'Samsung', categoria: 'Capas', produto: 'Capa Galaxy S23 Ultra Silicone', limiteMinimo: 5 },
+  { id: 'AC-003', marca: 'Apple', categoria: 'Películas', produto: 'Película Vidro iPhone 14 Pro Max', limiteMinimo: 15 },
+  { id: 'AC-004', marca: 'JBL', categoria: 'Fones', produto: 'Fone Bluetooth JBL Tune 510', limiteMinimo: 3 },
+  { id: 'AC-005', marca: 'Anker', categoria: 'Carregadores', produto: 'Carregador USB-C 20W', limiteMinimo: 8 },
 ];
 
 let nextId = 6;
@@ -44,8 +45,8 @@ export const deleteAcessorioCadastro = (id: string) => {
 };
 
 export const exportAcessoriosCadastroToCSV = (data: AcessorioCadastro[], filename: string) => {
-  const headers = ['ID', 'Marca', 'Categoria', 'Produto'];
-  const rows = data.map(a => [a.id, a.marca, a.categoria, a.produto]);
+  const headers = ['ID', 'Marca', 'Categoria', 'Produto', 'Limite Mínimo'];
+  const rows = data.map(a => [a.id, a.marca, a.categoria, a.produto, a.limiteMinimo.toString()]);
   const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
@@ -63,18 +64,19 @@ export default function CadastrosAcessorios() {
   const [form, setForm] = useState({
     marca: '',
     categoria: '',
-    produto: ''
+    produto: '',
+    limiteMinimo: ''
   });
 
   const resetForm = () => {
-    setForm({ marca: '', categoria: '', produto: '' });
+    setForm({ marca: '', categoria: '', produto: '', limiteMinimo: '' });
     setEditingAcessorio(null);
   };
 
   const handleOpenDialog = (acessorio?: AcessorioCadastro) => {
     if (acessorio) {
       setEditingAcessorio(acessorio);
-      setForm({ marca: acessorio.marca, categoria: acessorio.categoria, produto: acessorio.produto });
+      setForm({ marca: acessorio.marca, categoria: acessorio.categoria, produto: acessorio.produto, limiteMinimo: acessorio.limiteMinimo.toString() });
     } else {
       resetForm();
     }
@@ -82,16 +84,29 @@ export default function CadastrosAcessorios() {
   };
 
   const handleSave = () => {
-    if (!form.marca || !form.categoria || !form.produto) {
+    if (!form.marca || !form.categoria || !form.produto || !form.limiteMinimo) {
       toast({ title: 'Erro', description: 'Todos os campos são obrigatórios', variant: 'destructive' });
       return;
     }
 
+    const limite = parseInt(form.limiteMinimo);
+    if (isNaN(limite) || limite < 0) {
+      toast({ title: 'Erro', description: 'Limite mínimo deve ser um número válido', variant: 'destructive' });
+      return;
+    }
+
+    const dadosParaSalvar = {
+      marca: form.marca,
+      categoria: form.categoria,
+      produto: form.produto,
+      limiteMinimo: limite
+    };
+
     if (editingAcessorio) {
-      updateAcessorioCadastro(editingAcessorio.id, form);
+      updateAcessorioCadastro(editingAcessorio.id, dadosParaSalvar);
       toast({ title: 'Sucesso', description: 'Acessório atualizado com sucesso' });
     } else {
-      addAcessorioCadastro(form);
+      addAcessorioCadastro(dadosParaSalvar);
       toast({ title: 'Sucesso', description: 'Acessório cadastrado com sucesso' });
     }
 
@@ -148,6 +163,7 @@ export default function CadastrosAcessorios() {
                 <TableHead>Marca</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead>Produto</TableHead>
+                <TableHead className="text-center">Limite Mín.</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -158,6 +174,7 @@ export default function CadastrosAcessorios() {
                   <TableCell>{acessorio.marca}</TableCell>
                   <TableCell>{acessorio.categoria}</TableCell>
                   <TableCell className="font-medium">{acessorio.produto}</TableCell>
+                  <TableCell className="text-center font-semibold">{acessorio.limiteMinimo}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(acessorio)}>
@@ -192,6 +209,16 @@ export default function CadastrosAcessorios() {
             <div className="space-y-2">
               <Label>Produto *</Label>
               <Input value={form.produto} onChange={e => setForm({ ...form, produto: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Limite Mínimo *</Label>
+              <Input 
+                type="number" 
+                min="0"
+                value={form.limiteMinimo} 
+                onChange={e => setForm({ ...form, limiteMinimo: e.target.value })} 
+                placeholder="Ex: 5"
+              />
             </div>
           </div>
           <DialogFooter>

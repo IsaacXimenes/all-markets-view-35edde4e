@@ -305,5 +305,12 @@ export const deleteDespesa = (id: string): boolean => {
   return true;
 };
 
+export const updateDespesa = (id: string, data: Partial<Despesa>): boolean => {
+  const index = despesas.findIndex(d => d.id === id);
+  if (index === -1) return false;
+  despesas[index] = { ...despesas[index], ...data };
+  return true;
+};
+
 // Função helper para obter lojas ativas (usando os IDs reais)
 export const getLojas = () => Object.values(LOJAS_FINANCE);

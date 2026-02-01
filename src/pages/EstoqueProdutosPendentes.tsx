@@ -36,6 +36,7 @@ import { Eye, Clock, AlertTriangle, CheckCircle, Package, Filter, Download, Aler
 import { getProdutosPendentes, ProdutoPendente, calcularSLA } from '@/utils/osApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { getFornecedores } from '@/utils/cadastrosApi';
+import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
 import { toast } from 'sonner';
 import { formatIMEI, unformatIMEI } from '@/utils/imeiMask';
 import { InputComMascara } from '@/components/ui/InputComMascara';
@@ -482,17 +483,11 @@ export default function EstoqueProdutosPendentes() {
             </div>
             <div>
               <Label htmlFor="fornecedor">Fornecedor</Label>
-              <Select value={filters.fornecedor} onValueChange={(value) => setFilters({ ...filters, fornecedor: value })}>
-                <SelectTrigger id="fornecedor">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os Fornecedores</SelectItem>
-                  {fornecedores.map(f => (
-                    <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AutocompleteFornecedor
+                value={filters.fornecedor === 'todos' ? '' : filters.fornecedor}
+                onChange={(v) => setFilters({ ...filters, fornecedor: v || 'todos' })}
+                placeholder="Todos os Fornecedores"
+              />
             </div>
             <div>
               <Label htmlFor="status">Status Geral</Label>

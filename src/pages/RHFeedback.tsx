@@ -38,7 +38,7 @@ import {
   ColaboradorFeedback,
   FeedbackRegistro
 } from '@/utils/feedbackApi';
-import { getLojas } from '@/utils/cadastrosApi';
+import { useCadastroStore } from '@/store/cadastroStore';
 
 export default function RHFeedback() {
   const { toast } = useToast();
@@ -56,7 +56,7 @@ export default function RHFeedback() {
   const [arquivoFeedback, setArquivoFeedback] = useState<File | null>(null);
 
   const usuarioLogado = getUsuarioLogado();
-  const lojas = getLojas();
+  const { obterNomeLoja } = useCadastroStore();
   const todosColaboradores = getTodosColaboradoresParaFeedback();
 
   // Feedbacks filtrados para tabela principal
@@ -82,10 +82,10 @@ export default function RHFeedback() {
     return lista;
   }, [searchTerm, refreshKey, todosColaboradores, showOnlyWithFeedback]);
 
-  // Helper para nome da loja
+  // Helper para nome da loja usando CadastroStore
   const getNomeLoja = (lojaId: string) => {
-    const loja = lojas.find(l => l.id === lojaId);
-    return loja?.nome.replace('Thiago Imports ', '') || lojaId;
+    const nome = obterNomeLoja(lojaId);
+    return nome?.replace('Thiago Imports ', '').replace('TH Imports ', '') || lojaId;
   };
 
   // Helper para dados do colaborador

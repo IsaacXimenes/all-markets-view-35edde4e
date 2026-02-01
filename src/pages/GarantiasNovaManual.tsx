@@ -52,7 +52,7 @@ export default function GarantiasNovaManual() {
     modelo: '',
     condicao: '',
     planoGarantiaId: '',
-    tipoGarantia: 'Garantia - Apple',
+    tipoGarantia: 'Garantia - Thiago Imports',
     mesesGarantia: 12,
     valorGarantia: 0,
     dataInicioGarantia: format(new Date(), 'yyyy-MM-dd'),

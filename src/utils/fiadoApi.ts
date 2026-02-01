@@ -1,5 +1,5 @@
 // Fiado API - Gerenciamento de parcelas de vendas no fiado
-import { addMonths, differenceInDays, format, setDate } from 'date-fns';
+import { addMonths, differenceInDays, format, setDate, addWeeks, nextDay } from 'date-fns';
 
 export interface ParcelaFiado {
   id: string;
@@ -17,6 +17,8 @@ export interface ParcelaFiado {
   contaDestino?: string;
   responsavelPagamento?: string;
   observacao?: string;
+  tipoRecorrencia?: 'Mensal' | 'Semanal'; // Novo campo
+  diaSemana?: number; // 0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sab
 }
 
 // Mock data com exemplos
@@ -241,20 +243,38 @@ export function criarParcelasFiado(
   lojaNome: string,
   valorTotal: number,
   numeroParcelas: number,
-  diaVencimento: number
+  diaVencimento: number,
+  tipoRecorrencia: 'Mensal' | 'Semanal' = 'Mensal',
+  diaSemana?: number, // 0-6 (Dom-Sab) para recorrência semanal
+  dataInicial?: Date // Data de início das parcelas
 ): ParcelaFiado[] {
   const valorParcela = valorTotal / numeroParcelas;
-  const hoje = new Date();
+  const hoje = dataInicial || new Date();
   const novasParcelas: ParcelaFiado[] = [];
   
   for (let i = 0; i < numeroParcelas; i++) {
-    // Calcular data de vencimento
-    let dataVencimento = addMonths(hoje, i + 1);
+    let dataVencimento: Date;
     
-    // Ajustar para o dia do vencimento escolhido
-    const ultimoDiaMes = new Date(dataVencimento.getFullYear(), dataVencimento.getMonth() + 1, 0).getDate();
-    const diaAjustado = Math.min(diaVencimento, ultimoDiaMes);
-    dataVencimento = setDate(dataVencimento, diaAjustado);
+    if (tipoRecorrencia === 'Semanal' && diaSemana !== undefined) {
+      // Cálculo para parcelas semanais
+      if (i === 0) {
+        // Primeira parcela: próximo dia da semana a partir da data inicial
+        const diasSemana = [0, 1, 2, 3, 4, 5, 6] as const;
+        dataVencimento = nextDay(hoje, diasSemana[diaSemana]);
+      } else {
+        // Parcelas subsequentes: adiciona semanas a partir da primeira
+        const primeiraParcela = novasParcelas[0].dataVencimento;
+        dataVencimento = addWeeks(new Date(primeiraParcela), i);
+      }
+    } else {
+      // Cálculo mensal (comportamento atual)
+      dataVencimento = addMonths(hoje, i + 1);
+      
+      // Ajustar para o dia do vencimento escolhido
+      const ultimoDiaMes = new Date(dataVencimento.getFullYear(), dataVencimento.getMonth() + 1, 0).getDate();
+      const diaAjustado = Math.min(diaVencimento, ultimoDiaMes);
+      dataVencimento = setDate(dataVencimento, diaAjustado);
+    }
     
     const parcela: ParcelaFiado = {
       id: `FIADO-${vendaId}-${i + 1}`,
@@ -267,7 +287,9 @@ export function criarParcelasFiado(
       totalParcelas: numeroParcelas,
       valorParcela,
       dataVencimento: dataVencimento.toISOString(),
-      status: 'Pendente'
+      status: 'Pendente',
+      tipoRecorrencia,
+      diaSemana: tipoRecorrencia === 'Semanal' ? diaSemana : undefined
     };
     
     novasParcelas.push(parcela);

@@ -1,7 +1,7 @@
 import React from 'react';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { TabsNavigation } from '@/components/layout/TabsNavigation';
-import { Users, MessageSquareWarning, Store, Percent, CreditCard, Wallet } from 'lucide-react';
+import { Users, MessageSquareWarning, Store, Percent, CreditCard, Wallet, Bike } from 'lucide-react';
 
 interface RHLayoutProps {
   children: React.ReactNode;
@@ -15,6 +15,7 @@ const tabs = [
   { name: 'Salário - Colaborador', href: '/rh/salario-colaborador', icon: Percent },
   { name: 'Vales', href: '/rh/vales', icon: CreditCard },
   { name: 'Adiantamentos', href: '/rh/adiantamentos', icon: Wallet },
+  { name: 'Remuneração Motoboy', href: '/rh/motoboy-remuneracao', icon: Bike },
 ];
 
 export const RHLayout: React.FC<RHLayoutProps> = ({ children, title }) => {

@@ -19,6 +19,7 @@ import RHComissaoPorLoja from "./pages/RHComissaoPorLoja";
 import RHSalarioColaborador from "./pages/RHSalarioColaborador";
 import RHVales from "./pages/RHVales";
 import RHAdiantamentos from "./pages/RHAdiantamentos";
+import RHMotoboyRemuneracao from "./pages/RHMotoboyRemuneracao";
 import FinanceiroConferencia from "./pages/FinanceiroConferencia";
 import FinanceiroContas from "./pages/FinanceiroContas";
 import FinanceiroDespesasFixas from "./pages/FinanceiroDespesasFixas";
@@ -136,6 +137,7 @@ const App = () => (
             <Route path="/rh/salario-colaborador" element={<RHSalarioColaborador />} />
             <Route path="/rh/vales" element={<RHVales />} />
             <Route path="/rh/adiantamentos" element={<RHAdiantamentos />} />
+            <Route path="/rh/motoboy-remuneracao" element={<RHMotoboyRemuneracao />} />
             <Route path="/financeiro/conferencia" element={<FinanceiroConferencia />} />
             <Route path="/financeiro/fiado" element={<FinanceiroFiado />} />
             <Route path="/financeiro/contas" element={<FinanceiroContas />} />

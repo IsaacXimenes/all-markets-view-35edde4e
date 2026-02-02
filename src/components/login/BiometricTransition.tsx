@@ -24,21 +24,21 @@ export const BiometricTransition = ({ isActive, onComplete }: BiometricTransitio
 
     // Sequência de animação
     const timeline = async () => {
-      // Fase 1: Fade out do formulário
+      // Fase 1: Fade out do formulário (mais suave)
       setPhase('fadeOut');
-      await delay(300);
+      await delay(400);
 
-      // Fase 2: Celular centraliza e aumenta
+      // Fase 2: Celular centraliza e aumenta (mais lento)
       setPhase('centering');
-      await delay(500);
-
-      // Fase 3: Animação Face ID
-      setPhase('scanning');
-      await delay(1200);
-
-      // Fase 4: Expansão da tela
-      setPhase('expanding');
       await delay(800);
+
+      // Fase 3: Animação Face ID (mais tempo para ver)
+      setPhase('scanning');
+      await delay(1600);
+
+      // Fase 4: Expansão da tela (mais dramático)
+      setPhase('expanding');
+      await delay(1000);
 
       // Fase 5: Completo
       setPhase('complete');
@@ -58,18 +58,18 @@ export const BiometricTransition = ({ isActive, onComplete }: BiometricTransitio
     <div
       className={cn(
         'fixed inset-0 z-50 flex items-center justify-center bg-white',
-        'transition-opacity duration-500',
+        'transition-all duration-700 ease-out',
         phase === 'complete' && 'opacity-0 pointer-events-none'
       )}
     >
       {/* Phone Animation Container */}
       <div
         className={cn(
-          'transition-all duration-500 ease-out',
-          phase === 'fadeOut' && 'opacity-100',
-          phase === 'centering' && 'scale-110',
-          phase === 'scanning' && 'scale-125',
-          phase === 'expanding' && 'scale-[30] opacity-0'
+          'transition-all ease-out',
+          phase === 'fadeOut' && 'opacity-100 duration-400',
+          phase === 'centering' && 'scale-110 duration-700',
+          phase === 'scanning' && 'scale-125 duration-500',
+          phase === 'expanding' && 'scale-[30] opacity-0 duration-1000'
         )}
       >
         <Phone3D

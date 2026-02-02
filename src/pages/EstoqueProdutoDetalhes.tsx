@@ -244,6 +244,23 @@ export default function EstoqueProdutoDetalhes() {
                   <p className="font-semibold">{produto.quantidade}</p>
                 </div>
                 
+                {/* Badge de Retirada de Peças */}
+                {produto.statusRetiradaPecas && produto.statusRetiradaPecas !== 'Cancelada' && (
+                  <div className="col-span-2">
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        produto.statusRetiradaPecas === 'Pendente Assistência' && 'bg-orange-100 text-orange-700 border-orange-300',
+                        produto.statusRetiradaPecas === 'Em Desmonte' && 'bg-purple-100 text-purple-700 border-purple-300',
+                        produto.statusRetiradaPecas === 'Concluída' && 'bg-gray-100 text-gray-700 border-gray-300'
+                      )}
+                    >
+                      <Scissors className="h-3 w-3 mr-1" />
+                      Retirada de Peças: {produto.statusRetiradaPecas === 'Concluída' ? 'Desmontado' : produto.statusRetiradaPecas}
+                    </Badge>
+                  </div>
+                )}
+                
                 {/* Badge de Garantia Acionada */}
                 {(() => {
                   const garantiasAcionadas = getHistoricoGarantiasByIMEI(produto.imei);

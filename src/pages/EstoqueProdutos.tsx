@@ -13,13 +13,15 @@ import { getProdutos, getEstoqueStats, updateValorRecomendado, updateProdutoLoja
 import { useCadastroStore } from '@/store/cadastroStore';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
-import { Download, Eye, CheckCircle, XCircle, Package, DollarSign, AlertTriangle, FileWarning, AlertCircle, Edit, Wrench, ArrowRightLeft, X } from 'lucide-react';
+import { Download, Eye, CheckCircle, XCircle, Package, DollarSign, AlertTriangle, FileWarning, AlertCircle, Edit, Wrench, ArrowRightLeft, X, Scissors } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { formatIMEI, unformatIMEI } from '@/utils/imeiMask';
 import { InputComMascara } from '@/components/ui/InputComMascara';
 import { ResponsiveCardGrid, ResponsiveFilterGrid } from '@/components/ui/ResponsiveContainers';
+import { ModalRetiradaPecas } from '@/components/estoque/ModalRetiradaPecas';
+import { verificarDisponibilidadeRetirada } from '@/utils/retiradaPecasApi';
 
 import { formatCurrency, exportToCSV, parseMoeda } from '@/utils/formatUtils';
 
@@ -44,6 +46,9 @@ export default function EstoqueProdutos() {
   const [novoValorRecomendado, setNovoValorRecomendado] = useState('');
   const [usuarioSelecionado, setUsuarioSelecionado] = useState('');
 
+  // Modal para retirada de peças
+  const [showRetiradaModal, setShowRetiradaModal] = useState(false);
+  const [produtoRetirada, setProdutoRetirada] = useState<Produto | null>(null);
   // Colaboradores com permissão de estoque (gestores ou estoquistas)
   const colaboradoresEstoque = colaboradores.filter(col => 
     col.eh_estoquista || col.eh_gestor
@@ -423,13 +428,29 @@ export default function EstoqueProdutos() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => navigate(`/estoque/produto/${produto.id}`)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => navigate(`/estoque/produto/${produto.id}`)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      {verificarDisponibilidadeRetirada(produto.id).disponivel && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="text-orange-500 hover:text-orange-600"
+                          onClick={() => {
+                            setProdutoRetirada(produto);
+                            setShowRetiradaModal(true);
+                          }}
+                          title="Retirada de Peças"
+                        >
+                          <Scissors className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
                 );
@@ -508,6 +529,14 @@ export default function EstoqueProdutos() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal Retirada de Peças */}
+      <ModalRetiradaPecas
+        open={showRetiradaModal}
+        onOpenChange={setShowRetiradaModal}
+        produto={produtoRetirada}
+        onSuccess={() => setProdutos(getProdutos())}
+      />
     </EstoqueLayout>
   );
 }

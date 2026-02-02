@@ -142,9 +142,10 @@ export const solicitarRetiradaPecas = (
   
   retiradasPecas.push(novaRetirada);
   
-  // Atualizar status do produto
+  // Atualizar status do produto - mantém visível mas com status de retirada
   updateProduto(aparelhoId, {
-    statusNota: 'Pendente' // Usa campo existente para indicar status especial
+    statusRetiradaPecas: 'Pendente Assistência',
+    retiradaPecasId: novaRetirada.id
   });
   
   // Adicionar entrada na timeline do produto
@@ -203,17 +204,23 @@ export const iniciarDesmonte = (
     responsavel: tecnicoResponsavel
   });
   
-  // Atualizar timeline do produto original
+  // Atualizar timeline e status do produto original
   const produto = getProdutoById(retirada.aparelhoId);
-  if (produto && produto.timeline) {
-    produto.timeline.unshift({
-      id: `TL-PROD-${Date.now()}-desmonte`,
-      data: agora,
-      tipo: 'parecer_assistencia',
-      titulo: 'Desmonte Iniciado',
-      descricao: `Técnico ${tecnicoResponsavel} iniciou o desmonte do aparelho`,
-      responsavel: tecnicoResponsavel
+  if (produto) {
+    updateProduto(retirada.aparelhoId, {
+      statusRetiradaPecas: 'Em Desmonte'
     });
+    
+    if (produto.timeline) {
+      produto.timeline.unshift({
+        id: `TL-PROD-${Date.now()}-desmonte`,
+        data: agora,
+        tipo: 'parecer_assistencia',
+        titulo: 'Desmonte Iniciado',
+        descricao: `Técnico ${tecnicoResponsavel} iniciou o desmonte do aparelho`,
+        responsavel: tecnicoResponsavel
+      });
+    }
   }
   
   // Notificar Estoque sobre início do desmonte
@@ -383,7 +390,8 @@ export const finalizarDesmonte = (
   if (produto) {
     updateProduto(retirada.aparelhoId, {
       statusNota: 'Concluído',
-      quantidade: 0 // Zerar quantidade pois foi desmontado
+      quantidade: 0, // Zerar quantidade pois foi desmontado
+      statusRetiradaPecas: 'Concluída'
     });
     
     if (produto.timeline) {
@@ -451,7 +459,9 @@ export const cancelarRetiradaPecas = (
   const produto = getProdutoById(retirada.aparelhoId);
   if (produto) {
     updateProduto(retirada.aparelhoId, {
-      statusNota: 'Concluído'
+      statusNota: 'Concluído',
+      statusRetiradaPecas: null,
+      retiradaPecasId: undefined
     });
     
     if (produto.timeline) {

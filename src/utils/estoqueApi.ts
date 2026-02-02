@@ -49,6 +49,8 @@ export interface Produto {
   bloqueadoEmVendaId?: string; // ID da venda quando produto está bloqueado (sinal)
   statusMovimentacao?: 'Em movimentação' | null; // Status quando produto está em trânsito
   movimentacaoId?: string; // ID da movimentação ativa
+  statusRetiradaPecas?: 'Pendente Assistência' | 'Em Desmonte' | 'Concluída' | 'Cancelada' | null; // Status do fluxo de retirada de peças
+  retiradaPecasId?: string; // ID da retirada de peças ativa
 }
 
 // ============= INTERFACES MOVIMENTAÇÃO MATRIZ =============

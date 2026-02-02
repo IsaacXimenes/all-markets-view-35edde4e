@@ -322,12 +322,25 @@ export default function EstoqueProdutos() {
                   <TableCell className="font-mono text-xs">{formatIMEI(produto.imei)}</TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium">{produto.modelo}</span>
                         {produto.statusMovimentacao === 'Em movimentação' && (
                           <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300">
                             <ArrowRightLeft className="h-3 w-3 mr-1" />
                             Em movimentação
+                          </Badge>
+                        )}
+                        {produto.statusRetiradaPecas && produto.statusRetiradaPecas !== 'Cancelada' && (
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              produto.statusRetiradaPecas === 'Pendente Assistência' && 'bg-orange-100 text-orange-700 border-orange-300',
+                              produto.statusRetiradaPecas === 'Em Desmonte' && 'bg-purple-100 text-purple-700 border-purple-300',
+                              produto.statusRetiradaPecas === 'Concluída' && 'bg-gray-100 text-gray-700 border-gray-300'
+                            )}
+                          >
+                            <Scissors className="h-3 w-3 mr-1" />
+                            {produto.statusRetiradaPecas === 'Concluída' ? 'Desmontado' : produto.statusRetiradaPecas}
                           </Badge>
                         )}
                       </div>

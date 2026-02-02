@@ -90,6 +90,8 @@ import FinanceiroTetoBancario from "./pages/FinanceiroTetoBancario";
 import FinanceiroExtratoContas from "./pages/FinanceiroExtratoContas";
 import FinanceiroNotasPendencias from "./pages/FinanceiroNotasPendencias";
 import AssistenciaLotesPagamento from "./pages/AssistenciaLotesPagamento";
+import AssistRetiradaPecas from "./pages/AssistRetiradaPecas";
+import AssistRetiradaPecasDetalhes from "./pages/AssistRetiradaPecasDetalhes";
 import Relatorios from "./pages/Relatorios";
 import GarantiasNova from "./pages/GarantiasNova";
 import GarantiasNovaManual from "./pages/GarantiasNovaManual";
@@ -179,6 +181,8 @@ const App = () => (
               <Route path="/os/historico-notas" element={<OSHistoricoNotas />} />
               <Route path="/os/analise-garantia" element={<OSAnaliseGarantia />} />
               <Route path="/os/pecas" element={<OSPecas />} />
+              <Route path="/os/retirada-pecas" element={<AssistRetiradaPecas />} />
+              <Route path="/os/retirada-pecas/:id" element={<AssistRetiradaPecasDetalhes />} />
               <Route path="/financeiro/notas-assistencia" element={<FinanceiroNotasAssistencia />} />
               <Route path="/financeiro/extrato" element={<FinanceiroExtrato />} />
               <Route path="/financeiro/lotes-pagamento" element={<FinanceiroLotesPagamento />} />

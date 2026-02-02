@@ -9,7 +9,7 @@ export interface Peca {
   valorRecomendado: number;
   quantidade: number;
   dataEntrada: string;
-  origem: 'Nota de Compra' | 'Manual' | 'Solicitação';
+  origem: 'Nota de Compra' | 'Manual' | 'Solicitação' | 'Retirada de Peça';
   notaCompraId?: string;
   status: 'Disponível' | 'Reservada' | 'Utilizada';
 }

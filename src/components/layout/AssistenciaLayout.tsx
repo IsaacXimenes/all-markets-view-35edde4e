@@ -1,6 +1,6 @@
 import { PageLayout } from '@/components/layout/PageLayout';
 import { TabsNavigation } from '@/components/layout/TabsNavigation';
-import { Wrench, ClipboardList, Package, Wallet, ShoppingCart } from 'lucide-react';
+import { Wrench, ClipboardList, Package, Wallet, ShoppingCart, Scissors } from 'lucide-react';
 
 interface AssistenciaLayoutProps {
   children: React.ReactNode;
@@ -11,6 +11,7 @@ const tabs = [
   { name: 'Histórico de Assistência', href: '/os/historico-assistencia', icon: ClipboardList },
   { name: 'Assistência', href: '/os/assistencia', icon: Wrench },
   { name: 'Estoque - Assistência', href: '/os/pecas', icon: Package },
+  { name: 'Retirada de Peças', href: '/os/retirada-pecas', icon: Scissors },
   { name: 'Solicitações de Peças', href: '/os/solicitacoes-pecas', icon: ShoppingCart },
   { name: 'Análise de Tratativas', href: '/os/analise-garantia', icon: ClipboardList },
   { name: 'Histórico de Notas', href: '/os/historico-notas', icon: ClipboardList },

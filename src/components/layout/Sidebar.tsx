@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Package, Settings, ChevronRight, ChevronLeft, Home, Banknote, Users, Database, ShoppingCart, Wrench, BarChart3, Shield
+  Package, Settings, ChevronRight, ChevronLeft, Home, Banknote, Users, Database, ShoppingCart, Wrench, BarChart3, Shield, Scissors
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ const navItems: NavItem[] = [
   { title: 'Vendas', icon: ShoppingCart, href: '/vendas' },
   { title: 'Garantias', icon: Shield, href: '/garantias/nova' },
   { title: 'Assistência', icon: Wrench, href: '/os/produtos-analise' },
+  { title: 'Retirada de Peças', icon: Scissors, href: '/os/retirada-pecas' },
   { title: 'Relatórios', icon: BarChart3, href: '/relatorios' },
   { title: 'Cadastros', icon: Database, href: '/cadastros' },
   { title: 'Configurações', icon: Settings, href: '/settings' },
@@ -56,8 +57,13 @@ function SidebarContent({
     if (href === '/financeiro/conferencia') {
       return location.pathname.startsWith('/financeiro');
     }
+    // Assistência geral - exclui retirada de peças
     if (href === '/os/produtos-analise') {
-      return location.pathname.startsWith('/os');
+      return location.pathname.startsWith('/os') && !location.pathname.startsWith('/os/retirada-pecas');
+    }
+    // Retirada de Peças - rota específica
+    if (href === '/os/retirada-pecas') {
+      return location.pathname.startsWith('/os/retirada-pecas');
     }
     if (href === '/garantias/nova') {
       return location.pathname.startsWith('/garantias');

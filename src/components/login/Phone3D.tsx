@@ -79,18 +79,12 @@ export const Phone3D = ({ className, isAnimating, animationPhase = 'idle' }: Pho
             }}
           >
             {/* Clock Display */}
-            <div className="absolute top-16 left-1/2 -translate-x-1/2 text-center z-10">
+            <div className="absolute top-12 left-1/2 -translate-x-1/2 text-center z-10">
               <div 
                 className="text-black text-4xl tracking-wider"
                 style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro", system-ui, sans-serif', fontWeight: 700 }}
               >
                 {formatTime(currentTime)}
-              </div>
-              <div 
-                className="text-black/70 text-sm mt-1"
-                style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", system-ui, sans-serif', fontWeight: 400 }}
-              >
-                {formatDate(currentTime)}
               </div>
             </div>
 

@@ -28,6 +28,7 @@ import {
   getEstoqueSiaId,
   Produto
 } from '@/utils/estoqueApi';
+import { EstoqueLayout } from '@/components/layout/EstoqueLayout';
 
 export default function EstoqueNovaMovimentacaoMatriz() {
   const navigate = useNavigate();
@@ -136,10 +137,10 @@ export default function EstoqueNovaMovimentacaoMatriz() {
   }) + ' às 22:00';
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container py-4">
+    <EstoqueLayout title="Nova Movimentação - Matriz">
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Button 
               variant="ghost" 
@@ -148,24 +149,22 @@ export default function EstoqueNovaMovimentacaoMatriz() {
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div className="flex-1">
-              <h1 className="text-xl font-semibold flex items-center gap-2">
+            <div>
+              <h2 className="text-xl font-semibold flex items-center gap-2">
                 <Package className="h-5 w-5" />
                 Nova Movimentação - Matriz
-              </h1>
+              </h2>
               <p className="text-sm text-muted-foreground">
                 Registrar envio de aparelhos do Estoque SIA para a Loja Matriz
               </p>
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>Prazo de retorno: <strong className="text-foreground">{limiteFormatado}</strong></span>
-            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <span>Prazo de retorno: <strong className="text-foreground">{limiteFormatado}</strong></span>
           </div>
         </div>
-      </div>
 
-      <div className="container py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Coluna Esquerda - Formulário */}
           <div className="lg:col-span-2 space-y-6">
@@ -292,7 +291,7 @@ export default function EstoqueNovaMovimentacaoMatriz() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Prazo de retorno:</span>
-                    <span className="font-medium text-yellow-600">{limiteFormatado}</span>
+                    <span className="font-medium text-warning">{limiteFormatado}</span>
                   </div>
                 </div>
 
@@ -428,6 +427,6 @@ export default function EstoqueNovaMovimentacaoMatriz() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </EstoqueLayout>
   );
 }

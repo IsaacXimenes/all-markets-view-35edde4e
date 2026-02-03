@@ -163,9 +163,13 @@ const LOJAS_IDS = {
   AGUAS_LINDAS: '0d06e7db',      // Loja - Águas Lindas Shopping
 };
 
+// ID do Estoque - SIA (origem das movimentações matriz)
+const ESTOQUE_SIA_ID = 'dcc6547f';
+
 // Constantes para compartilhamento de estoque
 export const LOJA_MATRIZ_ID = LOJAS_IDS.MATRIZ;
 export const LOJA_ONLINE_ID = LOJAS_IDS.ONLINE;
+export const ESTOQUE_SIA_LOJA_ID = ESTOQUE_SIA_ID;
 
 // Função para verificar se uma loja compartilha estoque com a Matriz
 export const compartilhaEstoqueComMatriz = (lojaId: string): boolean => {
@@ -326,6 +330,140 @@ let produtos: Produto[] = [
     ],
     statusNota: 'Concluído',
     origemEntrada: 'Fornecedor'
+  },
+  // ============= PRODUTOS NO ESTOQUE - SIA (para movimentação matriz) =============
+  {
+    id: 'PROD-0020',
+    imei: '352123456789100',
+    marca: 'Apple',
+    modelo: 'iPhone 15 Pro Max',
+    cor: 'Titânio Azul',
+    tipo: 'Novo',
+    quantidade: 1,
+    valorCusto: 7500.00,
+    valorVendaSugerido: 15500.00,
+    vendaRecomendada: 13499.00,
+    saudeBateria: 100,
+    loja: ESTOQUE_SIA_ID,
+    estoqueConferido: true,
+    assistenciaConferida: true,
+    condicao: 'Lacrado',
+    historicoCusto: [
+      { data: '2025-01-20', fornecedor: 'Apple Distribuidor BR', valor: 7500.00 }
+    ],
+    historicoValorRecomendado: [
+      { data: '2025-01-20', usuario: 'Eilanne Mota Alves', valorAntigo: null, valorNovo: 13499.00 }
+    ],
+    statusNota: 'Concluído',
+    origemEntrada: 'Fornecedor'
+  },
+  {
+    id: 'PROD-0021',
+    imei: '352123456789101',
+    marca: 'Apple',
+    modelo: 'iPhone 15 Pro',
+    cor: 'Titânio Preto',
+    tipo: 'Novo',
+    quantidade: 1,
+    valorCusto: 6800.00,
+    valorVendaSugerido: 13600.00,
+    vendaRecomendada: 11999.00,
+    saudeBateria: 100,
+    loja: ESTOQUE_SIA_ID,
+    estoqueConferido: true,
+    assistenciaConferida: true,
+    condicao: 'Lacrado',
+    historicoCusto: [
+      { data: '2025-01-18', fornecedor: 'TechSupply Imports', valor: 6800.00 }
+    ],
+    historicoValorRecomendado: [
+      { data: '2025-01-18', usuario: 'Eilanne Mota Alves', valorAntigo: null, valorNovo: 11999.00 }
+    ],
+    statusNota: 'Concluído',
+    origemEntrada: 'Fornecedor'
+  },
+  {
+    id: 'PROD-0022',
+    imei: '352123456789102',
+    marca: 'Apple',
+    modelo: 'iPhone 14 Pro Max',
+    cor: 'Dourado',
+    tipo: 'Seminovo',
+    quantidade: 1,
+    valorCusto: 4200.00,
+    valorVendaSugerido: 8400.00,
+    vendaRecomendada: 6999.00,
+    saudeBateria: 92,
+    loja: ESTOQUE_SIA_ID,
+    estoqueConferido: true,
+    assistenciaConferida: true,
+    condicao: 'Excelente estado',
+    pareceres: 'Produto em perfeitas condições',
+    historicoCusto: [
+      { data: '2025-01-15', fornecedor: 'MobileWorld Atacado', valor: 4200.00 }
+    ],
+    historicoValorRecomendado: [
+      { data: '2025-01-15', usuario: 'Athirson Paiva', valorAntigo: null, valorNovo: 6999.00 }
+    ],
+    statusNota: 'Concluído',
+    origemEntrada: 'Base de Troca',
+    timeline: [
+      { id: 'TL-0022-1', tipo: 'entrada', data: '2025-01-15T10:00:00', titulo: 'Entrada via Base de Troca', descricao: 'Produto recebido em troca', responsavel: 'Athirson Paiva' }
+    ]
+  },
+  {
+    id: 'PROD-0023',
+    imei: '352123456789103',
+    marca: 'Apple',
+    modelo: 'iPhone 15',
+    cor: 'Azul',
+    tipo: 'Novo',
+    quantidade: 1,
+    valorCusto: 5400.00,
+    valorVendaSugerido: 10800.00,
+    vendaRecomendada: 9299.00,
+    saudeBateria: 100,
+    loja: ESTOQUE_SIA_ID,
+    estoqueConferido: true,
+    assistenciaConferida: true,
+    condicao: 'Lacrado',
+    historicoCusto: [
+      { data: '2025-01-22', fornecedor: 'FastCell Distribuição', valor: 5400.00 }
+    ],
+    historicoValorRecomendado: [
+      { data: '2025-01-22', usuario: 'Eilanne Mota Alves', valorAntigo: null, valorNovo: 9299.00 }
+    ],
+    statusNota: 'Concluído',
+    origemEntrada: 'Fornecedor'
+  },
+  {
+    id: 'PROD-0024',
+    imei: '352123456789104',
+    marca: 'Apple',
+    modelo: 'iPhone 14',
+    cor: 'Vermelho',
+    tipo: 'Seminovo',
+    quantidade: 1,
+    valorCusto: 3200.00,
+    valorVendaSugerido: 6400.00,
+    vendaRecomendada: 5299.00,
+    saudeBateria: 88,
+    loja: ESTOQUE_SIA_ID,
+    estoqueConferido: true,
+    assistenciaConferida: true,
+    condicao: 'Bom estado',
+    pareceres: 'Pequenos riscos na traseira, funcionamento perfeito',
+    historicoCusto: [
+      { data: '2025-01-10', fornecedor: 'GlobalCell Supply', valor: 3200.00 }
+    ],
+    historicoValorRecomendado: [
+      { data: '2025-01-10', usuario: 'Athirson Paiva', valorAntigo: null, valorNovo: 5299.00 }
+    ],
+    statusNota: 'Concluído',
+    origemEntrada: 'Base de Troca',
+    timeline: [
+      { id: 'TL-0024-1', tipo: 'entrada', data: '2025-01-10T14:30:00', titulo: 'Entrada via Base de Troca', descricao: 'Produto recebido em troca de cliente', responsavel: 'Athirson Paiva' }
+    ]
   }
 ];
 
@@ -1308,6 +1446,11 @@ export const getMatrizLojaId = (): string => {
   return LOJAS_IDS.MATRIZ;
 };
 
+// Obter ID do Estoque - SIA
+export const getEstoqueSiaId = (): string => {
+  return ESTOQUE_SIA_ID;
+};
+
 // Gerar ID único para movimentação matriz
 const generateMovMatrizId = (): string => {
   const now = new Date();
@@ -1354,7 +1497,7 @@ export const getMovimentacaoMatrizById = (id: string): MovimentacaoMatriz | null
   return movimentacoesMatriz.find(m => m.id === id) || null;
 };
 
-// Criar nova movimentação matriz
+// Criar nova movimentação matriz (Estoque SIA → Loja Matriz)
 export const criarMovimentacaoMatriz = (dados: {
   lojaDestinoId: string;
   responsavelLancamento: string;
@@ -1371,8 +1514,8 @@ export const criarMovimentacaoMatriz = (dados: {
     id: generateMovMatrizId(),
     dataHoraLancamento,
     responsavelLancamento: dados.responsavelLancamento,
-    lojaOrigemId: LOJAS_IDS.MATRIZ,
-    lojaDestinoId: dados.lojaDestinoId,
+    lojaOrigemId: ESTOQUE_SIA_ID, // Origem fixa: Estoque - SIA
+    lojaDestinoId: dados.lojaDestinoId, // Destino fixo: Loja - Matriz
     statusMovimentacao: 'Aguardando Retorno',
     dataHoraLimiteRetorno,
     itens: dados.itens.map(item => ({
@@ -1383,17 +1526,19 @@ export const criarMovimentacaoMatriz = (dados: {
       id: `TL-${Date.now()}`,
       data: dataHoraLancamento,
       tipo: 'saida_matriz' as const,
-      titulo: 'Saída da Matriz',
-      descricao: `${dados.itens.length} aparelho(s) enviado(s) para loja de destino`,
+      titulo: 'Saída do Estoque SIA',
+      descricao: `${dados.itens.length} aparelho(s) enviado(s) para Loja - Matriz`,
       responsavel: dados.responsavelLancamento
     }]
   };
   
-  // Atualizar lojaAtualId de cada produto
+  // Atualizar lojaAtualId de cada produto (agora está na Matriz)
   dados.itens.forEach(item => {
     const produto = produtos.find(p => p.id === item.aparelhoId);
     if (produto) {
-      produto.lojaAtualId = dados.lojaDestinoId;
+      produto.lojaAtualId = dados.lojaDestinoId; // Loja - Matriz
+      produto.statusMovimentacao = 'Em movimentação';
+      produto.movimentacaoId = novaMovimentacao.id;
       
       // Adicionar entrada na timeline do produto
       if (!produto.timeline) produto.timeline = [];
@@ -1401,8 +1546,8 @@ export const criarMovimentacaoMatriz = (dados: {
         id: `TL-PROD-${Date.now()}-${item.aparelhoId}`,
         data: dataHoraLancamento,
         tipo: 'saida_matriz',
-        titulo: 'Saída para Loja',
-        descricao: `Produto enviado da Matriz para loja de destino`,
+        titulo: 'Saída para Loja - Matriz',
+        descricao: `Produto enviado do Estoque - SIA para Loja - Matriz`,
         responsavel: dados.responsavelLancamento
       });
     }
@@ -1443,10 +1588,12 @@ export const registrarRetornoItemMatriz = (
   item.dataHoraRetorno = agora;
   item.responsavelRetorno = responsavelRetorno;
   
-  // Atualizar produto - voltar para Matriz
+  // Atualizar produto - voltar para Estoque - SIA
   const produto = produtos.find(p => p.id === aparelhoId);
   if (produto) {
-    produto.lojaAtualId = LOJAS_IDS.MATRIZ;
+    produto.lojaAtualId = undefined; // Volta ao Estoque SIA (loja original)
+    produto.statusMovimentacao = null;
+    produto.movimentacaoId = undefined;
     
     // Adicionar entrada na timeline do produto
     if (!produto.timeline) produto.timeline = [];
@@ -1454,8 +1601,8 @@ export const registrarRetornoItemMatriz = (
       id: `TL-PROD-${Date.now()}-${aparelhoId}-ret`,
       data: agora,
       tipo: 'retorno_matriz',
-      titulo: 'Retorno à Matriz',
-      descricao: `Produto devolvido à Matriz`,
+      titulo: 'Retorno ao Estoque - SIA',
+      descricao: `Produto devolvido ao Estoque - SIA`,
       responsavel: responsavelRetorno
     });
   }
@@ -1549,10 +1696,10 @@ export const marcarItemVendidoMatriz = (
   return { sucesso: false };
 };
 
-// Obter produtos disponíveis na Matriz para movimentação
+// Obter produtos disponíveis no Estoque - SIA para movimentação matriz
 export const getProdutosDisponivelMatriz = (): Produto[] => {
   return produtos.filter(p => 
-    p.loja === LOJAS_IDS.MATRIZ && 
+    p.loja === ESTOQUE_SIA_ID && 
     !p.lojaAtualId && 
     !p.statusMovimentacao &&
     !p.bloqueadoEmVendaId &&

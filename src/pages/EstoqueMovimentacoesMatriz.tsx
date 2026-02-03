@@ -35,6 +35,7 @@ import {
   registrarRetornoItemMatriz,
   getProdutosDisponivelMatriz,
   getMatrizLojaId,
+  getEstoqueSiaId,
   MovimentacaoMatriz,
   MovimentacaoMatrizItem,
   Produto
@@ -84,13 +85,17 @@ const TimerRegressivo = ({ dataLimite }: { dataLimite: string }) => {
 
 export default function EstoqueMovimentacoesMatriz() {
   const { toast } = useToast();
-  const { obterLojasTipoLoja, obterNomeLoja, obterColaboradoresAtivos, obterNomeColaborador } = useCadastroStore();
+  const { obterNomeLoja, obterColaboradoresAtivos, obterNomeColaborador } = useCadastroStore();
+  
+  // IDs fixos para origem e destino
+  const estoqueSiaId = getEstoqueSiaId();
+  const matrizId = getMatrizLojaId();
   
   // Estados do formulário de lançamento
-  const [lojaDestinoId, setLojaDestinoId] = useState('');
   const [buscaProduto, setBuscaProduto] = useState('');
   const [itensParaEnviar, setItensParaEnviar] = useState<Array<{ aparelhoId: string; imei: string; modelo: string; cor: string }>>([]);
   const [responsavelLancamento, setResponsavelLancamento] = useState('');
+  const [isModalSelecionarOpen, setIsModalSelecionarOpen] = useState(false);
   
   // Estados de movimentações
   const [movimentacoes, setMovimentacoes] = useState<MovimentacaoMatriz[]>([]);
@@ -107,14 +112,7 @@ export default function EstoqueMovimentacoesMatriz() {
     setMovimentacoes(getMovimentacoesMatriz());
   }, [refreshKey]);
   
-  // Obter lojas (excluindo Matriz)
-  const matrizId = getMatrizLojaId();
-  const lojasDestino = useMemo(() => 
-    obterLojasTipoLoja().filter(l => l.id !== matrizId),
-    [obterLojasTipoLoja, matrizId]
-  );
-  
-  // Produtos disponíveis na Matriz
+  // Produtos disponíveis no Estoque - SIA
   const produtosDisponiveis = useMemo(() => {
     const disponiveis = getProdutosDisponivelMatriz();
     if (!buscaProduto) return disponiveis;
@@ -128,6 +126,10 @@ export default function EstoqueMovimentacoesMatriz() {
   
   // Colaboradores para responsável
   const colaboradores = obterColaboradoresAtivos();
+  
+  // Nomes das lojas fixas
+  const nomeOrigem = obterNomeLoja(estoqueSiaId) || 'Estoque - SIA';
+  const nomeDestino = obterNomeLoja(matrizId) || 'Loja - Matriz';
   
   // Gerar dados do cabeçalho automático
   const cabecalhoMovimentacao = useMemo(() => {
@@ -163,10 +165,6 @@ export default function EstoqueMovimentacoesMatriz() {
   
   // Registrar lançamento
   const handleRegistrarLancamento = () => {
-    if (!lojaDestinoId) {
-      toast({ title: 'Erro', description: 'Selecione a loja de destino', variant: 'destructive' });
-      return;
-    }
     if (!responsavelLancamento) {
       toast({ title: 'Erro', description: 'Selecione o responsável pelo lançamento', variant: 'destructive' });
       return;
@@ -177,7 +175,7 @@ export default function EstoqueMovimentacoesMatriz() {
     }
     
     const novaMovimentacao = criarMovimentacaoMatriz({
-      lojaDestinoId,
+      lojaDestinoId: matrizId, // Destino fixo: Loja - Matriz
       responsavelLancamento: obterNomeColaborador(responsavelLancamento),
       itens: itensParaEnviar
     });
@@ -188,7 +186,6 @@ export default function EstoqueMovimentacoesMatriz() {
     });
     
     // Limpar formulário
-    setLojaDestinoId('');
     setItensParaEnviar([]);
     setResponsavelLancamento('');
     setRefreshKey(prev => prev + 1);
@@ -292,23 +289,24 @@ export default function EstoqueMovimentacoesMatriz() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Package className="h-5 w-5" />
-              Lançamento de Aparelhos (Saída da Matriz)
+              Lançamento de Aparelhos (Saída do Estoque SIA → Matriz)
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Loja de Destino</Label>
-                <Select value={lojaDestinoId} onValueChange={setLojaDestinoId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a loja de destino" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {lojasDestino.map(loja => (
-                      <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Origem (Fixo)</Label>
+                <div className="h-10 px-3 py-2 border rounded-md bg-muted flex items-center">
+                  <Building className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span className="font-medium">{nomeOrigem}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Destino (Fixo)</Label>
+                <div className="h-10 px-3 py-2 border rounded-md bg-muted flex items-center">
+                  <ArrowRight className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span className="font-medium">{nomeDestino}</span>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Responsável pelo Lançamento</Label>
@@ -328,43 +326,18 @@ export default function EstoqueMovimentacoesMatriz() {
             <Separator />
             
             <div className="space-y-2">
-              <Label>Buscar Aparelho (IMEI ou Modelo)</Label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    className="pl-10"
-                    placeholder="Digite o IMEI ou modelo..."
-                    value={buscaProduto}
-                    onChange={(e) => setBuscaProduto(e.target.value)}
-                  />
-                </div>
-              </div>
-              
-              {/* Lista de produtos encontrados */}
-              {buscaProduto && produtosDisponiveis.length > 0 && (
-                <div className="border rounded-md max-h-48 overflow-y-auto">
-                  {produtosDisponiveis.slice(0, 5).map(produto => (
-                    <div 
-                      key={produto.id}
-                      className="flex items-center justify-between p-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
-                      onClick={() => handleAdicionarProduto(produto)}
-                    >
-                      <div>
-                        <p className="font-medium text-sm">{produto.modelo} - {produto.cor}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{produto.imei}</p>
-                      </div>
-                      <Button size="sm" variant="ghost">
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {buscaProduto && produtosDisponiveis.length === 0 && (
-                <p className="text-sm text-muted-foreground">Nenhum aparelho encontrado na Matriz</p>
-              )}
+              <Label>Selecionar Aparelhos do Estoque - SIA</Label>
+              <Button 
+                variant="outline" 
+                className="w-full justify-start gap-2"
+                onClick={() => setIsModalSelecionarOpen(true)}
+              >
+                <Search className="h-4 w-4" />
+                Buscar Aparelho no Estoque
+                {produtosDisponiveis.length > 0 && (
+                  <Badge variant="secondary" className="ml-auto">{produtosDisponiveis.length} disponíveis</Badge>
+                )}
+              </Button>
             </div>
             
             {/* Lista de itens a enviar */}
@@ -408,7 +381,7 @@ export default function EstoqueMovimentacoesMatriz() {
             <div className="flex justify-end">
               <Button 
                 onClick={handleRegistrarLancamento}
-                disabled={!lojaDestinoId || !responsavelLancamento || itensParaEnviar.length === 0}
+                disabled={!responsavelLancamento || itensParaEnviar.length === 0}
                 className="gap-2"
               >
                 <ArrowRight className="h-4 w-4" />
@@ -643,6 +616,107 @@ export default function EstoqueMovimentacoesMatriz() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDetalheDialogOpen(false)}>
               Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* MODAL: Selecionar Aparelhos do Estoque */}
+      <Dialog open={isModalSelecionarOpen} onOpenChange={setIsModalSelecionarOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Selecionar Aparelhos - {nomeOrigem}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Busca */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                className="pl-10"
+                placeholder="Buscar por IMEI ou modelo..."
+                value={buscaProduto}
+                onChange={(e) => setBuscaProduto(e.target.value)}
+              />
+            </div>
+            
+            {/* Lista de produtos */}
+            <ScrollArea className="h-[400px]">
+              {produtosDisponiveis.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Nenhum aparelho disponível no {nomeOrigem}</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {produtosDisponiveis.map(produto => {
+                    const jaSelecionado = itensParaEnviar.some(i => i.aparelhoId === produto.id);
+                    return (
+                      <div 
+                        key={produto.id}
+                        className={`flex items-center justify-between p-3 border rounded-md cursor-pointer transition-colors ${
+                          jaSelecionado 
+                            ? 'bg-primary/10 border-primary' 
+                            : 'hover:bg-muted'
+                        }`}
+                        onClick={() => !jaSelecionado && handleAdicionarProduto(produto)}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{produto.marca} {produto.modelo}</p>
+                            <Badge variant="outline">{produto.cor}</Badge>
+                            <Badge variant={produto.tipo === 'Novo' ? 'default' : 'secondary'}>
+                              {produto.tipo}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                            <span className="font-mono">IMEI: {produto.imei}</span>
+                            <span>Custo: R$ {produto.valorCusto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            <span>Bateria: {produto.saudeBateria}%</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {jaSelecionado ? (
+                            <Badge className="bg-primary">Selecionado</Badge>
+                          ) : (
+                            <Button size="sm" variant="ghost">
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </ScrollArea>
+            
+            {/* Resumo dos selecionados */}
+            {itensParaEnviar.length > 0 && (
+              <div className="flex items-center justify-between pt-2 border-t">
+                <span className="text-sm text-muted-foreground">
+                  {itensParaEnviar.length} aparelho(s) selecionado(s)
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setItensParaEnviar([])}
+                >
+                  Limpar Seleção
+                </Button>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsModalSelecionarOpen(false); setBuscaProduto(''); }}>
+              Cancelar
+            </Button>
+            <Button onClick={() => { setIsModalSelecionarOpen(false); setBuscaProduto(''); }}>
+              Confirmar Seleção
             </Button>
           </DialogFooter>
         </DialogContent>

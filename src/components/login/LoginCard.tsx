@@ -1,9 +1,9 @@
 import { useState } from 'react';
+import { Phone3D } from './Phone3D';
 import { LoginForm } from './LoginForm';
 import { BiometricTransition } from './BiometricTransition';
 import { cn } from '@/lib/utils';
 import loginBackground from '@/assets/login-background.jpg';
-import phoneImage from '@/assets/phone-login.svg';
 
 export const LoginCard = () => {
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -41,17 +41,13 @@ export const LoginCard = () => {
           <div className="flex flex-col lg:flex-row h-full">
             {/* Left Panel - Phone & Description - Hidden on mobile */}
             <div className="hidden sm:flex flex-1 flex-col items-center justify-center p-4 md:p-6 lg:p-8 order-2 lg:order-1 min-h-0">
-              {/* Phone Image */}
-              <div className="flex items-center justify-center flex-shrink-0">
-                <img 
-                  src={phoneImage} 
-                  alt="Smartphone" 
-                  className="w-40 md:w-48 lg:w-56 h-auto object-contain"
-                />
+              {/* 3D Phone - Scaled responsively */}
+              <div className="flex items-center justify-center flex-shrink-0 scale-[0.7] md:scale-[0.8] lg:scale-90 origin-center">
+                <Phone3D />
               </div>
 
               {/* Description */}
-              <p className="text-muted-foreground text-center text-sm max-w-xs mt-4 leading-relaxed flex-shrink-0">
+              <p className="text-muted-foreground text-center text-sm max-w-xs mt-2 leading-relaxed flex-shrink-0">
                 Sua plataforma completa de gestão. Acesse sua conta para continuar.
               </p>
             </div>

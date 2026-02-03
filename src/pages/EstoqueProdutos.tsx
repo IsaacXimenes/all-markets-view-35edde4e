@@ -287,17 +287,17 @@ export default function EstoqueProdutos() {
           <Table className="min-w-[1200px]">
             <TableHeader>
               <TableRow>
+                <TableHead>Produto</TableHead>
+                <TableHead>Loja</TableHead>
+                <TableHead>Venda Recomendada</TableHead>
+                <TableHead>Custo</TableHead>
+                <TableHead>Custo Assist.</TableHead>
                 <TableHead>ID</TableHead>
                 <TableHead>IMEI</TableHead>
-                <TableHead>Produto</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Origem</TableHead>
                 <TableHead>Qtd</TableHead>
-                <TableHead>Custo</TableHead>
-                <TableHead>Custo Assist.</TableHead>
-                <TableHead>Venda Recomendada</TableHead>
                 <TableHead>Saúde Bat.</TableHead>
-                <TableHead>Loja</TableHead>
                 <TableHead>Estoque</TableHead>
                 <TableHead>Assistência</TableHead>
                 <TableHead>Ações</TableHead>
@@ -318,8 +318,7 @@ export default function EstoqueProdutos() {
                   key={produto.id}
                   className={getRowClassByBattery(produto.saudeBateria)}
                 >
-                  <TableCell className="font-mono text-xs">{produto.id}</TableCell>
-                  <TableCell className="font-mono text-xs">{formatIMEI(produto.imei)}</TableCell>
+                  {/* Produto */}
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -347,40 +346,9 @@ export default function EstoqueProdutos() {
                       <span className="text-xs text-muted-foreground">{produto.cor}</span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={
-                      produto.tipo === 'Novo' 
-                        ? 'bg-primary/10 text-primary border-primary/30' 
-                        : 'bg-muted text-muted-foreground'
-                    }>
-                      {produto.tipo}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={
-                      produto.origemEntrada === 'Base de Troca' 
-                        ? 'bg-accent text-accent-foreground'
-                        : produto.origemEntrada === 'Emprestado - Garantia'
-                        ? 'bg-destructive/10 text-destructive'
-                        : 'bg-primary/20 text-primary'
-                    }>
-                      {produto.origemEntrada}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{produto.quantidade}</TableCell>
-                  <TableCell>
-                    {formatCurrency(produto.valorCusto)}
-                  </TableCell>
-                  <TableCell>
-                    {produto.custoAssistencia ? (
-                      <div className="flex items-center gap-1 text-orange-600">
-                        <Wrench className="h-3 w-3" />
-                        <span>{formatCurrency(produto.custoAssistencia)}</span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
+                  {/* Loja */}
+                  <TableCell className="text-sm">{getLojaNome(produto.loja)}</TableCell>
+                  {/* Venda Recomendada */}
                   <TableCell>
                     {produto.vendaRecomendada ? (
                       <div className="flex items-center gap-2">
@@ -415,6 +383,50 @@ export default function EstoqueProdutos() {
                       </div>
                     )}
                   </TableCell>
+                  {/* Custo */}
+                  <TableCell>
+                    {formatCurrency(produto.valorCusto)}
+                  </TableCell>
+                  {/* Custo Assist. */}
+                  <TableCell>
+                    {produto.custoAssistencia ? (
+                      <div className="flex items-center gap-1 text-orange-600">
+                        <Wrench className="h-3 w-3" />
+                        <span>{formatCurrency(produto.custoAssistencia)}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  {/* ID */}
+                  <TableCell className="font-mono text-xs">{produto.id}</TableCell>
+                  {/* IMEI */}
+                  <TableCell className="font-mono text-xs">{formatIMEI(produto.imei)}</TableCell>
+                  {/* Tipo */}
+                  <TableCell>
+                    <Badge variant="outline" className={
+                      produto.tipo === 'Novo' 
+                        ? 'bg-primary/10 text-primary border-primary/30' 
+                        : 'bg-muted text-muted-foreground'
+                    }>
+                      {produto.tipo}
+                    </Badge>
+                  </TableCell>
+                  {/* Origem */}
+                  <TableCell>
+                    <Badge variant="outline" className={
+                      produto.origemEntrada === 'Base de Troca' 
+                        ? 'bg-accent text-accent-foreground'
+                        : produto.origemEntrada === 'Emprestado - Garantia'
+                        ? 'bg-destructive/10 text-destructive'
+                        : 'bg-primary/20 text-primary'
+                    }>
+                      {produto.origemEntrada}
+                    </Badge>
+                  </TableCell>
+                  {/* Qtd */}
+                  <TableCell>{produto.quantidade}</TableCell>
+                  {/* Saúde Bat. */}
                   <TableCell>
                     <span className={cn(
                       'font-semibold',
@@ -425,7 +437,7 @@ export default function EstoqueProdutos() {
                       {produto.saudeBateria}%
                     </span>
                   </TableCell>
-                  <TableCell className="text-sm">{getLojaNome(produto.loja)}</TableCell>
+                  {/* Estoque */}
                   <TableCell>
                     {produto.estoqueConferido ? (
                       <CheckCircle className="h-4 w-4 text-green-500" />
@@ -433,6 +445,7 @@ export default function EstoqueProdutos() {
                       <XCircle className="h-4 w-4 text-destructive" />
                     )}
                   </TableCell>
+                  {/* Assistência */}
                   <TableCell>
                     {produto.assistenciaConferida ? (
                       <CheckCircle className="h-4 w-4 text-green-500" />

@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
+import phoneWallpaper from '@/assets/phone-wallpaper.svg';
 
 interface Phone3DProps {
   className?: string;
@@ -70,7 +71,12 @@ export const Phone3D = ({ className, isAnimating, animationPhase = 'idle' }: Pho
 
           {/* Screen */}
           <div
-            className="absolute inset-1 rounded-[2.3rem] overflow-hidden bg-white"
+            className="absolute inset-1 rounded-[2.3rem] overflow-hidden"
+            style={{
+              backgroundImage: `url(${phoneWallpaper})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
           >
             {/* Clock Display */}
             <div className="absolute top-16 left-1/2 -translate-x-1/2 text-center z-10">

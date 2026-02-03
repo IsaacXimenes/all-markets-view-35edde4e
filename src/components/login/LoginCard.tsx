@@ -31,7 +31,7 @@ export const LoginCard = () => {
       >
         <div
           className={cn(
-            'w-full max-w-3xl max-h-[90vh] rounded-2xl md:rounded-3xl overflow-hidden',
+            'w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[90vh] rounded-2xl md:rounded-3xl overflow-hidden',
             'bg-white/20 backdrop-blur-xl border border-white/30',
             'shadow-[0_25px_80px_-20px_rgba(0,0,0,0.25)]',
             'transition-all duration-300',

@@ -83,12 +83,6 @@ export const BiometricTransition = ({ isActive, onComplete }: BiometricTransitio
         />
       </div>
 
-      {/* Unlock Text */}
-      {(phase === 'scanning' || phase === 'centering') && (
-        <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 text-center animate-fade-in">
-          <p className="text-gray-600 text-lg font-medium">Desbloqueando...</p>
-        </div>
-      )}
 
       {/* Success Indicator */}
       {phase === 'expanding' && (

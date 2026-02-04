@@ -1,128 +1,113 @@
 
+# Plano de Correções: Sistema de Notas de Entrada
 
-# Plano: Reestruturação da Aba Movimentação Matriz
+## Resumo do Problema
 
-## Resumo Executivo
-
-Este plano transforma a aba "Movimentação Matriz" de um layout de tela cheia (formulário sempre visível) para o padrão de tabela com registros históricos, seguindo o modelo da aba "Movimentações" regular. Além disso, corrige a regra de prazo de devolução: o limite passa a ser às **22:00 (dez da noite)** do mesmo dia, não mais "22 horas após o lançamento".
+Você identificou dois problemas:
+1. **Colunas Qtd Inf./Cad./Conf. e % Conf. não atualizam** após conferir aparelhos
+2. **Responsável no modal de pagamento** deve ser o usuário logado
 
 ---
 
-## Mudanças Principais
+## Problema 1: Dados não sincronizados entre módulos
 
-### 1. Layout em Formato de Tabela (Padrão do Sistema)
+### Causa Raiz
+Quando você confere produtos e salva, a função `finalizarConferencia` atualiza os dados na memória corretamente. Porém:
+- As telas de **Notas Pendências (Estoque)** e **Notas Pendências (Financeiro)** carregam os dados uma única vez ao abrir
+- Esses dados ficam "congelados" em um estado local
+- Para ver as atualizações, é necessário clicar no botão "Atualizar" manualmente
 
-**Antes:** Tela cheia com formulário de lançamento sempre visível + cards de movimentações abaixo.
+Além disso, há um erro no cálculo do percentual de conferência:
+- Atualmente usa `qtdInformada` como base (quantidade declarada na nota)
+- Deveria usar `qtdCadastrada` (quantidade de produtos efetivamente registrados)
 
-**Depois:** 
-- Barra de filtros no topo (Origem, Destino, Status)
-- Botão "Nova Movimentação" que abre modal de registro
-- Tabela com histórico de todas as movimentações
-- Colunas: ID, Data/Hora, Responsável, Qtd Aparelhos, Status, Timer, Ações
+### Solução
+1. **Atualização automática dos dados** - Após salvar conferência, redirecionar e forçar recarga dos dados
+2. **Corrigir cálculo do percentual** - Usar `qtdCadastrada` como denominador
 
-```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│  [Filtro Status ▼]  [Limpar]              [+ Nova Movimentação] [CSV]   │
-├─────────────────────────────────────────────────────────────────────────┤
-│  ID    │ Data/Hora Lançamento │ Resp. │ Aparelhos │ Status  │ Timer │ ⚙ │
-├────────┼──────────────────────┼───────┼───────────┼─────────┼───────┼───┤
-│ MM-001 │ 03/02/2026 20:00     │ João  │ 3 itens   │ Aguard. │ 02:00 │ 👁│
-│ MM-002 │ 03/02/2026 14:00     │ Maria │ 5 itens   │ Concl.  │   --  │ 👁│
-│ MM-003 │ 02/02/2026 18:00     │ Pedro │ 2 itens   │ Atrasad │ Expi. │ 👁│
-└─────────────────────────────────────────────────────────────────────────┘
-```
+### Arquivos a alterar
+- `src/pages/EstoqueNotaConferencia.tsx` - Forçar refresh ao retornar
+- `src/components/estoque/TabelaNotasPendencias.tsx` - Corrigir cálculo do percentual
+- `src/pages/EstoqueNotasPendencias.tsx` - Adicionar listener para atualização
+- `src/pages/FinanceiroNotasPendencias.tsx` - Sincronizar com mesma fonte de dados
 
-### 2. Correção da Regra do Timer
+---
 
-**Antes:** Prazo = Data/Hora do lançamento + 22 horas
+## Problema 2: Campo Responsável no Modal de Pagamento
 
-**Depois:** Prazo = Às 22:00 (dez da noite) do **mesmo dia** do lançamento
+### Causa Raiz
+O modal de pagamento (`ModalFinalizarPagamento.tsx`) tenta pegar o "usuário logado" da seguinte forma:
+- Busca o primeiro colaborador financeiro do cadastro
+- Isso não representa o usuário realmente autenticado
 
-**Exemplo prático:**
-- Lançamento às 20:00 → Prazo às 22:00 → Timer mostra **02:00:00** restantes
-- Lançamento às 14:00 → Prazo às 22:00 → Timer mostra **08:00:00** restantes
-- Lançamento às 10:00 → Prazo às 22:00 → Timer mostra **12:00:00** restantes
+O sistema de autenticação (`authStore.ts`) armazena apenas o username ("123"), sem vínculo com os colaboradores cadastrados.
 
-### 3. Modal "Nova Movimentação"
+### Solução
+1. **Melhorar o authStore** para armazenar informações do colaborador logado
+2. **Vincular login ao cadastro de colaboradores** - Buscar colaborador pelo username ou criar campo de email/login
+3. **Modal usar o authStore** para identificar o responsável automaticamente
 
-O formulário atual será movido para um modal/dialog, mantendo:
-- Origem fixa: **Estoque - SIA** (não editável)
-- Destino fixo: **Loja - Matriz** (não editável)
-- Seleção de responsável
-- Botão para buscar aparelhos (abre modal de seleção)
-- Lista de aparelhos selecionados
-- Botão "Registrar Lançamento"
+### Arquivos a alterar
+- `src/store/authStore.ts` - Adicionar campo para dados do colaborador
+- `src/components/estoque/ModalFinalizarPagamento.tsx` - Usar authStore ao invés do primeiro financeiro
 
 ---
 
 ## Detalhes Técnicos
 
-### Arquivo: `src/pages/EstoqueMovimentacoesMatriz.tsx`
+### Correção 1: Cálculo do Percentual de Conferência
 
-1. **Remover os cards de cabeçalho e formulário** que ocupam tela cheia
-2. **Adicionar barra de filtros** no topo (similar a EstoqueMovimentacoes.tsx)
-3. **Implementar tabela responsiva** com ResponsiveTableContainer
-4. **Criar Dialog para "Nova Movimentação"** com o formulário atual
-5. **Manter modal de conferência** existente (já funciona corretamente)
+```text
+Arquivo: src/components/estoque/TabelaNotasPendencias.tsx
 
-### Arquivo: `src/utils/estoqueApi.ts`
-
-1. **Alterar função `criarMovimentacaoMatriz`:**
-   - Ao invés de somar 22 horas, calcular o horário às 22:00 do mesmo dia
-   - Se o lançamento for após 22:00, o prazo é 22:00 do dia seguinte
-
-```typescript
-// ANTES (errado):
-const limite = new Date(agora.getTime() + 22 * 60 * 60 * 1000);
-
-// DEPOIS (correto):
-const limite = new Date(agora);
-limite.setHours(22, 0, 0, 0); // Define para 22:00 do mesmo dia
-// Se já passou das 22h, usa 22h do dia seguinte
-if (agora.getHours() >= 22) {
-  limite.setDate(limite.getDate() + 1);
-}
+Linha 202-205 - Alterar:
+  const calcularPercentualConferencia = (nota: NotaEntrada): number => {
+    if (nota.qtdCadastrada === 0) return 0;
+    return Math.round((nota.qtdConferida / nota.qtdCadastrada) * 100);
+  };
 ```
 
-### Componente TimerRegressivo
+### Correção 2: Sincronização de Dados
 
-Permanece o mesmo - já funciona corretamente calculando a diferença entre "agora" e "dataLimite". Apenas a `dataLimite` será gerada com a nova regra.
+```text
+Arquivo: src/pages/EstoqueNotasPendencias.tsx e FinanceiroNotasPendencias.tsx
+
+Adicionar useEffect que recarrega dados ao receber foco da janela
+ou usar um timestamp de atualização compartilhado
+```
+
+### Correção 3: Modal de Pagamento com Usuário Logado
+
+```text
+Arquivo: src/components/estoque/ModalFinalizarPagamento.tsx
+
+1. Importar useAuthStore
+2. Buscar colaborador pelo username do auth
+3. Preencher campo responsável com o nome do colaborador encontrado
+```
+
+### Correção 4: Melhorar AuthStore (Opcional)
+
+```text
+Arquivo: src/store/authStore.ts
+
+Adicionar campo 'colaboradorId' para vincular ao cadastro de colaboradores
+```
 
 ---
 
-## Colunas da Tabela
+## Sequência de Implementação
 
-| Coluna | Descrição |
-|--------|-----------|
-| ID | Código da movimentação (MM-XXXXXX) |
-| Data/Hora | Momento do lançamento |
-| Responsável | Quem registrou |
-| Aparelhos | Quantidade de itens (ex: "3 itens") |
-| Status | Badge colorido (Aguardando/Concluída/Atrasado) |
-| Timer | Tempo restante até 22:00 (ou "Expirado") |
-| Ações | Botões Visualizar e Conferir |
+1. Corrigir o cálculo do percentual na tabela
+2. Implementar sincronização automática de dados entre telas
+3. Atualizar modal de pagamento para usar usuário logado do authStore
+4. (Opcional) Melhorar sistema de autenticação para vincular ao cadastro
 
 ---
 
-## Cores de Linha na Tabela
+## Resultado Esperado
 
-Seguindo o padrão do sistema:
-- **Amarelo (bg-yellow-500/10):** Status "Aguardando Retorno"
-- **Verde (bg-green-500/10):** Status "Concluída"
-- **Vermelho (bg-red-500/10):** Status "Retorno Atrasado"
-
----
-
-## Fluxo de Uso
-
-1. Usuário acessa a aba "Movimentações - Matriz"
-2. Visualiza tabela com todas as movimentações existentes
-3. Clica em "+ Nova Movimentação"
-4. Modal abre com origem/destino fixos já preenchidos
-5. Seleciona responsável
-6. Clica em "Buscar Aparelho no Estoque" → Modal de seleção
-7. Seleciona os aparelhos desejados
-8. Clica em "Registrar Lançamento"
-9. Modal fecha, tabela atualiza com nova linha
-10. Timer mostra tempo até 22:00 da noite
-
+Após as correções:
+- ✅ Ao conferir produtos, as colunas Qtd Inf./Cad./Conf. e % Conf. atualizarão automaticamente
+- ✅ A visão do Financeiro mostrará os mesmos dados sincronizados
+- ✅ O campo Responsável no pagamento será preenchido com o usuário realmente logado

@@ -273,7 +273,17 @@ export default function EstoqueMovimentacaoMatrizDetalhes() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[400px]">
+              {movimentacao.statusMovimentacao !== 'Concluída' && itensPendentes.length > 0 && (
+                <Button 
+                  className="w-full mb-4 gap-2"
+                  onClick={() => setShowDevolucaoModal(true)}
+                >
+                  <Search className="h-4 w-4" />
+                  Registrar Devolução
+                </Button>
+              )}
+              
+              <ScrollArea className="h-[340px]">
                 {itensConferidos.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <CheckCircle className="h-10 w-10 mx-auto mb-2 opacity-30" />
@@ -324,18 +334,7 @@ export default function EstoqueMovimentacaoMatrizDetalhes() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {movimentacao.statusMovimentacao !== 'Concluída' && (
-                <Button 
-                  className="w-full mb-4 gap-2"
-                  onClick={() => setShowDevolucaoModal(true)}
-                  disabled={itensPendentes.length === 0}
-                >
-                  <Search className="h-4 w-4" />
-                  Registrar Devolução
-                </Button>
-              )}
-              
-              <ScrollArea className="h-[340px]">
+              <ScrollArea className="h-[400px]">
                 {itensPendentes.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <CheckCircle className="h-10 w-10 mx-auto mb-2 opacity-30 text-green-500" />

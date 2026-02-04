@@ -38,8 +38,10 @@ export interface Pagamento {
   descricao?: string;       // Campo livre opcional
   // Campos específicos para Fiado
   isFiado?: boolean;
-  fiadoDataBase?: number;   // Dia do mês para vencimento (1-31)
+  fiadoDataBase?: number;   // Dia do mês para vencimento (1-31) - usado para recorrência Mensal
   fiadoNumeroParcelas?: number; // Número de parcelas do fiado (1-10)
+  fiadoTipoRecorrencia?: 'Mensal' | 'Semanal'; // Tipo de recorrência do fiado
+  fiadoIntervaloDias?: number; // Intervalo em dias para recorrência Semanal (7, 14, 15, 21)
   // Campos para taxas de cartão
   taxaCartao?: number;      // Valor da taxa calculada
   valorComTaxa?: number;    // Valor total com taxa incluída

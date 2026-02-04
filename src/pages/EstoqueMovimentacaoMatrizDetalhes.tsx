@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { EstoqueLayout } from '@/components/layout/EstoqueLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -98,9 +98,17 @@ export default function EstoqueMovimentacaoMatrizDetalhes() {
   }, [id]);
   
   // Separar itens por status
-  const itensRelacaoOriginal = useMemo(() => movimentacao?.itens || [], [movimentacao]);
-  const itensConferidos = useMemo(() => movimentacao?.itens.filter(i => i.statusItem === 'Devolvido') || [], [movimentacao]);
-  const itensPendentes = useMemo(() => movimentacao?.itens.filter(i => i.statusItem === 'Enviado') || [], [movimentacao]);
+  // OBS: não usar useMemo aqui porque a API atual muta o objeto/array internamente;
+  // isso pode manter as listas “congeladas” (pendente não sai / conferido não entra).
+  const itensRelacaoOriginal = movimentacao?.itens ?? [];
+  const itensConferidos = itensRelacaoOriginal.filter(i => i.statusItem === 'Devolvido');
+  const itensPendentes = itensRelacaoOriginal.filter(i => i.statusItem === 'Enviado');
+
+  const cloneMovimentacao = (mov: MovimentacaoMatriz): MovimentacaoMatriz => ({
+    ...mov,
+    itens: mov.itens.map(i => ({ ...i })),
+    timeline: mov.timeline.map(t => ({ ...t })),
+  });
   
   // Registrar devolução
   const handleRegistrarDevolucao = () => {
@@ -124,7 +132,7 @@ export default function EstoqueMovimentacaoMatrizDetalhes() {
     
     if (resultado.sucesso) {
       toast({ title: 'Sucesso', description: 'Devolução registrada com sucesso' });
-      setMovimentacao(resultado.movimentacao!);
+      setMovimentacao(cloneMovimentacao(resultado.movimentacao!));
       setImeiDevolucao('');
       setShowDevolucaoModal(false);
     } else {
@@ -144,7 +152,7 @@ export default function EstoqueMovimentacaoMatrizDetalhes() {
     
     if (resultado.sucesso) {
       toast({ title: 'Sucesso', description: 'Conferência desfeita - item retornou para Pendentes' });
-      setMovimentacao(resultado.movimentacao!);
+      setMovimentacao(cloneMovimentacao(resultado.movimentacao!));
     } else {
       toast({ title: 'Erro', description: resultado.mensagem, variant: 'destructive' });
     }

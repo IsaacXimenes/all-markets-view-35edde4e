@@ -31,7 +31,7 @@ const formatCurrency = formatarMoeda;
 const TETO_BANCARIO = 120000; // R$ 120.000
 const ALERTA_LIMITE = 100000; // R$ 100.000
 
-// Interface para vendas agrupadas na aba NFE
+// Interface para vendas agrupadas na aba NFE (mantida para modal de detalhes)
 interface VendaAgrupada {
   vendaId: string;
   clienteNome: string;
@@ -50,6 +50,45 @@ interface VendaAgrupada {
     valorVenda: number;
   }>;
 }
+
+// Interface para linha da tabela NFE (espelho de Conferência de Contas - 1 linha por método de pagamento)
+interface LinhaNFE {
+  vendaId: string;
+  venda: VendaAgrupada;
+  metodoPagamento: string;
+  valor: number;
+  contaDestinoId: string;
+  contaDestinoNome: string;
+  dataVenda: string;
+  clienteNome: string;
+  notaEmitida: boolean;
+  tempoSLA: string;
+  slaHoras: number;
+}
+
+// Função para calcular SLA em formato legível
+const calcularSLANFE = (dataFinalizacao: string): { texto: string; horas: number } => {
+  const dataInicio = new Date(dataFinalizacao);
+  const dataFim = new Date();
+  
+  const diffMs = dataFim.getTime() - dataInicio.getTime();
+  const diffHoras = diffMs / (1000 * 60 * 60);
+  const diffMinutos = (diffMs % (1000 * 60 * 60)) / (1000 * 60);
+  
+  if (diffHoras >= 24) {
+    const dias = Math.floor(diffHoras / 24);
+    const horasRestantes = Math.floor(diffHoras % 24);
+    return { 
+      texto: `${dias}d ${horasRestantes}h`, 
+      horas: diffHoras 
+    };
+  }
+  
+  return { 
+    texto: `${Math.floor(diffHoras)}h ${Math.floor(diffMinutos)}m`, 
+    horas: diffHoras 
+  };
+};
 
 // Dados mockados de vendas finalizadas por conta e período
 const vendasFinalizadasMock = [
@@ -423,6 +462,49 @@ export default function FinanceiroTetoBancario() {
     return vendas.sort((a, b) => new Date(b.dataVenda).getTime() - new Date(a.dataVenda).getTime());
   }, [mesSelecionado, anoSelecionado, refreshKey]);
 
+  // Função auxiliar para obter nome da conta (definida antes do useMemo que a usa)
+  const obterNomeConta = useCallback((contaId: string) => {
+    const conta = contasFinanceiras.find(c => c.id === contaId);
+    return conta ? `${obterNomeLoja(conta.lojaVinculada)} - ${conta.nome}` : contaId;
+  }, [contasFinanceiras, obterNomeLoja]);
+
+  // Criar linhas NFE (espelho de Conferência de Contas - 1 linha por método de pagamento)
+  const linhasNFE = useMemo((): LinhaNFE[] => {
+    const linhas: LinhaNFE[] = [];
+    
+    vendasAgrupadas.forEach(venda => {
+      const slaResult = calcularSLANFE(venda.dataVenda);
+      
+      venda.pagamentos.forEach(pag => {
+        const contaNome = obterNomeConta(pag.contaId);
+        
+        linhas.push({
+          vendaId: venda.vendaId,
+          venda,
+          metodoPagamento: pag.metodo,
+          valor: pag.valor,
+          contaDestinoId: pag.contaId,
+          contaDestinoNome: contaNome,
+          dataVenda: venda.dataVenda,
+          clienteNome: venda.clienteNome,
+          notaEmitida: venda.notaEmitida,
+          tempoSLA: slaResult.texto,
+          slaHoras: slaResult.horas
+        });
+      });
+    });
+    
+    // Ordenar: pendentes primeiro, depois por data mais recente
+    return linhas.sort((a, b) => {
+      // Primeiro: pendentes (nota não emitida) no topo
+      if (a.notaEmitida !== b.notaEmitida) {
+        return a.notaEmitida ? 1 : -1;
+      }
+      // Depois por data mais recente
+      return new Date(b.dataVenda).getTime() - new Date(a.dataVenda).getTime();
+    });
+  }, [vendasAgrupadas, obterNomeConta]);
+
   const mesNome = meses.find(m => m.valor === mesSelecionado)?.nome || '';
 
   // Funções da aba NFE
@@ -464,10 +546,6 @@ export default function FinanceiroTetoBancario() {
     });
   }, [vendaSelecionada, checkboxConfirmado, mesSelecionado, anoSelecionado]);
 
-  const obterNomeConta = (contaId: string) => {
-    const conta = contasFinanceiras.find(c => c.id === contaId);
-    return conta ? `${obterNomeLoja(conta.lojaVinculada)} - ${conta.nome}` : contaId;
-  };
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -815,7 +893,7 @@ export default function FinanceiroTetoBancario() {
             </div>
           </TabsContent>
 
-          {/* Aba Emissão NFE - NOVA */}
+          {/* Aba Emissão NFE - Espelho de Conferência de Contas (1 linha por método de pagamento) */}
           <TabsContent value="emissao-nfe" className="space-y-6 mt-6">
             <Card>
               <CardHeader>
@@ -823,17 +901,20 @@ export default function FinanceiroTetoBancario() {
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <Receipt className="h-5 w-5" />
-                      Vendas para Emissão de NFE
+                      Lançamentos para Emissão de NFE
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Vendas finalizadas agrupadas por ID - {mesNome}/{anoSelecionado}
+                      Vendas finalizadas - {mesNome}/{anoSelecionado} (1 linha por método de pagamento)
                     </p>
                   </div>
-                  <Badge variant="secondary">{vendasAgrupadas.length} vendas</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{vendasAgrupadas.length} vendas</Badge>
+                    <Badge variant="secondary">{linhasNFE.length} lançamentos</Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {vendasAgrupadas.length === 0 ? (
+                {linhasNFE.length === 0 ? (
                   <div className="py-12 text-center text-muted-foreground">
                     <Receipt className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p>Nenhuma venda finalizada neste período</p>
@@ -845,32 +926,60 @@ export default function FinanceiroTetoBancario() {
                         <TableRow>
                           <TableHead>ID Venda</TableHead>
                           <TableHead>Data</TableHead>
-                          <TableHead>Cliente</TableHead>
-                          <TableHead className="text-right">Valor Total</TableHead>
-                          <TableHead>Status Nota</TableHead>
+                          <TableHead>SLA</TableHead>
+                          <TableHead>Método Pagamento</TableHead>
+                          <TableHead className="text-right">Valor</TableHead>
+                          <TableHead>Conta Destino</TableHead>
+                          <TableHead>Situação</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead className="text-center">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {vendasAgrupadas.map((venda) => (
+                        {linhasNFE.map((linha, idx) => (
                           <TableRow 
-                            key={venda.vendaId}
-                            className={venda.notaEmitida ? 'bg-green-500/10' : ''}
+                            key={`${linha.vendaId}-${linha.metodoPagamento}-${idx}`}
+                            className={linha.notaEmitida ? 'bg-green-500/10' : ''}
                           >
-                            <TableCell className="font-mono font-medium">{venda.vendaId}</TableCell>
-                            <TableCell>{formatDate(venda.dataVenda)}</TableCell>
-                            <TableCell>{venda.clienteNome}</TableCell>
-                            <TableCell className="text-right font-bold">
-                              {formatCurrency(venda.valorTotal)}
+                            <TableCell className="font-mono font-medium">{linha.vendaId}</TableCell>
+                            <TableCell>{formatDate(linha.dataVenda)}</TableCell>
+                            <TableCell>
+                              <span className={`text-xs px-2 py-1 rounded ${
+                                linha.slaHoras >= 48 
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' 
+                                  : linha.slaHoras >= 24 
+                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                    : 'bg-muted text-muted-foreground'
+                              }`}>
+                                {linha.tempoSLA}
+                              </span>
                             </TableCell>
                             <TableCell>
-                              {venda.notaEmitida ? (
-                                <Badge className="bg-green-600">
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                              <Badge variant="outline" className="font-normal">
+                                {linha.metodoPagamento}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-bold">
+                              {formatCurrency(linha.valor)}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {linha.contaDestinoNome}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className="bg-green-600 text-white">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Conferido
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {linha.notaEmitida ? (
+                                <Badge className="bg-green-600 text-white">
                                   Nota Emitida
                                 </Badge>
                               ) : (
-                                <Badge variant="outline">Pendente</Badge>
+                                <Badge variant="outline">
+                                  Finalizado
+                                </Badge>
                               )}
                             </TableCell>
                             <TableCell>
@@ -878,16 +987,16 @@ export default function FinanceiroTetoBancario() {
                                 <Button 
                                   variant="ghost" 
                                   size="icon"
-                                  onClick={() => abrirDetalhes(venda)}
-                                  title="Ver detalhes"
+                                  onClick={() => abrirDetalhes(linha.venda)}
+                                  title="Ver detalhes da venda"
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
-                                {!venda.notaEmitida && (
+                                {!linha.notaEmitida && (
                                   <Button 
                                     variant="default" 
                                     size="sm"
-                                    onClick={() => abrirConfirmacao(venda)}
+                                    onClick={() => abrirConfirmacao(linha.venda)}
                                   >
                                     <FileText className="h-4 w-4 mr-1" />
                                     Gerar Nota

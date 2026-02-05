@@ -1,234 +1,114 @@
 
-# Plano de Implementacao: Trade-In Inteligente e Base de Trocas
+# Plano: Exibir Anexos do Trade-In na Tela de Vendas
 
-## Analise do Estado Atual
-
-### O Que Ja Esta Implementado
-
-**Modulo de Vendas (VendasNova.tsx):**
-- Campo "Tipo de Entrega" com opcoes "Entregue no Ato" e "Com o Cliente"
-- Upload de Termo de Responsabilidade (PDF/imagem, max 5MB)
-- Upload de Fotos do Aparelho (multiplas imagens, max 5MB cada)
-- Validacoes obrigatorias para anexos quando "Com o Cliente"
-- Interface completa no modal de Trade-In
-
-**Modulo de Estoque (EstoquePendenciasBaseTrocas.tsx):**
-- Pagina criada com layout e estatisticas
-- Tabela com colunas: Modelo, IMEI, Cliente, ID Venda, Loja, Valor, SLA Devolucao, Acoes
-- Componente SLABadge com animacoes Framer Motion (cores por nivel)
-- Modal de Recebimento com carrossel de fotos originais
-- Upload de fotos de recebimento
-- Funcao de confirmar recebimento
-
-**API (baseTrocasPendentesApi.ts):**
-- Interface TradeInPendente completa
-- Funcoes: getTradeInsPendentes, addTradeInPendente, registrarRecebimento
-- Calculo de SLA (dias, horas, nivel)
-- Estatisticas da base
-- Dados mockados para teste
+## Objetivo
+Após registrar um Trade-In com "Aparelho com o Cliente", os anexos (Termo de Responsabilidade e Fotos do Aparelho) devem ser visíveis tanto na tela principal de Vendas quanto na página de detalhes da venda.
 
 ---
 
-## Pendencias Criticas Identificadas
+## Alterações Propostas
 
-### 1. Integracao Venda -> Base de Trocas (NAO IMPLEMENTADO)
+### 1. Tela Principal de Vendas (`src/pages/Vendas.tsx`)
 
-**Problema:**
-Quando uma venda e registrada com trade-in "Com o Cliente", o sistema NAO esta chamando `addTradeInPendente()` para enviar o registro para a aba de Pendencias.
+**Adicionar coluna/indicador de Trade-In com Anexos:**
 
-**Solucao:**
-Modificar a funcao de registro de venda em `VendasNova.tsx` para:
+Na tabela principal, adicionar uma nova coluna "Trade-In" após a coluna "Resp. Venda" que mostra:
+- Badge "Entregue" (verde) - quando o aparelho foi entregue no ato
+- Badge "Com Cliente" (âmbar) com ícone de anexo - quando está com o cliente
+- Ícones clicáveis para visualizar os anexos (Termo e Fotos)
 
+**Estrutura da coluna:**
 ```text
-// Apos registrar a venda com sucesso
-tradeIns.forEach(tradeIn => {
-  if (tradeIn.tipoEntrega === 'Com o Cliente') {
-    addTradeInPendente({
-      vendaId: venda.id,
-      clienteId,
-      clienteNome,
-      tradeIn,
-      dataVenda: new Date().toISOString(),
-      lojaVenda,
-      vendedorId: confirmVendedor,
-      vendedorNome,
-      status: 'Aguardando Devolucao',
-      termoResponsabilidade: tradeIn.termoResponsabilidade,
-      fotosAparelho: tradeIn.fotosAparelho
-    });
-  }
-});
-```
-
-### 2. Migracao para Produtos Pendentes (PARCIALMENTE IMPLEMENTADO)
-
-**Problema:**
-A funcao `migrarParaProdutosPendentes()` existe mas esta marcada como TODO sem integracao real com o estoque.
-
-**Solucao:**
-Implementar a integracao completa:
-
-```text
-// Em baseTrocasPendentesApi.ts
-import { addProdutoPendente } from './osApi';
-
-export function migrarParaProdutosPendentes(tradeInPendenteId: string): boolean {
-  const tradeIn = getTradeInPendenteById(tradeInPendenteId);
-  if (!tradeIn || tradeIn.status !== 'Recebido') return false;
-
-  addProdutoPendente({
-    modelo: tradeIn.tradeIn.modelo,
-    imei: tradeIn.tradeIn.imei,
-    condicao: tradeIn.tradeIn.condicao,
-    valorCusto: tradeIn.tradeIn.valorCompraUsado,
-    origem: 'Base de Troca',
-    vendaOrigemId: tradeIn.vendaId,
-    dataEntrada: tradeIn.dataRecebimento,
-    // Iniciar SLA de Tratativas
-    slaInicio: new Date().toISOString()
-  });
-  
-  return true;
-}
-```
-
-### 3. Coluna Vendedor Faltando na Tabela
-
-**Problema:**
-A tabela de Pendencias nao exibe a coluna "Vendedor" conforme especificado.
-
-**Solucao:**
-Adicionar coluna entre "Loja" e "Valor":
-
-```text
-<TableHead>Vendedor</TableHead>
-...
-<TableCell>{tradeIn.vendedorNome}</TableCell>
-```
-
-### 4. Chamada da Migracao no Recebimento
-
-**Problema:**
-O `handleConfirmarRecebimento` registra o recebimento mas nao chama a migracao.
-
-**Solucao:**
-```text
-const resultado = registrarRecebimento(tradeInSelecionado.id, {...});
-
-if (resultado) {
-  // Migrar para Produtos Pendentes
-  migrarParaProdutosPendentes(tradeInSelecionado.id);
-  
-  toast.success('Recebimento registrado!', {
-    description: 'Aparelho migrado para Produtos Pendentes. SLA de Tratativas iniciado.'
-  });
-}
+Trade-In
+├── Se não tem trade-in: "-"
+├── Se "Entregue no Ato": Badge verde "Entregue"
+└── Se "Com o Cliente": 
+    ├── Badge âmbar "Com Cliente"
+    ├── Ícone de documento (Termo) - clicável
+    └── Ícone de imagem (Fotos) - clicável com contador
 ```
 
 ---
 
-## Arquivos a Modificar
+### 2. Página de Detalhes (`src/pages/VendaDetalhes.tsx`)
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/pages/VendasNova.tsx` | Adicionar chamada `addTradeInPendente` apos registro de venda |
-| `src/utils/baseTrocasPendentesApi.ts` | Implementar integracao real com `addProdutoPendente` |
-| `src/pages/EstoquePendenciasBaseTrocas.tsx` | Adicionar coluna Vendedor e chamar migracao |
-| `src/pages/VendasEditar.tsx` | Replicar logica de trade-in inteligente (se necessario) |
-| `src/pages/VendasFinalizarDigital.tsx` | Replicar logica de trade-in inteligente (se necessario) |
+**Expandir o Card "Base de Troca" para exibir:**
 
----
+1. **Status de Entrega**: Badge indicando "Entregue no Ato" ou "Com o Cliente"
+2. **Termo de Responsabilidade**: 
+   - Ícone de documento com nome do arquivo
+   - Botão para visualizar/baixar o PDF
+3. **Fotos do Aparelho**:
+   - Grid de miniaturas das fotos anexadas
+   - Clique para ampliar em modal/carrossel
 
-## Detalhes Tecnicos
-
-### Fluxo Completo de Dados
-
+**Nova estrutura da tabela de Trade-In:**
 ```text
-VENDA NOVA
-    |
-    v
-[Trade-In "Com o Cliente"]
-    |
-    +-- Validar: Termo + Fotos obrigatorios
-    |
-    +-- Registrar venda normalmente
-    |
-    +-- addTradeInPendente() --> Base de Trocas
-    |
-    v
-ESTOQUE > PENDENCIAS - BASE DE TROCAS
-    |
-    +-- SLA Devolucao comeca a contar
-    |
-    +-- Status: "Aguardando Devolucao"
-    |
-    v
-[Cliente entrega aparelho]
-    |
-    +-- Estoquista clica "Registrar Recebimento"
-    |
-    +-- Modal exibe fotos originais
-    |
-    +-- Anexar novas fotos do estado atual
-    |
-    +-- Confirmar recebimento
-    |
-    v
-MIGRACAO AUTOMATICA
-    |
-    +-- registrarRecebimento() --> Status: "Recebido"
-    |
-    +-- migrarParaProdutosPendentes() --> addProdutoPendente()
-    |
-    +-- SLA Devolucao finaliza
-    |
-    +-- SLA Tratativas inicia
-    |
-    v
-ESTOQUE > APARELHOS PENDENTES
-    |
-    +-- Produto aparece com origem "Base de Troca"
-    |
-    +-- Fluxo normal de parecer Estoque/Assistencia
+| Modelo | Descrição | IMEI | Status Entrega | Anexos | Valor |
 ```
 
-### Persistencia de Anexos
+---
 
-Os anexos (Termo e Fotos) sao armazenados como DataURLs no estado. Isso funciona para o mock atual, mas para producao precisara de:
+## Detalhes Técnicos
 
-1. Upload para storage (Supabase Storage ou similar)
-2. Armazenar apenas URLs no banco de dados
-3. A infraestrutura ja esta preparada em `imagensProdutoApi.ts`
+### Arquivos a Modificar
 
-### Validacoes Implementadas
+| Arquivo | Alterações |
+|---------|------------|
+| `src/pages/Vendas.tsx` | Adicionar coluna Trade-In com badges e ícones de anexos |
+| `src/pages/VendaDetalhes.tsx` | Expandir card de Base de Troca com visualização de anexos |
 
-- Termo de Responsabilidade: obrigatorio quando "Com o Cliente"
-- Fotos do Aparelho: minimo 1 foto obrigatoria
-- Fotos de Recebimento: minimo 1 foto obrigatoria
-- IMEI Validado: continua bloqueando registro de venda
+### Componentes UI a Utilizar
+
+- `Badge` - para status de entrega
+- `Dialog` - para modal de visualização de fotos
+- `Tooltip` - para mostrar nome do arquivo ao passar o mouse
+- `FileText` e `Image` icons do Lucide - para indicar tipo de anexo
+
+### Lógica de Verificação
+
+```text
+// Para cada venda, verificar se há trade-ins com anexos
+const temTradeInComCliente = venda.tradeIns.some(
+  t => t.tipoEntrega === 'Com o Cliente'
+);
+
+const totalAnexos = venda.tradeIns.reduce((acc, t) => {
+  const qtdFotos = t.fotosAparelho?.length || 0;
+  const temTermo = t.termoResponsabilidade ? 1 : 0;
+  return acc + qtdFotos + temTermo;
+}, 0);
+```
 
 ---
 
-## Ordem de Implementacao
+## Experiência do Usuário
 
-1. **Integracao Venda -> Base de Trocas**
-   - Importar `addTradeInPendente` em VendasNova.tsx
-   - Adicionar logica apos registro de venda
+### Na Tela Principal (Vendas.tsx):
+1. Visualização rápida do status do trade-in
+2. Contador de anexos visível
+3. Clique nos ícones abre modal para visualizar
 
-2. **Completar Migracao**
-   - Implementar integracao real em `migrarParaProdutosPendentes`
-   - Chamar funcao no `handleConfirmarRecebimento`
+### Na Página de Detalhes (VendaDetalhes.tsx):
+1. Card de Base de Troca expandido
+2. Status de entrega destacado
+3. Grid de fotos com miniaturas clicáveis
+4. Botão de download para o Termo de Responsabilidade
+5. Modal de visualização em tela cheia para fotos
 
-3. **Ajustes de Tabela**
-   - Adicionar coluna Vendedor
-   - Garantir exibicao correta de todos os dados
+---
 
-4. **Replicar em Outras Paginas**
-   - VendasEditar.tsx (se aplicavel)
-   - VendasFinalizarDigital.tsx (se aplicavel)
+## Ordem de Implementação
 
-5. **Testes End-to-End**
-   - Criar venda com trade-in "Com o Cliente"
-   - Verificar aparicao em Pendencias
-   - Registrar recebimento
-   - Verificar migracao para Produtos Pendentes
+1. **Modificar `Vendas.tsx`**
+   - Adicionar coluna "Trade-In" na tabela
+   - Implementar badges de status
+   - Adicionar ícones de anexos com contadores
+   - Criar modal de visualização rápida
+
+2. **Modificar `VendaDetalhes.tsx`**
+   - Expandir tabela de Base de Troca
+   - Adicionar coluna de Status de Entrega
+   - Criar seção de anexos com grid de fotos
+   - Implementar modal de visualização de fotos
+   - Adicionar botão de download do Termo

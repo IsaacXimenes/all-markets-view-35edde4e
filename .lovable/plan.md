@@ -1,266 +1,131 @@
 
-# Plano: Melhorias no Módulo de Estoque - Movimentações
+# Plano: Correções nas Movimentações de Estoque
 
-## Visão Geral
+## Problemas Identificados
 
-Este plano implementa melhorias significativas nas telas de **Movimentações Matriz**, **Movimentações Aparelhos** e **Movimentações Acessórios**, focando em validação de IMEI, gestão de status dinâmica, logs de auditoria e padronização de campos.
+1. **Botão Scanner separado do "Buscar no Estoque"** - Na tela `EstoqueNovaMovimentacaoMatriz.tsx`, o botão "Escanear IMEI" está como botão separado (linha 243-251) em vez de estar dentro do modal de busca
+2. **Loja não atualiza na aba Aparelhos** - O filtro em `EstoqueProdutos.tsx` usa `p.loja` (linha 65) em vez de considerar `p.lojaAtualId` que é atualizado pela movimentação matriz
+3. **Colunas Origem/Destino com dados antigos** - Na tabela de `EstoqueMovimentacoes.tsx`, a função `getLojaNome` pode não estar resolvendo IDs corretamente se os dados antigos usam nomes em vez de IDs
+4. **Scanner no modal de busca de produto** - Falta botão de câmera dentro do modal de busca em `EstoqueMovimentacoes.tsx`
 
 ---
 
-## 1. Movimentações - Matriz
+## 1. Mover Scanner para Dentro do Modal (EstoqueNovaMovimentacaoMatriz.tsx)
 
-### 1.1 Leitura de IMEI via Câmera (Registrar Devolução + Nova Movimentação)
+**Antes:** Dois botões separados no header do card
+**Depois:** Apenas botão "Buscar no Estoque", com scanner dentro do modal
 
-**Arquivos:** `EstoqueMovimentacaoMatrizDetalhes.tsx`, `EstoqueNovaMovimentacaoMatriz.tsx`
+### Alterações:
+- Remover botão "Escanear IMEI" separado (linhas 243-251)
+- Adicionar botão de câmera dentro do modal, ao lado do campo de busca
+- O scanner ficará integrado no fluxo de busca
 
-**Alterações:**
-- Adicionar botão de câmera ao lado do campo IMEI no modal de devolução
-- Importar e utilizar o componente `BarcodeScanner` existente
-- Aplicar máscara `formatIMEI` nos itens pendentes listados no modal
-- Limpar campo IMEI ao fechar o modal (cancelar ou confirmar)
-
-**Estrutura do Input com Câmera:**
+### Nova estrutura do modal:
 ```text
-┌─────────────────────────────────────────────────┐
-│ IMEI do Aparelho *                              │
-│ ┌─────────────────────────────────┐ ┌────────┐  │
-│ │ Informe ou escaneie o IMEI...   │ │ 📷     │  │
-│ └─────────────────────────────────┘ └────────┘  │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│ Selecionar Aparelhos - Estoque - SIA                            │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌───────────────────────────────────────────┐ ┌───────────────┐ │
+│ │ 🔍 Buscar por IMEI ou modelo...           │ │ 📷 Escanear   │ │
+│ └───────────────────────────────────────────┘ └───────────────┘ │
+│                                                                 │
+│ [Lista de produtos...]                                          │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 Nova Lógica de Status Dinâmico
+---
 
-**Arquivo:** `estoqueApi.ts`
+## 2. Corrigir Filtro de Loja em EstoqueProdutos.tsx
 
-Substituir os 3 status atuais por 4 novos status:
+O problema está no filtro que não considera `lojaAtualId`:
 
-| Status Atual | Novo Status |
-|--------------|-------------|
-| `Aguardando Retorno` | `Pendente` |
-| `Retorno Atrasado` | `Atrasado` |
-| `Concluída` | `Finalizado - Dentro do Prazo` ou `Finalizado - Atrasado` |
-
-**Lógica de Transição:**
-```text
-1. Movimentação criada → status = 'Pendente'
-2. Se horário atual > 22:00 do dia limite e status = 'Pendente':
-   → status muda automaticamente para 'Atrasado'
-3. Ao finalizar conferência de todos os itens:
-   - Se status era 'Pendente' e horário < 22:00 → 'Finalizado - Dentro do Prazo'
-   - Se status era 'Atrasado' OU horário >= 22:00 → 'Finalizado - Atrasado'
-```
-
-**Interface Atualizada:**
+**Linha 64-65 atual:**
 ```typescript
-export interface MovimentacaoMatriz {
-  // ... campos existentes
-  statusMovimentacao: 'Pendente' | 'Atrasado' | 'Finalizado - Dentro do Prazo' | 'Finalizado - Atrasado';
-}
+if (lojaFilter !== 'todas' && p.loja !== lojaFilter) return false;
 ```
 
-### 1.3 Quadro de Logs de Movimentação
-
-**Arquivo:** `EstoqueMovimentacaoMatrizDetalhes.tsx`
-
-Adicionar um **4º quadro** abaixo dos 3 existentes (largura total):
-
-```text
-┌──────────────────────────────────────────────────────────────────────────┐
-│ 📜 Histórico de Ações                                          [Badge n] │
-├──────────────────────────────────────────────────────────────────────────┤
-│ 05/02/2025 14:30 - João Silva                                            │
-│   ✓ Item iPhone 14 Pro (IMEI: 35-123456-789012-3) conferido             │
-├──────────────────────────────────────────────────────────────────────────┤
-│ 05/02/2025 10:00 - Sistema                                               │
-│   ⚠️ Status alterado para "Atrasado" (horário limite ultrapassado)       │
-├──────────────────────────────────────────────────────────────────────────┤
-│ 04/02/2025 18:30 - Maria Santos                                          │
-│   📦 Movimentação criada com 5 aparelhos                                 │
-└──────────────────────────────────────────────────────────────────────────┘
-```
-
-**Dados exibidos de `movimentacao.timeline`:**
-- Data/Hora da ação
-- Usuário responsável
-- Descrição da ação com ícone contextual
-
-### 1.4 Comportamento de Movimentação Matriz (SEM status "Em movimentação")
-
-**Arquivo:** `estoqueApi.ts` → função `criarMovimentacaoMatriz`
-
-**Mudança Crítica:**
-- **REMOVER** a atribuição de `statusMovimentacao = 'Em movimentação'` nos produtos
-- Apenas atualizar `lojaAtualId` para a loja destino imediatamente
-- Produto continua disponível para venda na loja destino
-- A movimentação é apenas um registro de rastreabilidade
-
-**Antes:**
+**Correção:**
 ```typescript
-produto.statusMovimentacao = 'Em movimentação';
-produto.movimentacaoId = novaMovimentacao.id;
+// Usar lojaAtualId se existir (produto em movimentação matriz), senão usar loja original
+const lojaEfetiva = p.lojaAtualId || p.loja;
+if (lojaFilter !== 'todas' && lojaEfetiva !== lojaFilter) return false;
 ```
 
-**Depois:**
+Também atualizar a exibição na tabela para mostrar a loja efetiva.
+
+---
+
+## 3. Atualizar Tabela de Movimentações - Aparelhos
+
+Na tabela de `EstoqueMovimentacoes.tsx`, verificar se os dados antigos de `movimentacoes` usam IDs ou nomes, e garantir compatibilidade.
+
+**Verificação na função `getLojaNome` (linhas 111-115):**
 ```typescript
-// Apenas atualizar localização física (sem bloqueio)
-produto.lojaAtualId = dados.lojaDestinoId;
-// Manter referência para rastreabilidade, mas sem bloquear
-produto.movimentacaoId = novaMovimentacao.id;
-```
-
-### 1.5 Leitura de IMEI via Câmera ao Lançar Novo Registro
-
-**Arquivo:** `EstoqueNovaMovimentacaoMatriz.tsx`
-
-Adicionar opção de scanner no modal de seleção de aparelhos:
-- Botão "Escanear IMEI" que abre `BarcodeScanner`
-- Ao ler, busca o produto na lista e adiciona automaticamente
-
-### 1.6 Limpeza de Modal de Devolução
-
-**Arquivo:** `EstoqueMovimentacaoMatrizDetalhes.tsx`
-
-Garantir que ao fechar o modal (por qualquer meio):
-```typescript
-const handleCloseModal = () => {
-  setImeiDevolucao('');
-  setResponsavelDevolucao('');
-  setShowDevolucaoModal(false);
+const getLojaNome = (lojaIdOuNome: string) => {
+  const loja = obterLojaById(lojaIdOuNome);
+  if (loja) return loja.nome;
+  return obterNomeLoja(lojaIdOuNome);
 };
 ```
 
----
-
-## 2. Movimentações - Aparelhos
-
-### 2.1 Leitura de IMEI via Câmera
-
-**Arquivo:** `EstoqueMovimentacoes.tsx`
-
-- Adicionar botão de câmera no campo de busca de IMEI (filtro da tabela)
-- Adicionar botão de câmera no modal "Buscar Produto no Estoque"
-- Utilizar o componente `BarcodeScanner` existente
-
-### 2.2 Campos Origem e Destino Sincronizados
-
-**Arquivo:** `EstoqueMovimentacoes.tsx`
-
-O código atual já utiliza `AutocompleteLoja` para os campos - verificar se está filtrando apenas lojas ativas.
-
-**Validação:**
-- Filtros Origem/Destino: Já usam `AutocompleteLoja`
-- Modal de Registro: Origem é preenchida automaticamente, Destino usa `AutocompleteLoja`
-
-Nenhuma alteração necessária aqui, apenas validar funcionamento.
+A função já tem fallback, mas os dados mockados de `movimentacoes` podem estar usando nomes em vez de IDs. Precisamos verificar e corrigir os dados mockados em `estoqueApi.ts`.
 
 ---
 
-## 3. Movimentações - Acessórios
+## 4. Adicionar Scanner no Modal de Busca de Produto (EstoqueMovimentacoes.tsx)
 
-### 3.1 Campos Origem e Destino Sincronizados
+No modal "Buscar Produto no Estoque" (linhas 631-714), adicionar botão de câmera:
 
-**Arquivo:** `EstoqueMovimentacoesAcessorios.tsx`
+**Alterações:**
+- Adicionar botão de câmera ao lado do input de busca
+- Quando escanear um IMEI, popular o campo de busca automaticamente
 
-**Problema Atual (linha 282-304):**
-Os filtros e o formulário usam `Select` com `lojas.map(loja => loja.nome)` - isso passa o **nome** em vez do **ID**.
-
-**Solução:**
-Substituir os `<Select>` por `<AutocompleteLoja>` para:
-1. Filtro de Origem (linha 282-292)
-2. Filtro de Destino (linha 294-304)
-3. Campo Origem no modal (linha 359-368)
-4. Campo Destino no modal (linha 371-380)
+### Nova estrutura:
+```typescript
+<div className="flex gap-2">
+  <Input
+    placeholder="Buscar por modelo, marca ou IMEI..."
+    value={buscaProduto}
+    onChange={(e) => setBuscaProduto(e.target.value)}
+    className="flex-1"
+  />
+  <Button 
+    variant="outline" 
+    size="icon"
+    onClick={() => setShowScannerModal(true)}
+  >
+    <Camera className="h-4 w-4" />
+  </Button>
+  {/* ... select de loja ... */}
+</div>
+```
 
 ---
 
 ## Resumo de Arquivos a Modificar
 
-| Arquivo | Alterações |
+| Arquivo | Alteração |
 |---------|-----------|
-| `src/utils/estoqueApi.ts` | Nova lógica de status (4 estados), remover bloqueio "Em movimentação" |
-| `src/pages/EstoqueMovimentacaoMatrizDetalhes.tsx` | Scanner IMEI, máscara IMEI, quadro de logs, limpeza de modal |
-| `src/pages/EstoqueNovaMovimentacaoMatriz.tsx` | Scanner IMEI na seleção de aparelhos |
-| `src/pages/EstoqueMovimentacoesMatriz.tsx` | Atualizar badges para 4 novos status |
-| `src/pages/EstoqueMovimentacoes.tsx` | Scanner IMEI no filtro e modal |
-| `src/pages/EstoqueMovimentacoesAcessorios.tsx` | Substituir Selects por AutocompleteLoja |
+| `src/pages/EstoqueNovaMovimentacaoMatriz.tsx` | Mover scanner para dentro do modal de busca |
+| `src/pages/EstoqueProdutos.tsx` | Usar `lojaAtualId` no filtro e exibição |
+| `src/pages/EstoqueMovimentacoes.tsx` | Adicionar scanner no modal de busca de produto |
+| `src/utils/estoqueApi.ts` | Verificar dados mockados de movimentações (se usam IDs ou nomes) |
 
 ---
 
 ## Detalhes Técnicos
 
-### Novos Status e Cores (Badges)
-
-| Status | Cor | Ícone |
-|--------|-----|-------|
-| `Pendente` | `bg-yellow-500` | `Clock` |
-| `Atrasado` | `bg-destructive animate-pulse` | `AlertTriangle` |
-| `Finalizado - Dentro do Prazo` | `bg-green-600` | `CheckCircle` |
-| `Finalizado - Atrasado` | `bg-orange-500` | `CheckCircle` + `AlertTriangle` |
-
-### Lógica de Verificação Automática de Status
-
-Adicionar função `verificarStatusMovimentacaoMatriz` que:
-1. É chamada ao carregar a página
-2. Verifica todas as movimentações com status `Pendente`
-3. Se `dataHoraLimiteRetorno < agora`, muda para `Atrasado`
-4. Registra a mudança na timeline
-
-### Integração do BarcodeScanner
-
-Padrão de uso:
+### Lógica de Loja Efetiva
 ```typescript
-const [showScanner, setShowScanner] = useState(false);
-
-<div className="flex gap-2">
-  <Input 
-    placeholder="IMEI..."
-    value={imeiDevolucao}
-    onChange={(e) => setImeiDevolucao(formatIMEI(e.target.value))}
-  />
-  <Button variant="outline" size="icon" onClick={() => setShowScanner(true)}>
-    <Camera className="h-4 w-4" />
-  </Button>
-</div>
-
-<BarcodeScanner
-  open={showScanner}
-  onScan={(code) => {
-    setImeiDevolucao(code);
-    setShowScanner(false);
-  }}
-  onClose={() => setShowScanner(false)}
-/>
+// Helper para obter a loja onde o produto está fisicamente
+const getLojaFisica = (produto: Produto): string => {
+  // lojaAtualId é preenchido quando produto foi transferido via Movimentação Matriz
+  return produto.lojaAtualId || produto.loja;
+};
 ```
 
-### Estrutura do Quadro de Logs
-
-```typescript
-<Card className="col-span-full mt-6">
-  <CardHeader>
-    <CardTitle className="flex items-center gap-2">
-      <History className="h-4 w-4" />
-      Histórico de Ações
-      <Badge variant="secondary">{movimentacao.timeline.length}</Badge>
-    </CardTitle>
-  </CardHeader>
-  <CardContent>
-    <ScrollArea className="h-[250px]">
-      {movimentacao.timeline.map(entry => (
-        <div key={entry.id} className="flex gap-4 py-3 border-b last:border-0">
-          <div className="text-sm text-muted-foreground whitespace-nowrap">
-            {format(new Date(entry.data), "dd/MM/yyyy HH:mm")}
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium">{entry.titulo}</p>
-            <p className="text-xs text-muted-foreground">{entry.descricao}</p>
-            {entry.responsavel && (
-              <p className="text-xs text-primary">Por: {entry.responsavel}</p>
-            )}
-          </div>
-        </div>
-      ))}
-    </ScrollArea>
-  </CardContent>
-</Card>
-```
+### Integração do Scanner no Modal
+O scanner já está funcional no componente `BarcodeScanner`. Apenas precisamos:
+1. Adicionar state `showScannerModal` para controlar abertura
+2. No callback `onScan`, popular o campo de busca com o IMEI lido
+3. O filtro automático mostrará apenas o produto correspondente

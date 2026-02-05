@@ -1557,7 +1557,8 @@ export const criarMovimentacaoMatriz = (dados: {
       // Apenas atualizar localização física - NÃO bloquear para venda
       produto.lojaAtualId = dados.lojaDestinoId; // Loja - Matriz
       produto.movimentacaoId = novaMovimentacao.id; // Referência para rastreabilidade
-      // REMOVIDO: produto.statusMovimentacao = 'Em movimentação';
+      // Limpar qualquer status de movimentação anterior (movimentações matriz não bloqueiam)
+      produto.statusMovimentacao = null;
       
       // Adicionar entrada na timeline do produto
       if (!produto.timeline) produto.timeline = [];

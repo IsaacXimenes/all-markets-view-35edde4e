@@ -1,159 +1,128 @@
 
-
-# Plano de Implementação: Imagens Temporárias no Detalhamento de Aparelho
+# Plano: Carrossel de Imagens no Quadro do Produto + Lista de Arquivos Separada
 
 ## Objetivo
 
-Adicionar funcionalidade de anexar imagens temporariamente na tela de detalhamento de produto (`EstoqueProdutoDetalhes.tsx`), permitindo upload, visualização, download e remoção de imagens que ficam apenas em memória (Blob URLs) e são descartadas ao atualizar/fechar a página.
+Reorganizar a funcionalidade de imagens temporarias para:
+1. Integrar o upload e exibicao em carrossel no quadro "Imagem do Produto" ja existente
+2. Criar um quadro separado "Imagens Anexadas" apenas com lista de nomes de arquivos e opcao de download
 
 ---
 
-## Arquitetura da Solução
-
-A funcionalidade será implementada usando **Blob URLs** (`URL.createObjectURL`) ao invés de base64, garantindo melhor performance e menor uso de memória. O estado será mantido apenas no componente React, sem qualquer persistência.
+## Nova Arquitetura Visual
 
 ```text
-+---------------------------+
-|   EstoqueProdutoDetalhes  |
-|---------------------------|
-|  useState<ImagemTemp[]>   |  <-- Estado em memória (volátil)
-|        |                  |
-|        v                  |
-|  ImagensTemporarias       |  <-- Novo componente
-|  (upload, grid, actions)  |
-+---------------------------+
-         |
-         | onUnload: revokeObjectURL (limpeza)
-         v
-     [Descartado ao atualizar/fechar página]
-```
++-----------------------------------------------+
+|  [Image] Imagem do Produto                    |
++-----------------------------------------------+
+|  +---------------------------------------+    |
+|  |                                       |    |
+|  |   [<]  CARROSSEL DE IMAGENS   [>]    |    |
+|  |                                       |    |
+|  |   (exibe imagens temporarias ou       |    |
+|  |    placeholder se nao houver)         |    |
+|  +---------------------------------------+    |
+|                                               |
+|  [!] Imagens temporarias - serao perdidas...  |
+|                                               |
+|  [Selecionar Imagens]  [Tirar Foto]           |
+|  ou arraste arquivos aqui                     |
+|                                               |
+|  --- QR Code (permanece igual) ---            |
++-----------------------------------------------+
 
----
-
-## Etapas de Implementação
-
-### 1. Criar Componente `ImagensTemporarias`
-
-Criar um novo componente em `src/components/estoque/ImagensTemporarias.tsx` que gerencia:
-
-- **Upload**: Botao e area de drag-and-drop para selecionar imagens
-- **Visualizacao**: Grid de miniaturas das imagens carregadas
-- **Acoes por imagem**: Botoes de download e remover
-- **Limpeza de memoria**: Revoga Blob URLs ao desmontar o componente
-
-**Interface do componente:**
-
-```text
-ImagensTemporarias
-  Props:
-    - imagens: ImagemTemporaria[]
-    - onImagensChange: (imagens) => void
-    - maxFiles?: number (padrao: 20)
-    - maxSizeMB?: number (padrao: 10)
-
-  ImagemTemporaria:
-    - id: string
-    - nome: string
-    - tipo: string
-    - tamanho: number
-    - blobUrl: string (URL.createObjectURL)
-    - file: File (referencia original para download)
-```
-
-### 2. Funcionalidades Detalhadas do Componente
-
-**Upload:**
-- Aceitar apenas imagens (`image/*`)
-- Suporte a multiplos arquivos simultaneos
-- Validacao de tamanho maximo por arquivo
-- Compativel com desktop (file picker, drag-and-drop) e mobile (camera/galeria)
-- Input com `accept="image/*"` para abrir camera em dispositivos moveis
-
-**Visualizacao:**
-- Grid responsivo de miniaturas (3-4 colunas em desktop, 2 em mobile)
-- Preview usando Blob URL
-- Nome do arquivo truncado com tooltip
-- Tamanho formatado (KB/MB)
-
-**Acoes:**
-- **Download**: Cria link temporario e dispara download do arquivo original
-- **Remover**: Remove do estado e revoga o Blob URL correspondente
-
-**Aviso visual:**
-- Badge ou alerta amarelo informando que as imagens sao temporarias
-- Texto explicativo: "Estas imagens serao perdidas ao atualizar ou fechar a pagina"
-
-### 3. Integrar na Pagina EstoqueProdutoDetalhes
-
-**Alteracoes em `src/pages/EstoqueProdutoDetalhes.tsx`:**
-
-1. Adicionar estado para imagens temporarias:
-   ```text
-   const [imagensTemporarias, setImagensTemporarias] = useState<ImagemTemporaria[]>([]);
-   ```
-
-2. Adicionar efeito para limpeza de Blob URLs ao desmontar:
-   ```text
-   useEffect(() => {
-     return () => {
-       imagensTemporarias.forEach(img => URL.revokeObjectURL(img.blobUrl));
-     };
-   }, [imagensTemporarias]);
-   ```
-
-3. Renderizar o novo Card ao final da pagina (apos "Historico de Preco de Custo"):
-   - Titulo: "Imagens Anexadas Temporariamente"
-   - Icone: Camera ou Image
-   - Componente ImagensTemporarias integrado
-
-### 4. Layout Visual do Componente
-
-```text
-+-------------------------------------------------------+
-|  [Camera Icon] Imagens Anexadas Temporariamente   (3) |
-+-------------------------------------------------------+
-|  [!] Estas imagens serao perdidas ao atualizar        |
-|      ou fechar a pagina.                              |
-|-------------------------------------------------------|
-|  [Selecionar Imagens]  [Tirar Foto]                   |
-|  ou arraste arquivos aqui                             |
-|-------------------------------------------------------|
-|  +----------+  +----------+  +----------+             |
-|  | [thumb]  |  | [thumb]  |  | [thumb]  |             |
-|  | foto1.jpg|  | foto2.png|  | foto3.jpg|             |
-|  | 1.2 MB   |  | 850 KB   |  | 2.1 MB   |             |
-|  | [v] [x]  |  | [v] [x]  |  | [v] [x]  |             |
-|  +----------+  +----------+  +----------+             |
-+-------------------------------------------------------+
-         [v] = Download    [x] = Remover
++-----------------------------------------------+
+|  [List] Imagens Anexadas                  (3) |
++-----------------------------------------------+
+|  +-------------------------------------------+|
+|  | foto1.jpg           1.2 MB    [Download]  ||
+|  +-------------------------------------------+|
+|  | foto2.png           850 KB    [Download]  ||
+|  +-------------------------------------------+|
+|  | foto3.jpg           2.1 MB    [Download]  ||
+|  +-------------------------------------------+|
++-----------------------------------------------+
 ```
 
 ---
 
-## Detalhes Tecnicos
+## Etapas de Implementacao
 
-### Uso de Blob URLs
+### 1. Modificar o Quadro "Imagem do Produto"
 
-- **Criacao**: `URL.createObjectURL(file)` ao carregar cada imagem
-- **Limpeza**: `URL.revokeObjectURL(blobUrl)` ao remover ou desmontar componente
-- **Vantagem**: Melhor performance que base64 para arquivos grandes
+**No arquivo `EstoqueProdutoDetalhes.tsx`:**
 
-### Download de Imagens
+Substituir o conteudo atual do Card "Imagem do Produto" (linhas 181-211) para incluir:
 
-```text
-const handleDownload = (imagem: ImagemTemporaria) => {
-  const link = document.createElement('a');
-  link.href = imagem.blobUrl;
-  link.download = imagem.nome;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-```
+**Carrossel de Imagens:**
+- Usar o componente `Carousel` do shadcn/ui (ja existe em `src/components/ui/carousel.tsx`)
+- Exibir as imagens temporarias como slides
+- Se nao houver imagens, mostrar o placeholder atual ("Imagem do produto")
+- Botoes de navegacao (setas) aparecem quando ha mais de 1 imagem
+- Indicadores de posicao (dots) abaixo do carrossel
 
-### Suporte a Camera Mobile
+**Area de Upload integrada:**
+- Manter botoes "Selecionar Imagens" e "Tirar Foto"
+- Manter area de drag-and-drop
+- Manter alerta de aviso sobre imagens temporarias
 
-O input de arquivo com `accept="image/*"` permite que dispositivos moveis oferecam opcao de camera ou galeria nativamente.
+**QR Code:**
+- Permanece na mesma posicao, abaixo da area de upload
+
+### 2. Criar Novo Componente `ListaImagensAnexadas`
+
+**Novo arquivo: `src/components/estoque/ListaImagensAnexadas.tsx`**
+
+Componente simples que exibe:
+- Lista de arquivos em formato de tabela/lista
+- Nome do arquivo (truncado se muito longo)
+- Tamanho do arquivo formatado (KB/MB)
+- Botao de download para cada arquivo
+- Botao de remover para cada arquivo
+
+Interface mais compacta que o grid de miniaturas anterior.
+
+### 3. Atualizar `ImagensTemporarias` ou Criar Novos Componentes
+
+**Opcao escolhida: Dividir em componentes menores**
+
+Criar dois novos componentes para melhor separacao de responsabilidades:
+
+1. **`CarrosselImagensProduto`**: Exibe carrossel + area de upload
+2. **`ListaImagensAnexadas`**: Exibe lista de arquivos com download
+
+O estado `imagensTemporarias` continua sendo gerenciado pelo componente pai (`EstoqueProdutoDetalhes`).
+
+---
+
+## Detalhes do Carrossel
+
+**Comportamento:**
+- Loop desabilitado (para quando chega na ultima imagem)
+- Navegacao por setas laterais
+- Indicadores de posicao (dots) clicaveis
+- Transicao suave entre slides
+- Aspect ratio quadrado para manter consistencia
+
+**Estados visuais:**
+- Sem imagens: Exibe placeholder cinza com texto "Imagem do produto"
+- 1 imagem: Exibe imagem sem setas de navegacao
+- 2+ imagens: Exibe imagem com setas e indicadores
+
+---
+
+## Detalhes da Lista de Arquivos
+
+**Colunas/Informacoes:**
+- Icone de imagem (pequeno)
+- Nome do arquivo (truncado com tooltip)
+- Tamanho formatado
+- Botao de download
+- Botao de remover (X)
+
+**Layout:**
+- Lista vertical com separadores
+- Compacto para nao ocupar muito espaco
 
 ---
 
@@ -161,29 +130,83 @@ O input de arquivo com `accept="image/*"` permite que dispositivos moveis oferec
 
 | Arquivo | Acao |
 |---------|------|
-| `src/components/estoque/ImagensTemporarias.tsx` | Criar (novo componente) |
-| `src/pages/EstoqueProdutoDetalhes.tsx` | Modificar (adicionar estado e renderizar componente) |
+| `src/components/estoque/CarrosselImagensProduto.tsx` | Criar (carrossel + upload) |
+| `src/components/estoque/ListaImagensAnexadas.tsx` | Criar (lista de arquivos) |
+| `src/pages/EstoqueProdutoDetalhes.tsx` | Modificar (integrar novos componentes) |
+| `src/components/estoque/ImagensTemporarias.tsx` | Remover ou manter para outros usos |
 
 ---
 
-## Consistencia Visual
+## Codigo do Carrossel (Exemplo)
 
-O componente seguira os padroes ja estabelecidos no sistema:
-- Cards do shadcn/ui
-- Botoes com variantes outline e ghost
-- Cores de alerta (amber) para avisos
-- Grid responsivo com Container Queries
-- Icones do lucide-react
+```text
+<Carousel className="w-full">
+  <CarouselContent>
+    {imagens.length === 0 ? (
+      <CarouselItem>
+        <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
+          <span className="text-muted-foreground">Imagem do produto</span>
+        </div>
+      </CarouselItem>
+    ) : (
+      imagens.map((img) => (
+        <CarouselItem key={img.id}>
+          <div className="aspect-square relative">
+            <img src={img.blobUrl} alt={img.nome} className="w-full h-full object-cover rounded-lg" />
+          </div>
+        </CarouselItem>
+      ))
+    )}
+  </CarouselContent>
+  {imagens.length > 1 && (
+    <>
+      <CarouselPrevious />
+      <CarouselNext />
+    </>
+  )}
+</Carousel>
+```
 
 ---
 
-## Comportamento Esperado
+## Indicadores de Posicao (Dots)
+
+Adicionar dots clicaveis abaixo do carrossel para indicar qual imagem esta sendo exibida:
+
+```text
+<div className="flex justify-center gap-2 mt-2">
+  {imagens.map((_, index) => (
+    <button
+      key={index}
+      className={cn(
+        "h-2 w-2 rounded-full transition-colors",
+        currentIndex === index ? "bg-primary" : "bg-muted-foreground/30"
+      )}
+      onClick={() => api?.scrollTo(index)}
+    />
+  ))}
+</div>
+```
+
+---
+
+## Fluxo de Uso Final
 
 1. Usuario abre detalhes de um produto
-2. Rola ate o final e ve o quadro "Imagens Anexadas Temporariamente"
+2. No quadro "Imagem do Produto", ve o placeholder ou carrossel de imagens
 3. Clica em "Selecionar Imagens" ou arrasta arquivos
-4. Imagens aparecem como miniaturas no grid
-5. Usuario pode baixar qualquer imagem clicando no icone de download
-6. Usuario pode remover qualquer imagem clicando no X
-7. Se atualizar (F5) ou fechar a pagina, todas as imagens sao perdidas
+4. Imagens aparecem no carrossel (navegaveis por setas)
+5. Rola a pagina e ve o quadro "Imagens Anexadas" com lista de arquivos
+6. Pode baixar qualquer arquivo individualmente
+7. Pode remover arquivos da lista
+8. Se atualizar/fechar a pagina, imagens sao perdidas
 
+---
+
+## Beneficios da Nova Abordagem
+
+1. **Visualizacao rica**: Carrossel permite ver as imagens em tamanho maior
+2. **Organizacao clara**: Separacao entre visualizacao (carrossel) e gestao (lista)
+3. **Menos poluicao visual**: Lista compacta ao inves de grid de miniaturas
+4. **Consistencia**: Usa o mesmo espaco do "Imagem do Produto" existente
+5. **Reutilizacao**: Componentes podem ser usados em outras partes do sistema

@@ -1,98 +1,186 @@
 
-# Plano: Corrigir Migração e Adicionar Coluna Data/Hora
+# Plano: Implementação de Melhorias nos Módulos de Assistência, Garantia e Estoque
 
-## Problema Identificado
+## Visão Geral
+Este plano implementa 4 melhorias solicitadas:
+1. Campo "Vendedor" com Autocomplete no módulo de Assistência (Nova OS)
+2. Campo "Loja" sincronizado com Cadastros no módulo de Garantia (Nova Manual)
+3. Modal "Buscar Cliente" padronizado entre Garantia e Vendas
+4. Status "Empréstimo - Assistência" no Estoque com bloqueio de venda
 
-Após análise do código, identifiquei que:
+---
 
-1. **A migração está funcionando parcialmente** - A função `migrarParaProdutosPendentes` chama `addProdutoPendente` corretamente
-2. **O IMEI está sendo passado com hífens removidos** mas o formato original do mock (`99-888777-666555-4`) pode causar problemas na remoção
-3. **Falta coluna de Data/Hora** na tabela de Base de Trocas
+## 1. Campo Vendedor no Módulo de Assistência
 
-### Causa Raiz da Não-Migração
+**Arquivo:** `src/pages/OSAssistenciaNova.tsx`
 
-Na linha 218 de `baseTrocasPendentesApi.ts`:
-```typescript
-imei: tradeIn.tradeIn.imei?.replace(/-/g, '') || ''
-```
+### Alterações:
+- Adicionar novo campo "Vendedor" no quadro "Informações da OS"
+- Utilizar o componente `AutocompleteColaborador` já existente
+- Filtrar por vendedores usando `filtrarPorTipo="vendedoresEGestores"`
+- Armazenar o `vendedorId` no state e incluir ao criar a OS
 
-O IMEI no mock é `99-888777-666555-4` (17 caracteres com hífens). Após `replace(/-/g, '')` fica `998887776665554` (15 dígitos) - correto!
-
-O problema real é que os dados mockados da osApi já podem conter IMEIs que estão conflitando, OU a verificação de IMEI na `addProdutoPendente` está encontrando duplicata e retornando o existente sem adicionar.
-
-## Alterações Necessárias
-
-### Arquivo 1: `src/pages/EstoquePendenciasBaseTrocas.tsx`
-
-#### 1.1 Adicionar coluna "Data/Hora" na tabela
-
-| Linha | Alteração |
-|-------|-----------|
-| 283-294 | Adicionar `<TableHead>Data/Hora</TableHead>` após "Loja" |
-| 310-320 | Adicionar célula com data formatada |
-
-**Estrutura atualizada da tabela:**
+### Estrutura proposta:
 ```text
-| Modelo | IMEI | Cliente | ID Venda | Loja | Data/Hora | Vendedor | Valor | SLA | Status | Ações |
+Quadro "Informações da OS"
+├── Loja (já existe)
+├── Técnico (já existe)  
+├── Vendedor (NOVO) ← AutocompleteColaborador
+├── Setor (já existe)
+└── Status (já existe)
 ```
 
-#### 1.2 Formatar data/hora
-Usar `formatDateTime` de `formatUtils.ts` para exibir `dataVenda` como "05/02/2025 10:30"
+---
 
-### Arquivo 2: `src/utils/baseTrocasPendentesApi.ts`
+## 2. Campo Loja Sincronizado no Módulo de Garantia
 
-#### 2.1 Melhorar log de debug na migração
+**Arquivo:** `src/pages/GarantiasNovaManual.tsx`
 
-Adicionar console.log para debug do IMEI sendo passado:
+### Problema Atual:
+- Usa `getLojas()` de `cadastrosApi` que retorna todas as lojas (incluindo Estoque, Assistência, etc.)
+- Não filtra apenas lojas ativas do tipo "Loja"
+
+### Solução:
+- Substituir `getLojas()` por `useCadastroStore().obterLojasTipoLoja()`
+- Substituir o `<Select>` estático pelo `<AutocompleteLoja>` com `apenasLojasTipoLoja={true}`
+
+---
+
+## 3. Modal Buscar Cliente Padronizado
+
+**Arquivo:** `src/pages/GarantiasNovaManual.tsx`
+
+### Problema Atual:
+O modal de cliente em `GarantiasNovaManual` tem estrutura simplificada diferente do modal de `VendasNova.tsx`.
+
+### Solução - Replicar estrutura do VendasNova:
+
+| Característica | VendasNova (referência) | GarantiasNovaManual (ajustar) |
+|----------------|-------------------------|-------------------------------|
+| Tamanho Modal | `max-w-4xl` | Aplicar `max-w-4xl` |
+| Colunas Tabela | CPF, Nome, Tipo Pessoa, Tipo Cliente, Status, Telefone, Ações | Adicionar mesmas colunas |
+| Busca | Input com placeholder "Buscar por nome ou CPF..." | Manter padrão |
+| Botão Novo Cliente | Presente com ícone `Plus` | Manter padrão |
+| Validação Bloqueio | Verifica `status === 'Inativo'` e bloqueia seleção | Adicionar validação |
+
+### Campos da Tabela (padronizados):
+1. CPF/CNPJ
+2. Nome
+3. Tipo Pessoa (PF/PJ com badge colorido)
+4. Tipo Cliente (VIP/Normal/Novo)
+5. Status (Ativo/Bloqueado)
+6. Telefone
+7. Ações (Selecionar ou texto "Bloqueado")
+
+---
+
+## 4. Status "Empréstimo - Assistência" no Estoque
+
+### 4.1 Alterações na Interface de Produto
+
+**Arquivo:** `src/utils/estoqueApi.ts`
+
+Adicionar novo campo na interface `Produto`:
 ```typescript
-const imeiLimpo = tradeIn.tradeIn.imei?.replace(/-/g, '') || '';
-console.log(`[BaseTrocasAPI] Migrando IMEI: ${imeiLimpo} (original: ${tradeIn.tradeIn.imei})`);
-```
-
-### Arquivo 3: `src/utils/osApi.ts`
-
-#### 3.1 Forçar criação mesmo com IMEI existente (flag opcional)
-
-Modificar `addProdutoPendente` para aceitar um parâmetro `forcarCriacao` que ignora a verificação de duplicata quando vindo de Base de Troca:
-
-```typescript
-export const addProdutoPendente = (
-  produto: Omit<ProdutoPendente, 'id' | 'timeline' | ...>,
-  forcarCriacao: boolean = false
-): ProdutoPendente => {
-  // Verificar duplicatas APENAS se não for forçado
-  if (!forcarCriacao && produto.imei) {
-    const jaExiste = produtosPendentes.find(p => p.imei === produto.imei);
-    if (jaExiste) {
-      console.log(`[OS API] IMEI ${produto.imei} já existe, retornando existente.`);
-      return jaExiste;
-    }
-  }
-  // ... resto do código de criação
+interface Produto {
+  // ... campos existentes ...
+  statusEmprestimo?: 'Empréstimo - Assistência' | null;
+  emprestimoGarantiaId?: string; // ID da garantia vinculada
+  emprestimoClienteId?: string;   // ID do cliente com o aparelho
+  emprestimoClienteNome?: string; // Nome do cliente
+  emprestimoOsId?: string;        // ID da OS vinculada (se houver)
 }
 ```
 
-E na chamada em `migrarParaProdutosPendentes`:
+### 4.2 Alterações na Tratativa de Empréstimo
+
+**Arquivo:** `src/pages/GarantiasNovaManual.tsx`
+
+Quando tratativa = "Assistência + Empréstimo":
+- Atualizar produto com `statusEmprestimo: 'Empréstimo - Assistência'`
+- Armazenar `emprestimoGarantiaId`, `emprestimoClienteId`, `emprestimoClienteNome`
+- NÃO alterar `origemEntrada` (manter origem original)
+
+### 4.3 Visualização no Estoque
+
+**Arquivo:** `src/pages/Estoque.tsx` (aba Aparelhos)
+
+Adicionar identificação visual:
+- Badge/Tag `Empréstimo - Assistência` na linha do produto (similar a "Em movimentação")
+- Cor de fundo diferenciada (ex: `bg-purple-500/10`)
+- Tooltip com informações: Cliente, Garantia ID, Data
+
+### 4.4 Bloqueio de Venda
+
+**Arquivo:** `src/pages/VendasNova.tsx`
+
+Na filtragem de produtos disponíveis:
 ```typescript
-const produtoPendente = addProdutoPendente({...}, true); // força criação
+const produtosFiltrados = produtosEstoque.filter(p => {
+  if (p.quantidade <= 0) return false;
+  if (p.bloqueadoEmVendaId) return false;
+  if (p.statusMovimentacao) return false;
+  if (p.statusEmprestimo) return false; // NOVO: Bloquear empréstimos
+  // ...
+});
 ```
 
-## Resumo das Mudanças
+---
 
-| Arquivo | Tipo | Descrição |
-|---------|------|-----------|
-| EstoquePendenciasBaseTrocas.tsx | UI | Adicionar coluna Data/Hora formatada |
-| baseTrocasPendentesApi.ts | Debug | Melhorar logs de debug na migração |
-| osApi.ts | Lógica | Adicionar flag `forcarCriacao` em `addProdutoPendente` |
+## Resumo de Arquivos a Modificar
 
-## Fluxo Corrigido
+| Arquivo | Tipo | Alterações |
+|---------|------|------------|
+| `src/utils/estoqueApi.ts` | API | Adicionar campos de empréstimo na interface `Produto` |
+| `src/pages/OSAssistenciaNova.tsx` | UI | Adicionar campo Vendedor com AutocompleteColaborador |
+| `src/pages/GarantiasNovaManual.tsx` | UI | Sincronizar campo Loja + Padronizar modal cliente + Status empréstimo |
+| `src/pages/Estoque.tsx` | UI | Exibir badge e identificação visual de empréstimo |
+| `src/pages/VendasNova.tsx` | Lógica | Bloquear produtos com statusEmprestimo |
+
+---
+
+## Fluxo do Empréstimo (Diagrama)
 
 ```text
-1. Usuário clica "Registrar Recebimento"
-2. Anexa fotos e confirma
-3. Sistema:
-   a. Atualiza status para "Recebido" (mantém histórico com Data/Hora visível)
-   b. Chama migrarParaProdutosPendentes com forcarCriacao=true
-   c. Produto é SEMPRE criado em Produtos Pendentes
-   d. Redireciona para /estoque/produtos-pendentes
+1. Garantia > Nova Manual
+   └── Tratativa: "Assistência + Empréstimo"
+       └── Selecionar aparelho Seminovo
+
+2. Sistema atualiza Produto:
+   ├── statusEmprestimo = 'Empréstimo - Assistência'
+   ├── emprestimoGarantiaId = GAR-XXXX
+   ├── emprestimoClienteId = CLI-XXX
+   └── emprestimoClienteNome = "Nome Cliente"
+
+3. No Estoque > Aparelhos:
+   └── Linha do produto exibe:
+       ├── Badge roxo "Empréstimo - Assistência"
+       └── Tooltip: "Cliente: Nome | Garantia: GAR-XXXX"
+
+4. Em Vendas > Nova Venda:
+   └── Produto NÃO aparece na lista (bloqueado)
+
+5. Ao registrar devolução:
+   └── Limpar statusEmprestimo e campos relacionados
 ```
+
+---
+
+## Detalhes Técnicos
+
+### Campo Vendedor (OSAssistenciaNova)
+- Posição: Logo após o campo "Técnico"
+- Componente: `<AutocompleteColaborador filtrarPorTipo="vendedoresEGestores" />`
+- State: `vendedorId` (string)
+- Persistência: Incluir no objeto `addOrdemServico()`
+
+### Modal Cliente (GarantiasNovaManual)
+- Dimensão: `max-w-4xl`
+- Altura máxima tabela: `max-h-[400px] overflow-auto`
+- Validação: Impedir seleção de clientes com `status === 'Inativo'`
+- Formatação CPF/CNPJ: Usar função `formatCpfCnpj` existente
+
+### Identificação Visual Empréstimo
+- Cor badge: `bg-purple-500/10 text-purple-600 border-purple-500/30`
+- Posição: Na coluna de Status ou como nova coluna "Situação"
+- Ícone sugerido: `ArrowRightLeft` ou `Handshake`

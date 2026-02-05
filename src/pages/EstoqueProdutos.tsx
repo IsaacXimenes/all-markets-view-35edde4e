@@ -352,7 +352,7 @@ export default function EstoqueProdutos() {
                             Estoque Baixo
                           </Badge>
                         )}
-                        {produto.statusMovimentacao === 'Em movimentação' && (
+                        {produto.statusMovimentacao === 'Em movimentação' && !produto.lojaAtualId && (
                           <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300">
                             <ArrowRightLeft className="h-3 w-3 mr-1" />
                             Em movimentação

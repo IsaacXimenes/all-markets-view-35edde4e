@@ -1,56 +1,73 @@
 
-# Plano: Adicionar Redirecionamento para Produtos Pendentes
+# Plano: Corrigir Fluxo de Recebimento da Base de Trocas
 
-## Contexto Atual
-Ao confirmar o recebimento de um trade-in na aba "Pendências - Base de Trocas":
-1. O status é atualizado para "Recebido" (mantendo histórico)
-2. O aparelho é migrado para Produtos Pendentes via `migrarParaProdutosPendentes`
-3. A lista é atualizada removendo o item recebido
-4. **Falta**: Redirecionamento automático para a aba de Produtos Pendentes
+## Problemas Identificados
 
-## Alteração Necessária
+### 1. Item sumindo da aba "Pendências - Base de Trocas"
+- A lista atual usa `getTradeInsPendentesAguardando()` que filtra apenas status `'Aguardando Devolução'`
+- Quando o recebimento é confirmado, o status muda para `'Recebido'` e o item some da lista
+- **Solução**: Exibir todos os trade-ins (pendentes e finalizados) na mesma aba, com distinção visual por status
 
-### Arquivo: `src/pages/EstoquePendenciasBaseTrocas.tsx`
+### 2. Produto não aparece em "Aparelhos Pendentes"
+- A função `addProdutoPendente` na `osApi.ts` verifica duplicatas por IMEI
+- Se o IMEI já existe nos dados mockados, retorna o existente sem adicionar novo
+- O console loga "já existe nos pendentes, retornando existente" mas a UI não reflete
+- **Solução**: Verificar se a migração está criando novo ou retornando existente e notificar adequadamente
 
-#### 1. Adicionar import do useNavigate
+## Alterações Necessárias
+
+### Arquivo 1: `src/utils/baseTrocasPendentesApi.ts`
+
+| Linha | Alteração |
+|-------|-----------|
+| 119-121 | Criar nova função `getTradeInsPendentesRecebidos()` para filtrar status 'Recebido' |
+| 115-117 | Renomear uso da função `getTradeInsPendentes()` para retornar todos (já existe) |
+
+Adicionar função:
 ```typescript
-import { useNavigate } from 'react-router-dom';
-```
-
-#### 2. Adicionar hook de navegação
-```typescript
-const navigate = useNavigate();
-```
-
-#### 3. Adicionar redirecionamento após sucesso (linha ~148-158)
-Após a migração bem-sucedida, redirecionar para a página de Produtos Pendentes:
-
-```typescript
-if (produtoMigrado) {
-  toast.success('Recebimento registrado com sucesso!', {
-    description: `Aparelho migrado para Produtos Pendentes (${produtoMigrado.id}). SLA de Tratativas iniciado.`
-  });
-  
-  // Fechar modal e redirecionar
-  setShowRecebimentoModal(false);
-  navigate('/estoque/produtos-pendentes');
+export function getTradeInsPendentesRecebidos(): TradeInPendente[] {
+  return tradeInsPendentes.filter(t => t.status === 'Recebido');
 }
 ```
 
-## Fluxo Atualizado
+### Arquivo 2: `src/pages/EstoquePendenciasBaseTrocas.tsx`
 
+| Linha | Alteração |
+|-------|-----------|
+| 41 | Mudar de `getTradeInsPendentesAguardando()` para `getTradeInsPendentes()` |
+| 159 | Mudar de `getTradeInsPendentesAguardando()` para `getTradeInsPendentes()` |
+| Tabela | Adicionar coluna "Status" com badge visual (Aguardando/Finalizado) |
+| Ação | Desabilitar botão "Registrar Recebimento" para itens com status 'Recebido' |
+| Imports | Adicionar import de `getTradeInsPendentes` |
+
+Estrutura visual da tabela atualizada:
 ```text
-1. Usuario clica em "Registrar Recebimento"
-2. Anexa fotos do estado atual do aparelho
-3. Clica em "Confirmar Recebimento"
-4. Sistema:
-   - Atualiza status para "Recebido" (mantem historico)
-   - Migra para Produtos Pendentes (inicia SLA de Tratativas)
-   - Exibe toast de sucesso
-   - Redireciona automaticamente para /estoque/produtos-pendentes
+| Modelo | Cliente | IMEI | Loja | SLA Devolução | Status | Ações |
+|--------|---------|------|------|---------------|--------|-------|
+| iPhone 12 | João | ... | Matriz | 3 dias | ⏳ Aguardando | [Receber] |
+| iPhone 11 | Maria | ... | JK | - | ✅ Finalizado | [Ver] |
 ```
 
-## Beneficios
-- UX mais fluida - usuario vai direto para a proxima etapa do fluxo
-- Consistencia com outros modulos que redirecionam apos acao (ex: Parecer Encaminhamento)
-- Historico preservado na lista de trade-ins com status "Recebido"
+### Cards de Estatísticas
+Manter os 4 cards existentes mas incluir:
+- Total de aparelhos aguardando devolução
+- Total de aparelhos recebidos (finalizados)
+
+## Fluxo Corrigido
+
+```text
+1. Trade-In registrado na venda → Status: "Aguardando Devolução"
+2. Usuário clica "Registrar Recebimento" → Modal com fotos
+3. Confirma recebimento:
+   a. Status atualizado para "Recebido" (mantém na lista com badge verde)
+   b. Produto migrado para Aparelhos Pendentes (osApi)
+   c. Redireciona para /estoque/produtos-pendentes
+4. Item permanece visível na aba Base de Trocas como "Finalizado"
+```
+
+## Resumo das Mudanças
+
+| Arquivo | Tipo | Descrição |
+|---------|------|-----------|
+| baseTrocasPendentesApi.ts | API | Adicionar função para buscar recebidos |
+| EstoquePendenciasBaseTrocas.tsx | UI | Exibir todos os itens, adicionar coluna Status, desabilitar ações para finalizados |

@@ -1,323 +1,115 @@
 
-# Plano: Conferência Automática de Itens Pendentes via Venda
+# Plano: Correção da Exibição de Loja após Movimentação Matriz
 
-## Visão Geral
+## Problema Identificado
 
-Implementar uma funcionalidade de conferência automática no módulo de Movimentações - Matriz. Quando uma movimentação é visualizada, o sistema irá verificar automaticamente se algum dos itens "Pendentes" foi vendido, conferindo-os automaticamente e exibindo os dados da venda (ID da Venda + Vendedor).
+Quando o usuário registra uma **Movimentação Matriz** (Estoque - SIA → Loja - Matriz), na aba de Aparelhos:
+1. A coluna **Loja** ainda mostra "Estoque - SIA" em vez de "Loja - Matriz"
+2. Aparece o badge **"Em movimentação"** (que não deveria aparecer para movimentações matriz)
 
----
+## Análise Técnica
 
-## 1. Fluxo de Conferência Automática
+### Comportamento Atual
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Usuário abre detalhes                              │
-│                              da movimentação                                 │
-└───────────────────────────────────┬─────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    Para cada item com status "Enviado"                       │
-│                         (Pendente de retorno)                                │
-└───────────────────────────────────┬─────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│              Buscar na base de Vendas por IMEI do aparelho                   │
-│                   (considera apenas vendas Concluídas)                       │
-└───────────────┬───────────────────────────────────────────┬─────────────────┘
-                │                                           │
-        Venda encontrada                            Sem venda
-                │                                           │
-                ▼                                           ▼
-┌───────────────────────────────────┐      ┌───────────────────────────────────┐
-│  Item → status: "Vendido"         │      │   Item permanece "Enviado"        │
-│  Gravar vendaId + vendedorNome    │      │   (continua em Pendentes)         │
-│  Adicionar entrada na timeline    │      │                                   │
-│  Toast de sucesso                 │      │                                   │
-└───────────────────────────────────┘      └───────────────────────────────────┘
-```
+A função `criarMovimentacaoMatriz` já está correta:
+- Define `produto.lojaAtualId = dados.lojaDestinoId` (Loja - Matriz)
+- **NÃO** define `statusMovimentacao = 'Em movimentação'` (linha com comentário "REMOVIDO")
+
+A tela `EstoqueProdutos.tsx` já usa a lógica correta:
+- Linha 66: `const lojaEfetiva = p.lojaAtualId || p.loja;`
+- Linha 385: `getLojaNome(produto.lojaAtualId || produto.loja)`
+
+### Causa Provável
+
+O problema pode estar relacionado a:
+1. **Badge "Em movimentação"** aparecendo porque o produto tinha esse status definido de outra origem (movimentações de aparelhos comuns que usam os mesmos IMEIs)
+2. **Filtro de loja** não considerando corretamente `lojaAtualId` em todos os lugares
+3. **Dados mockados antigos** que podem ter `statusMovimentacao` definido
 
 ---
 
-## 2. Alterações Necessárias
+## 1. Remover Badge "Em movimentação" para Produtos em Movimentação Matriz
 
-### 2.1 Criar Função de Busca de Venda por IMEI (vendasApi.ts)
+Atualmente, o badge aparece se `statusMovimentacao === 'Em movimentação'`, independente do tipo de movimentação. Para movimentações matriz, o produto **NÃO** deve mostrar esse badge (já que está disponível para venda na loja destino).
 
-Adicionar função para buscar venda por IMEI do aparelho:
+### Alteração em EstoqueProdutos.tsx (linha 355-360):
 
 ```typescript
-// Buscar venda concluída que contenha um item com o IMEI especificado
-export const buscarVendaPorImei = (imei: string): { venda: Venda; item: ItemVenda; } | null => {
-  const imeiLimpo = imei.replace(/\D/g, '');
-  
-  for (const venda of vendas) {
-    // Apenas vendas concluídas
-    if (venda.status !== 'Concluída') continue;
-    
-    const item = venda.itens.find(i => i.imei === imeiLimpo);
-    if (item) {
-      return { venda, item };
-    }
-  }
-  
-  return null;
-};
+// ANTES: Badge aparece para qualquer statusMovimentacao
+{produto.statusMovimentacao === 'Em movimentação' && (
+  <Badge>Em movimentação</Badge>
+)}
+
+// DEPOIS: Badge NÃO aparece se produto tem lojaAtualId (movimentação matriz)
+{produto.statusMovimentacao === 'Em movimentação' && !produto.lojaAtualId && (
+  <Badge>Em movimentação</Badge>
+)}
 ```
 
-### 2.2 Atualizar Interface MovimentacaoMatrizItem (estoqueApi.ts)
+**Lógica**: Se o produto tem `lojaAtualId` definido, significa que foi transferido via Movimentação Matriz e está disponível para venda - não deve mostrar "Em movimentação".
 
-Adicionar campos para armazenar dados da venda quando item for conferido automaticamente:
+---
+
+## 2. Garantir Limpeza de statusMovimentacao na Movimentação Matriz
+
+Para evitar conflitos, a função `criarMovimentacaoMatriz` deve garantir que `statusMovimentacao` seja limpo:
+
+### Alteração em estoqueApi.ts (função criarMovimentacaoMatriz):
 
 ```typescript
-export interface MovimentacaoMatrizItem {
-  aparelhoId: string;
-  imei: string;
-  modelo: string;
-  cor: string;
-  statusItem: 'Enviado' | 'Devolvido' | 'Vendido';
-  dataHoraRetorno?: string;
-  responsavelRetorno?: string;
-  // Novos campos para conferência automática via venda
-  vendaId?: string;           // ID da venda quando conferido automaticamente
-  vendedorId?: string;        // ID do vendedor responsável
-  vendedorNome?: string;      // Nome do vendedor
-  conferenciaAutomatica?: boolean; // Flag para indicar conferência automática
-}
+dados.itens.forEach(item => {
+  const produto = produtos.find(p => p.id === item.aparelhoId);
+  if (produto) {
+    produto.lojaAtualId = dados.lojaDestinoId; // Loja - Matriz
+    produto.movimentacaoId = novaMovimentacao.id;
+    // Garantir que não tenha status de movimentação comum
+    produto.statusMovimentacao = null; // Limpar qualquer status anterior
+    // ... resto do código
+  }
+});
 ```
 
-### 2.3 Criar Função de Conferência Automática (estoqueApi.ts)
+---
 
-Nova função que verifica e confere itens pendentes automaticamente:
+## 3. Verificar Filtro de Loja no getProdutosDisponivelMatriz
+
+A função já está correta, mas vamos garantir que não retorne produtos que já foram transferidos:
+
+### Validação (já existente):
 
 ```typescript
-import { buscarVendaPorImei } from './vendasApi';
-
-export const conferirItensAutomaticamentePorVenda = (
-  movimentacaoId: string,
-  obterNomeColaborador: (id: string) => string
-): { 
-  movimentacao: MovimentacaoMatriz | null; 
-  itensConferidos: Array<{ imei: string; vendaId: string; vendedor: string }>; 
-} => {
-  const movimentacao = movimentacoesMatriz.find(m => m.id === movimentacaoId);
-  if (!movimentacao) {
-    return { movimentacao: null, itensConferidos: [] };
-  }
-  
-  // Apenas movimentações não finalizadas
-  if (movimentacao.statusMovimentacao.startsWith('Finalizado')) {
-    return { movimentacao, itensConferidos: [] };
-  }
-  
-  const agora = new Date();
-  const agoraISO = agora.toISOString();
-  const itensConferidos: Array<{ imei: string; vendaId: string; vendedor: string }> = [];
-  
-  // Para cada item pendente (Enviado), verificar se existe venda
-  movimentacao.itens.forEach(item => {
-    if (item.statusItem !== 'Enviado') return;
-    
-    const resultado = buscarVendaPorImei(item.imei);
-    if (resultado) {
-      const { venda } = resultado;
-      const vendedorNome = obterNomeColaborador(venda.vendedor) || 'Vendedor Desconhecido';
-      
-      // Atualizar item
-      item.statusItem = 'Vendido';
-      item.dataHoraRetorno = agoraISO;
-      item.vendaId = venda.id;
-      item.vendedorId = venda.vendedor;
-      item.vendedorNome = vendedorNome;
-      item.conferenciaAutomatica = true;
-      
-      // Adicionar à lista de conferidos
-      itensConferidos.push({
-        imei: item.imei,
-        vendaId: venda.id,
-        vendedor: vendedorNome
-      });
-      
-      // Adicionar entrada na timeline
-      movimentacao.timeline.unshift({
-        id: `TL-${Date.now()}-auto-${item.imei}`,
-        data: agoraISO,
-        tipo: 'venda_matriz',
-        titulo: 'Conferido Automaticamente via Venda',
-        descricao: `${item.modelo} ${item.cor} - Venda ${venda.id} por ${vendedorNome}`,
-        responsavel: 'Sistema',
-        aparelhoId: item.aparelhoId
-      });
-    }
-  });
-  
-  // Verificar se movimentação finalizou
-  const todosFinalizados = movimentacao.itens.every(
-    i => i.statusItem === 'Devolvido' || i.statusItem === 'Vendido'
+export const getProdutosDisponivelMatriz = (): Produto[] => {
+  return produtos.filter(p => 
+    p.loja === ESTOQUE_SIA_ID && 
+    !p.lojaAtualId &&  // ✅ Exclui produtos já transferidos
+    !p.statusMovimentacao &&
+    !p.bloqueadoEmVendaId &&
+    p.statusNota === 'Concluído'
   );
-  
-  if (todosFinalizados && itensConferidos.length > 0) {
-    const limite = new Date(movimentacao.dataHoraLimiteRetorno);
-    movimentacao.statusMovimentacao = (movimentacao.statusMovimentacao === 'Atrasado' || agora >= limite)
-      ? 'Finalizado - Atrasado'
-      : 'Finalizado - Dentro do Prazo';
-      
-    movimentacao.timeline.unshift({
-      id: `TL-${Date.now()}-auto-conc`,
-      data: agoraISO,
-      tipo: 'retorno_matriz',
-      titulo: 'Movimentação Finalizada Automaticamente',
-      descricao: `Todos os itens conferidos - ${movimentacao.statusMovimentacao}`,
-      responsavel: 'Sistema'
-    });
-  }
-  
-  return { movimentacao, itensConferidos };
 };
-```
-
-### 2.4 Atualizar Tela de Detalhes (EstoqueMovimentacaoMatrizDetalhes.tsx)
-
-#### Importar função e chamar no useEffect:
-
-```typescript
-import { 
-  // ... imports existentes
-  conferirItensAutomaticamentePorVenda
-} from '@/utils/estoqueApi';
-```
-
-```typescript
-// No useEffect de carregamento
-useEffect(() => {
-  if (id) {
-    // Verificar status de todas as movimentações
-    verificarStatusMovimentacoesMatriz();
-    
-    // Tentar conferir itens automaticamente por venda
-    const { movimentacao: movAtualizada, itensConferidos } = 
-      conferirItensAutomaticamentePorVenda(id, obterNomeColaborador);
-    
-    if (movAtualizada) {
-      setMovimentacao(movAtualizada);
-      
-      // Mostrar toast se houver conferências automáticas
-      if (itensConferidos.length > 0) {
-        toast({
-          title: 'Conferência Automática',
-          description: `${itensConferidos.length} item(ns) conferido(s) automaticamente via vendas realizadas`,
-        });
-      }
-    } else {
-      const mov = getMovimentacaoMatrizById(id);
-      setMovimentacao(mov);
-    }
-    
-    setIsLoading(false);
-  }
-}, [id]);
-```
-
-#### Atualizar Exibição no Quadro "Conferidos":
-
-No quadro de itens conferidos, separar itens conferidos manualmente dos automáticos e exibir dados adicionais:
-
-```typescript
-{/* Quadro Conferidos - Exibição com dados de venda */}
-{itensConferidos.map(item => (
-  <div 
-    key={item.aparelhoId}
-    className={`p-3 rounded-lg border ${
-      item.conferenciaAutomatica 
-        ? 'bg-blue-500/10 border-blue-500/30' 
-        : 'bg-green-500/10 border-green-500/30'
-    }`}
-  >
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="font-medium text-sm">{item.modelo}</p>
-        <p className="text-xs text-muted-foreground font-mono">{formatIMEI(item.imei)}</p>
-        
-        {item.conferenciaAutomatica && item.vendaId && (
-          <div className="mt-1 space-y-1">
-            <p className="text-xs text-blue-600">
-              <strong>Venda:</strong> {item.vendaId}
-            </p>
-            <p className="text-xs text-blue-600">
-              <strong>Vendedor:</strong> {item.vendedorNome}
-            </p>
-          </div>
-        )}
-        
-        {!item.conferenciaAutomatica && item.dataHoraRetorno && (
-          <p className="text-xs text-green-600 mt-1">
-            {format(new Date(item.dataHoraRetorno), "dd/MM HH:mm")} - {item.responsavelRetorno}
-          </p>
-        )}
-      </div>
-      
-      <div className="flex items-center gap-2">
-        {item.conferenciaAutomatica ? (
-          <Badge className="bg-blue-600 text-xs">Venda Automática</Badge>
-        ) : (
-          <Badge className="bg-green-600 text-xs">Devolvido</Badge>
-        )}
-      </div>
-    </div>
-  </div>
-))}
-```
-
-#### Atualizar Lista de Itens Conferidos:
-
-```typescript
-// Separar itens por status
-const itensRelacaoOriginal = movimentacao?.itens ?? [];
-const itensConferidos = itensRelacaoOriginal.filter(
-  i => i.statusItem === 'Devolvido' || i.statusItem === 'Vendido'
-);
-const itensPendentes = itensRelacaoOriginal.filter(i => i.statusItem === 'Enviado');
 ```
 
 ---
 
-## 3. Resumo de Arquivos a Modificar
+## Resumo de Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/utils/vendasApi.ts` | Adicionar função `buscarVendaPorImei` |
-| `src/utils/estoqueApi.ts` | Atualizar interface `MovimentacaoMatrizItem`, criar função `conferirItensAutomaticamentePorVenda` |
-| `src/pages/EstoqueMovimentacaoMatrizDetalhes.tsx` | Chamar conferência automática no carregamento, atualizar UI para exibir dados de venda |
+| `src/pages/EstoqueProdutos.tsx` | Não mostrar badge "Em movimentação" se produto tem `lojaAtualId` |
+| `src/utils/estoqueApi.ts` | Limpar `statusMovimentacao` na função `criarMovimentacaoMatriz` |
 
 ---
 
-## 4. Detalhes Técnicos
+## Resultado Esperado
 
-### Lógica de Busca de Venda
+Após as correções:
 
-- Busca em todas as vendas com `status === 'Concluída'`
-- Compara IMEI limpo (sem formatação) com `venda.itens[].imei`
-- Se múltiplas vendas (improvável), retorna a primeira encontrada (mais antiga)
-- Para priorizar mais recente, ordenar vendas por `dataHora` desc antes da busca
+1. **Ao registrar Movimentação Matriz**:
+   - Produto aparece imediatamente como "Loja - Matriz" na aba de Aparelhos
+   - Produto **NÃO** mostra badge "Em movimentação"
+   - Produto fica disponível para venda na Loja - Matriz
 
-### Performance
-
-A busca é O(n*m) onde n = vendas e m = itens por venda. Para otimização futura:
-- Criar índice Map por IMEI
-- Cache de resultados
-
-### Visualização no Timeline (Histórico de Ações)
-
-Entries de conferência automática terão:
-- Título: "Conferido Automaticamente via Venda"
-- Descrição: "{Modelo} {Cor} - Venda {ID} por {Vendedor}"
-- Responsável: "Sistema"
-- Tipo: `venda_matriz`
-
-### Cores e Badges
-
-| Tipo | Cor Background | Badge |
-|------|----------------|-------|
-| Devolvido (Manual) | `bg-green-500/10` | `Devolvido` (verde) |
-| Vendido (Automático) | `bg-blue-500/10` | `Venda Automática` (azul) |
-| Pendente | `bg-yellow-500/10` | N/A |
+2. **Movimentações de Aparelhos Comuns**:
+   - Continuam funcionando normalmente
+   - Badge "Em movimentação" aparece apenas para essas movimentações
+   - Produto bloqueado para venda até receber na loja destino

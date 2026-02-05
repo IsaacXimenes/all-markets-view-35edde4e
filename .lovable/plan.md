@@ -1,131 +1,323 @@
 
-# Plano: Correções nas Movimentações de Estoque
+# Plano: Conferência Automática de Itens Pendentes via Venda
 
-## Problemas Identificados
+## Visão Geral
 
-1. **Botão Scanner separado do "Buscar no Estoque"** - Na tela `EstoqueNovaMovimentacaoMatriz.tsx`, o botão "Escanear IMEI" está como botão separado (linha 243-251) em vez de estar dentro do modal de busca
-2. **Loja não atualiza na aba Aparelhos** - O filtro em `EstoqueProdutos.tsx` usa `p.loja` (linha 65) em vez de considerar `p.lojaAtualId` que é atualizado pela movimentação matriz
-3. **Colunas Origem/Destino com dados antigos** - Na tabela de `EstoqueMovimentacoes.tsx`, a função `getLojaNome` pode não estar resolvendo IDs corretamente se os dados antigos usam nomes em vez de IDs
-4. **Scanner no modal de busca de produto** - Falta botão de câmera dentro do modal de busca em `EstoqueMovimentacoes.tsx`
+Implementar uma funcionalidade de conferência automática no módulo de Movimentações - Matriz. Quando uma movimentação é visualizada, o sistema irá verificar automaticamente se algum dos itens "Pendentes" foi vendido, conferindo-os automaticamente e exibindo os dados da venda (ID da Venda + Vendedor).
 
 ---
 
-## 1. Mover Scanner para Dentro do Modal (EstoqueNovaMovimentacaoMatriz.tsx)
+## 1. Fluxo de Conferência Automática
 
-**Antes:** Dois botões separados no header do card
-**Depois:** Apenas botão "Buscar no Estoque", com scanner dentro do modal
-
-### Alterações:
-- Remover botão "Escanear IMEI" separado (linhas 243-251)
-- Adicionar botão de câmera dentro do modal, ao lado do campo de busca
-- O scanner ficará integrado no fluxo de busca
-
-### Nova estrutura do modal:
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│ Selecionar Aparelhos - Estoque - SIA                            │
-├─────────────────────────────────────────────────────────────────┤
-│ ┌───────────────────────────────────────────┐ ┌───────────────┐ │
-│ │ 🔍 Buscar por IMEI ou modelo...           │ │ 📷 Escanear   │ │
-│ └───────────────────────────────────────────┘ └───────────────┘ │
-│                                                                 │
-│ [Lista de produtos...]                                          │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           Usuário abre detalhes                              │
+│                              da movimentação                                 │
+└───────────────────────────────────┬─────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Para cada item com status "Enviado"                       │
+│                         (Pendente de retorno)                                │
+└───────────────────────────────────┬─────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│              Buscar na base de Vendas por IMEI do aparelho                   │
+│                   (considera apenas vendas Concluídas)                       │
+└───────────────┬───────────────────────────────────────────┬─────────────────┘
+                │                                           │
+        Venda encontrada                            Sem venda
+                │                                           │
+                ▼                                           ▼
+┌───────────────────────────────────┐      ┌───────────────────────────────────┐
+│  Item → status: "Vendido"         │      │   Item permanece "Enviado"        │
+│  Gravar vendaId + vendedorNome    │      │   (continua em Pendentes)         │
+│  Adicionar entrada na timeline    │      │                                   │
+│  Toast de sucesso                 │      │                                   │
+└───────────────────────────────────┘      └───────────────────────────────────┘
 ```
 
 ---
 
-## 2. Corrigir Filtro de Loja em EstoqueProdutos.tsx
+## 2. Alterações Necessárias
 
-O problema está no filtro que não considera `lojaAtualId`:
+### 2.1 Criar Função de Busca de Venda por IMEI (vendasApi.ts)
 
-**Linha 64-65 atual:**
+Adicionar função para buscar venda por IMEI do aparelho:
+
 ```typescript
-if (lojaFilter !== 'todas' && p.loja !== lojaFilter) return false;
-```
-
-**Correção:**
-```typescript
-// Usar lojaAtualId se existir (produto em movimentação matriz), senão usar loja original
-const lojaEfetiva = p.lojaAtualId || p.loja;
-if (lojaFilter !== 'todas' && lojaEfetiva !== lojaFilter) return false;
-```
-
-Também atualizar a exibição na tabela para mostrar a loja efetiva.
-
----
-
-## 3. Atualizar Tabela de Movimentações - Aparelhos
-
-Na tabela de `EstoqueMovimentacoes.tsx`, verificar se os dados antigos de `movimentacoes` usam IDs ou nomes, e garantir compatibilidade.
-
-**Verificação na função `getLojaNome` (linhas 111-115):**
-```typescript
-const getLojaNome = (lojaIdOuNome: string) => {
-  const loja = obterLojaById(lojaIdOuNome);
-  if (loja) return loja.nome;
-  return obterNomeLoja(lojaIdOuNome);
+// Buscar venda concluída que contenha um item com o IMEI especificado
+export const buscarVendaPorImei = (imei: string): { venda: Venda; item: ItemVenda; } | null => {
+  const imeiLimpo = imei.replace(/\D/g, '');
+  
+  for (const venda of vendas) {
+    // Apenas vendas concluídas
+    if (venda.status !== 'Concluída') continue;
+    
+    const item = venda.itens.find(i => i.imei === imeiLimpo);
+    if (item) {
+      return { venda, item };
+    }
+  }
+  
+  return null;
 };
 ```
 
-A função já tem fallback, mas os dados mockados de `movimentacoes` podem estar usando nomes em vez de IDs. Precisamos verificar e corrigir os dados mockados em `estoqueApi.ts`.
+### 2.2 Atualizar Interface MovimentacaoMatrizItem (estoqueApi.ts)
 
----
+Adicionar campos para armazenar dados da venda quando item for conferido automaticamente:
 
-## 4. Adicionar Scanner no Modal de Busca de Produto (EstoqueMovimentacoes.tsx)
-
-No modal "Buscar Produto no Estoque" (linhas 631-714), adicionar botão de câmera:
-
-**Alterações:**
-- Adicionar botão de câmera ao lado do input de busca
-- Quando escanear um IMEI, popular o campo de busca automaticamente
-
-### Nova estrutura:
 ```typescript
-<div className="flex gap-2">
-  <Input
-    placeholder="Buscar por modelo, marca ou IMEI..."
-    value={buscaProduto}
-    onChange={(e) => setBuscaProduto(e.target.value)}
-    className="flex-1"
-  />
-  <Button 
-    variant="outline" 
-    size="icon"
-    onClick={() => setShowScannerModal(true)}
+export interface MovimentacaoMatrizItem {
+  aparelhoId: string;
+  imei: string;
+  modelo: string;
+  cor: string;
+  statusItem: 'Enviado' | 'Devolvido' | 'Vendido';
+  dataHoraRetorno?: string;
+  responsavelRetorno?: string;
+  // Novos campos para conferência automática via venda
+  vendaId?: string;           // ID da venda quando conferido automaticamente
+  vendedorId?: string;        // ID do vendedor responsável
+  vendedorNome?: string;      // Nome do vendedor
+  conferenciaAutomatica?: boolean; // Flag para indicar conferência automática
+}
+```
+
+### 2.3 Criar Função de Conferência Automática (estoqueApi.ts)
+
+Nova função que verifica e confere itens pendentes automaticamente:
+
+```typescript
+import { buscarVendaPorImei } from './vendasApi';
+
+export const conferirItensAutomaticamentePorVenda = (
+  movimentacaoId: string,
+  obterNomeColaborador: (id: string) => string
+): { 
+  movimentacao: MovimentacaoMatriz | null; 
+  itensConferidos: Array<{ imei: string; vendaId: string; vendedor: string }>; 
+} => {
+  const movimentacao = movimentacoesMatriz.find(m => m.id === movimentacaoId);
+  if (!movimentacao) {
+    return { movimentacao: null, itensConferidos: [] };
+  }
+  
+  // Apenas movimentações não finalizadas
+  if (movimentacao.statusMovimentacao.startsWith('Finalizado')) {
+    return { movimentacao, itensConferidos: [] };
+  }
+  
+  const agora = new Date();
+  const agoraISO = agora.toISOString();
+  const itensConferidos: Array<{ imei: string; vendaId: string; vendedor: string }> = [];
+  
+  // Para cada item pendente (Enviado), verificar se existe venda
+  movimentacao.itens.forEach(item => {
+    if (item.statusItem !== 'Enviado') return;
+    
+    const resultado = buscarVendaPorImei(item.imei);
+    if (resultado) {
+      const { venda } = resultado;
+      const vendedorNome = obterNomeColaborador(venda.vendedor) || 'Vendedor Desconhecido';
+      
+      // Atualizar item
+      item.statusItem = 'Vendido';
+      item.dataHoraRetorno = agoraISO;
+      item.vendaId = venda.id;
+      item.vendedorId = venda.vendedor;
+      item.vendedorNome = vendedorNome;
+      item.conferenciaAutomatica = true;
+      
+      // Adicionar à lista de conferidos
+      itensConferidos.push({
+        imei: item.imei,
+        vendaId: venda.id,
+        vendedor: vendedorNome
+      });
+      
+      // Adicionar entrada na timeline
+      movimentacao.timeline.unshift({
+        id: `TL-${Date.now()}-auto-${item.imei}`,
+        data: agoraISO,
+        tipo: 'venda_matriz',
+        titulo: 'Conferido Automaticamente via Venda',
+        descricao: `${item.modelo} ${item.cor} - Venda ${venda.id} por ${vendedorNome}`,
+        responsavel: 'Sistema',
+        aparelhoId: item.aparelhoId
+      });
+    }
+  });
+  
+  // Verificar se movimentação finalizou
+  const todosFinalizados = movimentacao.itens.every(
+    i => i.statusItem === 'Devolvido' || i.statusItem === 'Vendido'
+  );
+  
+  if (todosFinalizados && itensConferidos.length > 0) {
+    const limite = new Date(movimentacao.dataHoraLimiteRetorno);
+    movimentacao.statusMovimentacao = (movimentacao.statusMovimentacao === 'Atrasado' || agora >= limite)
+      ? 'Finalizado - Atrasado'
+      : 'Finalizado - Dentro do Prazo';
+      
+    movimentacao.timeline.unshift({
+      id: `TL-${Date.now()}-auto-conc`,
+      data: agoraISO,
+      tipo: 'retorno_matriz',
+      titulo: 'Movimentação Finalizada Automaticamente',
+      descricao: `Todos os itens conferidos - ${movimentacao.statusMovimentacao}`,
+      responsavel: 'Sistema'
+    });
+  }
+  
+  return { movimentacao, itensConferidos };
+};
+```
+
+### 2.4 Atualizar Tela de Detalhes (EstoqueMovimentacaoMatrizDetalhes.tsx)
+
+#### Importar função e chamar no useEffect:
+
+```typescript
+import { 
+  // ... imports existentes
+  conferirItensAutomaticamentePorVenda
+} from '@/utils/estoqueApi';
+```
+
+```typescript
+// No useEffect de carregamento
+useEffect(() => {
+  if (id) {
+    // Verificar status de todas as movimentações
+    verificarStatusMovimentacoesMatriz();
+    
+    // Tentar conferir itens automaticamente por venda
+    const { movimentacao: movAtualizada, itensConferidos } = 
+      conferirItensAutomaticamentePorVenda(id, obterNomeColaborador);
+    
+    if (movAtualizada) {
+      setMovimentacao(movAtualizada);
+      
+      // Mostrar toast se houver conferências automáticas
+      if (itensConferidos.length > 0) {
+        toast({
+          title: 'Conferência Automática',
+          description: `${itensConferidos.length} item(ns) conferido(s) automaticamente via vendas realizadas`,
+        });
+      }
+    } else {
+      const mov = getMovimentacaoMatrizById(id);
+      setMovimentacao(mov);
+    }
+    
+    setIsLoading(false);
+  }
+}, [id]);
+```
+
+#### Atualizar Exibição no Quadro "Conferidos":
+
+No quadro de itens conferidos, separar itens conferidos manualmente dos automáticos e exibir dados adicionais:
+
+```typescript
+{/* Quadro Conferidos - Exibição com dados de venda */}
+{itensConferidos.map(item => (
+  <div 
+    key={item.aparelhoId}
+    className={`p-3 rounded-lg border ${
+      item.conferenciaAutomatica 
+        ? 'bg-blue-500/10 border-blue-500/30' 
+        : 'bg-green-500/10 border-green-500/30'
+    }`}
   >
-    <Camera className="h-4 w-4" />
-  </Button>
-  {/* ... select de loja ... */}
-</div>
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="font-medium text-sm">{item.modelo}</p>
+        <p className="text-xs text-muted-foreground font-mono">{formatIMEI(item.imei)}</p>
+        
+        {item.conferenciaAutomatica && item.vendaId && (
+          <div className="mt-1 space-y-1">
+            <p className="text-xs text-blue-600">
+              <strong>Venda:</strong> {item.vendaId}
+            </p>
+            <p className="text-xs text-blue-600">
+              <strong>Vendedor:</strong> {item.vendedorNome}
+            </p>
+          </div>
+        )}
+        
+        {!item.conferenciaAutomatica && item.dataHoraRetorno && (
+          <p className="text-xs text-green-600 mt-1">
+            {format(new Date(item.dataHoraRetorno), "dd/MM HH:mm")} - {item.responsavelRetorno}
+          </p>
+        )}
+      </div>
+      
+      <div className="flex items-center gap-2">
+        {item.conferenciaAutomatica ? (
+          <Badge className="bg-blue-600 text-xs">Venda Automática</Badge>
+        ) : (
+          <Badge className="bg-green-600 text-xs">Devolvido</Badge>
+        )}
+      </div>
+    </div>
+  </div>
+))}
+```
+
+#### Atualizar Lista de Itens Conferidos:
+
+```typescript
+// Separar itens por status
+const itensRelacaoOriginal = movimentacao?.itens ?? [];
+const itensConferidos = itensRelacaoOriginal.filter(
+  i => i.statusItem === 'Devolvido' || i.statusItem === 'Vendido'
+);
+const itensPendentes = itensRelacaoOriginal.filter(i => i.statusItem === 'Enviado');
 ```
 
 ---
 
-## Resumo de Arquivos a Modificar
+## 3. Resumo de Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/pages/EstoqueNovaMovimentacaoMatriz.tsx` | Mover scanner para dentro do modal de busca |
-| `src/pages/EstoqueProdutos.tsx` | Usar `lojaAtualId` no filtro e exibição |
-| `src/pages/EstoqueMovimentacoes.tsx` | Adicionar scanner no modal de busca de produto |
-| `src/utils/estoqueApi.ts` | Verificar dados mockados de movimentações (se usam IDs ou nomes) |
+| `src/utils/vendasApi.ts` | Adicionar função `buscarVendaPorImei` |
+| `src/utils/estoqueApi.ts` | Atualizar interface `MovimentacaoMatrizItem`, criar função `conferirItensAutomaticamentePorVenda` |
+| `src/pages/EstoqueMovimentacaoMatrizDetalhes.tsx` | Chamar conferência automática no carregamento, atualizar UI para exibir dados de venda |
 
 ---
 
-## Detalhes Técnicos
+## 4. Detalhes Técnicos
 
-### Lógica de Loja Efetiva
-```typescript
-// Helper para obter a loja onde o produto está fisicamente
-const getLojaFisica = (produto: Produto): string => {
-  // lojaAtualId é preenchido quando produto foi transferido via Movimentação Matriz
-  return produto.lojaAtualId || produto.loja;
-};
-```
+### Lógica de Busca de Venda
 
-### Integração do Scanner no Modal
-O scanner já está funcional no componente `BarcodeScanner`. Apenas precisamos:
-1. Adicionar state `showScannerModal` para controlar abertura
-2. No callback `onScan`, popular o campo de busca com o IMEI lido
-3. O filtro automático mostrará apenas o produto correspondente
+- Busca em todas as vendas com `status === 'Concluída'`
+- Compara IMEI limpo (sem formatação) com `venda.itens[].imei`
+- Se múltiplas vendas (improvável), retorna a primeira encontrada (mais antiga)
+- Para priorizar mais recente, ordenar vendas por `dataHora` desc antes da busca
+
+### Performance
+
+A busca é O(n*m) onde n = vendas e m = itens por venda. Para otimização futura:
+- Criar índice Map por IMEI
+- Cache de resultados
+
+### Visualização no Timeline (Histórico de Ações)
+
+Entries de conferência automática terão:
+- Título: "Conferido Automaticamente via Venda"
+- Descrição: "{Modelo} {Cor} - Venda {ID} por {Vendedor}"
+- Responsável: "Sistema"
+- Tipo: `venda_matriz`
+
+### Cores e Badges
+
+| Tipo | Cor Background | Badge |
+|------|----------------|-------|
+| Devolvido (Manual) | `bg-green-500/10` | `Devolvido` (verde) |
+| Vendido (Automático) | `bg-blue-500/10` | `Venda Automática` (azul) |
+| Pendente | `bg-yellow-500/10` | N/A |

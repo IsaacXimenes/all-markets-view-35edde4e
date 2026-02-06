@@ -102,9 +102,11 @@ export function ModalFinalizarPagamento({
     }
   }, [open, usuarioLogado, isParcial, saldoDevedor, pendencia]);
 
-  // Verificar se conferência está incompleta
+  // Verificar se conferência está incompleta - apenas para Pagamento Pós
   const conferenciaIncompleta = useMemo(() => {
     if (!pendencia) return false;
+    // Alerta só para Pagamento Pós (paga após conferência)
+    if (pendencia.tipoPagamento !== 'Pagamento Pos') return false;
     return pendencia.percentualConferencia < 100;
   }, [pendencia]);
 

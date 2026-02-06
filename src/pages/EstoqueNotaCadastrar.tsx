@@ -61,8 +61,7 @@ export default function EstoqueNotaCadastrar() {
   
   // Informações da Nota
   const [fornecedor, setFornecedor] = useState('');
-  const [dataEntrada, setDataEntrada] = useState('');
-  const [valorTotal, setValorTotal] = useState<number>(0);
+  const [dataEntrada, setDataEntrada] = useState(new Date().toISOString().split('T')[0]);
   
   // Flag de Urgência
   const [urgente, setUrgente] = useState(false);
@@ -104,10 +103,6 @@ export default function EstoqueNotaCadastrar() {
     return produtosCadastro.filter(p => p.marca.toLowerCase() === marca.toLowerCase());
   };
 
-  const handleValorTotalChange = (formatted: string, raw: string | number) => {
-    const valor = typeof raw === 'number' ? raw : parseFloat(String(raw)) || 0;
-    setValorTotal(valor);
-  };
 
   const adicionarProduto = () => {
     setProdutos([...produtos, produtoLinhaVazia()]);
@@ -201,23 +196,11 @@ export default function EstoqueNotaCadastrar() {
       return;
     }
 
-    // Validar que a data não seja no futuro
-    const dataInformada = new Date(dataEntrada + 'T12:00:00');
-    const hoje = new Date();
-    hoje.setHours(23, 59, 59, 999);
-    
-    if (dataInformada > hoje) {
-      toast.error('Data inválida', {
-        description: 'A data de entrada não pode ser no futuro'
-      });
-      return;
-    }
-
     // Se tem produtos preenchidos, validá-los
     if (temProdutosPreenchidos && !validarProdutos()) return;
 
-    // Usar valor total dos produtos se houver, senão o informado manualmente
-    const valorFinal = temProdutosPreenchidos && valorTotalProdutos > 0 ? valorTotalProdutos : valorTotal;
+    // Valor total é sempre a soma dos produtos
+    const valorFinal = valorTotalProdutos;
 
     // Criar nota via API
     const novaNota = criarNotaEntrada({
@@ -322,15 +305,18 @@ export default function EstoqueNotaCadastrar() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="valorTotal">Valor Total da Nota</Label>
-                <InputComMascara
-                  mascara="moeda"
-                  value={valorTotal}
-                  onChange={handleValorTotalChange}
-                  placeholder="R$ 0,00"
+              <div className="flex items-center gap-3 mt-2">
+                <Checkbox
+                  id="urgente"
+                  checked={urgente}
+                  onCheckedChange={(checked) => setUrgente(checked as boolean)}
                 />
-                <p className="text-xs text-muted-foreground mt-1">Valor previsto da nota fiscal</p>
+                <div className="flex items-center gap-2">
+                  <Zap className={`h-4 w-4 ${urgente ? 'text-destructive' : 'text-muted-foreground'}`} />
+                  <Label htmlFor="urgente" className={`cursor-pointer ${urgente ? 'text-destructive font-medium' : ''}`}>
+                    Solicitação de Urgência
+                  </Label>
+                </div>
               </div>
               <div className="flex items-center gap-3 mt-6">
                 <Checkbox
@@ -349,7 +335,132 @@ export default function EstoqueNotaCadastrar() {
           </CardContent>
         </Card>
 
-        {/* Quadro de Produtos - HABILITADO */}
+        {/* Seção Pagamento */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Pagamento *</CardTitle>
+            <CardDescription>
+              O tipo de pagamento define o fluxo da nota e a atuação inicial
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <Label className="mb-3 block">Forma de Pagamento</Label>
+                <RadioGroup 
+                  value={formaPagamento} 
+                  onValueChange={(v) => setFormaPagamento(v as 'Dinheiro' | 'Pix')}
+                  className="flex gap-6"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="Dinheiro" id="dinheiro" />
+                    <Label htmlFor="dinheiro" className="font-normal cursor-pointer">Dinheiro</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="Pix" id="pix" />
+                    <Label htmlFor="pix" className="font-normal cursor-pointer">Pix</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div>
+                <Label className="mb-3 block">Tipo de Pagamento *</Label>
+                <Select 
+                  value={tipoPagamento} 
+                  onValueChange={(v) => setTipoPagamento(v as TipoPagamentoNota)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pagamento Pos">
+                      <div className="flex flex-col">
+                        <span className="font-medium">Pagamento Pós</span>
+                        <span className="text-xs text-muted-foreground">100% após conferência do estoque</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="Pagamento Parcial">
+                      <div className="flex flex-col">
+                        <span className="font-medium">Pagamento Parcial</span>
+                        <span className="text-xs text-muted-foreground">Adiantamento + restante após conferência</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="Pagamento 100% Antecipado">
+                      <div className="flex flex-col">
+                        <span className="font-medium">Pagamento 100% Antecipado</span>
+                        <span className="text-xs text-muted-foreground">Pagamento total antes da conferência</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="mb-3 block flex items-center gap-2">
+                  Atuação Atual
+                  <Lock className="h-3 w-3 text-muted-foreground" />
+                </Label>
+                <div className="h-10 px-3 py-2 border rounded-md bg-muted flex items-center gap-2">
+                  {atuacaoAtual ? (
+                    <>
+                      {getAtuacaoBadge(atuacaoAtual)}
+                      <span className="text-sm text-muted-foreground">
+                        (definido automaticamente)
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">
+                      Selecione o tipo de pagamento
+                    </span>
+                  )}
+                </div>
+                {atuacaoAtual && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {atuacaoAtual === 'Estoque' 
+                      ? 'Estoque cadastra e confere primeiro' 
+                      : 'Financeiro realiza pagamento primeiro'}
+                  </p>
+                )}
+              </div>
+            </div>
+            {tipoPagamento && (
+              <Alert className="mt-4">
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  {tipoPagamento === 'Pagamento Pos' && (
+                    <>
+                      <strong>Fluxo Pagamento Pós:</strong> Estoque cadastra produtos → Estoque realiza conferência → 
+                      Ao atingir 100% conferência → Financeiro realiza pagamento total → Nota encerrada
+                    </>
+                  )}
+                  {tipoPagamento === 'Pagamento Parcial' && (
+                    <>
+                      <strong>Fluxo Pagamento Parcial:</strong> Financeiro realiza primeiro pagamento → 
+                      Estoque cadastra produtos e confere → Ao atingir 100% conferência → 
+                      Financeiro realiza pagamento restante → Nota encerrada
+                    </>
+                  )}
+                  {tipoPagamento === 'Pagamento 100% Antecipado' && (
+                    <>
+                      <strong>Fluxo 100% Antecipado:</strong> Financeiro realiza pagamento total → 
+                      Estoque cadastra produtos e confere → Ao atingir 100% conferência → Nota encerrada automaticamente
+                    </>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+            <div>
+              <Label htmlFor="observacao">Observação</Label>
+              <Textarea 
+                id="observacao"
+                value={observacaoPagamento}
+                onChange={(e) => setObservacaoPagamento(e.target.value)}
+                placeholder="Informações adicionais sobre o pagamento..."
+                rows={3}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quadro de Produtos */}
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -528,142 +639,9 @@ export default function EstoqueNotaCadastrar() {
               <div className="text-right">
                 <p className="text-sm text-muted-foreground">Valor Total dos Produtos</p>
                 <p className="text-2xl font-bold">
-                  {formatCurrency(valorTotalProdutos || valorTotal)}
+                  {formatCurrency(valorTotalProdutos)}
                 </p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Seção Pagamento */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Pagamento *</CardTitle>
-            <CardDescription>
-              O tipo de pagamento define o fluxo da nota e a atuação inicial
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Forma de Pagamento */}
-              <div>
-                <Label className="mb-3 block">Forma de Pagamento</Label>
-                <RadioGroup 
-                  value={formaPagamento} 
-                  onValueChange={(v) => setFormaPagamento(v as 'Dinheiro' | 'Pix')}
-                  className="flex gap-6"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="Dinheiro" id="dinheiro" />
-                    <Label htmlFor="dinheiro" className="font-normal cursor-pointer">Dinheiro</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="Pix" id="pix" />
-                    <Label htmlFor="pix" className="font-normal cursor-pointer">Pix</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-              
-              {/* Tipo de Pagamento - OBRIGATÓRIO */}
-              <div>
-                <Label className="mb-3 block">Tipo de Pagamento *</Label>
-                <Select 
-                  value={tipoPagamento} 
-                  onValueChange={(v) => setTipoPagamento(v as TipoPagamentoNota)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Pagamento Pos">
-                      <div className="flex flex-col">
-                        <span className="font-medium">Pagamento Pós</span>
-                        <span className="text-xs text-muted-foreground">100% após conferência do estoque</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="Pagamento Parcial">
-                      <div className="flex flex-col">
-                        <span className="font-medium">Pagamento Parcial</span>
-                        <span className="text-xs text-muted-foreground">Adiantamento + restante após conferência</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="Pagamento 100% Antecipado">
-                      <div className="flex flex-col">
-                        <span className="font-medium">Pagamento 100% Antecipado</span>
-                        <span className="text-xs text-muted-foreground">Pagamento total antes da conferência</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {/* Atuação Atual - SOMENTE LEITURA */}
-              <div>
-                <Label className="mb-3 block flex items-center gap-2">
-                  Atuação Atual
-                  <Lock className="h-3 w-3 text-muted-foreground" />
-                </Label>
-                <div className="h-10 px-3 py-2 border rounded-md bg-muted flex items-center gap-2">
-                  {atuacaoAtual ? (
-                    <>
-                      {getAtuacaoBadge(atuacaoAtual)}
-                      <span className="text-sm text-muted-foreground">
-                        (definido automaticamente)
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground text-sm">
-                      Selecione o tipo de pagamento
-                    </span>
-                  )}
-                </div>
-                {atuacaoAtual && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {atuacaoAtual === 'Estoque' 
-                      ? 'Estoque cadastra e confere primeiro' 
-                      : 'Financeiro realiza pagamento primeiro'}
-                  </p>
-                )}
-              </div>
-            </div>
-            
-            {/* Descrição do fluxo baseado no tipo */}
-            {tipoPagamento && (
-              <Alert className="mt-4">
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  {tipoPagamento === 'Pagamento Pos' && (
-                    <>
-                      <strong>Fluxo Pagamento Pós:</strong> Estoque cadastra produtos → Estoque realiza conferência → 
-                      Ao atingir 100% conferência → Financeiro realiza pagamento total → Nota encerrada
-                    </>
-                  )}
-                  {tipoPagamento === 'Pagamento Parcial' && (
-                    <>
-                      <strong>Fluxo Pagamento Parcial:</strong> Financeiro realiza primeiro pagamento → 
-                      Estoque cadastra produtos e confere → Ao atingir 100% conferência → 
-                      Financeiro realiza pagamento restante → Nota encerrada
-                    </>
-                  )}
-                  {tipoPagamento === 'Pagamento 100% Antecipado' && (
-                    <>
-                      <strong>Fluxo 100% Antecipado:</strong> Financeiro realiza pagamento total → 
-                      Estoque cadastra produtos e confere → Ao atingir 100% conferência → Nota encerrada automaticamente
-                    </>
-                  )}
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            <div>
-              <Label htmlFor="observacao">Observação</Label>
-              <Textarea 
-                id="observacao"
-                value={observacaoPagamento}
-                onChange={(e) => setObservacaoPagamento(e.target.value)}
-                placeholder="Informações adicionais sobre o pagamento..."
-                rows={3}
-              />
             </div>
           </CardContent>
         </Card>

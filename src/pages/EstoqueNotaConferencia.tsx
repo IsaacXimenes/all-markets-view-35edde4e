@@ -17,12 +17,14 @@ import {
   ChevronUp,
   CheckCircle,
   Save,
-  Layers
+  Layers,
+  Undo2
 } from 'lucide-react';
 import { 
   getNotaEntradaById, 
   finalizarConferencia, 
   explodirProdutoNota,
+  recolherProdutoNota,
   NotaEntrada,
   ProdutoNotaEntrada,
   podeRealizarAcao,
@@ -167,6 +169,44 @@ export default function EstoqueNotaConferencia() {
     }
   };
 
+  // Recolher itens explodidos de volta em uma linha agrupada
+  const handleRecolherItens = (produtoId: string) => {
+    if (!nota) return;
+    
+    // Extrair prefixo original do ID (ex: PROD-NE-2026-00001-001 de PROD-NE-2026-00001-001-U001)
+    const prefixo = produtoId.replace(/-U\d{3}$/, '');
+    
+    const resultado = recolherProdutoNota(nota.id, prefixo, 'Carlos Estoque');
+    if (resultado) {
+      setNota(resultado);
+      // Reinicializar campos editáveis
+      const campos: Record<string, { imei: string; cor: string; categoria: string }> = {};
+      resultado.produtos.forEach(p => {
+        if (p.statusConferencia !== 'Conferido') {
+          campos[p.id] = {
+            imei: p.imei || '',
+            cor: p.cor || '',
+            categoria: p.categoria || ''
+          };
+        }
+      });
+      setCamposEditaveis(campos);
+      const jaConferidos = new Set(
+        resultado.produtos
+          .filter(p => p.statusConferencia === 'Conferido')
+          .map(p => p.id)
+      );
+      setProdutosConferidos(jaConferidos);
+      toast.success('Itens recolhidos de volta em linha agrupada');
+    } else {
+      toast.error('Não é possível recolher: itens já conferidos não podem ser recolhidos');
+    }
+  };
+
+  // Verificar se um item é explodido (tem sufixo -UXXX)
+  const isItemExplodido = (produtoId: string): boolean => {
+    return /-U\d{3}$/.test(produtoId);
+  };
   // Salvar conferência - só aqui que confirma tudo
   const handleSalvarConferencia = () => {
     if (!nota) return;
@@ -458,6 +498,18 @@ export default function EstoqueNotaConferencia() {
                                 title="Gerar unidades individuais"
                               >
                                 <Layers className="h-4 w-4 text-primary" />
+                              </Button>
+                            )}
+                            {/* Botão Recolher para itens explodidos */}
+                            {isItemExplodido(produto.id) && produto.statusConferencia !== 'Conferido' && !produtosConferidos.has(produto.id) && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8"
+                                onClick={() => handleRecolherItens(produto.id)}
+                                title="Recolher unidades de volta"
+                              >
+                                <Undo2 className="h-4 w-4 text-muted-foreground" />
                               </Button>
                             )}
                             {/* Botão Conferir */}

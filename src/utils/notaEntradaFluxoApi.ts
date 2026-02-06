@@ -788,7 +788,7 @@ export const conferirProduto = (
   produto.responsavelConferencia = dadosConferencia.responsavel;
   
   // Atualizar contadores
-  nota.qtdConferida = nota.produtos.filter(p => p.statusConferencia === 'Conferido').length;
+  nota.qtdConferida = nota.produtos.filter(p => p.statusConferencia === 'Conferido').reduce((acc, p) => acc + p.quantidade, 0);
   nota.valorConferido = nota.produtos
     .filter(p => p.statusConferencia === 'Conferido')
     .reduce((acc, p) => acc + p.custoTotal, 0);
@@ -1078,6 +1078,55 @@ export const explodirProdutoNota = (
 
   registrarTimeline(nota, usuario, 'Estoque',
     `Item "${produto.modelo}" explodido em ${produto.quantidade} unidades`,
+    nota.status);
+
+  return JSON.parse(JSON.stringify(nota));
+};
+
+// ============= FUNÇÃO DE RECOLHER ITENS EXPLODIDOS =============
+
+export const recolherProdutoNota = (
+  notaId: string,
+  prefixoProdutoId: string,
+  usuario: string
+): NotaEntrada | null => {
+  const nota = notasEntrada.find(n => n.id === notaId);
+  if (!nota) return null;
+
+  // Encontrar todos os itens explodidos com o prefixo
+  const itensExplodidos = nota.produtos.filter(p => p.id.startsWith(prefixoProdutoId + '-U'));
+  if (itensExplodidos.length === 0) return null;
+
+  // Validar que nenhum item esteja conferido
+  const algumConferido = itensExplodidos.some(p => p.statusConferencia === 'Conferido');
+  if (algumConferido) {
+    console.error('Não é possível recolher itens já conferidos');
+    return null;
+  }
+
+  // Reagrupar: somar quantidades e recriar item consolidado
+  const totalQtd = itensExplodidos.reduce((acc, p) => acc + p.quantidade, 0);
+  const primeiro = itensExplodidos[0];
+
+  const itemConsolidado: ProdutoNotaEntrada = {
+    id: prefixoProdutoId,
+    tipoProduto: primeiro.tipoProduto,
+    marca: primeiro.marca,
+    modelo: primeiro.modelo,
+    quantidade: totalQtd,
+    custoUnitario: primeiro.custoUnitario,
+    custoTotal: primeiro.custoUnitario * totalQtd,
+    statusRecebimento: 'Pendente' as const,
+    statusConferencia: 'Pendente' as const
+  };
+
+  // Remover itens explodidos e inserir o consolidado na posição do primeiro
+  const primeiroIndex = nota.produtos.findIndex(p => p.id === itensExplodidos[0].id);
+  nota.produtos = nota.produtos.filter(p => !p.id.startsWith(prefixoProdutoId + '-U'));
+  nota.produtos.splice(primeiroIndex, 0, itemConsolidado);
+
+  registrarTimeline(nota, usuario, 'Estoque',
+    `Item "${primeiro.modelo}" recolhido de ${itensExplodidos.length} unidades para 1 linha (Qtd: ${totalQtd})`,
     nota.status);
 
   return JSON.parse(JSON.stringify(nota));

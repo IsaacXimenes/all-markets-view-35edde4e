@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EstoqueLayout } from '@/components/layout/EstoqueLayout';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowLeft, Lock, AlertCircle, Info, FileText, Zap } from 'lucide-react';
+import { ArrowLeft, Lock, AlertCircle, Info, FileText, Zap, Plus, Trash2, Layers } from 'lucide-react';
 import { getNotasCompra } from '@/utils/estoqueApi';
 import { 
   criarNotaEntrada, 
@@ -25,11 +25,39 @@ import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
 import { formatCurrency } from '@/utils/formatUtils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { BufferAnexos, AnexoTemporario } from '@/components/estoque/BufferAnexos';
+import { getProdutosCadastro } from '@/utils/cadastrosApi';
 
-// Número da nota será gerado automaticamente pela API
+interface ProdutoLinha {
+  tipoProduto: 'Aparelho' | 'Acessorio';
+  marca: string;
+  modelo: string;
+  imei: string;
+  cor: string;
+  categoria: string;
+  quantidade: number;
+  custoUnitario: number;
+  custoTotal: number;
+  explodido?: boolean;
+}
+
+const marcasAparelhos = ['Apple', 'Samsung', 'Xiaomi', 'Motorola', 'LG', 'Huawei', 'OnePlus', 'Realme', 'ASUS', 'Nokia', 'Oppo', 'Vivo'];
+
+const produtoLinhaVazia = (): ProdutoLinha => ({
+  tipoProduto: 'Aparelho',
+  marca: 'Apple',
+  modelo: '',
+  imei: '',
+  cor: '',
+  categoria: '',
+  quantidade: 1,
+  custoUnitario: 0,
+  custoTotal: 0,
+  explodido: false
+});
 
 export default function EstoqueNotaCadastrar() {
   const navigate = useNavigate();
+  const produtosCadastro = getProdutosCadastro();
   
   // Informações da Nota
   const [fornecedor, setFornecedor] = useState('');
@@ -50,6 +78,14 @@ export default function EstoqueNotaCadastrar() {
   // Buffer de anexos temporários
   const [anexos, setAnexos] = useState<AnexoTemporario[]>([]);
 
+  // Produtos
+  const [produtos, setProdutos] = useState<ProdutoLinha[]>([produtoLinhaVazia()]);
+
+  // Campos simplificados (oculta IMEI, Cor, Categoria)
+  const camposSimplificados = useMemo(() => {
+    return tipoPagamento === 'Pagamento 100% Antecipado' || tipoPagamento === 'Pagamento Parcial';
+  }, [tipoPagamento]);
+
   // Atualizar atuação automaticamente quando tipo de pagamento muda
   useEffect(() => {
     if (tipoPagamento) {
@@ -59,10 +95,79 @@ export default function EstoqueNotaCadastrar() {
     }
   }, [tipoPagamento]);
 
+  // Valor total calculado dos produtos
+  const valorTotalProdutos = useMemo(() => {
+    return produtos.reduce((acc, p) => acc + p.custoTotal, 0);
+  }, [produtos]);
+
+  const getModelosAparelhos = (marca: string) => {
+    return produtosCadastro.filter(p => p.marca.toLowerCase() === marca.toLowerCase());
+  };
 
   const handleValorTotalChange = (formatted: string, raw: string | number) => {
     const valor = typeof raw === 'number' ? raw : parseFloat(String(raw)) || 0;
     setValorTotal(valor);
+  };
+
+  const adicionarProduto = () => {
+    setProdutos([...produtos, produtoLinhaVazia()]);
+  };
+
+  const removerProduto = (index: number) => {
+    if (produtos.length > 1) {
+      setProdutos(produtos.filter((_, i) => i !== index));
+    }
+  };
+
+  const atualizarProduto = (index: number, campo: keyof ProdutoLinha, valor: any) => {
+    const novosProdutos = [...produtos];
+    novosProdutos[index] = { ...novosProdutos[index], [campo]: valor };
+
+    if (campo === 'tipoProduto') {
+      novosProdutos[index].marca = valor === 'Aparelho' ? 'Apple' : '';
+      novosProdutos[index].modelo = '';
+      novosProdutos[index].imei = '';
+      novosProdutos[index].cor = '';
+      novosProdutos[index].categoria = '';
+    }
+
+    if (campo === 'marca') {
+      novosProdutos[index].modelo = '';
+    }
+
+    if (campo === 'quantidade' || campo === 'custoUnitario') {
+      novosProdutos[index].custoTotal = novosProdutos[index].quantidade * novosProdutos[index].custoUnitario;
+    }
+
+    setProdutos(novosProdutos);
+  };
+
+  const handleCustoChange = (index: number, formatted: string, raw: string | number) => {
+    const valor = typeof raw === 'number' ? raw : parseFloat(String(raw)) || 0;
+    atualizarProduto(index, 'custoUnitario', valor);
+  };
+
+  const explodirItem = (index: number) => {
+    const item = produtos[index];
+    if (item.quantidade <= 1) return;
+
+    const novasLinhas: ProdutoLinha[] = Array.from({ length: item.quantidade }, () => ({
+      ...item,
+      quantidade: 1,
+      custoTotal: item.custoUnitario,
+      imei: '',
+      cor: '',
+      categoria: '',
+      explodido: true
+    }));
+
+    const novosProdutos = [
+      ...produtos.slice(0, index),
+      ...novasLinhas,
+      ...produtos.slice(index + 1)
+    ];
+    setProdutos(novosProdutos);
+    toast.success(`Item explodido em ${item.quantidade} unidades individuais`);
   };
 
   const validarCampos = (): string[] => {
@@ -74,6 +179,40 @@ export default function EstoqueNotaCadastrar() {
     
     return camposFaltando;
   };
+
+  const validarProdutos = (): boolean => {
+    // Pelo menos verificar campos obrigatórios simplificados
+    for (const p of produtos) {
+      if (!p.modelo) {
+        toast.error('Selecione o modelo de todos os produtos');
+        return false;
+      }
+      if (p.custoUnitario <= 0) {
+        toast.error('Informe o custo unitário de todos os produtos');
+        return false;
+      }
+      // Se Pagamento Pós, exigir campos completos
+      if (!camposSimplificados) {
+        if (p.tipoProduto === 'Aparelho' && !p.imei) {
+          toast.error('Informe o IMEI de todos os aparelhos');
+          return false;
+        }
+        if (p.tipoProduto === 'Aparelho' && !p.cor) {
+          toast.error('Selecione a cor de todos os aparelhos');
+          return false;
+        }
+        if (p.tipoProduto === 'Aparelho' && !p.categoria) {
+          toast.error('Selecione a categoria de todos os aparelhos');
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  const temProdutosPreenchidos = useMemo(() => {
+    return produtos.some(p => p.modelo && p.custoUnitario > 0);
+  }, [produtos]);
 
   const handleSalvar = () => {
     const camposFaltando = validarCampos();
@@ -97,26 +236,42 @@ export default function EstoqueNotaCadastrar() {
       return;
     }
 
-    // Criar nota via nova API (LANÇAMENTO INICIAL - sem produtos)
-    // O número da nota será gerado automaticamente pela API
+    // Se tem produtos preenchidos, validá-los
+    if (temProdutosPreenchidos && !validarProdutos()) return;
+
+    // Usar valor total dos produtos se houver, senão o informado manualmente
+    const valorFinal = temProdutosPreenchidos && valorTotalProdutos > 0 ? valorTotalProdutos : valorTotal;
+
+    // Criar nota via API
     const novaNota = criarNotaEntrada({
       data: dataEntrada,
-      fornecedor, // Passa o nome do fornecedor diretamente
+      fornecedor,
       tipoPagamento: tipoPagamento as TipoPagamentoNota,
-      valorTotal: valorTotal || undefined,
+      valorTotal: valorFinal || undefined,
       formaPagamento: formaPagamento || undefined,
-      responsavel: 'Usuário Estoque', // TODO: obter do contexto de autenticação
+      responsavel: 'Usuário Estoque',
       observacoes: observacaoPagamento || undefined,
-      urgente: urgente
+      urgente: urgente,
+      produtos: temProdutosPreenchidos ? produtos.filter(p => p.modelo && p.custoUnitario > 0).map(p => ({
+        tipoProduto: p.tipoProduto,
+        marca: p.marca,
+        modelo: p.modelo,
+        imei: p.imei || undefined,
+        cor: p.cor || undefined,
+        categoria: (p.categoria as 'Novo' | 'Seminovo') || undefined,
+        quantidade: p.quantidade,
+        custoUnitario: p.custoUnitario,
+        custoTotal: p.custoTotal
+      })) : undefined
     });
 
     // Mensagem de sucesso
     const atuacao = definirAtuacaoInicial(tipoPagamento as TipoPagamentoNota);
-    toast.success(`Nota ${novaNota.id} lançada com sucesso!`, {
-      description: `Atuação inicial: ${atuacao}. ${atuacao === 'Estoque' ? 'Acesse Notas Pendências para cadastrar produtos.' : 'Aguardando ação do Financeiro.'}`
+    const prodMsg = temProdutosPreenchidos ? ' com produtos registrados' : '';
+    toast.success(`Nota ${novaNota.id} lançada com sucesso${prodMsg}!`, {
+      description: `Atuação inicial: ${atuacao}. ${atuacao === 'Estoque' ? 'Acesse Notas Pendências para cadastrar/conferir produtos.' : 'Aguardando ação do Financeiro.'}`
     });
     
-    // Redirecionar para Notas Pendências
     navigate('/estoque/notas-pendencias');
   };
 
@@ -143,12 +298,14 @@ export default function EstoqueNotaCadastrar() {
           Voltar para Notas de Compra
         </Button>
 
-        {/* Alerta informativo sobre Lançamento Inicial */}
+        {/* Alerta informativo */}
         <Alert className="border-primary/30 bg-primary/5">
           <Info className="h-4 w-4 text-primary" />
           <AlertDescription className="text-sm">
-            <strong>Lançamento Inicial:</strong> Esta tela registra a existência da nota e define o fluxo de pagamento. 
-            Os produtos serão cadastrados posteriormente na aba <strong>Notas Pendências</strong> quando a Atuação Atual for "Estoque".
+            <strong>Lançamento Inicial:</strong> Registre a nota e, opcionalmente, os produtos. 
+            {camposSimplificados 
+              ? ' Para pagamentos Antecipado/Parcial, campos simplificados (sem IMEI, Cor, Categoria).'
+              : ' Para Pagamento Pós, todos os campos de produto são obrigatórios.'}
           </AlertDescription>
         </Alert>
 
@@ -215,60 +372,196 @@ export default function EstoqueNotaCadastrar() {
           </CardContent>
         </Card>
 
-        {/* Quadro de Produtos - BLOQUEADO */}
-        <Card className="opacity-70 relative">
-          <div className="absolute inset-0 bg-background/50 z-10 flex items-center justify-center rounded-lg">
-            <div className="text-center p-6 bg-muted rounded-lg shadow-lg">
-              <Lock className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-              <p className="font-medium text-foreground">Produtos bloqueados no Lançamento Inicial</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Cadastre produtos em <strong>Notas Pendências</strong> após salvar
-              </p>
-            </div>
-          </div>
+        {/* Quadro de Produtos - HABILITADO */}
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-muted-foreground">
-              <Lock className="h-5 w-5" />
-              Produtos
-            </CardTitle>
-            <CardDescription>
-              O cadastro de produtos é realizado posteriormente via Notas Pendências
-            </CardDescription>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Produtos
+                  {camposSimplificados && (
+                    <Badge variant="outline" className="text-xs">Simplificado</Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {camposSimplificados 
+                    ? 'Campos simplificados: IMEI, Cor e Categoria serão preenchidos na conferência'
+                    : 'Todos os campos habilitados para Pagamento Pós'}
+                </CardDescription>
+              </div>
+              <Button onClick={adicionarProduto} size="sm">
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar Produto
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-muted-foreground">Tipo Produto</TableHead>
-                    <TableHead className="text-muted-foreground">Marca</TableHead>
-                    <TableHead className="text-muted-foreground">IMEI</TableHead>
-                    <TableHead className="text-muted-foreground">Modelo</TableHead>
-                    <TableHead className="text-muted-foreground">Cor</TableHead>
-                    <TableHead className="text-muted-foreground">Categoria</TableHead>
-                    <TableHead className="text-muted-foreground">Qtd</TableHead>
-                    <TableHead className="text-muted-foreground">Custo Unit.</TableHead>
-                    <TableHead className="text-muted-foreground">Custo Total</TableHead>
+                    <TableHead>Tipo Produto *</TableHead>
+                    <TableHead>Marca *</TableHead>
+                    <TableHead>Modelo *</TableHead>
+                    {!camposSimplificados && <TableHead>IMEI</TableHead>}
+                    {!camposSimplificados && <TableHead>Cor</TableHead>}
+                    {!camposSimplificados && <TableHead className="min-w-[120px]">Categoria</TableHead>}
+                    <TableHead>Qtd *</TableHead>
+                    <TableHead className="min-w-[130px]">Custo Unit. *</TableHead>
+                    <TableHead>Custo Total</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      <div className="flex flex-col items-center gap-2">
-                        <AlertCircle className="h-6 w-6" />
-                        <span>Nenhum produto cadastrado nesta etapa</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                  {produtos.map((produto, index) => (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <Select 
+                          value={produto.tipoProduto}
+                          onValueChange={(value) => atualizarProduto(index, 'tipoProduto', value)}
+                        >
+                          <SelectTrigger className="w-28">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Aparelho">Aparelho</SelectItem>
+                            <SelectItem value="Acessorio">Acessório</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select 
+                          value={produto.marca}
+                          onValueChange={(value) => atualizarProduto(index, 'marca', value)}
+                        >
+                          <SelectTrigger className="w-28">
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {marcasAparelhos.map(marca => (
+                              <SelectItem key={marca} value={marca}>{marca}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select 
+                          value={produto.modelo}
+                          onValueChange={(value) => atualizarProduto(index, 'modelo', value)}
+                        >
+                          <SelectTrigger className="w-44">
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getModelosAparelhos(produto.marca).map(p => (
+                              <SelectItem key={p.id} value={p.produto}>{p.produto}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      {!camposSimplificados && (
+                        <TableCell>
+                          {produto.tipoProduto === 'Aparelho' ? (
+                            <InputComMascara
+                              mascara="imei"
+                              value={produto.imei}
+                              onChange={(formatted, raw) => atualizarProduto(index, 'imei', String(raw))}
+                              className="w-40"
+                              placeholder="00-000000-000000-0"
+                            />
+                          ) : (
+                            <Input disabled placeholder="N/A" className="w-40 bg-muted" />
+                          )}
+                        </TableCell>
+                      )}
+                      {!camposSimplificados && (
+                        <TableCell>
+                          {produto.tipoProduto === 'Aparelho' ? (
+                            <Input
+                              value={produto.cor}
+                              onChange={(e) => atualizarProduto(index, 'cor', e.target.value)}
+                              className="w-32"
+                              placeholder="Cor"
+                            />
+                          ) : (
+                            <Input disabled placeholder="N/A" className="w-32 bg-muted" />
+                          )}
+                        </TableCell>
+                      )}
+                      {!camposSimplificados && (
+                        <TableCell>
+                          {produto.tipoProduto === 'Aparelho' ? (
+                            <Select
+                              value={produto.categoria || 'selecione'}
+                              onValueChange={(value) => atualizarProduto(index, 'categoria', value === 'selecione' ? '' : value)}
+                            >
+                              <SelectTrigger className="w-24">
+                                <SelectValue placeholder="Cat" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="selecione">Selecione</SelectItem>
+                                <SelectItem value="Novo">Novo</SelectItem>
+                                <SelectItem value="Seminovo">Seminovo</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input disabled placeholder="N/A" className="w-24 bg-muted" />
+                          )}
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={produto.quantidade}
+                          onChange={(e) => atualizarProduto(index, 'quantidade', parseInt(e.target.value) || 1)}
+                          className="w-16"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <InputComMascara 
+                          mascara="moeda"
+                          value={produto.custoUnitario}
+                          onChange={(formatted, raw) => handleCustoChange(index, formatted, raw)}
+                          className="w-28"
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {formatCurrency(produto.custoTotal)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          {produto.quantidade > 1 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => explodirItem(index)}
+                              title="Gerar unidades individuais"
+                            >
+                              <Layers className="h-4 w-4 text-primary" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removerProduto(index)}
+                            disabled={produtos.length === 1}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
             
             <div className="mt-4 pt-4 border-t flex justify-end">
               <div className="text-right">
-                <p className="text-sm text-muted-foreground">Valor Total da Nota</p>
+                <p className="text-sm text-muted-foreground">Valor Total dos Produtos</p>
                 <p className="text-2xl font-bold">
-                  {formatCurrency(valorTotal)}
+                  {formatCurrency(valorTotalProdutos || valorTotal)}
                 </p>
               </div>
             </div>

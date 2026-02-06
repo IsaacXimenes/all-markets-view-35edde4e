@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, Plus, Trash2, AlertTriangle, Save, CheckCircle, Clock } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, AlertTriangle, Save, CheckCircle, Clock, Layers } from 'lucide-react';
 import { 
   getNotaEntradaById, 
   cadastrarProdutosNota, 
@@ -35,6 +35,7 @@ interface ProdutoLinha {
   quantidade: number;
   custoUnitario: number;
   custoTotal: number;
+  explodido?: boolean;
 }
 
 const marcasAparelhos = ['Apple', 'Samsung', 'Xiaomi', 'Motorola', 'LG', 'Huawei', 'OnePlus', 'Realme', 'ASUS', 'Nokia', 'Oppo', 'Vivo'];
@@ -128,6 +129,29 @@ export default function EstoqueNotaCadastrarProdutos() {
     }
     
     setProdutos(novosProdutos);
+  };
+
+  const explodirItem = (index: number) => {
+    const item = produtos[index];
+    if (item.quantidade <= 1) return;
+
+    const novasLinhas: ProdutoLinha[] = Array.from({ length: item.quantidade }, () => ({
+      ...item,
+      quantidade: 1,
+      custoTotal: item.custoUnitario,
+      imei: '',
+      cor: '',
+      categoria: '' as const,
+      explodido: true
+    }));
+
+    const novosProdutos = [
+      ...produtos.slice(0, index),
+      ...novasLinhas,
+      ...produtos.slice(index + 1)
+    ];
+    setProdutos(novosProdutos);
+    toast.success(`Item explodido em ${item.quantidade} unidades individuais`);
   };
 
   const handleCustoChange = (index: number, formatted: string, raw: string | number) => {
@@ -544,14 +568,26 @@ export default function EstoqueNotaCadastrarProdutos() {
                         {formatCurrency(produto.custoTotal)}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removerProduto(index)}
-                          disabled={produtos.length === 1}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          {produto.quantidade > 1 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => explodirItem(index)}
+                              title="Gerar unidades individuais"
+                            >
+                              <Layers className="h-4 w-4 text-primary" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removerProduto(index)}
+                            disabled={produtos.length === 1}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -91,16 +91,24 @@ export function ModalFinalizarPagamento({
   const saldoDevedor = pendencia ? pendencia.valorPendente : 0;
   const valorJaPago = pendencia?.valorPago ?? 0;
 
-  // Preencher responsável e valor automaticamente quando o modal abrir
+  // Preencher responsável e valor apenas na ABERTURA do modal
   useEffect(() => {
     if (open && pendencia) {
-      setForm(prev => ({
-        ...prev,
-        responsavel: prev.responsavel || usuarioLogado,
+      setForm({
+        contaPagamento: '',
+        formaPagamento: '',
+        parcelas: 1,
+        dataVencimento: '',
+        comprovante: '',
+        comprovanteNome: '',
+        observacoes: '',
+        responsavel: usuarioLogado,
+        forcarFinalizacao: false,
         valorPagamento: isParcial ? saldoDevedor : undefined
-      }));
+      });
     }
-  }, [open, usuarioLogado, isParcial, saldoDevedor, pendencia]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Verificar se conferência está incompleta - apenas para Pagamento Pós
   const conferenciaIncompleta = useMemo(() => {

@@ -116,19 +116,28 @@ export default function FinanceiroNotasPendencias() {
   const handleFinalizarPagamento = (dados: DadosPagamento) => {
     if (!notaSelecionada) return;
     
-    // Usar novo sistema de pagamento
+    // Usar valor editado pelo usuário (para parcial) ou o valor pendente total
+    const valorPagar = dados.valorPagamento ?? notaSelecionada.valorPendente;
+    
+    // Determinar tipo do pagamento
+    let tipoPag: 'inicial' | 'parcial' | 'final' = 'inicial';
+    if (notaSelecionada.valorPago > 0) {
+      // Tolerância de R$ 0,01
+      const saldoAposPagamento = notaSelecionada.valorPendente - valorPagar;
+      tipoPag = Math.abs(saldoAposPagamento) <= 0.01 ? 'final' : 'parcial';
+    }
+    
     const resultado = registrarPagamento(notaSelecionada.id, {
-      valor: notaSelecionada.valorPendente,
+      valor: valorPagar,
       formaPagamento: dados.formaPagamento,
       contaPagamento: dados.contaPagamento,
       comprovante: dados.comprovante,
       responsavel: dados.responsavel || 'Usuário Financeiro',
-      tipo: notaSelecionada.valorPago > 0 ? 'final' : 'inicial'
+      tipo: tipoPag
     });
 
     if (resultado) {
-      toast.success(`Pagamento da nota ${notaSelecionada.id} confirmado!`);
-      // Recarregar dados
+      toast.success(`Pagamento de ${formatCurrency(valorPagar)} da nota ${notaSelecionada.id} confirmado!`);
       setNotas(getNotasParaFinanceiro());
       setDialogPagamento(false);
       setDialogDetalhes(false);
@@ -221,7 +230,9 @@ export default function FinanceiroNotasPendencias() {
       ? Math.round((notaSelecionada.qtdConferida / notaSelecionada.qtdCadastrada) * 100) 
       : 0,
     qtdInformada: notaSelecionada.qtdInformada,
-    qtdConferida: notaSelecionada.qtdConferida
+    qtdConferida: notaSelecionada.qtdConferida,
+    tipoPagamento: notaSelecionada.tipoPagamento,
+    valorPago: notaSelecionada.valorPago
   } : null;
 
   return (

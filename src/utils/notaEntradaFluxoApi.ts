@@ -318,6 +318,17 @@ export const criarNotaEntrada = (dados: {
   responsavel: string;
   observacoes?: string;
   urgente?: boolean;
+  produtos?: {
+    tipoProduto: 'Aparelho' | 'Acessorio';
+    marca: string;
+    modelo: string;
+    imei?: string;
+    cor?: string;
+    categoria?: 'Novo' | 'Seminovo';
+    quantidade: number;
+    custoUnitario: number;
+    custoTotal: number;
+  }[];
 }): NotaEntrada => {
   // Gerar número da nota usando contador auto-incremental
   const numeroNota = gerarNumeroNotaAutoIncremental();
@@ -325,13 +336,34 @@ export const criarNotaEntrada = (dados: {
   // ID é igual ao número da nota para consistência
   const id = numeroNota;
   
-  // LANÇAMENTO INICIAL: Nenhum produto cadastrado
-  // Produtos serão adicionados posteriormente via Notas Pendências
+  // Processar produtos se fornecidos no lançamento
   const produtosProcessados: ProdutoNotaEntrada[] = [];
+  let qtdCadastrada = 0;
   
-  const valorTotal = dados.valorTotal || 0;
-  const qtdCadastrada = 0;
-  const qtdInformada = dados.qtdInformada || 0;
+  if (dados.produtos && dados.produtos.length > 0) {
+    dados.produtos.forEach((p, idx) => {
+      produtosProcessados.push({
+        id: `PROD-${id}-${String(idx + 1).padStart(3, '0')}`,
+        tipoProduto: p.tipoProduto,
+        marca: p.marca,
+        modelo: p.modelo,
+        imei: p.imei,
+        cor: p.cor,
+        categoria: p.categoria,
+        quantidade: p.quantidade,
+        custoUnitario: p.custoUnitario,
+        custoTotal: p.custoUnitario * p.quantidade,
+        statusRecebimento: 'Pendente' as const,
+        statusConferencia: 'Pendente' as const
+      });
+    });
+    qtdCadastrada = produtosProcessados.length;
+  }
+  
+  const valorTotal = (dados.produtos && dados.produtos.length > 0)
+    ? produtosProcessados.reduce((acc, p) => acc + p.custoTotal, 0)
+    : (dados.valorTotal || 0);
+  const qtdInformada = dados.qtdInformada || (qtdCadastrada > 0 ? qtdCadastrada : 0);
   
   // Definir atuação inicial automaticamente
   const atuacaoInicial = definirAtuacaoInicial(dados.tipoPagamento);
@@ -372,11 +404,12 @@ export const criarNotaEntrada = (dados: {
   };
   
   // Registrar criação na timeline
+  const produtosMsg = qtdCadastrada > 0 ? ` com ${qtdCadastrada} produto(s)` : '';
   registrarTimeline(
     novaNota,
     dados.responsavel,
     'Estoque',
-    'Lançamento inicial da nota',
+    `Lançamento inicial da nota${produtosMsg}`,
     statusInicial,
     valorTotal,
     `Tipo de pagamento: ${dados.tipoPagamento}. Atuação inicial: ${atuacaoInicial}`
@@ -414,7 +447,6 @@ export const criarNotaEntrada = (dados: {
   
   return novaNota;
 };
-
 // ============= FUNÇÕES DE ALTERAÇÃO DE ATUAÇÃO =============
 
 export const alterarAtuacao = (
@@ -585,20 +617,29 @@ export const registrarPagamento = (
       alterarAtuacao(notaId, 'Estoque', 'Sistema', 'Pagamento 100% concluído - aguardando conferência do estoque');
     }
   } else if (nota.tipoPagamento === 'Pagamento Parcial') {
-    if (pagamento.tipo === 'inicial') {
+    // Tolerância de R$ 0,01
+    const quitado = Math.abs(nota.valorPendente) <= 0.01;
+    
+    if (nota.pagamentos.length === 1 && !quitado) {
+      // Primeiro pagamento parcial - transicionar para estoque
       transicionarStatus(notaId, 'Pagamento Parcial Realizado', pagamento.responsavel, 'Financeiro');
       transicionarStatus(notaId, 'Aguardando Conferencia', 'Sistema', 'Sistema');
-      // Após primeiro pagamento, muda atuação para Estoque
-      alterarAtuacao(notaId, 'Estoque', 'Sistema', 'Pagamento inicial realizado - aguardando cadastro e conferência');
-    } else if (pagamento.tipo === 'final' && nota.valorPago >= nota.valorTotal) {
-      // Verificar se conferência está concluída
+      alterarAtuacao(notaId, 'Estoque', 'Sistema', 'Pagamento parcial realizado - aguardando cadastro e conferência');
+    } else if (quitado) {
+      // Pagamento quitou o saldo
       if (nota.status === 'Aguardando Pagamento Final' || nota.status === 'Conferencia Concluida') {
         transicionarStatus(notaId, 'Finalizada', pagamento.responsavel, 'Financeiro');
         nota.dataFinalizacao = new Date().toISOString();
         nota.responsavelFinalizacao = pagamento.responsavel;
         alterarAtuacao(notaId, 'Encerrado', 'Sistema', 'Nota finalizada - todos os pagamentos e conferência concluídos');
+      } else if (nota.status === 'Aguardando Pagamento Inicial' || nota.status === 'Pagamento Parcial Realizado') {
+        // Pagou tudo antes da conferência
+        transicionarStatus(notaId, 'Pagamento Concluido', pagamento.responsavel, 'Financeiro');
+        transicionarStatus(notaId, 'Aguardando Conferencia', 'Sistema', 'Sistema');
+        alterarAtuacao(notaId, 'Estoque', 'Sistema', 'Pagamento total concluído - aguardando conferência do estoque');
       }
     }
+    // Se não quitou e não é primeiro pagamento, apenas registra (mantém status atual)
   } else if (nota.tipoPagamento === 'Pagamento Pos') {
     // Só pode pagar após conferência concluída
     if (nota.status !== 'Conferencia Concluida' && nota.status !== 'Aguardando Pagamento Final') {

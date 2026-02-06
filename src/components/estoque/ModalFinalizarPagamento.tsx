@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { InputComMascara } from '@/components/ui/InputComMascara';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,8 @@ export interface PendenciaPagamentoData {
   aparelhosConferidos?: number;
   qtdInformada?: number;
   qtdConferida?: number;
+  tipoPagamento?: string;
+  valorPago?: number;
 }
 
 export interface DadosPagamento {
@@ -37,6 +40,7 @@ export interface DadosPagamento {
   observacoes: string;
   responsavel: string;
   forcarFinalizacao?: boolean;
+  valorPagamento?: number;
 }
 
 interface ModalFinalizarPagamentoProps {
@@ -78,15 +82,25 @@ export function ModalFinalizarPagamento({
     comprovanteNome: '',
     observacoes: '',
     responsavel: '',
-    forcarFinalizacao: false
+    forcarFinalizacao: false,
+    valorPagamento: undefined
   });
 
-  // Preencher responsável automaticamente quando o modal abrir
+  // Verificar se é pagamento parcial
+  const isParcial = pendencia?.tipoPagamento === 'Pagamento Parcial';
+  const saldoDevedor = pendencia ? pendencia.valorPendente : 0;
+  const valorJaPago = pendencia?.valorPago ?? 0;
+
+  // Preencher responsável e valor automaticamente quando o modal abrir
   useEffect(() => {
-    if (open && usuarioLogado && !form.responsavel) {
-      setForm(prev => ({ ...prev, responsavel: usuarioLogado }));
+    if (open && pendencia) {
+      setForm(prev => ({
+        ...prev,
+        responsavel: prev.responsavel || usuarioLogado,
+        valorPagamento: isParcial ? saldoDevedor : undefined
+      }));
     }
-  }, [open, usuarioLogado]);
+  }, [open, usuarioLogado, isParcial, saldoDevedor, pendencia]);
 
   // Verificar se conferência está incompleta
   const conferenciaIncompleta = useMemo(() => {
@@ -126,6 +140,16 @@ export function ModalFinalizarPagamento({
       toast.error('Faça upload do comprovante de pagamento');
       return false;
     }
+    if (isParcial && form.valorPagamento !== undefined) {
+      if (form.valorPagamento <= 0) {
+        toast.error('O valor do pagamento deve ser maior que zero');
+        return false;
+      }
+      if (form.valorPagamento > saldoDevedor + 0.01) {
+        toast.error('O valor não pode exceder o saldo devedor');
+        return false;
+      }
+    }
     if (conferenciaIncompleta && !form.forcarFinalizacao) {
       toast.error('Marque a opção para forçar finalização com conferência incompleta');
       return false;
@@ -146,7 +170,8 @@ export function ModalFinalizarPagamento({
       comprovanteNome: '',
       observacoes: '',
       responsavel: '',
-      forcarFinalizacao: false
+      forcarFinalizacao: false,
+      valorPagamento: undefined
     });
   };
 
@@ -165,8 +190,24 @@ export function ModalFinalizarPagamento({
         <div className="space-y-4">
           {/* Resumo */}
           <div className="p-3 rounded-lg bg-muted/50">
-            <p className="text-sm text-muted-foreground">Valor Total</p>
-            <p className="text-xl font-bold">{formatCurrency(pendencia.valorTotal)}</p>
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-muted-foreground">Valor Total da Nota</p>
+                <p className="text-xl font-bold">{formatCurrency(pendencia.valorTotal)}</p>
+              </div>
+              {isParcial && valorJaPago > 0 && (
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Já Pago</p>
+                  <p className="text-lg font-semibold text-primary">{formatCurrency(valorJaPago)}</p>
+                </div>
+              )}
+            </div>
+            {isParcial && (
+              <div className="mt-2 pt-2 border-t border-border">
+                <p className="text-sm text-muted-foreground">Saldo Devedor</p>
+                <p className="text-lg font-bold text-destructive">{formatCurrency(saldoDevedor)}</p>
+              </div>
+            )}
             <p className="text-sm text-muted-foreground mt-1">
               Conferência: {pendencia.percentualConferencia}% 
               ({pendencia.qtdConferida ?? pendencia.aparelhosConferidos ?? 0}/{pendencia.qtdInformada ?? pendencia.aparelhosTotal ?? 0} aparelhos)
@@ -201,6 +242,24 @@ export function ModalFinalizarPagamento({
 
           {/* Campos do formulário */}
           <div className="space-y-3">
+            {/* Campo de valor editável para pagamento parcial */}
+            {isParcial && (
+              <div>
+                <Label>Valor do Pagamento *</Label>
+                <InputComMascara
+                  mascara="moeda"
+                  value={form.valorPagamento ?? 0}
+                  onChange={(formatted, raw) => {
+                    const valor = typeof raw === 'number' ? raw : parseFloat(String(raw)) || 0;
+                    setForm(prev => ({ ...prev, valorPagamento: valor }));
+                  }}
+                  placeholder="R$ 0,00"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Máximo: {formatCurrency(saldoDevedor)}
+                </p>
+              </div>
+            )}
             <div>
               <Label>Conta de Pagamento *</Label>
               <Select 

@@ -1,320 +1,183 @@
 
-# Plano: Módulo de Gestão Administrativa - Conferência de Caixa
 
-## Visão Geral
+# Plano: Otimizacao do Fluxo de Notas de Entrada - Produtos no Lancamento e Pagamento Parcial Flexivel
 
-Criar um novo módulo chamado **"Gestão Administrativa"** destinado a gestores para conferência de caixa e conciliação financeira diária. O módulo será 100% sincronizado com as vendas do sistema.
+## Visao Geral
 
----
+Tres grandes mudancas no fluxo de Notas de Entrada:
 
-## 1. Estrutura do Módulo
-
-### Novos Arquivos a Criar
-
-| Arquivo | Descrição |
-|---------|-----------|
-| `src/pages/GestaoAdministrativa.tsx` | Página principal - Conferência Diária |
-| `src/components/layout/GestaoAdministrativaLayout.tsx` | Layout com tabs de navegação |
-| `src/utils/gestaoAdministrativaApi.ts` | API para dados de conferência, ajustes e logs |
-
-### Modificações em Arquivos Existentes
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/App.tsx` | Adicionar rota `/gestao-administrativa` |
-| `src/components/layout/Sidebar.tsx` | Adicionar item "Gestão Administrativa" com ícone `ClipboardCheck` |
+1. **Desbloquear o quadro de produtos no lancamento** com campos condicionais baseados no tipo de pagamento
+2. **Pagamento parcial flexivel** no modulo Financeiro (usuario define o valor a pagar)
+3. **Funcionalidade "Explodir Itens"** para gerar unidades individuais a partir de um item consolidado
 
 ---
 
-## 2. Estrutura de Dados
+## 1. Desbloquear Quadro de Produtos no Lancamento
 
-### 2.1 Interface de Conferência Diária
+### Arquivo: `src/pages/EstoqueNotaCadastrar.tsx`
+
+**O que muda:**
+- Remover o overlay de "Produtos bloqueados" (linhas 218-276)
+- Adicionar um quadro de produtos funcional com logica condicional:
+  - **Pagamento Antecipado ou Parcial**: campos habilitados apenas Tipo Produto, Marca, Modelo, Qtd, Custo Unitario. Campos IMEI, Cor, Categoria ficam ocultos/desabilitados
+  - **Pagamento Pos**: todos os campos habilitados (fluxo completo atual)
+- Adicionar estado `produtos` (array de `ProdutoLinha`) e funcoes de adicionar/remover/atualizar
+- No `handleSalvar`, passar os produtos junto com a criacao da nota
+- Atualizar o alerta informativo para refletir o novo comportamento
+
+### Arquivo: `src/utils/notaEntradaFluxoApi.ts`
+
+**O que muda:**
+- Atualizar `criarNotaEntrada` para aceitar produtos opcionais no lancamento
+- Quando produtos sao passados, ja registra-los na nota (qtdCadastrada, valorTotal calculado)
+- Manter a logica de atuacao inicial intacta
+
+---
+
+## 2. Pagamento Parcial Flexivel no Financeiro
+
+### Arquivo: `src/components/estoque/ModalFinalizarPagamento.tsx`
+
+**O que muda:**
+- Adicionar campo editavel de "Valor do Pagamento" quando a nota for do tipo `Pagamento Parcial`
+- Exibir informacoes claras: Valor Total da Nota, Valor Ja Pago, Saldo Devedor
+- Validacao: valor inserido nao pode exceder o saldo devedor
+- Pre-preencher com o saldo devedor mas permitir edicao
+- Adicionar a interface `PendenciaPagamentoData` o campo `tipoPagamento`
+
+### Arquivo: `src/pages/FinanceiroNotasPendencias.tsx`
+
+**O que muda:**
+- Passar `tipoPagamento` e `valorPago` para o modal de pagamento
+- Ajustar `handleFinalizarPagamento` para usar o valor informado pelo usuario (ao inves de sempre `valorPendente`)
+
+### Arquivo: `src/utils/notaEntradaFluxoApi.ts`
+
+**O que muda na funcao `registrarPagamento`:**
+- Para tipo `Pagamento Parcial`, aceitar pagamentos de qualquer valor (nao apenas o total pendente)
+- Nao transicionar para `Finalizada` se ainda houver saldo devedor apos o pagamento
+- Registrar corretamente como `parcial` quando o valor pago nao quita o saldo
+
+---
+
+## 3. Funcionalidade "Explodir Itens"
+
+### Arquivo: `src/pages/EstoqueNotaCadastrar.tsx`
+
+**O que muda:**
+- Adicionar botao "Gerar Unidades" ao lado de itens com Qtd > 1
+- Ao clicar:
+  1. Remove o item consolidado
+  2. Gera N linhas individuais (Qtd = 1 cada) com Tipo Produto, Marca, Modelo e Custo Unitario pre-preenchidos
+  3. Campos IMEI, Cor, Categoria ficam vazios para preenchimento posterior
+- Flag `explodido: boolean` na interface `ProdutoLinha` para diferenciar itens consolidados de individuais
+- Botao visivel apenas quando Qtd > 1
+
+### Arquivo: `src/pages/EstoqueNotaCadastrarProdutos.tsx`
+
+**O que muda:**
+- Mesma funcionalidade de "Explodir Itens" disponivel tambem nesta tela (cadastro posterior)
+- Util para notas que chegaram sem produtos e estao sendo cadastradas via Notas Pendencias
+
+---
+
+## 4. Resumo de Alteracoes por Arquivo
+
+| Arquivo | Tipo | Descricao |
+|---------|------|-----------|
+| `src/pages/EstoqueNotaCadastrar.tsx` | Modificar | Desbloquear quadro de produtos + campos condicionais + explodir itens |
+| `src/pages/EstoqueNotaCadastrarProdutos.tsx` | Modificar | Adicionar funcionalidade de explodir itens |
+| `src/components/estoque/ModalFinalizarPagamento.tsx` | Modificar | Campo editavel de valor para pagamento parcial |
+| `src/pages/FinanceiroNotasPendencias.tsx` | Modificar | Passar tipoPagamento ao modal + ajustar handler |
+| `src/utils/notaEntradaFluxoApi.ts` | Modificar | Aceitar produtos no lancamento + pagamento parcial flexivel |
+
+---
+
+## 5. Detalhes Tecnicos
+
+### Interface ProdutoLinha atualizada (EstoqueNotaCadastrar)
 
 ```typescript
-interface ConferenciaDiaria {
-  id: string;
-  data: string; // YYYY-MM-DD
-  lojaId: string;
+interface ProdutoLinha {
+  tipoProduto: 'Aparelho' | 'Acessorio';
+  marca: string;
+  modelo: string;
+  imei: string;        // oculto/desabilitado para Antecipado/Parcial
+  cor: string;         // oculto/desabilitado para Antecipado/Parcial
+  categoria: string;   // oculto/desabilitado para Antecipado/Parcial
+  quantidade: number;
+  custoUnitario: number;
+  custoTotal: number;
+  explodido?: boolean; // true se gerado pela explosao
+}
+```
+
+### PendenciaPagamentoData atualizada
+
+```typescript
+export interface PendenciaPagamentoData {
+  // ... campos existentes
+  tipoPagamento?: string;  // NOVO
+  valorPago?: number;      // NOVO
+}
+```
+
+### DadosPagamento atualizado
+
+```typescript
+export interface DadosPagamento {
+  // ... campos existentes
+  valorPagamento?: number; // NOVO - valor editado pelo usuario
+}
+```
+
+### Logica de campos condicionais
+
+```typescript
+const camposSimplificados = tipoPagamento === 'Pagamento 100% Antecipado' 
+                         || tipoPagamento === 'Pagamento Parcial';
+
+// Na tabela de produtos:
+// Se camposSimplificados = true:
+//   - Mostrar: Tipo Produto, Marca, Modelo, Qtd, Custo Unit, Custo Total
+//   - Ocultar: IMEI, Cor, Categoria
+// Se camposSimplificados = false:
+//   - Mostrar todos os campos
+```
+
+### Logica de explosao de itens
+
+```typescript
+const explodirItem = (index: number) => {
+  const item = produtos[index];
+  if (item.quantidade <= 1) return;
   
-  // Totais consolidados por método de pagamento
-  totaisPorMetodo: {
-    pix: { bruto: number; conferido: boolean; conferidoPor?: string; dataConferencia?: string };
-    debito: { bruto: number; conferido: boolean; conferidoPor?: string; dataConferencia?: string };
-    credito: { bruto: number; conferido: boolean; conferidoPor?: string; dataConferencia?: string };
-    dinheiro: { bruto: number; conferido: boolean; conferidoPor?: string; dataConferencia?: string };
-    transferencia: { bruto: number; conferido: boolean; conferidoPor?: string; dataConferencia?: string };
-  };
+  const novasLinhas = Array.from({ length: item.quantidade }, () => ({
+    ...item,
+    quantidade: 1,
+    custoTotal: item.custoUnitario,
+    imei: '',
+    cor: '',
+    categoria: '',
+    explodido: true
+  }));
   
-  vendasTotal: number;
-  statusConferencia: 'Não Conferido' | 'Parcial' | 'Conferido';
-  
-  // Ajustes/Divergências
-  ajustes: AjusteDivergencia[];
-}
-
-interface AjusteDivergencia {
-  id: string;
-  metodoPagamento: string;
-  valorDiferenca: number;
-  justificativa: string;
-  registradoPor: string;
-  dataRegistro: string;
-}
-
-interface LogAuditoria {
-  id: string;
-  conferenciaId: string;
-  acao: 'conferencia_marcada' | 'conferencia_desmarcada' | 'ajuste_registrado';
-  metodoPagamento?: string;
-  usuarioId: string;
-  usuarioNome: string;
-  dataHora: string;
-  detalhes: string;
-}
-```
-
----
-
-## 3. Interface do Usuário
-
-### 3.1 Filtros Principais (Topo)
-
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  [Competência: Fevereiro/2026 ▼]  [Loja: Todas ▼]  [Vendedor: Todos ▼]   │
-│                                                                          │
-│  📊 Cards de Resumo:                                                     │
-│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐            │
-│  │ Total Bruto│ │ Conferido  │ │ Pendente   │ │ Dias Abertos│            │
-│  │R$ 150.000  │ │R$ 120.000  │ │R$ 30.000   │ │    5       │            │
-│  └────────────┘ └────────────┘ └────────────┘ └────────────┘            │
-└──────────────────────────────────────────────────────────────────────────┘
-```
-
-### 3.2 Tabela de Conferência Diária
-
-| Data | Status | Vendas (Bruto) | PIX | ✓ PIX | Débito | ✓ Deb | Crédito | ✓ Cred | Dinheiro | ✓ Din | Ações |
-|------|--------|----------------|-----|-------|--------|-------|---------|--------|----------|-------|-------|
-| 05/02 | 🟡 Parcial | R$ 15.000 | R$ 5.000 | ✅ | R$ 3.000 | ❌ | R$ 7.000 | ✅ | R$ 0 | - | 👁️ ✍️ |
-| 04/02 | 🟢 Conferido | R$ 12.500 | R$ 4.000 | ✅ | R$ 2.500 | ✅ | R$ 6.000 | ✅ | R$ 0 | - | 👁️ |
-
-**Cores das Linhas:**
-- 🔴 `bg-red-500/10` - Não Conferido
-- 🟡 `bg-yellow-500/10` - Parcial
-- 🟢 `bg-green-500/10` - Conferido
-
-### 3.3 Modal de Drill-Down (Detalhes do Dia)
-
-Ao clicar em um valor ou no botão "Visualizar":
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│  Vendas do Dia 05/02/2026 - Loja Matriz                                 │
-│  Método: PIX (R$ 5.000,00)                                              │
-├─────────────────────────────────────────────────────────────────────────┤
-│  ID Venda    │ Cliente       │ Vendedor        │ Valor                  │
-│  VEN-2025-01 │ João Silva    │ Carlos Vendedor │ R$ 2.500,00            │
-│  VEN-2025-02 │ Maria Santos  │ Ana Vendedora   │ R$ 2.500,00            │
-├─────────────────────────────────────────────────────────────────────────┤
-│  Total Bruto: R$ 5.000,00                                               │
-│  Taxa Estimada (Cartão): -                                              │
-│  Valor Líquido: R$ 5.000,00                                             │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 3.4 Modal de Ajuste/Divergência
-
-Ao clicar no botão ✍️:
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│  Registrar Divergência - 05/02/2026                                     │
-├─────────────────────────────────────────────────────────────────────────┤
-│  Método de Pagamento: [PIX ▼]                                           │
-│  Valor da Diferença:  [R$ __________]                                   │
-│  Justificativa:       [________________________]                        │
-│                       [________________________]                        │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                          [Cancelar]  [Salvar Ajuste]    │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 4. Implementação Técnica
-
-### 4.1 API de Gestão Administrativa (`gestaoAdministrativaApi.ts`)
-
-```typescript
-// Consolidar vendas por dia, loja e método de pagamento
-export const consolidarVendasPorDia = (
-  competencia: string,   // "2026-02"
-  lojaId?: string,
-  vendedorId?: string
-): ConferenciaDiaria[] => {
-  // 1. Filtrar vendas por competência
-  // 2. Agrupar por data
-  // 3. Para cada dia, somar valores por método de pagamento
-  // 4. Verificar status de conferência salvo no localStorage
-};
-
-// Obter vendas detalhadas de um dia/método
-export const getVendasPorDiaMetodo = (
-  data: string,
-  lojaId: string,
-  metodoPagamento: string
-): VendaDrillDown[] => {
-  // Filtrar vendas e retornar com dados para o modal
-};
-
-// Marcar/Desmarcar conferência
-export const toggleConferencia = (
-  data: string,
-  lojaId: string,
-  metodoPagamento: string,
-  usuarioId: string,
-  usuarioNome: string
-): void => {
-  // Salvar no localStorage e registrar log
-};
-
-// Registrar ajuste/divergência
-export const registrarAjuste = (
-  data: string,
-  lojaId: string,
-  ajuste: Omit<AjusteDivergencia, 'id' | 'dataRegistro'>
-): void => {
-  // Salvar ajuste e registrar log
-};
-
-// Obter logs de auditoria
-export const getLogsAuditoria = (
-  competencia?: string,
-  lojaId?: string
-): LogAuditoria[] => {
-  // Retornar logs filtrados
+  const novosProdutos = [
+    ...produtos.slice(0, index),
+    ...novasLinhas,
+    ...produtos.slice(index + 1)
+  ];
+  setProdutos(novosProdutos);
 };
 ```
 
-### 4.2 Layout do Módulo (`GestaoAdministrativaLayout.tsx`)
-
-```typescript
-const tabs = [
-  { name: 'Conferência Diária', href: '/gestao-administrativa', icon: ClipboardCheck },
-  { name: 'Logs de Auditoria', href: '/gestao-administrativa/logs', icon: History },
-];
-```
-
-### 4.3 Controle de Acesso
-
-O módulo deve verificar se o usuário logado é gestor:
-
-```typescript
-// No componente principal
-const { colaboradores } = useCadastroStore();
-const { user } = useAuthStore();
-
-const colaboradorLogado = colaboradores.find(c => c.id === user?.colaborador?.id);
-const ehGestor = colaboradorLogado?.eh_gestor ?? false;
-
-if (!ehGestor) {
-  return <Alert>Acesso restrito a gestores.</Alert>;
-}
-```
-
 ---
 
-## 5. Fluxo de Conferência
+## 6. Validacoes
 
-```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                      Gestor acessa o módulo                              │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│            Seleciona Competência (mês/ano) e Loja                        │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│           Sistema consolida vendas por dia automaticamente               │
-│              (100% sincronizado com base de vendas)                      │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                Para cada método de pagamento do dia:                     │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                  │
-│  │ Visualizar  │    │   Conferir  │    │  Registrar  │                  │
-│  │  Detalhes   │    │  (Checkbox) │    │   Ajuste    │                  │
-│  └─────────────┘    └─────────────┘    └─────────────┘                  │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    Todas as ações são auditadas                          │
-│         (quem fez, quando fez, qual método, qual valor)                  │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+- Campos obrigatorios no lancamento simplificado: Tipo Produto, Marca, Modelo, Qtd, Custo Unitario
+- Campos obrigatorios no lancamento completo (Pos): todos os campos incluindo IMEI, Cor, Categoria
+- Valor do pagamento parcial: deve ser > 0 e <= saldo devedor
+- Explosao: soma das quantidades individuais deve igualar a quantidade original
+- Tolerancia financeira de R$ 0,01 nas comparacoes de saldo
 
----
-
-## 6. Persistência de Dados
-
-### localStorage Keys
-
-| Key | Descrição |
-|-----|-----------|
-| `gestao_conferencia_{YYYY-MM}_{lojaId}` | Status de conferência por dia |
-| `gestao_ajustes_{YYYY-MM}_{lojaId}` | Ajustes/divergências registrados |
-| `gestao_logs_auditoria` | Logs de todas as ações |
-
----
-
-## 7. Resumo de Arquivos
-
-### Novos Arquivos (3)
-
-1. **`src/pages/GestaoAdministrativa.tsx`** (~400 linhas)
-   - Página principal com tabela de conferência diária
-   - Filtros de competência, loja e vendedor
-   - Cards de resumo (Total, Conferido, Pendente, Dias)
-   - Modais de drill-down e ajuste
-
-2. **`src/components/layout/GestaoAdministrativaLayout.tsx`** (~35 linhas)
-   - Layout padrão com TabsNavigation
-
-3. **`src/utils/gestaoAdministrativaApi.ts`** (~250 linhas)
-   - Funções de consolidação de vendas
-   - Gerenciamento de conferências
-   - Registro de ajustes e logs
-
-### Arquivos a Modificar (2)
-
-4. **`src/App.tsx`**
-   - Adicionar import e rota
-
-5. **`src/components/layout/Sidebar.tsx`**
-   - Adicionar item de menu
-
----
-
-## 8. Considerações de Performance
-
-- A consolidação de vendas usa `useMemo` para evitar recálculos desnecessários
-- Filtros aplicados antes da agregação para reduzir volume de dados
-- Índices por data e loja para buscas rápidas
-- Debounce em filtros de texto (se aplicável)
-
----
-
-## 9. Padrões Seguidos
-
-- Layout consistente com outros módulos (FinanceiroLayout como referência)
-- Tabela com scroll horizontal (TableScrollArea)
-- Cores de status conforme `statusColors.ts`
-- Formatação monetária brasileira (R$ XXX.XXX,XX)
-- Checkboxes para conferência com feedback visual
-- Modais para detalhes e ações
-- Logs de auditoria para rastreabilidade

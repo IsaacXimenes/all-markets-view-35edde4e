@@ -25,6 +25,7 @@ import {
   finalizarConferencia, 
   explodirProdutoNota,
   recolherProdutoNota,
+  migrarProdutosConferidosPorCategoria,
   NotaEntrada,
   ProdutoNotaEntrada,
   podeRealizarAcao,
@@ -237,12 +238,30 @@ export default function EstoqueNotaConferencia() {
       setNota(resultado);
       toast.success(`${produtosIds.length} produto(s) conferido(s) com sucesso!`);
       
-      // Verificar se finalizou 100%
-      if (resultado.qtdConferida === resultado.qtdCadastrada) {
+      // Verificar se finalizou 100% - migrar produtos automaticamente
+      if (resultado.qtdConferida === resultado.qtdCadastrada && resultado.qtdCadastrada > 0) {
+        // Buscar nota original (não a cópia) para a migração registrar timeline
+        const notaOriginal = getNotaEntradaById(resultado.id);
+        if (notaOriginal) {
+          const migracaoResult = migrarProdutosConferidosPorCategoria(notaOriginal, 'Carlos Estoque');
+          
+          const partes: string[] = [];
+          if (migracaoResult.novos > 0) partes.push(`${migracaoResult.novos} novo(s) → Estoque`);
+          if (migracaoResult.seminovos > 0) partes.push(`${migracaoResult.seminovos} seminovo(s) → Aparelhos Pendentes`);
+          
+          if (partes.length > 0) {
+            toast.success('Produtos migrados com sucesso!', {
+              description: partes.join(' | ') + ' (Destino: Estoque - SIA)'
+            });
+          }
+        }
+        
         toast.success('Conferência 100% concluída!', {
           description: resultado.tipoPagamento === 'Pagamento Pos' 
             ? 'Nota enviada para pagamento no Financeiro' 
-            : 'Status da nota atualizado'
+            : resultado.tipoPagamento === 'Pagamento 100% Antecipado'
+              ? 'Nota finalizada automaticamente'
+              : 'Status da nota atualizado'
         });
         navigate('/estoque/notas-pendencias');
       }

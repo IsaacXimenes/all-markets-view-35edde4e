@@ -132,10 +132,17 @@ const statusColorMap: Record<string, StatusColor> = {
   // Status especiais (roxo)
   'VIP': 'purple',
   'Premium': 'purple',
+  'Empréstimo': 'purple',
   
   // Status de alerta moderado (laranja)
   'Baixo Estoque': 'orange',
-  'Atenção': 'orange'
+  'Atenção': 'orange',
+  'Retirada de Peças': 'orange',
+  
+  // Status de aparelho
+  'Vendido': 'red',
+  'Em movimentação': 'yellow',
+  'Bloqueado': 'gray'
 };
 
 /**

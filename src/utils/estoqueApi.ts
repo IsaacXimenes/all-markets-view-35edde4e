@@ -482,6 +482,16 @@ let produtos: Produto[] = [
 // Exportar IDs de lojas para uso em outros módulos
 export const ESTOQUE_LOJAS_IDS = LOJAS_IDS;
 
+// Helper para derivar o status atual do aparelho
+export const getStatusAparelho = (produto: Produto): string => {
+  if (produto.quantidade === 0 && produto.statusNota === 'Concluído') return 'Vendido';
+  if (produto.statusMovimentacao === 'Em movimentação') return 'Em movimentação';
+  if (produto.statusEmprestimo === 'Empréstimo - Assistência') return 'Empréstimo';
+  if (produto.statusRetiradaPecas && produto.statusRetiradaPecas !== 'Cancelada') return 'Retirada de Peças';
+  if (produto.bloqueadoEmVendaId) return 'Bloqueado';
+  return 'Disponível';
+};
+
 // Inicializa IDs existentes no sistema
 const initializeExistingIds = () => {
   const allIds = produtos.map(p => p.id);

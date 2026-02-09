@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { getProdutos, getEstoqueStats, updateValorRecomendado, updateProdutoLoja, Produto } from '@/utils/estoqueApi';
+import { getProdutos, getEstoqueStats, updateValorRecomendado, updateProdutoLoja, Produto, getStatusAparelho } from '@/utils/estoqueApi';
+import { getStatusBadgeClasses } from '@/utils/statusColors';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
@@ -39,6 +40,7 @@ export default function EstoqueProdutos() {
   const [imeiFilter, setImeiFilter] = useState('');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
   const [origemFilter, setOrigemFilter] = useState<string>('todas');
+  const [statusAparelhoFilter, setStatusAparelhoFilter] = useState<string>('todos');
   const [somenteNaoConferidos, setSomenteNaoConferidos] = useState(false);
   
   // Modal para informar valor recomendado
@@ -69,6 +71,7 @@ export default function EstoqueProdutos() {
     if (imeiFilter && !unformatIMEI(p.imei).includes(unformatIMEI(imeiFilter))) return false;
     if (tipoFilter !== 'todos' && p.tipo !== tipoFilter) return false;
     if (origemFilter !== 'todas' && p.origemEntrada !== origemFilter) return false;
+    if (statusAparelhoFilter !== 'todos' && getStatusAparelho(p) !== statusAparelhoFilter) return false;
     if (somenteNaoConferidos && (p.estoqueConferido && p.assistenciaConferida)) return false;
     return true;
   });
@@ -267,6 +270,24 @@ export default function EstoqueProdutos() {
                 </Select>
               </div>
 
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Status</p>
+                <Select value={statusAparelhoFilter} onValueChange={setStatusAparelhoFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="Disponível">Disponível</SelectItem>
+                    <SelectItem value="Vendido">Vendido</SelectItem>
+                    <SelectItem value="Em movimentação">Em movimentação</SelectItem>
+                    <SelectItem value="Empréstimo">Empréstimo</SelectItem>
+                    <SelectItem value="Retirada de Peças">Retirada de Peças</SelectItem>
+                    <SelectItem value="Bloqueado">Bloqueado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="flex items-center space-x-2 h-10 self-end">
                 <Checkbox 
                   id="naoConferidos" 
@@ -286,6 +307,7 @@ export default function EstoqueProdutos() {
                     setImeiFilter('');
                     setTipoFilter('todos');
                     setOrigemFilter('todas');
+                    setStatusAparelhoFilter('todos');
                     setSomenteNaoConferidos(false);
                   }} 
                   variant="ghost"
@@ -310,6 +332,7 @@ export default function EstoqueProdutos() {
             <TableHeader>
               <TableRow>
                 <TableHead>Produto</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Loja</TableHead>
                 <TableHead>Venda Recomendada</TableHead>
                 <TableHead>Custo</TableHead>
@@ -345,43 +368,28 @@ export default function EstoqueProdutos() {
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium">{produto.modelo}</span>
-                        {/* Badge de Estoque Baixo - Sincronizado com Cadastros > Acessórios */}
                         {verificarEstoqueBaixo(produto.modelo, produto.quantidade) && (
                           <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
                             <AlertCircle className="h-3 w-3 mr-0.5" />
                             Estoque Baixo
                           </Badge>
                         )}
-                        {produto.statusMovimentacao === 'Em movimentação' && !produto.lojaAtualId && (
-                          <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300">
-                            <ArrowRightLeft className="h-3 w-3 mr-1" />
-                            Em movimentação
-                          </Badge>
-                        )}
-                        {produto.statusEmprestimo === 'Empréstimo - Assistência' && (
-                          <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/30">
-                            <ArrowRightLeft className="h-3 w-3 mr-1" />
-                            Empréstimo - Assistência
-                          </Badge>
-                        )}
-                        {produto.statusRetiradaPecas && produto.statusRetiradaPecas !== 'Cancelada' && (
-                          <Badge 
-                            variant="outline" 
-                            className={cn(
-                              produto.statusRetiradaPecas === 'Pendente Assistência' && 'bg-orange-100 text-orange-700 border-orange-300',
-                              produto.statusRetiradaPecas === 'Em Desmonte' && 'bg-purple-100 text-purple-700 border-purple-300',
-                              produto.statusRetiradaPecas === 'Concluída' && 'bg-gray-100 text-gray-700 border-gray-300'
-                            )}
-                          >
-                            <Scissors className="h-3 w-3 mr-1" />
-                            {produto.statusRetiradaPecas === 'Concluída' ? 'Desmontado' : produto.statusRetiradaPecas}
-                          </Badge>
-                        )}
                       </div>
                       <span className="text-xs text-muted-foreground">{produto.cor}</span>
                     </div>
                   </TableCell>
-                  {/* Loja - Usa lojaAtualId (movimentação matriz) ou loja original */}
+                  {/* Status do Aparelho */}
+                  <TableCell>
+                    {(() => {
+                      const status = getStatusAparelho(produto);
+                      return (
+                        <Badge variant="outline" className={getStatusBadgeClasses(status)}>
+                          {status}
+                        </Badge>
+                      );
+                    })()}
+                  </TableCell>
+                  {/* Loja - Sempre exibe o nome real da loja */}
                   <TableCell className="text-sm">{getLojaNome(produto.lojaAtualId || produto.loja)}</TableCell>
                   {/* Venda Recomendada */}
                   <TableCell>

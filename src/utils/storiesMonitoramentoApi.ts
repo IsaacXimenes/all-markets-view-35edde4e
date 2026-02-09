@@ -107,19 +107,21 @@ export const gerarLotesDiarios = (
   lojas: { id: string; nome: string }[]
 ): LoteMonitoramento[] => {
   const existentes = getStoredLotes(competencia);
-  if (existentes.length > 0) return existentes;
-
   const vendas = getVendas();
   const [ano, mes] = competencia.split('-').map(Number);
   const inicioMes = startOfMonth(new Date(ano, mes - 1));
   const fimMes = endOfMonth(new Date(ano, mes - 1));
-  // Limit to today
   const hoje = new Date();
   const fimReal = fimMes > hoje ? hoje : fimMes;
-  if (inicioMes > hoje) return [];
+  if (inicioMes > hoje) return existentes;
 
   const dias = eachDayOfInterval({ start: inicioMes, end: fimReal });
-  const lotes: LoteMonitoramento[] = [];
+
+  // Index existing lots by id for fast lookup
+  const lotesMap = new Map<string, LoteMonitoramento>();
+  existentes.forEach(l => lotesMap.set(l.id, l));
+
+  let changed = false;
 
   for (const dia of dias) {
     const dataStr = format(dia, 'yyyy-MM-dd');
@@ -133,37 +135,82 @@ export const gerarLotesDiarios = (
       if (vendasDoDia.length === 0) continue;
 
       const loteId = `LOTE-${dataStr}-${loja.id}`;
-      const vendasMon: VendaMonitoramento[] = vendasDoDia.map(v => ({
-        id: `VM-${v.id}`,
-        loteId,
-        vendaId: v.id,
-        vendaNumero: v.numero,
-        clienteNome: v.clienteNome,
-        vendedorId: v.vendedor,
-        vendedorNome: '', // will be resolved in UI
-        valorVenda: v.total,
-        lojaVenda: v.lojaVenda,
-        statusAnexo: 'Sem Anexo' as StatusAnexo,
-        anexos: []
-      }));
+      const loteExistente = lotesMap.get(loteId);
 
-      lotes.push({
-        id: loteId,
-        data: dataStr,
-        lojaId: loja.id,
-        lojaNome: loja.nome,
-        totalVendas: vendasMon.length,
-        vendasComStory: 0,
-        percentualStories: 0,
-        status: 'Pendente Conf. Operacional',
-        vendas: vendasMon
-      });
+      if (loteExistente) {
+        // Check for new sales not yet in the lot
+        const idsExistentes = new Set(loteExistente.vendas.map(v => v.vendaId));
+        const novasVendas = vendasDoDia.filter(v => !idsExistentes.has(v.id));
+
+        if (novasVendas.length > 0) {
+          const novasVendasMon: VendaMonitoramento[] = novasVendas.map(v => ({
+            id: `VM-${v.id}`,
+            loteId,
+            vendaId: v.id,
+            vendaNumero: v.numero,
+            clienteNome: v.clienteNome,
+            vendedorId: v.vendedor,
+            vendedorNome: '',
+            valorVenda: v.total,
+            lojaVenda: v.lojaVenda,
+            statusAnexo: 'Sem Anexo' as StatusAnexo,
+            anexos: []
+          }));
+
+          loteExistente.vendas.push(...novasVendasMon);
+          loteExistente.totalVendas = loteExistente.vendas.length;
+          const comStory = loteExistente.vendas.filter(v => 
+            v.statusAnexo === 'Anexado' || v.statusAnexo === 'Anexo Pendente' || v.statusAnexo === 'Validado'
+          ).length;
+          loteExistente.vendasComStory = comStory;
+          loteExistente.percentualStories = loteExistente.totalVendas > 0 
+            ? Math.round((comStory / loteExistente.totalVendas) * 100) : 0;
+          
+          // If lot was already validated, revert to pending since new sales added
+          if (loteExistente.status !== 'Pendente Conf. Operacional') {
+            loteExistente.status = 'Pendente Conf. Operacional';
+          }
+          changed = true;
+        }
+      } else {
+        // Create new lot
+        const vendasMon: VendaMonitoramento[] = vendasDoDia.map(v => ({
+          id: `VM-${v.id}`,
+          loteId,
+          vendaId: v.id,
+          vendaNumero: v.numero,
+          clienteNome: v.clienteNome,
+          vendedorId: v.vendedor,
+          vendedorNome: '',
+          valorVenda: v.total,
+          lojaVenda: v.lojaVenda,
+          statusAnexo: 'Sem Anexo' as StatusAnexo,
+          anexos: []
+        }));
+
+        lotesMap.set(loteId, {
+          id: loteId,
+          data: dataStr,
+          lojaId: loja.id,
+          lojaNome: loja.nome,
+          totalVendas: vendasMon.length,
+          vendasComStory: 0,
+          percentualStories: 0,
+          status: 'Pendente Conf. Operacional',
+          vendas: vendasMon
+        });
+        changed = true;
+      }
     }
   }
 
-  // Sort newest first
+  const lotes = Array.from(lotesMap.values());
   lotes.sort((a, b) => b.data.localeCompare(a.data));
-  saveLotes(competencia, lotes);
+
+  if (changed || existentes.length === 0) {
+    saveLotes(competencia, lotes);
+  }
+
   return lotes;
 };
 

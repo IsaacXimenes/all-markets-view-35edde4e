@@ -15,6 +15,7 @@ export interface ConferenciaDiaria {
   id: string;
   data: string; // YYYY-MM-DD
   lojaId: string;
+  lojaNome?: string;
   totaisPorMetodo: {
     [key: string]: TotalPorMetodo;
   };
@@ -131,82 +132,90 @@ export const consolidarVendasPorDia = (
     return true;
   });
   
-  // Agrupar por data
-  const vendasPorDia = new Map<string, Venda[]>();
+  // Agrupar por data + loja
+  const vendasPorDiaLoja = new Map<string, Venda[]>();
   vendasFiltradas.forEach(v => {
     const dataStr = format(new Date(v.dataHora), 'yyyy-MM-dd');
-    const existing = vendasPorDia.get(dataStr) || [];
-    vendasPorDia.set(dataStr, [...existing, v]);
+    const key = `${dataStr}_${v.lojaVenda}`;
+    const existing = vendasPorDiaLoja.get(key) || [];
+    vendasPorDiaLoja.set(key, [...existing, v]);
   });
-  
-  // Buscar conferências e ajustes salvos
-  const storedConferencias = getStoredConferencias(competencia, lojaId || 'todas');
-  const storedAjustes = getStoredAjustes(competencia, lojaId || 'todas');
   
   // Gerar array de dias do mês
   const diasDoMes = eachDayOfInterval({ start: inicioMes, end: fimMes });
   
-  const conferencias: ConferenciaDiaria[] = diasDoMes.map(dia => {
+  // Coletar todas as lojas presentes nas vendas filtradas
+  const lojasPresentes = new Set<string>();
+  vendasFiltradas.forEach(v => lojasPresentes.add(v.lojaVenda));
+  
+  const conferencias: ConferenciaDiaria[] = [];
+  
+  for (const dia of diasDoMes) {
     const dataStr = format(dia, 'yyyy-MM-dd');
-    const vendasDoDia = vendasPorDia.get(dataStr) || [];
     
-    // Consolidar totais por método de pagamento
-    const totaisPorMetodo: Record<string, TotalPorMetodo> = {};
+    // Para cada loja presente, gerar uma linha
+    const lojasParaProcessar = lojasPresentes.size > 0 ? Array.from(lojasPresentes) : [];
     
-    METODOS_PAGAMENTO.forEach(metodo => {
-      let total = 0;
-      vendasDoDia.forEach(v => {
-        v.pagamentos.forEach(p => {
-          if (p.meioPagamento === metodo) {
-            total += p.valor;
-          }
+    for (const lojaReal of lojasParaProcessar) {
+      const key = `${dataStr}_${lojaReal}`;
+      const vendasDoDiaLoja = vendasPorDiaLoja.get(key) || [];
+      
+      if (vendasDoDiaLoja.length === 0) continue;
+      
+      // Buscar conferências salvas para esta loja específica
+      const storedConferencias = getStoredConferencias(competencia, lojaReal);
+      const storedAjustes = getStoredAjustes(competencia, lojaReal);
+      
+      // Consolidar totais por método de pagamento
+      const totaisPorMetodo: Record<string, TotalPorMetodo> = {};
+      
+      METODOS_PAGAMENTO.forEach(metodo => {
+        let total = 0;
+        vendasDoDiaLoja.forEach(v => {
+          v.pagamentos.forEach(p => {
+            if (p.meioPagamento === metodo) {
+              total += p.valor;
+            }
+          });
         });
+        
+        const conferenciaSalva = storedConferencias[dataStr]?.[metodo];
+        const valorMudou = conferenciaSalva && conferenciaSalva.bruto !== total;
+        
+        totaisPorMetodo[metodo] = {
+          bruto: total,
+          conferido: valorMudou ? false : (conferenciaSalva?.conferido ?? false),
+          conferidoPor: valorMudou ? undefined : conferenciaSalva?.conferidoPor,
+          dataConferencia: valorMudou ? undefined : conferenciaSalva?.dataConferencia
+        };
       });
       
-      // Verificar se há conferência salva
-      const conferenciaSalva = storedConferencias[dataStr]?.[metodo];
+      const vendasTotal = vendasDoDiaLoja.reduce((acc, v) => acc + v.total, 0);
       
-      // Se o valor bruto mudou (nova venda adicionada/removida), invalidar conferência
-      const valorMudou = conferenciaSalva && conferenciaSalva.bruto !== total;
+      const metodosComValor = Object.entries(totaisPorMetodo)
+        .filter(([_, dados]) => dados.bruto > 0);
+      const metodosConferidos = metodosComValor.filter(([_, dados]) => dados.conferido);
       
-      totaisPorMetodo[metodo] = {
-        bruto: total,
-        conferido: valorMudou ? false : (conferenciaSalva?.conferido ?? false),
-        conferidoPor: valorMudou ? undefined : conferenciaSalva?.conferidoPor,
-        dataConferencia: valorMudou ? undefined : conferenciaSalva?.dataConferencia
-      };
-    });
-    
-    // Calcular total de vendas
-    const vendasTotal = vendasDoDia.reduce((acc, v) => acc + v.total, 0);
-    
-    // Calcular status de conferência
-    const metodosComValor = Object.entries(totaisPorMetodo)
-      .filter(([_, dados]) => dados.bruto > 0);
-    const metodosConferidos = metodosComValor.filter(([_, dados]) => dados.conferido);
-    
-    let statusConferencia: 'Não Conferido' | 'Parcial' | 'Conferido' = 'Não Conferido';
-    if (metodosComValor.length > 0) {
-      if (metodosConferidos.length === metodosComValor.length) {
-        statusConferencia = 'Conferido';
-      } else if (metodosConferidos.length > 0) {
-        statusConferencia = 'Parcial';
+      let statusConferencia: 'Não Conferido' | 'Parcial' | 'Conferido' = 'Não Conferido';
+      if (metodosComValor.length > 0) {
+        if (metodosConferidos.length === metodosComValor.length) {
+          statusConferencia = 'Conferido';
+        } else if (metodosConferidos.length > 0) {
+          statusConferencia = 'Parcial';
+        }
       }
-    } else if (vendasDoDia.length === 0) {
-      // Dia sem vendas - considerar como conferido
-      statusConferencia = 'Conferido';
+      
+      conferencias.push({
+        id: `CONF-${dataStr}-${lojaReal}`,
+        data: dataStr,
+        lojaId: lojaReal,
+        totaisPorMetodo,
+        vendasTotal,
+        statusConferencia,
+        ajustes: storedAjustes[dataStr] || []
+      });
     }
-    
-    return {
-      id: `CONF-${dataStr}-${lojaId || 'todas'}`,
-      data: dataStr,
-      lojaId: lojaId || 'todas',
-      totaisPorMetodo,
-      vendasTotal,
-      statusConferencia,
-      ajustes: storedAjustes[dataStr] || []
-    };
-  });
+  }
   
   // Ordenar por data decrescente
   return conferencias.sort((a, b) => b.data.localeCompare(a.data));

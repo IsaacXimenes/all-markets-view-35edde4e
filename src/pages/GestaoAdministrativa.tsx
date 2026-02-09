@@ -138,7 +138,7 @@ export default function GestaoAdministrativa() {
     toggleConferencia(
       competencia,
       conf.data,
-      lojaId ? lojaId : conf.lojaId,
+      conf.lojaId,
       metodo,
       user?.colaborador?.id || '',
       user?.colaborador?.nome || 'Usuário',
@@ -151,7 +151,7 @@ export default function GestaoAdministrativa() {
   };
   
   const handleAbrirDrillDown = (conf: ConferenciaDiaria, metodo: string) => {
-    const vendas = getVendasPorDiaMetodo(conf.data, lojaId || 'todas', metodo);
+    const vendas = getVendasPorDiaMetodo(conf.data, conf.lojaId, metodo);
     setVendasDrillDown(vendas);
     setMetodoDrillDown(metodo);
     setConferenciaSelecionada(conf);
@@ -159,7 +159,7 @@ export default function GestaoAdministrativa() {
   };
   
   const handleAbrirDetalhesDia = (conf: ConferenciaDiaria) => {
-    const vendas = getVendasDoDia(conf.data, lojaId || 'todas');
+    const vendas = getVendasDoDia(conf.data, conf.lojaId);
     setVendasDoDia(vendas);
     setMetodoDrillDown(null);
     setConferenciaSelecionada(conf);
@@ -189,7 +189,7 @@ export default function GestaoAdministrativa() {
     registrarAjuste(
       competencia,
       conferenciaSelecionada!.data,
-      lojaId ? lojaId : conferenciaSelecionada!.lojaId,
+      conferenciaSelecionada!.lojaId,
       {
         metodoPagamento: ajusteMetodo,
         valorDiferenca: valor,
@@ -376,6 +376,7 @@ export default function GestaoAdministrativa() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-20">Data</TableHead>
+                    <TableHead className="w-32">Loja</TableHead>
                     <TableHead className="w-28">Status</TableHead>
                     <TableHead className="text-right w-32">Vendas (Bruto)</TableHead>
                     {METODOS_PAGAMENTO.map(metodo => (
@@ -394,6 +395,9 @@ export default function GestaoAdministrativa() {
                       <TableRow key={conf.id} className={getRowClass(conf.statusConferencia, hasValue)}>
                         <TableCell className="font-medium">
                           {formatarDataExibicao(conf.data)}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {getLojaNome(conf.lojaId)}
                         </TableCell>
                         <TableCell>
                           {hasValue ? getStatusBadge(conf.statusConferencia) : (

@@ -86,8 +86,13 @@ export default function EstoquePendenciasBaseTrocas() {
   // Abrir modal de recebimento
   const handleAbrirRecebimento = (tradeIn: TradeInPendente) => {
     setTradeInSelecionado(tradeIn);
-    setFotosRecebimento([]);
-    setObservacoesRecebimento('');
+    if (tradeIn.status === 'Recebido') {
+      setFotosRecebimento(tradeIn.fotosRecebimento || []);
+      setObservacoesRecebimento(tradeIn.observacoesRecebimento || '');
+    } else {
+      setFotosRecebimento([]);
+      setObservacoesRecebimento('');
+    }
     setShowRecebimentoModal(true);
   };
 
@@ -406,7 +411,7 @@ export default function EstoquePendenciasBaseTrocas() {
           <DialogHeader className="flex-shrink-0 p-6 pb-4">
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-green-500" />
-              Registrar Recebimento
+              {tradeInSelecionado?.status === 'Recebido' ? 'Detalhes do Recebimento' : 'Registrar Recebimento'}
             </DialogTitle>
           </DialogHeader>
           
@@ -488,35 +493,72 @@ export default function EstoquePendenciasBaseTrocas() {
 
                 <Separator />
 
-                {/* Upload de Fotos de Recebimento */}
+                {/* Info adicional para itens finalizados */}
+                {tradeInSelecionado.status === 'Recebido' && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        Informações do Recebimento
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Data do Recebimento:</span>
+                        <p className="font-medium">{tradeInSelecionado.dataRecebimento ? formatDateTime(tradeInSelecionado.dataRecebimento) : '-'}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Responsável:</span>
+                        <p className="font-medium">{tradeInSelecionado.responsavelRecebimentoNome || '-'}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">SLA Congelado:</span>
+                        <p className="font-medium">{tradeInSelecionado.slaCongelado || '-'}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Faixa SLA:</span>
+                        <p className="font-medium">{tradeInSelecionado.slaFaixaCongelada || '-'}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Fotos de Recebimento */}
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Upload className="h-4 w-4" />
-                      Fotos do Recebimento *
+                      {tradeInSelecionado.status === 'Recebido' ? (
+                        <Camera className="h-4 w-4" />
+                      ) : (
+                        <Upload className="h-4 w-4" />
+                      )}
+                      Fotos do Recebimento {tradeInSelecionado.status !== 'Recebido' && '*'}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <label className="cursor-pointer">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={handleFileSelect}
-                          className="hidden"
-                        />
-                        <Button type="button" variant="outline" className="gap-2" asChild>
-                          <span>
-                            <Camera className="h-4 w-4" />
-                            Adicionar Fotos
-                          </span>
-                        </Button>
-                      </label>
-                      <span className="text-xs text-muted-foreground">
-                        Máx. 5MB por foto
-                      </span>
-                    </div>
+                    {/* Upload apenas para itens aguardando */}
+                    {tradeInSelecionado.status !== 'Recebido' && (
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handleFileSelect}
+                            className="hidden"
+                          />
+                          <Button type="button" variant="outline" className="gap-2" asChild>
+                            <span>
+                              <Camera className="h-4 w-4" />
+                              Adicionar Fotos
+                            </span>
+                          </Button>
+                        </label>
+                        <span className="text-xs text-muted-foreground">
+                          Máx. 5MB por foto
+                        </span>
+                      </div>
+                    )}
 
                     {fotosRecebimento.length > 0 ? (
                       <div className="grid grid-cols-3 gap-3">
@@ -529,26 +571,32 @@ export default function EstoquePendenciasBaseTrocas() {
                                 className="w-full h-full object-cover"
                               />
                             </div>
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="icon"
-                              className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => handleRemoverFoto(foto.id)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
+                            {tradeInSelecionado.status !== 'Recebido' && (
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => handleRemoverFoto(foto.id)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            )}
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div className="text-center py-8 border-2 border-dashed rounded-lg text-muted-foreground">
                         <Image className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">Adicione fotos do estado atual do aparelho</p>
+                        <p className="text-sm">
+                          {tradeInSelecionado.status === 'Recebido'
+                            ? 'Nenhuma foto de recebimento registrada'
+                            : 'Adicione fotos do estado atual do aparelho'}
+                        </p>
                       </div>
                     )}
 
-                    {fotosRecebimento.length === 0 && (
+                    {tradeInSelecionado.status !== 'Recebido' && fotosRecebimento.length === 0 && (
                       <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-900">
                         <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
                         <p className="text-xs text-amber-700 dark:text-amber-300">
@@ -562,12 +610,18 @@ export default function EstoquePendenciasBaseTrocas() {
                 {/* Observações */}
                 <div>
                   <label className="text-sm font-medium">Observações do Recebimento</label>
-                  <textarea
-                    value={observacoesRecebimento}
-                    onChange={(e) => setObservacoesRecebimento(e.target.value)}
-                    placeholder="Descreva o estado do aparelho ao receber..."
-                    className="mt-2 w-full min-h-[100px] px-3 py-2 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
+                  {tradeInSelecionado.status === 'Recebido' ? (
+                    <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">
+                      {observacoesRecebimento || 'Nenhuma observação registrada.'}
+                    </p>
+                  ) : (
+                    <textarea
+                      value={observacoesRecebimento}
+                      onChange={(e) => setObservacoesRecebimento(e.target.value)}
+                      placeholder="Descreva o estado do aparelho ao receber..."
+                      className="mt-2 w-full min-h-[100px] px-3 py-2 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -575,16 +629,18 @@ export default function EstoquePendenciasBaseTrocas() {
 
           <DialogFooter className="flex-shrink-0 p-6 pt-4 border-t bg-background">
             <Button variant="outline" onClick={() => setShowRecebimentoModal(false)}>
-              Cancelar
+              {tradeInSelecionado?.status === 'Recebido' ? 'Fechar' : 'Cancelar'}
             </Button>
-            <Button 
-              onClick={handleConfirmarRecebimento}
-              disabled={isLoading || fotosRecebimento.length === 0}
-              className="gap-2"
-            >
-              <ArrowRight className="h-4 w-4" />
-              {isLoading ? 'Processando...' : 'Confirmar Recebimento'}
-            </Button>
+            {tradeInSelecionado?.status !== 'Recebido' && (
+              <Button 
+                onClick={handleConfirmarRecebimento}
+                disabled={isLoading || fotosRecebimento.length === 0}
+                className="gap-2"
+              >
+                <ArrowRight className="h-4 w-4" />
+                {isLoading ? 'Processando...' : 'Confirmar Recebimento'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

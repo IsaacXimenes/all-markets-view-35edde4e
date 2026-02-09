@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ArrowLeft, Printer, ShoppingCart, User, Package, CreditCard, Truck, Clock, DollarSign, TrendingUp, AlertTriangle, Shield, History, Pencil, Wrench, FileText, Image, Download, Check, X } from 'lucide-react';
 import { getVendaById, formatCurrency, Venda, ItemTradeIn, AnexoTradeIn } from '@/utils/vendasApi';
 import { getContasFinanceiras } from '@/utils/cadastrosApi';
+import { ComprovantePreview, ComprovanteBadgeSemAnexo } from '@/components/vendas/ComprovantePreview';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { getGarantiasByVendaId, calcularStatusExpiracao } from '@/utils/garantiasApi';
 import { calcularComissaoVenda, getComissaoColaborador } from '@/utils/comissoesApi';
@@ -363,6 +364,7 @@ export default function VendaDetalhes() {
                     <TableHead>Meio de Pagamento</TableHead>
                     <TableHead>Conta de Destino</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
+                    <TableHead>Comprovante</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -371,6 +373,12 @@ export default function VendaDetalhes() {
                       <TableCell className="font-medium">{pag.meioPagamento}</TableCell>
                       <TableCell>{getContaNome(pag.contaDestino)}</TableCell>
                       <TableCell className="text-right font-medium">{formatCurrency(pag.valor)}</TableCell>
+                      <TableCell>
+                        {pag.comprovante 
+                          ? <ComprovantePreview comprovante={pag.comprovante} comprovanteNome={pag.comprovanteNome} />
+                          : <ComprovanteBadgeSemAnexo />
+                        }
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

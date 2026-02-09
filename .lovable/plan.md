@@ -1,50 +1,31 @@
 
 
-# Plano: Corrigir erro "Erro ao migrar aparelho para Produtos Pendentes"
+# Plano: Persistir e Exibir Anexos de Recebimento nos Detalhes
 
-## Causa Raiz
+## Problema
 
-O bug esta na funcao `addProdutoPendente` em `src/utils/osApi.ts` (linhas 617-624).
+Quando o usuario clica em "Ver Detalhes" de um trade-in ja finalizado, o modal abre mas as fotos de recebimento nao aparecem. Isso ocorre porque o `handleAbrirRecebimento` (linha 89) sempre reseta `fotosRecebimento` para um array vazio `[]`, e o modal exibe apenas esse estado local — nunca consulta os dados ja salvos no objeto `tradeIn.fotosRecebimento`.
 
-O fluxo atual e:
-
-1. `generateProductId()` gera um novo ID (ex: `PROD-0100`)
-2. Internamente, `generateProductId` **registra** esse ID no Set `registeredProductIds` (linha 34 do `idManager.ts`)
-3. Logo em seguida, `addProdutoPendente` chama `isProductIdRegistered(newId)` para validar
-4. Como o ID **ja foi registrado** no passo 2, a verificacao retorna `true`
-5. O sistema lanca um `throw new Error("Erro de rastreabilidade - ID duplicado detectado")`
-6. O `catch` em `migrarParaProdutosPendentes` captura o erro e retorna `null`
-7. A pagina exibe o toast "Erro ao migrar aparelho para Produtos Pendentes"
-
-Em resumo: a funcao `generateProductId` ja registra o ID, tornando a verificacao subsequente sempre verdadeira, o que causa o erro em 100% dos casos.
+Os dados estao corretamente armazenados na API (a funcao `registrarRecebimento` persiste as fotos no objeto). O problema e exclusivamente na interface.
 
 ## Correcao
 
-### Arquivo: `src/utils/osApi.ts`
+### Arquivo: `src/pages/EstoquePendenciasBaseTrocas.tsx`
 
-Remover a verificacao redundante `isProductIdRegistered` nas linhas 620-624, pois `generateProductId` ja garante unicidade internamente (usa um loop `do/while` para evitar colisoes e registra o ID antes de retornar).
+**1. Alterar `handleAbrirRecebimento`** (linhas 87-92):
+- Se o trade-in ja estiver com status "Recebido", pre-carregar `fotosRecebimento` com os dados salvos (`tradeIn.fotosRecebimento`) e `observacoesRecebimento` com o texto salvo.
+- Se estiver "Aguardando Devolucao", manter o comportamento atual (arrays vazios).
 
-O trecho:
+**2. Alterar o modal para modo leitura quando finalizado:**
+- Quando o status for "Recebido", esconder o botao de upload e o botao "Confirmar Recebimento".
+- Exibir as fotos de recebimento salvas em modo somente leitura (sem botao de remover).
+- Exibir as observacoes como texto estatico em vez de textarea editavel.
+- Exibir informacoes adicionais: data do recebimento, responsavel, e SLA congelado.
+- Alterar o titulo do modal para "Detalhes do Recebimento".
 
-```
-const newId = generateProductId();
+## Resumo das Alteracoes
 
-if (isProductIdRegistered(newId)) {
-  console.error(`Erro de rastreabilidade – ID duplicado detectado: ${newId}`);
-  throw new Error(`Erro de rastreabilidade – ID duplicado detectado: ${newId}`);
-}
-```
+- 1 arquivo modificado: `EstoquePendenciasBaseTrocas.tsx`
+- Logica: carregar dados persistidos ao abrir detalhes
+- UI: modo leitura para itens finalizados vs modo edicao para itens aguardando
 
-Deve ser simplificado para:
-
-```
-const newId = generateProductId();
-```
-
-A funcao `generateProductId` ja garante que o ID e unico e ja o registra no Set centralizado, tornando a verificacao posterior desnecessaria e, na verdade, destrutiva.
-
-## Impacto
-
-- Corrige o erro de migracao para todos os trade-ins na Base de Trocas
-- Corrige tambem qualquer outra chamada a `addProdutoPendente` que esteja falhando pela mesma razao (ex: cadastro de produtos via Nota de Entrada)
-- Nenhum efeito colateral, pois a unicidade continua garantida pelo `generateProductId`

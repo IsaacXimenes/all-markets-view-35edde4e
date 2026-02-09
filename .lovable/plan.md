@@ -1,92 +1,50 @@
 
 
-# Plano: Otimizacao do Fluxo de Recebimento e SLA na Base de Trocas
+# Plano: Corrigir erro "Erro ao migrar aparelho para Produtos Pendentes"
 
-## Resumo
+## Causa Raiz
 
-Ajustar a aba "Pendencias - Base de Trocas" para: (1) garantir migracao automatica e status "Finalizado" ao confirmar recebimento, (2) exibir SLA em faixas categoricas (0-24h, 24-48h, etc.), (3) adicionar filtro de SLA, e (4) congelar o SLA para itens finalizados mostrando o tempo total decorrido.
+O bug esta na funcao `addProdutoPendente` em `src/utils/osApi.ts` (linhas 617-624).
 
-## Arquivos a Modificar
+O fluxo atual e:
 
-### 1. `src/utils/baseTrocasPendentesApi.ts`
+1. `generateProductId()` gera um novo ID (ex: `PROD-0100`)
+2. Internamente, `generateProductId` **registra** esse ID no Set `registeredProductIds` (linha 34 do `idManager.ts`)
+3. Logo em seguida, `addProdutoPendente` chama `isProductIdRegistered(newId)` para validar
+4. Como o ID **ja foi registrado** no passo 2, a verificacao retorna `true`
+5. O sistema lanca um `throw new Error("Erro de rastreabilidade - ID duplicado detectado")`
+6. O `catch` em `migrarParaProdutosPendentes` captura o erro e retorna `null`
+7. A pagina exibe o toast "Erro ao migrar aparelho para Produtos Pendentes"
 
-**Interface `TradeInPendente`:**
-- Adicionar campo `slaCongelado?: string` para armazenar o texto do SLA no momento da finalizacao
-- Adicionar campo `slaFaixaCongelada?: string` para armazenar a faixa (ex: "48-72 horas")
+Em resumo: a funcao `generateProductId` ja registra o ID, tornando a verificacao subsequente sempre verdadeira, o que causa o erro em 100% dos casos.
 
-**Funcao `calcularSLA`:**
-- Adicionar campo `faixa` no retorno da `SLAInfo`: `'0-24 horas' | '24-48 horas' | '48-72 horas' | '72+ horas'`
-- Logica: calcular horas totais e categorizar na faixa correspondente
-- Ajustar `nivel`: 0-24h = normal, 24-48h = normal, 48-72h = atencao, 72+ = critico
+## Correcao
 
-**Funcao `registrarRecebimento`:**
-- Antes de alterar o status, calcular o SLA atual e salvar `slaCongelado` e `slaFaixaCongelada` no registro
-- Manter o status como `'Recebido'` (ja existente)
+### Arquivo: `src/utils/osApi.ts`
 
-### 2. `src/pages/EstoquePendenciasBaseTrocas.tsx`
+Remover a verificacao redundante `isProductIdRegistered` nas linhas 620-624, pois `generateProductId` ja garante unicidade internamente (usa um loop `do/while` para evitar colisoes e registra o ID antes de retornar).
 
-**Filtro de SLA:**
-- Adicionar um `Select` com opcoes: "Todas", "0-24 horas", "24-48 horas", "48-72 horas", "72+ horas"
-- Novo estado `filtroSLA` com valor padrao vazio
-- Aplicar filtro no `useMemo` de `tradeInsFiltrados` comparando a faixa calculada (para aguardando) ou a faixa congelada (para finalizados)
+O trecho:
 
-**Coluna "SLA Devolucao":**
-- Para status "Aguardando Devolucao": exibir a faixa categorizada (ex: "48-72 horas") com o badge animado atual e cores por faixa
-- Para status "Recebido/Finalizado": exibir o SLA congelado (ex: "2 dias e 5 horas") com badge verde estatico e indicacao visual de que esta congelado (icone de cadeado ou check)
+```
+const newId = generateProductId();
 
-**Toast de confirmacao:**
-- Remover a mensagem fallback "Aparelho aguardando migracao para Produtos Pendentes"
-- Manter apenas a mensagem de sucesso com o ID do produto migrado
-- Se a migracao falhar, exibir toast de erro e nao mudar status
-
-**Status na tabela:**
-- Manter o texto "Finalizado" (ja implementado via badge verde)
-
-## Detalhes Tecnicos
-
-### Faixas de SLA
-
-```text
-horasTotal = (Date.now() - dataVenda) / (1000 * 60 * 60)
-
-0-24 horas   -> horasTotal < 24   -> nivel: normal  -> cor: verde
-24-48 horas  -> horasTotal < 48   -> nivel: normal  -> cor: verde
-48-72 horas  -> horasTotal < 72   -> nivel: atencao -> cor: amarelo
-72+ horas    -> horasTotal >= 72  -> nivel: critico -> cor: vermelho
+if (isProductIdRegistered(newId)) {
+  console.error(`Erro de rastreabilidade – ID duplicado detectado: ${newId}`);
+  throw new Error(`Erro de rastreabilidade – ID duplicado detectado: ${newId}`);
+}
 ```
 
-### Congelamento do SLA
+Deve ser simplificado para:
 
-Ao chamar `registrarRecebimento`, antes de mudar o status:
-1. Calcular `calcularSLA(tradeIn.dataVenda)` naquele instante
-2. Salvar `slaCongelado = sla.texto` (ex: "3 dias e 14 horas")
-3. Salvar `slaFaixaCongelada = sla.faixa` (ex: "72+ horas")
-4. Esses valores ficam fixos e sao exibidos na tabela para itens finalizados
-
-### Filtro de SLA no `useMemo`
-
-Para cada trade-in, determinar a faixa:
-- Se `status === 'Recebido'`: usar `slaFaixaCongelada`
-- Se `status === 'Aguardando Devolucao'`: calcular `calcularSLA(dataVenda).faixa` em tempo real
-
-Comparar com o valor do filtro selecionado.
-
-### Fluxo de Confirmacao Revisado
-
-```text
-1. Usuario clica "Registrar Recebimento" (fotos obrigatorias)
-   |
-   v
-2. registrarRecebimento():
-   - Calcula SLA e congela nos campos
-   - Muda status para 'Recebido'
-   |
-   v
-3. migrarParaProdutosPendentes():
-   - Cria produto em Aparelhos Pendentes
-   - Se sucesso: toast verde com ID do produto
-   - Se falha: toast de erro (recebimento ja foi registrado)
-   |
-   v
-4. Redireciona para /estoque/produtos-pendentes
 ```
+const newId = generateProductId();
+```
+
+A funcao `generateProductId` ja garante que o ID e unico e ja o registra no Set centralizado, tornando a verificacao posterior desnecessaria e, na verdade, destrutiva.
+
+## Impacto
+
+- Corrige o erro de migracao para todos os trade-ins na Base de Trocas
+- Corrige tambem qualquer outra chamada a `addProdutoPendente` que esteja falhando pela mesma razao (ex: cadastro de produtos via Nota de Entrada)
+- Nenhum efeito colateral, pois a unicidade continua garantida pelo `generateProductId`

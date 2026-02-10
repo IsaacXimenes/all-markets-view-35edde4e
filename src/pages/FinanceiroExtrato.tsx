@@ -21,7 +21,8 @@ export default function FinanceiroExtrato() {
   const [despesas] = useState<Despesa[]>(getDespesas());
 
   // Filtros
-  const [periodoGrafico, setPeriodoGrafico] = useState<'1S' | '2S' | '3S' | '1M'>('1M');
+  const [graficoDataInicio, setGraficoDataInicio] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
+  const [graficoDataFim, setGraficoDataFim] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [dataInicio, setDataInicio] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [dataFim, setDataFim] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [filtroConta, setFiltroConta] = useState('todas');
@@ -112,22 +113,16 @@ export default function FinanceiroExtrato() {
     };
   }, [movimentacoesFiltradas]);
 
-  // Dias do período do gráfico
-  const diasGrafico = useMemo(() => {
-    const map: Record<typeof periodoGrafico, number> = { '1S': 7, '2S': 14, '3S': 21, '1M': 30 };
-    return map[periodoGrafico];
-  }, [periodoGrafico]);
-
-  // Dados para o gráfico (datas corridas, independente de ter lançamento)
+  // Dados para o gráfico (datas corridas, filtro independente por data início/fim)
   const dadosGrafico = useMemo(() => {
-    const hoje = new Date();
-    const inicio = subDays(hoje, diasGrafico);
+    const inicio = parseISO(graficoDataInicio);
+    const fim = parseISO(graficoDataFim);
     
     // Indexar movimentações por data
     const agrupado: Record<string, { entradas: number; saidas: number }> = {};
     movimentacoes.forEach(mov => {
       const dataMov = parseISO(mov.data);
-      if (dataMov < startOfDay(inicio) || dataMov > endOfDay(hoje)) return;
+      if (dataMov < startOfDay(inicio) || dataMov > endOfDay(fim)) return;
       const dateISO = mov.data.slice(0, 10);
       if (!agrupado[dateISO]) {
         agrupado[dateISO] = { entradas: 0, saidas: 0 };
@@ -140,7 +135,7 @@ export default function FinanceiroExtrato() {
     });
 
     // Gerar todas as datas corridas do intervalo
-    const dias = eachDayOfInterval({ start: startOfDay(inicio), end: endOfDay(hoje) });
+    const dias = eachDayOfInterval({ start: startOfDay(inicio), end: endOfDay(fim) });
     return dias.map(dia => {
       const dateISO = format(dia, 'yyyy-MM-dd');
       const valores = agrupado[dateISO] || { entradas: 0, saidas: 0 };
@@ -150,7 +145,7 @@ export default function FinanceiroExtrato() {
         saidas: valores.saidas,
       };
     });
-  }, [movimentacoes, diasGrafico]);
+  }, [movimentacoes, graficoDataInicio, graficoDataFim]);
 
   const formatCurrency = (value: number) => {
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -299,18 +294,25 @@ export default function FinanceiroExtrato() {
                 <Calendar className="h-5 w-5" />
                 Fluxo de Caixa
               </CardTitle>
-              <div className="flex gap-1">
-                {(['1S', '2S', '3S', '1M'] as const).map(p => (
-                  <Button
-                    key={p}
-                    size="sm"
-                    variant={periodoGrafico === p ? 'default' : 'outline'}
-                    className="h-7 px-2 text-xs"
-                    onClick={() => setPeriodoGrafico(p)}
-                  >
-                    {p}
-                  </Button>
-                ))}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs whitespace-nowrap">De</Label>
+                  <Input
+                    type="date"
+                    value={graficoDataInicio}
+                    onChange={(e) => setGraficoDataInicio(e.target.value)}
+                    className="h-7 text-xs w-[130px]"
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs whitespace-nowrap">Até</Label>
+                  <Input
+                    type="date"
+                    value={graficoDataFim}
+                    onChange={(e) => setGraficoDataFim(e.target.value)}
+                    className="h-7 text-xs w-[130px]"
+                  />
+                </div>
               </div>
             </CardHeader>
             <CardContent>

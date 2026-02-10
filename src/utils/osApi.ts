@@ -1,6 +1,9 @@
 // API para Lista de Reparos (OS)
-import { Produto, addProdutoMigrado } from './estoqueApi';
+import { Produto, addProdutoMigrado, validarAparelhoNota, verificarConferenciaNota } from './estoqueApi';
 import { generateProductId, registerProductId, isProductIdRegistered } from './idManager';
+import { encaminharParaAnaliseGarantia } from './garantiasApi';
+import { atualizarPendencia, getPendenciaPorNota } from './pendenciasFinanceiraApi';
+import { addNotification } from './notificationsApi';
 
 export interface ParecerEstoque {
   id: string;
@@ -412,10 +415,6 @@ export const salvarParecerEstoque = (
   // Se o produto veio de uma nota, atualizar validação progressiva
   if (produto.notaOuVendaId && produto.notaOuVendaId.startsWith('NC-') || produto.notaOuVendaId?.startsWith('URG-')) {
     try {
-      // Importar dinamicamente para evitar dependência circular
-      const { validarAparelhoNota, verificarConferenciaNota } = require('./estoqueApi');
-      const { atualizarPendencia, getPendenciaPorNota } = require('./pendenciasFinanceiraApi');
-      const { addNotification } = require('./notificationsApi');
       
       // Validar o aparelho na nota
       const resultado = validarAparelhoNota(produto.notaOuVendaId, produto.imei, {
@@ -475,7 +474,6 @@ export const salvarParecerEstoque = (
     
     // Adicionar à Análise de Tratativas
     try {
-      const { encaminharParaAnaliseGarantia } = require('./garantiasApi');
       encaminharParaAnaliseGarantia(
         produto.id,
         'Estoque',

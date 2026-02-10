@@ -223,13 +223,21 @@ export default function EstoqueProdutos() {
               </div>
 
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Modelo</p>
-                <Input
-                  placeholder="Modelo"
-                  value={modeloFilter}
-                  onChange={(e) => setModeloFilter(e.target.value)}
-                  className="w-full"
-                />
+                <p className="text-xs text-muted-foreground mb-1">Status</p>
+                <Select value={statusAparelhoFilter} onValueChange={setStatusAparelhoFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="Disponível">Disponível</SelectItem>
+                    <SelectItem value="Vendido">Vendido</SelectItem>
+                    <SelectItem value="Em movimentação">Em movimentação</SelectItem>
+                    <SelectItem value="Empréstimo">Empréstimo</SelectItem>
+                    <SelectItem value="Retirada de Peças">Retirada de Peças</SelectItem>
+                    <SelectItem value="Bloqueado">Bloqueado</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
@@ -271,21 +279,13 @@ export default function EstoqueProdutos() {
               </div>
 
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Status</p>
-                <Select value={statusAparelhoFilter} onValueChange={setStatusAparelhoFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="Disponível">Disponível</SelectItem>
-                    <SelectItem value="Vendido">Vendido</SelectItem>
-                    <SelectItem value="Em movimentação">Em movimentação</SelectItem>
-                    <SelectItem value="Empréstimo">Empréstimo</SelectItem>
-                    <SelectItem value="Retirada de Peças">Retirada de Peças</SelectItem>
-                    <SelectItem value="Bloqueado">Bloqueado</SelectItem>
-                  </SelectContent>
-                </Select>
+                <p className="text-xs text-muted-foreground mb-1">Modelo</p>
+                <Input
+                  placeholder="Modelo"
+                  value={modeloFilter}
+                  onChange={(e) => setModeloFilter(e.target.value)}
+                  className="w-full"
+                />
               </div>
 
               <div className="flex items-center space-x-2 h-10 self-end">

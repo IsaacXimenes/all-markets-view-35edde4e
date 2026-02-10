@@ -21,7 +21,6 @@ export default function FinanceiroExtrato() {
   const [despesas] = useState<Despesa[]>(getDespesas());
 
   // Filtros
-  
   const [dataInicio, setDataInicio] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [dataFim, setDataFim] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [filtroConta, setFiltroConta] = useState('todas');

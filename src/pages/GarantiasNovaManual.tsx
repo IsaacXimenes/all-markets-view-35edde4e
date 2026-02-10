@@ -23,7 +23,7 @@ import { addGarantia, addTimelineEntry, addTratativa } from '@/utils/garantiasAp
 import { getPlanosPorModelo, PlanoGarantia, formatCurrency } from '@/utils/planosGarantiaApi';
 import { getProdutos, updateProduto, addMovimentacao, Produto } from '@/utils/estoqueApi';
 import { format, addMonths } from 'date-fns';
-import { formatIMEI, unformatIMEI } from '@/utils/imeiMask';
+import { formatIMEI, unformatIMEI, displayIMEI } from '@/utils/imeiMask';
 
 export default function GarantiasNovaManual() {
   const navigate = useNavigate();
@@ -852,9 +852,9 @@ export default function GarantiasNovaManual() {
 
       {/* Modal Buscar Cliente - Padronizado com VendasNova */}
       <Dialog open={showClienteModal} onOpenChange={setShowClienteModal}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-5xl">
           <DialogHeader>
-            <DialogTitle>Buscar Cliente</DialogTitle>
+            <DialogTitle>Selecionar Cliente</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex gap-2">
@@ -1053,7 +1053,7 @@ export default function GarantiasNovaManual() {
 
       {/* Modal Seleção de Aparelho */}
       <Dialog open={showModalAparelho} onOpenChange={setShowModalAparelho}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-6xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {tipoTratativa === 'Assistência + Empréstimo' ? 'Selecionar Aparelho para Empréstimo' : 'Selecionar Aparelho para Troca'}
@@ -1061,32 +1061,36 @@ export default function GarantiasNovaManual() {
           </DialogHeader>
           
           <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por IMEI ou modelo..."
-                value={buscaAparelho}
-                onChange={(e) => setBuscaAparelho(e.target.value)}
-                className="pl-10"
-              />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por IMEI ou modelo..."
+                  value={buscaAparelho}
+                  onChange={(e) => setBuscaAparelho(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </div>
             
             <div className="flex-1 overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Produto</TableHead>
+                    <TableHead>Condição</TableHead>
                     <TableHead>IMEI</TableHead>
-                    <TableHead>Modelo</TableHead>
                     <TableHead>Cor</TableHead>
-                    <TableHead>Bateria</TableHead>
+                    <TableHead>Saúde Bateria</TableHead>
                     <TableHead>Loja</TableHead>
-                    <TableHead className="text-right">Ação</TableHead>
+                    <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {aparelhosDisponiveis.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         Nenhum aparelho disponível encontrado
                       </TableCell>
                     </TableRow>
@@ -1096,12 +1100,18 @@ export default function GarantiasNovaManual() {
                         key={produto.id}
                         className={aparelhoSelecionado?.id === produto.id ? 'bg-primary/10' : ''}
                       >
-                        <TableCell className="font-mono text-xs">{produto.imei}</TableCell>
-                        <TableCell>{produto.modelo}</TableCell>
+                        <TableCell className="font-mono text-xs">{produto.id}</TableCell>
+                        <TableCell className="font-medium">{produto.modelo}</TableCell>
+                        <TableCell>
+                          <Badge variant={produto.tipo === 'Novo' ? 'default' : 'secondary'}>
+                            {produto.tipo || 'Seminovo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{displayIMEI(produto.imei || '')}</TableCell>
                         <TableCell>{produto.cor}</TableCell>
                         <TableCell>{produto.saudeBateria}%</TableCell>
                         <TableCell>{getLojaName(produto.loja)}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell>
                           <Button 
                             size="sm" 
                             variant={aparelhoSelecionado?.id === produto.id ? 'default' : 'outline'}

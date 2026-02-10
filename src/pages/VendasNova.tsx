@@ -3440,7 +3440,7 @@ export default function VendasNova() {
 
       {/* Modal Selecionar Acessórios */}
       <Dialog open={showAcessorioModal} onOpenChange={setShowAcessorioModal}>
-        <DialogContent className="max-w-6xl max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>Selecionar Acessórios</DialogTitle>
           </DialogHeader>
@@ -3452,52 +3452,54 @@ export default function VendasNova() {
               className="flex-shrink-0"
             />
             
-            <div className="flex-1 overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead className="text-center">Qtd Disp.</TableHead>
-                    <TableHead className="text-right">Valor Custo</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {acessoriosFiltrados.map(acessorio => (
-                    <TableRow key={acessorio.id} className={acessorio.quantidade < 10 ? 'bg-destructive/10' : ''}>
-                      <TableCell className="font-mono text-sm">{acessorio.id}</TableCell>
-                      <TableCell className="font-medium">{acessorio.descricao}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{acessorio.categoria}</Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={acessorio.quantidade < 10 ? "destructive" : "secondary"}>
-                          {acessorio.quantidade}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{formatCurrency(acessorio.valorCusto)}</TableCell>
-                      <TableCell>
-                        <Button 
-                          size="sm" 
-                          onClick={() => handleAddAcessorio(acessorio)}
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Adicionar
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {acessoriosFiltrados.length === 0 && (
+            <div className="flex-1 overflow-auto">
+              <div className="min-w-[600px]">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                        Nenhum acessório encontrado.
-                      </TableCell>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead className="text-center">Qtd Disp.</TableHead>
+                      <TableHead className="text-right">Valor Custo</TableHead>
+                      <TableHead></TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {acessoriosFiltrados.map(acessorio => (
+                      <TableRow key={acessorio.id} className={acessorio.quantidade < 10 ? 'bg-destructive/10' : ''}>
+                        <TableCell className="font-mono text-sm">{acessorio.id}</TableCell>
+                        <TableCell className="font-medium">{acessorio.descricao}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{acessorio.categoria}</Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={acessorio.quantidade < 10 ? "destructive" : "secondary"}>
+                            {acessorio.quantidade}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(acessorio.valorCusto)}</TableCell>
+                        <TableCell>
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleAddAcessorio(acessorio)}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Adicionar
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {acessoriosFiltrados.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          Nenhum acessório encontrado.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </div>
           <DialogFooter className="flex-shrink-0">

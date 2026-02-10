@@ -1,33 +1,24 @@
 
+# Ocultar coluna ID no modal "Selecionar Produto"
 
-# Corrigir card de Prejuizo no quadro de pagamentos
+## Objetivo
+Remover a coluna "ID" das tabelas do modal de selecao de produto na Nova Venda, eliminando scroll horizontal e otimizando para uso mobile com selecao rapida.
 
-## Problema
-Ao adicionar um produto na Nova Venda, o card "Prejuizo" no resumo de pagamentos exibe imediatamente o valor de custo do aparelho como prejuizo, mesmo sem nenhum valor de venda definido. Isso ocorre porque `lucroProjetado = total - valorCustoTotal` resulta em negativo quando `total === 0`.
-
-Prejuizo so deve ser sinalizado quando a venda ja possui um valor total maior que zero e esse valor e inferior ao custo.
-
-## Alteracao
+## Alteracoes
 
 ### Arquivo: `src/pages/VendasNova.tsx`
 
-Alterar a linha 441:
+#### 1. Aba "Produtos - Estoque" (linhas ~2769-2877)
+- Remover `<TableHead>ID</TableHead>` (linha 2771)
+- Remover `<TableCell>` com `produto.id` (linha 2784) nos produtos filtrados
+- Remover `<TableCell>` com `produto.id` (linha 2838) nos produtos de outras lojas
+- Atualizar `colSpan` de 8 para 7 nas linhas de "Nenhum produto" e "Produtos em outras lojas"
 
-De:
-```
-const isPrejuizo = lucroProjetado < 0;
-```
+#### 2. Aba "Produtos - Pendentes" (linhas ~2880-2920+)
+- Remover `<TableHead>ID</TableHead>` (linha 2883)
+- Remover `<TableCell>` com `produto.id` (linha 2900)
 
-Para:
-```
-const isPrejuizo = total > 0 && lucroProjetado < 0;
-```
+#### 3. Remover largura minima fixa
+- Remover o wrapper `<div className="min-w-[700px]">` (linha 2765) que forca uma largura minima e causa scroll horizontal desnecessario
 
-Isso corrige:
-- O card mostra "Lucro: R$ 0,00" enquanto nenhum valor de venda estiver configurado
-- A badge "PREJUIZO" no header do card so aparece quando ha venda com valor definido abaixo do custo
-- A borda vermelha do card so e aplicada em caso de prejuizo real
-- A margem e os estilos de cores destrutivas so aparecem quando ha prejuizo real
-
-Nenhuma outra alteracao necessaria -- todos os locais que referenciam `isPrejuizo` serao automaticamente corrigidos.
-
+Essas alteracoes reduzem o numero de colunas, permitindo que a tabela caiba na tela sem scroll horizontal, melhorando a experiencia em dispositivos moveis.

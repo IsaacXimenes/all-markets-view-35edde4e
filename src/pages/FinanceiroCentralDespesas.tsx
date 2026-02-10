@@ -133,12 +133,13 @@ export default function FinanceiroCentralDespesas() {
       toast.error('Selecione a periodicidade');
       return;
     }
+    const competenciaNova = form.competencia;
     addDespesa({
       tipo: form.tipo,
       descricao: form.descricao,
       valor: parseMoeda(form.valor),
       data: new Date().toISOString().split('T')[0],
-      competencia: form.competencia,
+      competencia: competenciaNova,
       conta: form.conta,
       observacoes: form.observacoes,
       lojaId: form.lojaId,
@@ -151,6 +152,11 @@ export default function FinanceiroCentralDespesas() {
       pagoPor: null,
     });
     refreshDespesas();
+    // Ajustar filtro de competência para exibir a despesa recém-lançada
+    if (filtroCompetencia !== 'all' && filtroCompetencia !== competenciaNova) {
+      setFiltroCompetencia(competenciaNova);
+    }
+    setFormOpen(false);
     toast.success('Despesa lançada com sucesso');
     resetForm();
   };
@@ -573,39 +579,116 @@ export default function FinanceiroCentralDespesas() {
         {/* Modal Detalhes */}
         <Dialog open={!!detalheModal} onOpenChange={v => !v && setDetalheModal(null)}>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Detalhes da Despesa</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Detalhes da Despesa
+              </DialogTitle>
+            </DialogHeader>
             {detalheModal && (
-              <div className="space-y-3 py-4">
-                <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
-                  <span className="text-muted-foreground">ID:</span><span className="font-mono">{detalheModal.id}</span>
-                  <span className="text-muted-foreground">Tipo:</span><span>{detalheModal.tipo}</span>
-                  <span className="text-muted-foreground">Categoria:</span><span>{detalheModal.categoria}</span>
-                  <span className="text-muted-foreground">Descrição:</span><span className="font-medium">{detalheModal.descricao}</span>
-                  <span className="text-muted-foreground">Loja:</span><span>{obterLojaById(detalheModal.lojaId)?.nome || '-'}</span>
-                  <span className="text-muted-foreground">Data de Lançamento:</span><span>{new Date(detalheModal.data + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-                  <span className="text-muted-foreground">Data de Vencimento:</span><span>{new Date(detalheModal.dataVencimento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-                  <span className="text-muted-foreground">Competência:</span><span>{detalheModal.competencia}</span>
-                  <span className="text-muted-foreground">Conta de Origem:</span><span>{detalheModal.conta}</span>
-                  <span className="text-muted-foreground">Valor:</span><span className="font-semibold">{formatCurrency(detalheModal.valor)}</span>
-                  <span className="text-muted-foreground">Status:</span>
-                  <span>
+              <div className="space-y-5 py-2">
+                {/* Cabeçalho com valor e status em destaque */}
+                <div className="flex items-center justify-between p-4 rounded-lg bg-muted">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Valor</p>
+                    <p className="text-2xl font-bold">{formatCurrency(detalheModal.valor)}</p>
+                  </div>
+                  <div className="text-right space-y-1">
                     <Badge variant="outline" className={
                       detalheModal.status === 'Pago' ? 'bg-green-500/10 text-green-700 dark:text-green-400' :
                       detalheModal.status === 'Vencido' ? 'bg-red-500/10 text-red-700 dark:text-red-400' :
                       'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
                     }>{detalheModal.status}</Badge>
-                  </span>
-                  <span className="text-muted-foreground">Recorrente:</span><span>{detalheModal.recorrente ? `Sim (${detalheModal.periodicidade})` : 'Não'}</span>
-                  <span className="text-muted-foreground">Responsável:</span><span>{detalheModal.pagoPor || '-'}</span>
+                    <div className="mt-1">
+                      <Badge variant="outline" className={detalheModal.tipo === 'Fixa' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-400' : 'bg-orange-500/10 text-orange-700 dark:text-orange-400'}>
+                        {detalheModal.tipo}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Informações Gerais */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Informações Gerais</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">ID</p>
+                      <p className="text-sm font-mono">{detalheModal.id}</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Categoria</p>
+                      <p className="text-sm font-medium">{detalheModal.categoria}</p>
+                    </div>
+                    <div className="col-span-2 space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Descrição</p>
+                      <p className="text-sm font-medium">{detalheModal.descricao}</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Loja</p>
+                      <p className="text-sm">{obterLojaById(detalheModal.lojaId)?.nome || '-'}</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Conta de Origem</p>
+                      <p className="text-sm">{detalheModal.conta}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <hr className="border-border" />
+
+                {/* Datas */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Datas e Competência</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Lançamento</p>
+                      <p className="text-sm">{new Date(detalheModal.data + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Vencimento</p>
+                      <p className="text-sm font-medium">{new Date(detalheModal.dataVencimento + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Competência</p>
+                      <p className="text-sm">{detalheModal.competencia}</p>
+                    </div>
+                  </div>
                   {detalheModal.dataPagamento && (
-                    <><span className="text-muted-foreground">Data Pagamento:</span><span>{new Date(detalheModal.dataPagamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span></>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Data Pagamento</p>
+                        <p className="text-sm text-green-600 font-medium">{new Date(detalheModal.dataPagamento + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                      </div>
+                    </div>
                   )}
                 </div>
-                {detalheModal.observacoes && (
-                  <div className="pt-2 border-t">
-                    <span className="text-sm text-muted-foreground">Observações:</span>
-                    <p className="text-sm mt-1">{detalheModal.observacoes}</p>
+
+                <hr className="border-border" />
+
+                {/* Responsável e Recorrência */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Responsável e Recorrência</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Pago por</p>
+                      <p className="text-sm">{detalheModal.pagoPor || '-'}</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Recorrente</p>
+                      <p className="text-sm">{detalheModal.recorrente ? `Sim (${detalheModal.periodicidade})` : 'Não'}</p>
+                    </div>
                   </div>
+                </div>
+
+                {/* Observações */}
+                {detalheModal.observacoes && (
+                  <>
+                    <hr className="border-border" />
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Observações</h4>
+                      <p className="text-sm bg-muted p-3 rounded-lg">{detalheModal.observacoes}</p>
+                    </div>
+                  </>
                 )}
               </div>
             )}

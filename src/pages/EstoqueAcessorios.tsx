@@ -306,10 +306,10 @@ export default function EstoqueAcessorios() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Categoria</TableHead>
+                    <TableHead className="sticky left-0 z-20 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Descrição</TableHead>
                     <TableHead>Loja</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>ID</TableHead>
                     <TableHead className="text-right">Estoque Disponível</TableHead>
                     <TableHead className="text-right">Valor Custo</TableHead>
                     <TableHead className="text-right">Valor Recomendado</TableHead>
@@ -320,14 +320,14 @@ export default function EstoqueAcessorios() {
                 <TableBody>
                   {acessoriosFiltrados.map(acessorio => (
                     <TableRow key={acessorio.id}>
-                      <TableCell className="font-mono font-medium">{acessorio.id}</TableCell>
-                      <TableCell className="font-medium">{acessorio.descricao}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{acessorio.categoria}</Badge>
-                      </TableCell>
+                      <TableCell className="font-medium sticky left-0 z-10 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{acessorio.descricao}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {acessorio.lojas.map(lojaId => getLojaNome(lojaId)).join(', ')}
                       </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{acessorio.categoria}</Badge>
+                      </TableCell>
+                      <TableCell className="font-mono font-medium">{acessorio.id}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           {acessorio.quantidadeTotal < 10 && (

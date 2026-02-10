@@ -2763,15 +2763,14 @@ export default function VendasNova() {
             <div className="flex-1 overflow-y-auto overflow-x-hidden [&_table]:min-w-0 [&_[data-radix-scroll-area-viewport]]:!overflow-x-hidden [&_[data-radix-scroll-area-scrollbar][data-orientation=horizontal]]:hidden">
             {!showPendentesTab ? (
               /* Aba Produtos Estoque */
-              <Table className="min-w-full">
+              <Table className="min-w-full [&_th]:px-2 [&_td]:px-2 [&_th]:text-xs [&_td]:text-xs">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Produto</TableHead>
                     <TableHead>IMEI</TableHead>
-                    
-                    <TableHead className="text-right">Valor Recomendado</TableHead>
+                    <TableHead className="text-right">Valor Rec.</TableHead>
                     <TableHead>Loja</TableHead>
-                    <TableHead>Ações</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

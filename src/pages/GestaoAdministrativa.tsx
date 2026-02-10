@@ -90,6 +90,7 @@ export default function GestaoAdministrativa() {
   const [agendaOpen, setAgendaOpen] = useState(false);
   const [agendaLojaId, setAgendaLojaId] = useState('');
   const [agendaLojaNome, setAgendaLojaNome] = useState('');
+  const [agendaData, setAgendaData] = useState('');
   
   // Lojas ativas
   const lojasAtivas = useMemo(() => {
@@ -142,9 +143,10 @@ export default function GestaoAdministrativa() {
     }
   };
 
-  const handleAbrirAgenda = (lId: string, lNome: string) => {
+  const handleAbrirAgenda = (lId: string, lNome: string, data: string) => {
     setAgendaLojaId(lId);
     setAgendaLojaNome(lNome);
+    setAgendaData(data);
     setAgendaOpen(true);
   };
 
@@ -403,23 +405,9 @@ export default function GestaoAdministrativa() {
         {conferenciasPorLoja.map(({ lojaId: lId, lojaNome, conferencias: confsLoja }) => (
           <Card key={lId}>
             <CardHeader>
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <CardTitle className="flex items-center gap-2">
-                  <Store className="h-5 w-5" /> Conferência Diária - {lojaNome}
-                </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="relative"
-                  onClick={() => handleAbrirAgenda(lId, lojaNome)}
-                >
-                  <CalendarDays className="h-4 w-4 mr-1" />
-                  Agenda
-                  {temAnotacaoImportante(`conferencia_${lId}`) && (
-                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-destructive" />
-                  )}
-                </Button>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <Store className="h-5 w-5" /> Conferência Diária - {lojaNome}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <ScrollArea className="w-full" type="always">
@@ -566,6 +554,25 @@ export default function GestaoAdministrativa() {
                                     </Tooltip>
                                   </TooltipProvider>
                                 )}
+                                
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 relative"
+                                        onClick={() => handleAbrirAgenda(lId, lojaNome, conf.data)}
+                                      >
+                                        <CalendarDays className="h-4 w-4" />
+                                        {temAnotacaoImportante(`conferencia_${lId}_${conf.data}`) && (
+                                          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-destructive" />
+                                        )}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Agenda Eletrônica</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -785,9 +792,9 @@ export default function GestaoAdministrativa() {
       <AgendaEletronicaModal
         open={agendaOpen}
         onOpenChange={setAgendaOpen}
-        chaveContexto={`conferencia_${agendaLojaId}`}
+        chaveContexto={`conferencia_${agendaLojaId}_${agendaData}`}
         titulo="Agenda Eletrônica"
-        subtitulo={agendaLojaNome}
+        subtitulo={`${agendaLojaNome} — ${agendaData ? formatarDataExibicao(agendaData) : ''}`}
       />
     </GestaoAdministrativaLayout>
   );

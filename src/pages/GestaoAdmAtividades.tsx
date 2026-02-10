@@ -48,6 +48,8 @@ export default function GestaoAdmAtividades() {
   const [agendaOpen, setAgendaOpen] = useState(false);
   const [agendaLojaId, setAgendaLojaId] = useState('');
   const [agendaLojaNome, setAgendaLojaNome] = useState('');
+  const [agendaAtividadeId, setAgendaAtividadeId] = useState('');
+  const [agendaAtividadeNome, setAgendaAtividadeNome] = useState('');
 
   const dataStr = format(dataSelecionada, 'yyyy-MM-dd');
 
@@ -83,9 +85,11 @@ export default function GestaoAdmAtividades() {
     setRefreshKey(k => k + 1);
   };
 
-  const handleAbrirAgenda = (lojaId: string, lojaNome: string) => {
+  const handleAbrirAgenda = (lojaId: string, lojaNome: string, atividadeId: string, atividadeNome: string) => {
     setAgendaLojaId(lojaId);
     setAgendaLojaNome(lojaNome);
+    setAgendaAtividadeId(atividadeId);
+    setAgendaAtividadeNome(atividadeNome);
     setAgendaOpen(true);
   };
 
@@ -175,18 +179,6 @@ export default function GestaoAdmAtividades() {
                     <Badge variant={resumoLoja.percentual === 100 ? 'default' : 'outline'}>
                       {resumoLoja.percentual}%
                     </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="relative"
-                      onClick={() => handleAbrirAgenda(lojaId, lojaNome)}
-                    >
-                      <CalendarDays className="h-4 w-4 mr-1" />
-                      Agenda
-                      {temAnotacaoImportante(`atividades_${lojaId}`) && (
-                        <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-destructive" />
-                      )}
-                    </Button>
                   </div>
                 </div>
                 <Progress value={resumoLoja.percentual} className="h-1.5 mt-2" />
@@ -202,6 +194,7 @@ export default function GestaoAdmAtividades() {
                         <TableHead className="text-center">Executado</TableHead>
                         <TableHead className="text-center">Pontuação</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead className="text-center">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -230,6 +223,19 @@ export default function GestaoAdmAtividades() {
                                exec.status === 'executado_com_atraso' ? 'Com Atraso' : 'Pendente'}
                             </Badge>
                           </TableCell>
+                          <TableCell className="text-center">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 relative"
+                              onClick={() => handleAbrirAgenda(lojaId, lojaNome, exec.atividadeId, exec.atividadeNome)}
+                            >
+                              <CalendarDays className="h-4 w-4" />
+                              {temAnotacaoImportante(`atividades_${lojaId}_${exec.atividadeId}`) && (
+                                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-destructive" />
+                              )}
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -250,9 +256,9 @@ export default function GestaoAdmAtividades() {
       <AgendaEletronicaModal
         open={agendaOpen}
         onOpenChange={setAgendaOpen}
-        chaveContexto={`atividades_${agendaLojaId}`}
+        chaveContexto={`atividades_${agendaLojaId}_${agendaAtividadeId}`}
         titulo="Agenda Eletrônica"
-        subtitulo={agendaLojaNome}
+        subtitulo={`${agendaLojaNome} — ${agendaAtividadeNome}`}
       />
     </GestaoAdministrativaLayout>
   );

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { unformatIMEI } from '@/utils/imeiMask';
 import { useNavigate } from 'react-router-dom';
 import { OSLayout } from '@/components/layout/OSLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -85,7 +86,7 @@ export default function OSProdutosAnalise() {
   // Filtrar produtos
   const filteredProdutos = useMemo(() => {
     return produtos.filter(produto => {
-      if (filters.imei && !produto.imei.toLowerCase().includes(filters.imei.toLowerCase())) return false;
+      if (filters.imei && !unformatIMEI(produto.imei).includes(unformatIMEI(filters.imei))) return false;
       if (filters.modelo && !produto.modelo.toLowerCase().includes(filters.modelo.toLowerCase())) return false;
       if (filters.loja !== 'todas' && produto.loja !== filters.loja) return false;
       return true;
@@ -307,7 +308,7 @@ export default function OSProdutosAnalise() {
                 id="imei"
                 placeholder="Buscar por IMEI..."
                 value={filters.imei}
-                onChange={(e) => setFilters({ ...filters, imei: e.target.value })}
+                onChange={(e) => setFilters({ ...filters, imei: formatIMEI(e.target.value) })}
               />
             </div>
             <div>

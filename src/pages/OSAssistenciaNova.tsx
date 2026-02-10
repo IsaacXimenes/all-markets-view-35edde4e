@@ -37,7 +37,7 @@ import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
 import { getVendaById } from '@/utils/vendasApi';
 import { getGarantiaById } from '@/utils/garantiasApi';
 import { getProdutoPendenteById } from '@/utils/osApi';
-import { getPecas, Peca, darBaixaPeca } from '@/utils/pecasApi';
+import { getPecas, Peca, darBaixaPeca, initializePecasWithLojaIds } from '@/utils/pecasApi';
 import { Plus, Trash2, Search, AlertTriangle, Clock, User, History, ArrowLeft, Smartphone, Save, Package, Info, Camera } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -126,7 +126,15 @@ export default function OSAssistenciaNova() {
   ]);
 
   // Peças do estoque (carregadas dinamicamente)
-  const pecasEstoque = getPecas().filter(p => p.status === 'Disponível');
+  // Inicializar peças com IDs válidos de loja
+  useEffect(() => {
+    const lojaIds = lojas.map(l => l.id);
+    if (lojaIds.length > 0) {
+      initializePecasWithLojaIds(lojaIds);
+    }
+  }, [lojas]);
+
+  const pecasEstoque = useMemo(() => getPecas().filter(p => p.status === 'Disponível'), [lojas]);
 
   // Pagamentos
   const [pagamentos, setPagamentos] = useState<PagamentoForm[]>([

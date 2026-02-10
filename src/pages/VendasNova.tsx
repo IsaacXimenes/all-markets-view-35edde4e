@@ -2760,8 +2760,7 @@ export default function VendasNova() {
               </Select>
             </div>
             
-            <div className="flex-1 overflow-y-auto overflow-x-hidden">
-              <div className="overflow-x-auto min-w-0">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden [&_table]:min-w-0">
             {!showPendentesTab ? (
               /* Aba Produtos Estoque */
               <Table>
@@ -2941,7 +2940,6 @@ export default function VendasNova() {
                 </TableBody>
               </Table>
             )}
-              </div>
             </div>
           </div>
         </DialogContent>

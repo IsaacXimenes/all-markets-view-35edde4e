@@ -1,32 +1,51 @@
 
-# Plano: Persistir acessorios na venda e exibi-los na Conferencia de Lancamento
+# Plano: Coluna "Produto" fixa e reordenacao de colunas na tabela de Aparelhos
 
-## Problema
+## Objetivo
 
-Ao criar uma Nova Venda com acessorios, eles nao sao enviados para a API porque o campo `acessorios` nao e incluido no objeto `vendaData`. A interface `Venda` em `vendasApi.ts` ja suporta o campo `acessorios?: VendaAcessorio[]`, mas ele nunca e preenchido. Alem disso, o modal de conferencia nao exibe acessorios.
+Fixar a coluna "Produto" na tabela de Estoque > Aparelhos para que ela permaneca visivel ao rolar horizontalmente, e reordenar as colunas conforme solicitado.
+
+## Nova ordem de colunas
+
+```text
+Produto (fixa) > Loja > Venda Recomendada > Custo > Custo Assist. > Status > ID > IMEI > Tipo > Origem > Qtd > Saude Bat. > Estoque > Assistencia > Acoes
+```
+
+A coluna "Status" foi movida para depois de "Custo Assist." (antes estava em segundo lugar).
 
 ## Alteracoes
 
-### 1. Salvar acessorios ao registrar venda (`src/pages/VendasNova.tsx`)
+### 1. Coluna fixa "Produto" (`src/pages/EstoqueProdutos.tsx`)
 
-Adicionar `acessorios: acessoriosVenda` ao objeto `vendaData` em dois locais:
+- Aplicar `sticky left-0 z-10 bg-background` no `TableHead` e `TableCell` da coluna "Produto"
+- Para as linhas com cor de fundo condicional (bateria), o `TableCell` do Produto herdara a cor da linha via CSS, garantindo que nao haja "buraco" visual
+- Adicionar uma sombra sutil no lado direito da coluna fixa para indicar visualmente a separacao (`shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`)
 
-- **Venda normal** (linha ~963, dentro de `handleConfirmarVenda`): adicionar `acessorios: acessoriosVenda,` apos a linha `itens,`
-- **Venda com sinal** (linha ~881, dentro de `handleSalvarComSinal`): adicionar `acessorios: acessoriosVenda,` apos a linha `itens,`
+### 2. Reordenar colunas (`src/pages/EstoqueProdutos.tsx`)
 
-### 2. Exibir acessorios no modal de conferencia (`src/pages/VendasConferenciaLancamento.tsx`)
+Mover tanto os `TableHead` quanto os `TableCell` correspondentes para a nova ordem:
+1. Produto (sticky)
+2. Loja
+3. Venda Recomendada
+4. Custo
+5. Custo Assist.
+6. Status
+7. ID
+8. IMEI
+9. Tipo
+10. Origem
+11. Qtd
+12. Saude Bat.
+13. Estoque
+14. Assistencia
+15. Acoes
 
-Adicionar uma secao no modal de aprovacao (apos os dados basicos e antes dos comprovantes) que lista os itens (produtos) e acessorios da venda:
-
-- **Secao "Produtos"**: listar `vendaSelecionada.itens` com modelo, IMEI e valor
-- **Secao "Acessorios"**: listar `vendaSelecionada.acessorios` com descricao, quantidade, valor unitario e valor total
-- Ambas as secoes so aparecem se houver dados
-
-Sera necessario importar `VendaAcessorio` ou acessar os campos diretamente do objeto venda.
-
-## Arquivos Modificados
+## Arquivo Modificado
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/pages/VendasNova.tsx` | Adicionar `acessorios: acessoriosVenda` no vendaData (2 locais) |
-| `src/pages/VendasConferenciaLancamento.tsx` | Exibir secoes de Produtos e Acessorios no modal de conferencia |
+| `src/pages/EstoqueProdutos.tsx` | Reordenar colunas do header e body; aplicar classes sticky na coluna Produto |
+
+## Detalhe Tecnico
+
+A coluna fixa usa CSS nativo `position: sticky` com `left: 0`, que funciona nativamente dentro do scroll horizontal do `TableScrollArea` (Radix ScrollArea). O `z-index: 10` garante que a coluna fique acima das demais ao rolar. O `bg-background` (ou cor herdada da linha) evita sobreposicao transparente.

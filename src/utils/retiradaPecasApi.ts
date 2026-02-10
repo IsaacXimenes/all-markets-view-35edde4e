@@ -334,14 +334,8 @@ export const finalizarDesmonte = (
     return { sucesso: false, mensagem: 'Adicione pelo menos uma peça antes de finalizar' };
   }
   
-  // Validar custo
+  // Calcular custo (informativo, não bloqueia)
   const validacao = validarCustoRetirada(retiradaId);
-  if (!validacao.valido) {
-    return { 
-      sucesso: false, 
-      mensagem: `A soma das peças (R$ ${validacao.somaPecas.toFixed(2)}) deve cobrir o custo do aparelho (R$ ${validacao.custoAparelho.toFixed(2)}). Diferença: R$ ${Math.abs(validacao.diferenca).toFixed(2)}` 
-    };
-  }
   
   const agora = new Date().toISOString();
   

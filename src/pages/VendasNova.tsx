@@ -1342,7 +1342,7 @@ export default function VendasNova() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Produto</TableHead>
+                    <TableHead className="sticky left-0 z-10 bg-background">Produto</TableHead>
                     <TableHead>IMEI</TableHead>
                     <TableHead>Loja</TableHead>
                     <TableHead className="text-right">Custo do Produto</TableHead>
@@ -1354,7 +1354,7 @@ export default function VendasNova() {
                 <TableBody>
                   {itens.map(item => (
                     <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.produto}</TableCell>
+                      <TableCell className="font-medium sticky left-0 z-10 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{item.produto}</TableCell>
                       <TableCell className="font-mono text-sm">{displayIMEI(item.imei)}</TableCell>
                       <TableCell>{obterNomeLoja(item.loja)}</TableCell>
                       <TableCell className="text-right text-muted-foreground">
@@ -1593,7 +1593,7 @@ export default function VendasNova() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Modelo</TableHead>
+                    <TableHead>Produto</TableHead>
                     <TableHead>Condição</TableHead>
                     <TableHead>IMEI</TableHead>
                     <TableHead>IMEI Validado</TableHead>

@@ -1,24 +1,28 @@
 
-# Ocultar coluna ID no modal "Selecionar Produto"
 
-## Objetivo
-Remover a coluna "ID" das tabelas do modal de selecao de produto na Nova Venda, eliminando scroll horizontal e otimizando para uso mobile com selecao rapida.
+# Corrigir scroll horizontal no modal "Selecionar Produto"
+
+## Problema raiz
+O componente `Table` global (`src/components/ui/table.tsx`) aplica `min-w-max` na tag `<table>` e envolve tudo em um `TableScrollArea` com scroll horizontal forcado. Isso faz com que qualquer tabela, incluindo a do modal, se expanda alem do container e exiba scroll horizontal -- mesmo com a tentativa de `[&_table]:min-w-0`.
+
+## Solucao
+Passar uma classe customizada na `Table` do modal para sobrescrever o `min-w-max` com `min-w-full`, forcando a tabela a respeitar a largura do container. Isso funciona porque o componente `Table` aceita `className` e usa `cn()` para merge, permitindo que a classe passada sobrescreva a padrao.
 
 ## Alteracoes
 
 ### Arquivo: `src/pages/VendasNova.tsx`
 
-#### 1. Aba "Produtos - Estoque" (linhas ~2769-2877)
-- Remover `<TableHead>ID</TableHead>` (linha 2771)
-- Remover `<TableCell>` com `produto.id` (linha 2784) nos produtos filtrados
-- Remover `<TableCell>` com `produto.id` (linha 2838) nos produtos de outras lojas
-- Atualizar `colSpan` de 8 para 7 nas linhas de "Nenhum produto" e "Produtos em outras lojas"
+1. Nas duas instancias de `<Table>` dentro do modal de selecao de produto (aba Estoque e aba Pendentes), adicionar `className="min-w-full"`:
 
-#### 2. Aba "Produtos - Pendentes" (linhas ~2880-2920+)
-- Remover `<TableHead>ID</TableHead>` (linha 2883)
-- Remover `<TableCell>` com `produto.id` (linha 2900)
+```tsx
+// Aba Estoque (~linha 2766)
+<Table className="min-w-full">
 
-#### 3. Remover largura minima fixa
-- Remover o wrapper `<div className="min-w-[700px]">` (linha 2765) que forca uma largura minima e causa scroll horizontal desnecessario
+// Aba Pendentes (~linha correspondente)
+<Table className="min-w-full">
+```
 
-Essas alteracoes reduzem o numero de colunas, permitindo que a tabela caiba na tela sem scroll horizontal, melhorando a experiencia em dispositivos moveis.
+2. Manter o container com `overflow-x-hidden` para garantir que nada vaze.
+
+Isso faz com que a tabela ocupe 100% da largura do modal sem ultrapassar, eliminando o scroll horizontal e deixando o botao "Selecionar" sempre visivel.
+

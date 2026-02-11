@@ -24,12 +24,12 @@ import {
   ComissaoPorLoja,
   HistoricoComissaoPorLoja
 } from '@/utils/comissaoPorLojaApi';
-import { getLojaById, getCargoNome, getCargos } from '@/utils/cadastrosApi';
+import { getCargoNome, getCargos } from '@/utils/cadastrosApi';
 import { exportToCSV } from '@/utils/formatUtils';
 
 export default function RHComissaoPorLoja() {
   const [activeTab, setActiveTab] = useUrlTabs('tabela');
-  const { obterLojasTipoLoja, obterNomeLoja } = useCadastroStore();
+  const { obterLojasTipoLoja, obterNomeLoja, obterLojaById } = useCadastroStore();
   const [comissoes, setComissoes] = useState<ComissaoPorLoja[]>([]);
   const lojas = obterLojasTipoLoja();
   const [cargos] = useState(() => getCargos());
@@ -127,7 +127,7 @@ export default function RHComissaoPorLoja() {
     const historico = getHistoricoComissaoPorLoja(comissao.id);
     setHistoricoSelecionado(historico);
     setComissaoSelecionada({
-      loja: getLojaById(comissao.lojaId)?.nome || comissao.lojaId,
+      loja: obterLojaById(comissao.lojaId)?.nome || comissao.lojaId,
       cargo: getCargoNome(comissao.cargoId)
     });
     setShowHistoricoModal(true);
@@ -164,7 +164,7 @@ export default function RHComissaoPorLoja() {
       }
       grupos[c.cargoId].lojas.push({
         lojaId: c.lojaId,
-        lojaNome: getLojaById(c.lojaId)?.nome || c.lojaId,
+        lojaNome: obterLojaById(c.lojaId)?.nome || c.lojaId,
         comissao: c
       });
     });
@@ -183,7 +183,7 @@ export default function RHComissaoPorLoja() {
   const handleExportCSV = () => {
     const dataToExport = comissoesFiltradas.map(c => ({
       ID: c.id,
-      Loja: getLojaById(c.lojaId)?.nome || c.lojaId,
+      Loja: obterLojaById(c.lojaId)?.nome || c.lojaId,
       Cargo: getCargoNome(c.cargoId),
       'Comissão (%)': c.percentualComissao.toFixed(2)
     }));
@@ -335,7 +335,7 @@ export default function RHComissaoPorLoja() {
                   </TableHeader>
                   <TableBody>
                     {comissoesFiltradas.map((comissao) => {
-                      const loja = getLojaById(comissao.lojaId);
+                      const loja = obterLojaById(comissao.lojaId);
                       const cargoNome = getCargoNome(comissao.cargoId);
                       
                       return (

@@ -44,7 +44,7 @@ const DRAFT_KEY = 'draft_venda_acessorios';
 
 export default function VendasAcessorios() {
   const navigate = useNavigate();
-  const { obterLojasAtivas, obterLojasTipoLoja, obterVendedores, obterNomeLoja, obterNomeColaborador, obterColaboradorById } = useCadastroStore();
+  const { obterLojasAtivas, obterLojasTipoLoja, obterVendedores, obterNomeLoja, obterNomeColaborador, obterColaboradorById, obterRodizioAtivoDoColaborador } = useCadastroStore();
   
   // Dados do cadastros - usando Zustand store
   const lojas = obterLojasAtivas();
@@ -496,7 +496,10 @@ export default function VendasAcessorios() {
                     setVendedor(id);
                     if (id) {
                       const col = obterColaboradorById(id);
-                      if (col) setLojaVenda(col.loja_id);
+                      if (col) {
+                        const rodizio = obterRodizioAtivoDoColaborador(col.id);
+                        setLojaVenda(rodizio ? rodizio.loja_destino_id : col.loja_id);
+                      }
                     } else {
                       setLojaVenda('');
                     }

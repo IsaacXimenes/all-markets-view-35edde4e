@@ -1,108 +1,72 @@
 
-## Plano de Implementacao - Ajustes Financeiro e Vendas
 
-Este plano abrange 5 frentes de trabalho nos modulos Financeiro e Vendas.
+# Plano de Implementacao - Ajustes em Vendas, Financeiro e RH
 
----
+## 1. Nova Venda - Preencher Loja automaticamente ao selecionar Responsavel
 
-### 1. Central de Despesas: Lancamento Recorrente Automatico e Encerramento
+**Arquivo:** `src/pages/VendasNova.tsx`
 
-**Problema atual**: Ao salvar uma despesa recorrente mensal, o sistema so cria a proxima competencia quando o usuario paga a despesa atual e confirma o provisionamento. Nao ha opcao para encerrar a recorrencia.
+Ao selecionar o colaborador no campo "Responsavel", o sistema consultara o `obterColaboradorById` do `useCadastroStore` para obter o `loja_id` do colaborador e preenchera automaticamente o campo "Loja de Venda" com essa loja.
 
-**Solucao**:
+- Alterar o `onChange` do `AutocompleteColaborador` (linha ~1118) para uma funcao que, alem de `setVendedor(id)`, busca o colaborador via `obterColaboradorById(id)` e chama `setLojaVenda(colaborador.loja_id)`.
 
-**1.1 Lancamento automatico da proxima competencia**
-- **Arquivo**: `src/pages/FinanceiroCentralDespesas.tsx` (funcao `handleLancar`)
-- Ao salvar uma despesa com `recorrente: true` e `periodicidade: 'Mensal'` (ou Trimestral/Anual), o sistema chamara `provisionarProximoPeriodo` automaticamente apos o `addDespesa`, criando a proxima competencia com status "A vencer".
+## 2. Venda Balcao - Modal de Acessorios e Valor Unit. editavel
 
-**1.2 Encerrar Recorrencia**
-- **Arquivo**: `src/utils/financeApi.ts` - Adicionar campo `recorrenciaEncerrada?: boolean` e `dataEncerramentoRecorrencia?: string` na interface `Despesa`. Criar funcao `encerrarRecorrencia(id, dataEncerramento)`.
-- **Arquivo**: `src/pages/FinanceiroCentralDespesas.tsx`:
-  - Adicionar botao "Encerrar Recorrencia" (icone XCircle) nas acoes de despesas com `recorrente: true` e `status !== 'Pago'`.
-  - Modal de confirmacao com campo de data de encerramento.
-  - Ao confirmar, marca `recorrenciaEncerrada: true` e impede futuros provisionamentos automaticos.
-  - Manter lancamentos ja criados intactos.
+**Arquivo:** `src/pages/VendasAcessorios.tsx`
 
----
+### 2.1 Redimensionar modal de acessorios
+- Alterar `max-w-3xl` para `max-w-4xl` na DialogContent do modal de selecao de acessorios (linha 936).
 
-### 2. Teto Bancario: Filtros de Loja e Conta Financeira
+### 2.2 Tornar Valor Unit. editavel na tabela de acessorios
+- Na tabela de acessorios adicionados (linha ~658), substituir o texto estatico `formatCurrency(item.valorUnitario)` por um input editavel com mascara de moeda.
+- Ao alterar o valor unitario, recalcular `valorTotal = valorUnitario * quantidade`.
 
-**Problema atual**: A aba Teto Bancario so filtra por mes/ano. Nao ha filtros por loja ou conta especifica.
+## 3. Financeiro - Conferencia de Contas: Remover Historico de Conferencias
 
-**Solucao**:
-- **Arquivo**: `src/pages/FinanceiroTetoBancario.tsx`
-  - Adicionar estados `filtroLoja` e `filtroConta` no componente.
-  - Na area de filtros (Card de Periodo, linhas 562-598), adicionar:
-    - AutocompleteLoja para filtro por loja
-    - Select de Conta Financeira (populado com `contasFinanceiras`)
-  - Na logica de `saldosPorConta` e nos cards de contas, aplicar os filtros:
-    - Se `filtroLoja` definido, exibir apenas contas vinculadas aquela loja.
-    - Se `filtroConta` definido, exibir apenas aquela conta especifica.
-  - Aplicar os mesmos filtros na aba Emissao-NFE.
+**Arquivo:** `src/pages/FinanceiroConferencia.tsx`
 
----
+- Remover o bloco "Historico de Conferencias" (linhas ~1282-1306) do painel lateral de detalhes da venda, que exibe o card com icone `History` e a lista de conferencias realizadas. Manter apenas as informacoes do registro atual (validacoes de pagamento, observacoes, aprovacao do gestor, etc.).
 
-### 3. Gestao de Dinheiro por Loja
+## 4. RH Feedback - Scroll nos modais
 
-**Problema atual**: Existe um card unico "Caixa Dinheiro" consolidado. Nao ha visualizacao por loja individual.
+**Arquivo:** `src/pages/RHFeedback.tsx`
 
-**Solucao**:
-- **Arquivo**: `src/pages/FinanceiroTetoBancario.tsx`
-  - Substituir o card unico de "Caixa Dinheiro" por um grid de cards, um por loja ativa.
-  - Para cada loja, calcular o total de pagamentos em dinheiro de vendas finalizadas no periodo cujo `lojaVenda` corresponda aquela loja.
-  - Card por loja exibindo: nome da loja, saldo em dinheiro, quantidade de vendas em dinheiro.
-  - Manter o totalizador geral abaixo dos cards individuais.
+### 4.1 Modal de Detalhes sem scroll
+- O modal de detalhes (linha 355) ja tem `max-h-[90vh]` e `ScrollArea`, mas pode estar com problema de overflow. Ajustar para garantir que o `ScrollArea` ocupe o espaco disponivel corretamente com `overflow-y-auto` e altura adequada.
 
----
+### 4.2 Modal de Registrar Feedback sem scroll
+- Mesmo ajuste no modal de registro (linha 532).
 
-### 4. Persistencia de Acessorios e Garantias na Edicao (Conferencias)
+### 4.3 Select de colaborador mostrando codigo + nome
+- Na linha 554-555, o `SelectItem` exibe `{c.id} - {c.nome} ({c.cargo})`. Remover o `c.id` para exibir apenas `{c.nome} ({c.cargo})`.
 
-**Problema atual**: Acessorios e garantias estendidas lancados na Nova Venda podem desaparecer ao editar a venda nas conferencias.
+### 4.4 Layout do Anexar Documento + icone de camera
+- Substituir o input de arquivo (linhas 623-656) por um layout mais visual com dois botoes: um para upload de arquivo e outro com icone de camera para captura direta.
+- Adicionar import do icone `Camera` do lucide-react.
 
-**Solucao**:
-- **Arquivo**: `src/pages/VendasEditar.tsx`
-  - Verificar que ao carregar a venda via `getVendaById` ou `getVendaComFluxo`, os campos `acessorios` e `garantias` sao corretamente mapeados para o estado local do componente.
-  - Garantir que `updateVenda` persiste esses campos sem sobrescreve-los com arrays vazios.
-- **Arquivo**: `src/pages/VendasConferenciaGestorDetalhes.tsx`
-  - Ja exibe acessorios (linhas 129-131). Verificar se `dadosVenda.acessorios` chega preenchido.
-- **Arquivo**: `src/utils/fluxoVendasApi.ts` / `src/utils/vendasApi.ts`
-  - Auditar as funcoes de persistencia para garantir que `acessorios` e `garantiasEstendidas` sao salvos e carregados em todas as etapas do fluxo (localStorage keys).
+## Detalhes Tecnicos
 
----
+### Arquivo: `src/pages/VendasNova.tsx`
+- Criar funcao `handleVendedorChange(id)` que faz:
+  ```
+  setVendedor(id);
+  if (id) {
+    const col = obterColaboradorById(id);
+    if (col) setLojaVenda(col.loja_id);
+  }
+  ```
+- Substituir `onChange={setVendedor}` por `onChange={handleVendedorChange}` no AutocompleteColaborador.
 
-### 5. Redimensionamento do Quadro de Conferencia do Gestor
+### Arquivo: `src/pages/VendasAcessorios.tsx`
+- Modal: `max-w-3xl` -> `max-w-4xl`
+- Na tabela, coluna Valor Unit.: trocar de texto para `InputComMascara` com mascara "moeda", com `onBlur` para recalcular o total.
+- Funcao `handleUpdateValorUnitario(itemId, novoValor)` que atualiza o item no array `acessorios`.
 
-**Problema atual**: O quadro lateral de conferencia nao ocupa 100% da altura disponivel.
+### Arquivo: `src/pages/FinanceiroConferencia.tsx`
+- Remover linhas 1282-1306 (bloco do Historico de Conferencias).
 
-**Solucao**:
-- **Arquivo**: `src/pages/VendasConferenciaGestorDetalhes.tsx`
-  - No container lateral (coluna direita, linha 184), adicionar classes `sticky top-4` e `h-fit` para que acompanhe o scroll.
-  - Alternativamente, usar `min-h-[calc(100vh-12rem)]` no container lateral para que ocupe a altura total da area visivel.
+### Arquivo: `src/pages/RHFeedback.tsx`
+- Modal detalhes e registro: ajustar ScrollArea para funcionar com scroll.
+- SelectItem: `{c.id} - {c.nome}` -> `{c.nome} ({c.cargo})`
+- Anexar documento: layout com dois botoes (Upload e Camera) em cards visuais, usando `useRef` para input file e input capture.
 
----
-
-### 6. Unificacao do Fluxo de Venda Balcao
-
-**Problema atual**: A Venda Balcao (`VendasAcessorios.tsx`) atualmente apenas subtrai estoque e navega para `/vendas`. Nao chama `addVenda` nem `inicializarVendaNoFluxo`, portanto a venda NAO passa pelas conferencias (Lancamento, Gestor, Financeiro) e NAO gera registros de pagamento no fluxo financeiro.
-
-**Solucao**:
-- **Arquivo**: `src/pages/VendasAcessorios.tsx` (funcao `handleConfirmarVenda`, linhas 399-415)
-  - Importar `addVenda` de `vendasApi` e `inicializarVendaNoFluxo` de `fluxoVendasApi`.
-  - Ao confirmar a venda, chamar `addVenda` com os dados do formulario (cliente, loja, vendedor, acessorios como itens, pagamentos, etc.), seguido de `inicializarVendaNoFluxo` para inserir a venda no pipeline de conferencias.
-  - Marcar a venda com `tipoVenda: 'Balcão'` para diferenciar nas conferencias.
-  - A venda passara entao por: Conferencia Lancamento -> Conferencia Gestor -> Conferencia Financeiro -> Finalizado, exatamente como uma venda de aparelho.
-  - O financeiro ao finalizar gerara os pagamentos via `criarPagamentosDeVenda` e atualizara o fluxo de caixa.
-
----
-
-### Resumo de Arquivos Modificados
-
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/utils/financeApi.ts` | Campos `recorrenciaEncerrada`, `dataEncerramentoRecorrencia` na interface Despesa; funcao `encerrarRecorrencia` |
-| `src/pages/FinanceiroCentralDespesas.tsx` | Auto-provisionamento ao lancar; botao e modal "Encerrar Recorrencia" |
-| `src/pages/FinanceiroTetoBancario.tsx` | Filtros por Loja e Conta; cards de dinheiro por loja |
-| `src/pages/VendasAcessorios.tsx` | Integracao com `addVenda` + `inicializarVendaNoFluxo` |
-| `src/pages/VendasConferenciaGestorDetalhes.tsx` | Layout lateral fullheight |
-| `src/pages/VendasEditar.tsx` | Auditoria de persistencia de acessorios/garantias |
-| `src/utils/vendasApi.ts` / `src/utils/fluxoVendasApi.ts` | Auditoria de campos acessorios/garantias no fluxo |

@@ -306,7 +306,7 @@ export default function FinanceiroCentralDespesas() {
         {/* Filtros */}
         <Card>
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
               <div>
                 <Label className="text-xs">Competência</Label>
                 <Select value={filtroCompetencia} onValueChange={setFiltroCompetencia}>
@@ -358,6 +358,24 @@ export default function FinanceiroCentralDespesas() {
               <div>
                 <Label className="text-xs">Busca</Label>
                 <Input value={buscaGlobal} onChange={e => setBuscaGlobal(e.target.value)} placeholder="Pesquisar..." />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    setFiltroCompetencia(getCompetenciaAtual());
+                    setFiltroLoja('');
+                    setFiltroCategoria('');
+                    setFiltroStatus('');
+                    setFiltroTipo('');
+                    setBuscaGlobal('');
+                  }}
+                >
+                  <XCircle className="h-4 w-4 mr-1" />
+                  Limpar Filtros
+                </Button>
               </div>
             </div>
           </CardContent>

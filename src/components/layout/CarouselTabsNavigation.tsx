@@ -17,6 +17,7 @@ interface CarouselTabsNavigationProps {
 
 export function CarouselTabsNavigation({ tabs, size = 'default' }: CarouselTabsNavigationProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const activeTabRef = useRef<HTMLAnchorElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const location = useLocation();
@@ -36,6 +37,12 @@ export function CarouselTabsNavigation({ tabs, size = 'default' }: CarouselTabsN
     resizeObserver.observe(element);
     return () => resizeObserver.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (activeTabRef.current) {
+      activeTabRef.current.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }, [location.pathname]);
 
   const isSmall = size === 'sm';
 
@@ -66,6 +73,7 @@ export function CarouselTabsNavigation({ tabs, size = 'default' }: CarouselTabsN
             <Link
               key={tab.href}
               to={tab.href}
+              ref={isActive ? activeTabRef : undefined}
               className={cn(
                 "flex items-center gap-1.5 rounded-lg whitespace-nowrap transition-colors",
                 isSmall ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm",

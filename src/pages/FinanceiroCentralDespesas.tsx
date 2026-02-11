@@ -96,6 +96,10 @@ export default function FinanceiroCentralDespesas() {
   const [dialogLoteOpen, setDialogLoteOpen] = useState(false);
   const [novaCompetenciaLote, setNovaCompetenciaLote] = useState('');
 
+  // Encerrar recorrência
+  const [encerrarModal, setEncerrarModal] = useState<Despesa | null>(null);
+  const [dataEncerramento, setDataEncerramento] = useState('');
+
   // Refresh key for agenda indicators
   const [agendaRefresh, setAgendaRefresh] = useState(0);
 

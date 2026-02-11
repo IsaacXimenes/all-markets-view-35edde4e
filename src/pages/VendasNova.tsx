@@ -55,7 +55,7 @@ const DRAFT_KEY = 'draft_venda_nova';
 export default function VendasNova() {
   const isMobilePreview = useIsMobile();
   const navigate = useNavigate();
-  const { obterLojasAtivas, obterLojasTipoLoja, obterVendedores, obterMotoboys, obterLojaById, obterNomeLoja, obterNomeColaborador, obterLojaMatriz, obterLojaOnline, obterColaboradorById } = useCadastroStore();
+  const { obterLojasAtivas, obterLojasTipoLoja, obterVendedores, obterMotoboys, obterLojaById, obterNomeLoja, obterNomeColaborador, obterLojaMatriz, obterLojaOnline, obterColaboradorById, obterRodizioAtivoDoColaborador } = useCadastroStore();
   
   // Dados do cadastros - usando Zustand store
   const lojas = obterLojasAtivas();
@@ -1107,7 +1107,10 @@ export default function VendasNova() {
                     setVendedor(id);
                     if (id) {
                       const col = obterColaboradorById(id);
-                      if (col) setLojaVenda(col.loja_id);
+                      if (col) {
+                        const rodizio = obterRodizioAtivoDoColaborador(col.id);
+                        setLojaVenda(rodizio ? rodizio.loja_destino_id : col.loja_id);
+                      }
                     } else {
                       setLojaVenda('');
                     }

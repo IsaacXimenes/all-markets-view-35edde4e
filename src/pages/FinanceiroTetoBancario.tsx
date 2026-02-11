@@ -639,12 +639,12 @@ export default function FinanceiroTetoBancario() {
               </div>
               <div className="space-y-1.5 w-56">
                 <Label className="text-xs text-muted-foreground">Filtrar por Conta</Label>
-                <Select value={filtroConta} onValueChange={setFiltroConta}>
+                <Select value={filtroConta || '__all__'} onValueChange={(v) => setFiltroConta(v === '__all__' ? '' : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todas as contas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas as contas</SelectItem>
+                    <SelectItem value="__all__">Todas as contas</SelectItem>
                     {contasFinanceiras.filter(c => c.status === 'Ativo').map(c => (
                       <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
                     ))}

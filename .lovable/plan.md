@@ -1,54 +1,53 @@
 
+# Plano - Correcoes no Modulo de Assistencia e Financeiro (5 problemas)
 
-# Plano - Correcoes no Modulo de Assistencia (6 problemas)
+## Problema 1: Campo "Descrição" nao retorna opcoes do estoque ao marcar "Estoque" na edicao da OS
 
-## Problema 1: Pagamentos nao editaveis nos Detalhes da OS
+Na tela de detalhes/edicao (`OSAssistenciaDetalhes.tsx`, linhas 448-459), o campo de descricao da peca e sempre um `Input` livre, mesmo quando o checkbox "Estoque" esta marcado. Na tela de Nova Assistencia (`OSAssistenciaNova.tsx`, linhas 1108-1140), quando `pecaNoEstoque` e true, o campo muda para um `Select` com as pecas do estoque filtradas por loja.
 
-Na tela `OSAssistenciaDetalhes.tsx`, o card de Pagamentos (linhas 653-685) nao tem modo de edicao. Ele sempre renderiza a tabela estatica, sem condicional `isEditing`.
-
-**Correcao:** Quando `isEditing === true`, renderizar o componente `PagamentoQuadro` (mesmo usado na Nova Assistencia) em vez da tabela estatica. Adicionar estado `editPagamentosQuadro` para rastrear pagamentos editados e incluir no `handleSaveChanges`.
-
----
-
-## Problema 2: OS criada pela Analise de Tratativas sem cliente quando origem e Estoque
-
-Em `OSAnaliseGarantia.tsx` (linhas 171-173), quando a origem e "Estoque", o codigo so define `origemOS = 'Estoque'` sem buscar nenhum dado adicional (clienteId, modelo, IMEI). Esses dados ficam vazios.
-
-**Correcao:** No bloco `else if (registroAprovado.origem === 'Estoque')`, buscar o produto pendente via `getProdutoPendenteById(registroAprovado.origemId)` e extrair modelo/IMEI do produto. O clienteId pode ficar vazio (preenchido depois na edicao).
+**Correcao em `OSAssistenciaDetalhes.tsx`:** Replicar a logica da Nova Assistencia no bloco de edicao de pecas. Quando `peca.pecaNoEstoque === true`, renderizar um `Select` com as pecas do estoque (via `getPecas()`) filtradas pela loja da OS (`editLojaId`), exibindo descricao, quantidade e origem. Quando nao marcado, manter o Input livre.
 
 ---
 
-## Problema 3: Editar na Nova Assistencia deve abrir mesmo layout do Detalhe com campos habilitados
+## Problema 2: Solicitacoes de Pecas perdidas ao salvar edicao
 
-Atualmente ao clicar no lapis (Edit) na listagem `OSAssistencia.tsx`, o sistema navega para `/os/assistencia/${id}` (detalhes em modo leitura). O usuario quer que ao clicar no lapis, abra a mesma tela de detalhes mas ja com edicao habilitada.
+A solicitacao de peca e adicionada corretamente via `addSolicitacao` (linha 653), e o refresh e feito (linha 662). Porem, ao clicar "Salvar Alteracoes" (`handleSaveChanges`, linha 103), o `updateOrdemServico` nao afeta as solicitacoes (sao independentes). O problema real e que apos salvar e sair do modo de edicao, as solicitacoes continuam visiveis. Preciso verificar se o estado `solicitacoesOS` e mantido apos `setIsEditing(false)`. O reload (linhas 129-131) esta correto.
 
-**Correcao:** Na acao de editar da tabela em `OSAssistencia.tsx`, navegar para `/os/assistencia/${os.id}?edit=true`. No `OSAssistenciaDetalhes.tsx`, ler o parametro `edit` do URL e iniciar com `isEditing = true` quando presente.
-
----
-
-## Problema 4: Mensagens de validacao ao preencher Origem de Compra
-
-Na `OSAssistenciaNova.tsx` (linhas 1464-1496), o alerta de campos obrigatorios inclui "Origem da Compra" (linha 1466) e "Modelo do Aparelho" (linha 1467). O usuario relata que ao preencher esses campos as mensagens de validacao persistem indevidamente. Tambem os labels (linhas 889, 905) ficam com `text-destructive` enquanto vazios, gerando ruido visual.
-
-**Correcao:** Remover "Origem da Compra" e "Modelo do Aparelho" da lista de campos obrigatorios no alerta (linhas 1466-1467). Remover as classes `text-destructive` e `border-destructive` condicionais dos campos de Origem e Modelo.
+**Investigacao adicional:** O problema pode estar no fato de que ao adicionar a solicitacao, o status da OS deveria mudar para "Solicitacao Enviada", mas isso nao esta sendo feito automaticamente na edicao. Tambem, a solicitacao precisa ter o campo `lojaSolicitante` corretamente preenchido. Vou garantir que a logica de persistencia funcione e que o `getSolicitacoesByOS` retorne os dados corretamente apos o save.
 
 ---
 
-## Problema 5: Unidade de Servico retorna lojas em vez de cadastros tipo Assistencia
+## Problema 3: Coluna "Loja" no quadro de Informacoes da OS retorna apenas lojas tipo "Loja"
 
-No card de Pecas/Servicos da `OSAssistenciaNova.tsx` (linha 1181-1185), o `AutocompleteLoja` usa `apenasLojasTipoLoja={true}`, que filtra apenas lojas do tipo "Loja". O usuario precisa que retorne cadastros do tipo "Assistencia".
+Na linha 61, `const lojas = obterLojasTipoLoja();` filtra apenas lojas com `tipo === 'Loja'`. Deveria filtrar por tipo "Assistencia" (conforme correcao anterior aplicada na Unidade de Servico).
 
-**Correcao:** Alterar de `apenasLojasTipoLoja={true}` para `filtrarPorTipo="Assistência"` no AutocompleteLoja da Unidade de Servico. O componente ja suporta essa prop nativamente (linha 48 do AutocompleteLoja.tsx).
+**Correcao em `OSAssistenciaDetalhes.tsx`:** Substituir `obterLojasTipoLoja()` por `obterLojasPorTipo('Assistência')` ou usar `AutocompleteLoja` com `filtrarPorTipo="Assistência"` no campo de Loja da edicao (linhas 786-796), mantendo consistencia com o padrao do sistema.
 
 ---
 
-## Problema 6: Solicitacoes de pecas perdidas ao registrar OS
+## Problema 4: Responsavel Financeiro vazio ao conferir nota
 
-Na `OSAssistenciaNova.tsx` (linhas 730-753), as solicitacoes sao persistidas via `addSolicitacao` apos a criacao da OS. Porem o estado `solicitacoesPecas` e local (React state) e nao sobrevive a navegacao. O problema e que apos registrar a OS, o sistema navega para `/os/assistencia` e os dados locais se perdem. Ao editar a OS via detalhes, as solicitacoes deveriam ser carregadas via `getSolicitacoesByOS`, o que ja acontece (linha 76).
+A funcao `obterFinanceiros()` (cadastroStore, linha 251-254) filtra colaboradores cujo cargo contenha "financeiro". Nenhum colaborador mockado possui essa palavra no cargo - existem "Gestor (a)", "Vendedor (a)", "Estoquista", "Tecnico", "Assistente Administrativo".
 
-O problema real e que ao salvar edicoes no `handleSaveChanges` (linhas 91-111), as solicitacoes adicionadas no formulario de edicao sao salvas via `addSolicitacao` (linha 630-643), mas o `setSolicitacoesOS` que atualiza a UI faz refresh correto. Preciso investigar se o `getSolicitacoesByOS` esta retornando dados corretamente.
+**Correcao em `src/store/cadastroStore.ts`:** Ampliar o filtro de `obterFinanceiros` para incluir cargos relevantes: "Assistente Administrativo" e "Gestor (a)", que sao os perfis que tipicamente atuam no financeiro. Alternativamente, usar `AutocompleteColaborador` em vez do `Select` para permitir busca em todos os colaboradores ativos.
 
-**Correcao:** Garantir que apos `handleSaveChanges` no detalhes, o estado `solicitacoesOS` seja recarregado via `getSolicitacoesByOS(os.id)`. Tambem no registro original (Nova Assistencia), verificar que `addSolicitacao` esta sendo chamado corretamente e que os dados persistem na API mock.
+**Correcao em `src/pages/FinanceiroNotasAssistencia.tsx`:** Substituir o `Select` de "Responsavel Financeiro" por `AutocompleteColaborador` para consistencia com o padrao do sistema e garantir que sempre haja opcoes disponiveis.
+
+---
+
+## Problema 5: Integracao da saida com o Extrato Geral e por Conta
+
+A funcao `finalizarNotaAssistencia` (solicitacaoPecasApi.ts, linhas 527-588) atualiza o status da nota e das solicitacoes, mas nao registra nenhuma despesa/saida no sistema financeiro. O Extrato Geral (`FinanceiroExtrato.tsx`) le despesas via `getDespesas()` do `financeApi.ts`.
+
+**Correcao em `src/utils/solicitacaoPecasApi.ts`:** Na funcao `finalizarNotaAssistencia`, apos finalizar a nota, chamar `addDespesa` do `financeApi.ts` para registrar a saida financeira com:
+- descricao: "Pagamento Nota Assistencia [ID]"
+- valor: valorTotal da nota
+- conta: contaPagamento informada
+- tipo/categoria: "Assistencia"
+- data: data atual
+- status: "Pago"
+
+Isso fara o valor aparecer automaticamente no Extrato Geral e no Extrato por Contas.
 
 ---
 
@@ -56,8 +55,7 @@ O problema real e que ao salvar edicoes no `handleSaveChanges` (linhas 91-111), 
 
 | Arquivo | Alteracoes |
 |---------|-----------|
-| `src/pages/OSAssistenciaDetalhes.tsx` | Adicionar PagamentoQuadro em modo edicao; ler param `?edit=true` para iniciar em modo edicao; recarregar solicitacoes apos salvar |
-| `src/pages/OSAnaliseGarantia.tsx` | Buscar dados do produto pendente quando origem e "Estoque" para preencher modelo/IMEI |
-| `src/pages/OSAssistencia.tsx` | Alterar navegacao do botao Edit para incluir `?edit=true` |
-| `src/pages/OSAssistenciaNova.tsx` | Remover validacao de Origem da Compra; alterar Unidade de Servico para filtrar por tipo "Assistencia"; verificar persistencia de solicitacoes |
-
+| `src/pages/OSAssistenciaDetalhes.tsx` | Adicionar Select de pecas do estoque quando checkbox "Estoque" marcado; trocar Loja de `obterLojasTipoLoja` para `AutocompleteLoja` com filtro tipo Assistencia |
+| `src/store/cadastroStore.ts` | Ampliar filtro de `obterFinanceiros` para incluir "Assistente Administrativo" e "Gestor (a)" |
+| `src/pages/FinanceiroNotasAssistencia.tsx` | Substituir Select de Responsavel Financeiro por `AutocompleteColaborador` |
+| `src/utils/solicitacaoPecasApi.ts` | Na `finalizarNotaAssistencia`, registrar despesa via `addDespesa` para integracao com Extrato |

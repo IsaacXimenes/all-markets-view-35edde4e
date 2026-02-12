@@ -60,7 +60,7 @@ export interface ProdutoPendente {
   parecerAssistencia?: ParecerAssistencia;
   timeline: TimelineEntry[];
   custoAssistencia: number;
-  statusGeral: 'Pendente Estoque' | 'Aguardando Recebimento Assistência' | 'Em Análise Assistência' | 'Aguardando Peça' | 'Liberado' | 'Retornado da Assistência' | 'Devolvido para Fornecedor';
+  statusGeral: 'Pendente Estoque' | 'Aguardando Recebimento Assistência' | 'Em Análise Assistência' | 'Aguardando Peça' | 'Liberado' | 'Retornado da Assistência' | 'Devolvido para Fornecedor' | 'Retirada de Peças';
   contadorEncaminhamentos: number;
 }
 

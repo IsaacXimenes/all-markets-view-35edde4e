@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   getOrdemServicoById, 
   formatCurrency, 
@@ -17,11 +18,12 @@ import {
   updateOrdemServico
 } from '@/utils/assistenciaApi';
 import { getClientes, getFornecedores } from '@/utils/cadastrosApi';
-import { getSolicitacoesByOS, SolicitacaoPeca } from '@/utils/solicitacaoPecasApi';
+import { getSolicitacoesByOS, addSolicitacao, SolicitacaoPeca } from '@/utils/solicitacaoPecasApi';
+import { getPecas } from '@/utils/pecasApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
-import { ArrowLeft, FileText, Clock, AlertTriangle, User, Wrench, MapPin, Calendar, CreditCard, Save, Edit, Package } from 'lucide-react';
+import { ArrowLeft, FileText, Clock, AlertTriangle, User, Wrench, MapPin, Calendar, CreditCard, Save, Edit, Package, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import QRCode from 'qrcode';
 import { toast } from 'sonner';
@@ -42,6 +44,14 @@ export default function OSAssistenciaDetalhes() {
   const [editStatus, setEditStatus] = useState('');
   const [editSetor, setEditSetor] = useState('');
   const [editDescricao, setEditDescricao] = useState('');
+  const [editPecas, setEditPecas] = useState<OrdemServico['pecas']>([]);
+
+  // Solicitação de peças form
+  const [novaSolPeca, setNovaSolPeca] = useState('');
+  const [novaSolQtd, setNovaSolQtd] = useState(1);
+  const [novaSolJustificativa, setNovaSolJustificativa] = useState('');
+
+  const pecasEstoque = getPecas();
 
   const clientes = getClientes();
   const { obterLojasTipoLoja, obterTecnicos, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
@@ -60,6 +70,7 @@ export default function OSAssistenciaDetalhes() {
         setEditStatus(ordem.status);
         setEditSetor(ordem.setor);
         setEditDescricao(ordem.descricao || '');
+        setEditPecas([...ordem.pecas]);
       }
       // Buscar solicitações de peças vinculadas à OS
       const solicitacoes = getSolicitacoesByOS(id);
@@ -80,13 +91,16 @@ export default function OSAssistenciaDetalhes() {
   const handleSaveChanges = () => {
     if (!os) return;
     
+    const valorTotal = editPecas.reduce((acc, p) => acc + p.valorTotal, 0);
     updateOrdemServico(os.id, {
       clienteId: editClienteId,
       lojaId: editLojaId,
       tecnicoId: editTecnicoId,
-      status: editStatus as 'Em Análise' | 'Aguardando Peça' | 'Em serviço' | 'Peça Recebida' | 'Serviço concluído' | 'Solicitação Enviada',
+      status: editStatus as any,
       setor: editSetor as 'GARANTIA' | 'ASSISTÊNCIA' | 'TROCA',
-      descricao: editDescricao
+      descricao: editDescricao,
+      pecas: editPecas,
+      valorTotal
     });
     
     // Refresh OS data
@@ -365,65 +379,176 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
             {/* Peças/Serviços */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Wrench className="h-5 w-5" />
-                  Peças / Serviços
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Wrench className="h-5 w-5" />
+                    Peças / Serviços
+                  </span>
+                  {isEditing && (
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setEditPecas([...editPecas, {
+                        id: `PECA-${Date.now()}`,
+                        peca: '',
+                        imei: '',
+                        valor: 0,
+                        percentual: 0,
+                        valorTotal: 0,
+                        unidadeServico: '',
+                        pecaNoEstoque: false,
+                        pecaDeFornecedor: false,
+                        servicoTerceirizado: false
+                      }]);
+                    }}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Adicionar
+                    </Button>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Descrição</TableHead>
-                      <TableHead>IMEI</TableHead>
-                      <TableHead>Valor</TableHead>
-                      <TableHead>Desconto</TableHead>
-                      <TableHead>Valor Total</TableHead>
-                      <TableHead>Origem</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {os.pecas.map((peca, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{peca.peca}</TableCell>
-                        <TableCell className="font-mono text-xs">{peca.imei || '-'}</TableCell>
-                        <TableCell>{formatCurrency(peca.valor)}</TableCell>
-                        <TableCell>{peca.percentual}%</TableCell>
-                        <TableCell className="font-medium">{formatCurrency(peca.valorTotal)}</TableCell>
-                        <TableCell>
-                          {peca.pecaNoEstoque && (
-                            <Badge 
-                              variant="outline" 
-                              className="mr-1 cursor-pointer hover:bg-primary/10"
-                              onClick={() => navigate('/os/pecas')}
-                            >
-                              Estoque
-                            </Badge>
-                          )}
-                          {peca.pecaDeFornecedor && (
-                            <Badge variant="outline">
-                              {fornecedores.find(f => f.id === peca.fornecedorId)?.nome || 'Fornecedor'}
-                            </Badge>
-                          )}
-                          {peca.servicoTerceirizado && <Badge variant="secondary">Terceirizado</Badge>}
-                        </TableCell>
-                      </TableRow>
+                {isEditing ? (
+                  <div className="space-y-3">
+                    {editPecas.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">Nenhuma peça/serviço adicionada. Clique em "Adicionar" para incluir.</p>
+                    )}
+                    {editPecas.map((peca, index) => (
+                      <div key={index} className="p-3 border rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Item {index + 1}</span>
+                          <Button size="sm" variant="ghost" className="text-destructive h-8 w-8 p-0" onClick={() => {
+                            setEditPecas(editPecas.filter((_, i) => i !== index));
+                          }}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Descrição *</label>
+                            <Input
+                              value={peca.peca}
+                              onChange={(e) => {
+                                const updated = [...editPecas];
+                                updated[index] = { ...updated[index], peca: e.target.value };
+                                setEditPecas(updated);
+                              }}
+                              placeholder="Descrição da peça/serviço"
+                              className={cn(!peca.peca && 'border-destructive')}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Valor (R$)</label>
+                            <Input
+                              type="number"
+                              value={peca.valor || ''}
+                              onChange={(e) => {
+                                const valor = parseFloat(e.target.value) || 0;
+                                const updated = [...editPecas];
+                                const valorTotal = valor - (valor * (updated[index].percentual / 100));
+                                updated[index] = { ...updated[index], valor, valorTotal };
+                                setEditPecas(updated);
+                              }}
+                              placeholder="0,00"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Desconto (%)</label>
+                            <Input
+                              type="number"
+                              value={peca.percentual || ''}
+                              onChange={(e) => {
+                                const percentual = parseFloat(e.target.value) || 0;
+                                const updated = [...editPecas];
+                                const valorTotal = updated[index].valor - (updated[index].valor * (percentual / 100));
+                                updated[index] = { ...updated[index], percentual, valorTotal };
+                                setEditPecas(updated);
+                              }}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <label className="flex items-center gap-2">
+                            <Checkbox checked={peca.pecaNoEstoque} onCheckedChange={(checked) => {
+                              const updated = [...editPecas];
+                              updated[index] = { ...updated[index], pecaNoEstoque: !!checked };
+                              setEditPecas(updated);
+                            }} />
+                            Estoque
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <Checkbox checked={peca.pecaDeFornecedor} onCheckedChange={(checked) => {
+                              const updated = [...editPecas];
+                              updated[index] = { ...updated[index], pecaDeFornecedor: !!checked };
+                              setEditPecas(updated);
+                            }} />
+                            Fornecedor
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <Checkbox checked={peca.servicoTerceirizado} onCheckedChange={(checked) => {
+                              const updated = [...editPecas];
+                              updated[index] = { ...updated[index], servicoTerceirizado: !!checked };
+                              setEditPecas(updated);
+                            }} />
+                            Terceirizado
+                          </label>
+                          <span className="ml-auto font-medium">{formatCurrency(peca.valorTotal)}</span>
+                        </div>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+                ) : (
+                  <>
+                    {os.pecas.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">Nenhuma peça/serviço registrada.</p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Descrição</TableHead>
+                            <TableHead>IMEI</TableHead>
+                            <TableHead>Valor</TableHead>
+                            <TableHead>Desconto</TableHead>
+                            <TableHead>Valor Total</TableHead>
+                            <TableHead>Origem</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {os.pecas.map((peca, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="font-medium">{peca.peca}</TableCell>
+                              <TableCell className="font-mono text-xs">{peca.imei || '-'}</TableCell>
+                              <TableCell>{formatCurrency(peca.valor)}</TableCell>
+                              <TableCell>{peca.percentual}%</TableCell>
+                              <TableCell className="font-medium">{formatCurrency(peca.valorTotal)}</TableCell>
+                              <TableCell>
+                                {peca.pecaNoEstoque && (
+                                  <Badge variant="outline" className="mr-1 cursor-pointer hover:bg-primary/10" onClick={() => navigate('/os/pecas')}>Estoque</Badge>
+                                )}
+                                {peca.pecaDeFornecedor && (
+                                  <Badge variant="outline">{fornecedores.find(f => f.id === peca.fornecedorId)?.nome || 'Fornecedor'}</Badge>
+                                )}
+                                {peca.servicoTerceirizado && <Badge variant="secondary">Terceirizado</Badge>}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </>
+                )}
               </CardContent>
             </Card>
 
-            {/* Solicitações de Peças */}
-            {solicitacoesOS.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    Solicitações de Peças
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
+            {/* Solicitações de Peças - sempre visível */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Solicitações de Peças
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {solicitacoesOS.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -460,9 +585,70 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                       ))}
                     </TableBody>
                   </Table>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-2">Nenhuma solicitação registrada.</p>
+                )}
+
+                {/* Formulário para nova solicitação */}
+                {isEditing && (
+                  <div className="border-t pt-4 space-y-3">
+                    <p className="text-sm font-medium">Nova Solicitação de Peça</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground">Peça *</label>
+                        <Input
+                          value={novaSolPeca}
+                          onChange={(e) => setNovaSolPeca(e.target.value)}
+                          placeholder="Nome da peça"
+                          className={cn(!novaSolPeca && 'border-destructive')}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Quantidade</label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={novaSolQtd}
+                          onChange={(e) => setNovaSolQtd(parseInt(e.target.value) || 1)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Justificativa *</label>
+                        <Input
+                          value={novaSolJustificativa}
+                          onChange={(e) => setNovaSolJustificativa(e.target.value)}
+                          placeholder="Justificativa"
+                          className={cn(!novaSolJustificativa && 'border-destructive')}
+                        />
+                      </div>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => {
+                      if (!novaSolPeca.trim() || !novaSolJustificativa.trim()) {
+                        toast.error('Preencha peça e justificativa');
+                        return;
+                      }
+                      addSolicitacao({
+                        osId: os.id,
+                        peca: novaSolPeca,
+                        quantidade: novaSolQtd,
+                        justificativa: novaSolJustificativa,
+                        modeloImei: os.pecas[0]?.imei || '',
+                        lojaSolicitante: os.lojaId
+                      });
+                      // Refresh solicitações
+                      setSolicitacoesOS(getSolicitacoesByOS(os.id));
+                      setNovaSolPeca('');
+                      setNovaSolQtd(1);
+                      setNovaSolJustificativa('');
+                      toast.success('Solicitação adicionada!');
+                    }}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Adicionar Solicitação
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Pagamentos */}
             <Card>

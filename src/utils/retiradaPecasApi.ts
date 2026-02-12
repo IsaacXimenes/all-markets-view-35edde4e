@@ -1,6 +1,7 @@
 // API para Retirada de Peças
 
 import { Produto, getProdutoById, updateProduto } from './estoqueApi';
+import { getProdutoPendenteById, updateProdutoPendente } from './osApi';
 import { addPeca } from './pecasApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { addNotification } from './notificationsApi';
@@ -111,8 +112,9 @@ export const solicitarRetiradaPecas = (
   responsavel: string
 ): { sucesso: boolean; mensagem: string; retirada?: RetiradaPecas } => {
   const produto = getProdutoById(aparelhoId);
+  const produtoPendente = !produto ? getProdutoPendenteById(aparelhoId) : null;
   
-  if (!produto) {
+  if (!produto && !produtoPendente) {
     return { sucesso: false, mensagem: 'Aparelho não encontrado' };
   }
   
@@ -126,13 +128,21 @@ export const solicitarRetiradaPecas = (
   }
   
   const agora = new Date().toISOString();
+  
+  // Dados do aparelho (estoque principal ou pendente)
+  const imei = produto?.imei || produtoPendente!.imei;
+  const modelo = produto?.modelo || produtoPendente!.modelo;
+  const cor = produto?.cor || produtoPendente!.cor;
+  const valorCusto = produto?.valorCusto || produtoPendente!.valorCusto;
+  const loja = produto?.loja || produtoPendente!.loja;
+  
   const novaRetirada: RetiradaPecas = {
     id: generateRetiradaId(),
-    aparelhoId: produto.id,
-    imeiOriginal: produto.imei,
-    modeloOriginal: produto.modelo,
-    corOriginal: produto.cor,
-    valorCustoAparelho: produto.valorCusto,
+    aparelhoId,
+    imeiOriginal: imei,
+    modeloOriginal: modelo,
+    corOriginal: cor,
+    valorCustoAparelho: valorCusto,
     motivo,
     responsavelSolicitacao: responsavel,
     dataSolicitacao: agora,
@@ -147,7 +157,7 @@ export const solicitarRetiradaPecas = (
       descricao: `Solicitação criada por ${responsavel}. Motivo: ${motivo}`,
       responsavel
     }],
-    lojaId: produto.loja
+    lojaId: loja
   };
   
   // Adicionar log de auditoria na criação
@@ -161,29 +171,44 @@ export const solicitarRetiradaPecas = (
 
   retiradasPecas.push(novaRetirada);
   
-  // Atualizar status do produto - mantém visível mas com status de retirada
-  updateProduto(aparelhoId, {
-    statusRetiradaPecas: 'Pendente Assistência',
-    retiradaPecasId: novaRetirada.id
-  });
-  
-  // Adicionar entrada na timeline do produto
-  if (!produto.timeline) produto.timeline = [];
-  produto.timeline.unshift({
-    id: `TL-PROD-${Date.now()}-ret`,
-    data: agora,
-    tipo: 'entrada', // Usa tipo existente
-    titulo: 'Retirada de Peças Solicitada',
-    descricao: `Aparelho enviado para desmonte. Motivo: ${motivo}`,
-    responsavel
-  });
+  if (produto) {
+    // Atualizar status do produto no estoque principal
+    updateProduto(aparelhoId, {
+      statusRetiradaPecas: 'Pendente Assistência',
+      retiradaPecasId: novaRetirada.id
+    });
+    
+    if (!produto.timeline) produto.timeline = [];
+    produto.timeline.unshift({
+      id: `TL-PROD-${Date.now()}-ret`,
+      data: agora,
+      tipo: 'entrada',
+      titulo: 'Retirada de Peças Solicitada',
+      descricao: `Aparelho enviado para desmonte. Motivo: ${motivo}`,
+      responsavel
+    });
+  } else if (produtoPendente) {
+    // Atualizar status do produto pendente
+    updateProdutoPendente(aparelhoId, {
+      statusGeral: 'Retirada de Peças'
+    });
+    
+    produtoPendente.timeline.unshift({
+      id: `TL-PROD-${Date.now()}-ret`,
+      data: agora,
+      tipo: 'entrada',
+      titulo: 'Retirada de Peças Solicitada',
+      descricao: `Aparelho pendente enviado para desmonte. Motivo: ${motivo}`,
+      responsavel
+    });
+  }
   
   // Notificar Assistência sobre nova demanda
   addNotification({
     type: 'retirada_pecas',
     title: 'Nova Solicitação de Retirada de Peças',
-    description: `Aparelho IMEI ${produto.imei} (${produto.modelo}) aguardando desmonte. Motivo: ${motivo}`,
-    targetUsers: [] // Todos os técnicos da assistência
+    description: `Aparelho IMEI ${imei} (${modelo}) aguardando desmonte. Motivo: ${motivo}`,
+    targetUsers: []
   });
   
   return { 
@@ -544,35 +569,51 @@ export const verificarDisponibilidadeRetirada = (aparelhoId: string): {
 } => {
   const produto = getProdutoById(aparelhoId);
   
-  if (!produto) {
-    return { disponivel: false, motivo: 'Aparelho não encontrado' };
+  if (produto) {
+    // Verificar se está bloqueado em venda
+    if (produto.bloqueadoEmVendaId) {
+      return { disponivel: false, motivo: 'Aparelho está bloqueado em uma venda' };
+    }
+    
+    // Verificar se está em movimentação
+    if (produto.statusMovimentacao === 'Em movimentação') {
+      return { disponivel: false, motivo: 'Aparelho está em movimentação' };
+    }
+    
+    // Verificar se já tem retirada ativa
+    const retiradaAtiva = retiradasPecas.find(
+      r => r.aparelhoId === aparelhoId && r.status !== 'Cancelada' && r.status !== 'Concluída'
+    );
+    
+    if (retiradaAtiva) {
+      return { disponivel: false, motivo: 'Já existe uma solicitação de retirada ativa para este aparelho' };
+    }
+    
+    // Verificar se quantidade é maior que 0
+    if (produto.quantidade <= 0) {
+      return { disponivel: false, motivo: 'Aparelho sem quantidade disponível' };
+    }
+    
+    return { disponivel: true };
   }
   
-  // Verificar se está bloqueado em venda
-  if (produto.bloqueadoEmVendaId) {
-    return { disponivel: false, motivo: 'Aparelho está bloqueado em uma venda' };
+  // Buscar em produtos pendentes
+  const produtoPendente = getProdutoPendenteById(aparelhoId);
+  
+  if (produtoPendente) {
+    // Verificar se já tem retirada ativa
+    const retiradaAtiva = retiradasPecas.find(
+      r => r.aparelhoId === aparelhoId && r.status !== 'Cancelada' && r.status !== 'Concluída'
+    );
+    
+    if (retiradaAtiva) {
+      return { disponivel: false, motivo: 'Já existe uma solicitação de retirada ativa para este aparelho' };
+    }
+    
+    return { disponivel: true };
   }
   
-  // Verificar se está em movimentação
-  if (produto.statusMovimentacao === 'Em movimentação') {
-    return { disponivel: false, motivo: 'Aparelho está em movimentação' };
-  }
-  
-  // Verificar se já tem retirada ativa
-  const retiradaAtiva = retiradasPecas.find(
-    r => r.aparelhoId === aparelhoId && r.status !== 'Cancelada' && r.status !== 'Concluída'
-  );
-  
-  if (retiradaAtiva) {
-    return { disponivel: false, motivo: 'Já existe uma solicitação de retirada ativa para este aparelho' };
-  }
-  
-  // Verificar se quantidade é maior que 0
-  if (produto.quantidade <= 0) {
-    return { disponivel: false, motivo: 'Aparelho sem quantidade disponível' };
-  }
-  
-  return { disponivel: true };
+  return { disponivel: false, motivo: 'Aparelho não encontrado' };
 };
 
 // Estatísticas de retiradas

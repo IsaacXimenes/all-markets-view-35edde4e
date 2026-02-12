@@ -250,7 +250,9 @@ export const useCadastroStore = create<CadastroStore>((set, get) => ({
   
   obterFinanceiros: () => {
     return get().colaboradores.filter(col => 
-      col.cargo.toLowerCase().includes('financeiro') && col.ativo
+      (col.cargo.toLowerCase().includes('financeiro') || 
+       col.cargo.toLowerCase().includes('assistente administrativo') || 
+       col.cargo.toLowerCase().includes('gestor')) && col.ativo
     );
   },
   

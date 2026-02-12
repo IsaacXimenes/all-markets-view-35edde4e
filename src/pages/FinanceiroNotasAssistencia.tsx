@@ -23,6 +23,7 @@ import { useCadastroStore } from '@/store/cadastroStore';
 import { ResponsiveCardGrid, ResponsiveFilterGrid } from '@/components/ui/ResponsiveContainers';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
+import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { getStatusRowClass } from '@/utils/statusColors';
 
 export default function FinanceiroNotasAssistencia() {
@@ -30,7 +31,7 @@ export default function FinanceiroNotasAssistencia() {
   const [notaSelecionada, setNotaSelecionada] = useState<NotaAssistencia | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   
-  const { obterLojasAtivas, obterFinanceiros, obterNomeLoja } = useCadastroStore();
+  const { obterLojasAtivas, obterFinanceiros, obterNomeLoja, obterColaboradorById } = useCadastroStore();
   
   const contasFinanceiras = getContasFinanceiras().filter(c => c.status === 'Ativo');
   const colaboradoresFinanceiros = obterFinanceiros();
@@ -424,16 +425,14 @@ export default function FinanceiroNotasAssistencia() {
 
                         <div>
                           <Label htmlFor="responsavelFinanceiro">Responsável Financeiro *</Label>
-                          <Select value={responsavelFinanceiro} onValueChange={setResponsavelFinanceiro}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o responsável" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {colaboradoresFinanceiros.map(col => (
-                                <SelectItem key={col.id} value={col.nome}>{col.nome}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <AutocompleteColaborador
+                            value={responsavelFinanceiro}
+                            onChange={(id) => {
+                              const col = obterColaboradorById(id);
+                              setResponsavelFinanceiro(col?.nome || id);
+                            }}
+                            placeholder="Buscar colaborador..."
+                          />
                         </div>
 
                         <div>

@@ -57,8 +57,8 @@ export default function OSAssistenciaDetalhes() {
   const pecasEstoque = getPecas();
 
   const clientes = getClientes();
-  const { obterLojasTipoLoja, obterTecnicos, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
-  const lojas = obterLojasTipoLoja();
+  const { obterLojasPorTipo, obterTecnicos, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
+  const lojas = obterLojasPorTipo('Assistência');
   const tecnicos = obterTecnicos();
   const fornecedores = getFornecedores();
 
@@ -447,16 +447,40 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div>
                             <label className="text-xs text-muted-foreground">Descrição *</label>
-                            <Input
-                              value={peca.peca}
-                              onChange={(e) => {
-                                const updated = [...editPecas];
-                                updated[index] = { ...updated[index], peca: e.target.value };
-                                setEditPecas(updated);
-                              }}
-                              placeholder="Descrição da peça/serviço"
-                              className={cn(!peca.peca && 'border-destructive')}
-                            />
+                            {peca.pecaNoEstoque ? (
+                              <Select
+                                value={peca.peca}
+                                onValueChange={(value) => {
+                                  const updated = [...editPecas];
+                                  updated[index] = { ...updated[index], peca: value };
+                                  setEditPecas(updated);
+                                }}
+                              >
+                                <SelectTrigger className={cn(!peca.peca && 'border-destructive')}>
+                                  <SelectValue placeholder="Selecione a peça do estoque" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {pecasEstoque
+                                    .filter(p => !editLojaId || p.lojaId === editLojaId)
+                                    .map(p => (
+                                      <SelectItem key={p.id} value={p.descricao}>
+                                        {p.descricao} (Qtd: {p.quantidade} | {p.origem})
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Input
+                                value={peca.peca}
+                                onChange={(e) => {
+                                  const updated = [...editPecas];
+                                  updated[index] = { ...updated[index], peca: e.target.value };
+                                  setEditPecas(updated);
+                                }}
+                                placeholder="Descrição da peça/serviço"
+                                className={cn(!peca.peca && 'border-destructive')}
+                              />
+                            )}
                           </div>
                           <div>
                             <label className="text-xs text-muted-foreground">Valor (R$)</label>
@@ -784,16 +808,12 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                   <>
                     <div>
                       <label className="text-xs text-muted-foreground">Loja</label>
-                      <Select value={editLojaId} onValueChange={setEditLojaId}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Selecione a loja" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {lojas.map(l => (
-                            <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <AutocompleteLoja
+                        value={editLojaId}
+                        onChange={setEditLojaId}
+                        filtrarPorTipo="Assistência"
+                        placeholder="Selecione a loja"
+                      />
                     </div>
                     <Separator />
                     <div>

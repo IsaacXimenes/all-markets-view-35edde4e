@@ -1,5 +1,6 @@
 // Solicitação de Peças API - Mock Data
 import { getOrdemServicoById, updateOrdemServico } from './assistenciaApi';
+import { addDespesa } from './financeApi';
 export interface SolicitacaoPeca {
   id: string;
   osId: string;
@@ -584,6 +585,28 @@ export const finalizarNotaAssistencia = (notaId: string, dados: {
       });
     }
   }
+
+  // Registrar despesa no financeiro para integração com Extrato
+  const hoje = new Date().toISOString().split('T')[0];
+  const meses = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+  const mesAtual = `${meses[new Date().getMonth()]}-${new Date().getFullYear()}`;
+  addDespesa({
+    tipo: 'Variável',
+    data: hoje,
+    descricao: `Pagamento Nota Assistência ${notaId}`,
+    valor: nota.valorTotal,
+    competencia: mesAtual,
+    conta: dados.contaPagamento,
+    observacoes: `Fornecedor: ${nota.fornecedor} | Lote: ${nota.loteId}`,
+    lojaId: nota.lojaSolicitante,
+    status: 'Pago',
+    categoria: 'Assistência',
+    dataVencimento: hoje,
+    dataPagamento: hoje,
+    recorrente: false,
+    periodicidade: null,
+    pagoPor: dados.responsavelFinanceiro
+  });
   
   return notasAssistencia[notaIndex];
 };

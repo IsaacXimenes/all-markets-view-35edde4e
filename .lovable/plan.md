@@ -1,38 +1,54 @@
 
 
-# Plano - Correcoes em Solicitacoes de Pecas e Notas Pendentes Assistencia
+# Plano - Correcoes no Modulo de Assistencia (6 problemas)
 
-## Problema 1: Lote desaparece ao enviar para o Financeiro
+## Problema 1: Pagamentos nao editaveis nos Detalhes da OS
 
-**Causa raiz:** A aba "Lotes Pendentes" filtra apenas lotes com `status === 'Pendente'` (linha 341 de `OSSolicitacoesPecas.tsx`). Ao clicar "Enviar Lote", a funcao `enviarLote` altera o status para `'Enviado'`, fazendo o lote sumir da listagem.
+Na tela `OSAssistenciaDetalhes.tsx`, o card de Pagamentos (linhas 653-685) nao tem modo de edicao. Ele sempre renderiza a tabela estatica, sem condicional `isEditing`.
 
-**Correcao em `src/pages/OSSolicitacoesPecas.tsx`:**
-- Alterar a aba "Lotes Pendentes" para exibir TODOS os lotes (pendentes e enviados), nao apenas os pendentes
-- Renomear a aba para "Lotes" (removendo "Pendentes")
-- Exibir badge de status diferenciado: amarelo para "Pendente", roxo para "Enviado", verde para "Finalizado"
-- Desabilitar o botao "Enviar Lote" quando o status ja for "Enviado", mantendo visivel com texto "Enviado"
-- Atualizar o contador no tab para refletir todos os lotes ativos (Pendente + Enviado)
+**Correcao:** Quando `isEditing === true`, renderizar o componente `PagamentoQuadro` (mesmo usado na Nova Assistencia) em vez da tabela estatica. Adicionar estado `editPagamentosQuadro` para rastrear pagamentos editados e incluir no `handleSaveChanges`.
 
 ---
 
-## Problema 2: Coluna "Loja Solicitante" mostra UUID
+## Problema 2: OS criada pela Analise de Tratativas sem cliente quando origem e Estoque
 
-**Causa raiz:** Na funcao `enviarLote` (linha 490 de `solicitacaoPecasApi.ts`), o campo `lojaSolicitante` da nota recebe o UUID direto da solicitacao (`solicitacoesDoLote[0]?.lojaSolicitante`). Na tela `FinanceiroNotasAssistencia.tsx` (linha 320), o valor e renderizado diretamente sem resolver o nome.
+Em `OSAnaliseGarantia.tsx` (linhas 171-173), quando a origem e "Estoque", o codigo so define `origemOS = 'Estoque'` sem buscar nenhum dado adicional (clienteId, modelo, IMEI). Esses dados ficam vazios.
 
-**Correcao em `src/pages/FinanceiroNotasAssistencia.tsx`:**
-- Na coluna "Loja Solicitante" da tabela (linha 320), usar `obterNomeLoja(nota.lojaSolicitante)` para resolver o UUID para o nome da loja
-- O `obterNomeLoja` ja esta importado do `useCadastroStore` (linha 29)
-- Tambem corrigir o filtro de loja solicitante para usar UUIDs em vez de nomes
+**Correcao:** No bloco `else if (registroAprovado.origem === 'Estoque')`, buscar o produto pendente via `getProdutoPendenteById(registroAprovado.origemId)` e extrair modelo/IMEI do produto. O clienteId pode ficar vazio (preenchido depois na edicao).
 
 ---
 
-## Problema 3: Layout da aba "Notas Pendentes - Assistencia" esta feio
+## Problema 3: Editar na Nova Assistencia deve abrir mesmo layout do Detalhe com campos habilitados
 
-**Correcao em `src/pages/FinanceiroNotasAssistencia.tsx`:**
-- Aplicar o mesmo padrao visual da Nova Assistencia: cards com `ResponsiveCardGrid`, filtros com `ResponsiveFilterGrid`, tabela com cores de linha por status usando `getStatusRowClass`
-- Usar `AutocompleteLoja` no filtro de loja solicitante (em vez de Select com nomes hardcoded)
-- Usar `AutocompleteFornecedor` no filtro de fornecedor
-- Melhorar o espacamento e a apresentacao geral dos cards de resumo e da tabela
+Atualmente ao clicar no lapis (Edit) na listagem `OSAssistencia.tsx`, o sistema navega para `/os/assistencia/${id}` (detalhes em modo leitura). O usuario quer que ao clicar no lapis, abra a mesma tela de detalhes mas ja com edicao habilitada.
+
+**Correcao:** Na acao de editar da tabela em `OSAssistencia.tsx`, navegar para `/os/assistencia/${os.id}?edit=true`. No `OSAssistenciaDetalhes.tsx`, ler o parametro `edit` do URL e iniciar com `isEditing = true` quando presente.
+
+---
+
+## Problema 4: Mensagens de validacao ao preencher Origem de Compra
+
+Na `OSAssistenciaNova.tsx` (linhas 1464-1496), o alerta de campos obrigatorios inclui "Origem da Compra" (linha 1466) e "Modelo do Aparelho" (linha 1467). O usuario relata que ao preencher esses campos as mensagens de validacao persistem indevidamente. Tambem os labels (linhas 889, 905) ficam com `text-destructive` enquanto vazios, gerando ruido visual.
+
+**Correcao:** Remover "Origem da Compra" e "Modelo do Aparelho" da lista de campos obrigatorios no alerta (linhas 1466-1467). Remover as classes `text-destructive` e `border-destructive` condicionais dos campos de Origem e Modelo.
+
+---
+
+## Problema 5: Unidade de Servico retorna lojas em vez de cadastros tipo Assistencia
+
+No card de Pecas/Servicos da `OSAssistenciaNova.tsx` (linha 1181-1185), o `AutocompleteLoja` usa `apenasLojasTipoLoja={true}`, que filtra apenas lojas do tipo "Loja". O usuario precisa que retorne cadastros do tipo "Assistencia".
+
+**Correcao:** Alterar de `apenasLojasTipoLoja={true}` para `filtrarPorTipo="Assistência"` no AutocompleteLoja da Unidade de Servico. O componente ja suporta essa prop nativamente (linha 48 do AutocompleteLoja.tsx).
+
+---
+
+## Problema 6: Solicitacoes de pecas perdidas ao registrar OS
+
+Na `OSAssistenciaNova.tsx` (linhas 730-753), as solicitacoes sao persistidas via `addSolicitacao` apos a criacao da OS. Porem o estado `solicitacoesPecas` e local (React state) e nao sobrevive a navegacao. O problema e que apos registrar a OS, o sistema navega para `/os/assistencia` e os dados locais se perdem. Ao editar a OS via detalhes, as solicitacoes deveriam ser carregadas via `getSolicitacoesByOS`, o que ja acontece (linha 76).
+
+O problema real e que ao salvar edicoes no `handleSaveChanges` (linhas 91-111), as solicitacoes adicionadas no formulario de edicao sao salvas via `addSolicitacao` (linha 630-643), mas o `setSolicitacoesOS` que atualiza a UI faz refresh correto. Preciso investigar se o `getSolicitacoesByOS` esta retornando dados corretamente.
+
+**Correcao:** Garantir que apos `handleSaveChanges` no detalhes, o estado `solicitacoesOS` seja recarregado via `getSolicitacoesByOS(os.id)`. Tambem no registro original (Nova Assistencia), verificar que `addSolicitacao` esta sendo chamado corretamente e que os dados persistem na API mock.
 
 ---
 
@@ -40,6 +56,8 @@
 
 | Arquivo | Alteracoes |
 |---------|-----------|
-| `src/pages/OSSolicitacoesPecas.tsx` | Exibir todos os lotes (nao apenas pendentes) na aba de lotes; badge de status; desabilitar botao apos envio |
-| `src/pages/FinanceiroNotasAssistencia.tsx` | Resolver UUID da loja para nome via `obterNomeLoja`; melhorar layout com componentes responsivos e autocompletes |
+| `src/pages/OSAssistenciaDetalhes.tsx` | Adicionar PagamentoQuadro em modo edicao; ler param `?edit=true` para iniciar em modo edicao; recarregar solicitacoes apos salvar |
+| `src/pages/OSAnaliseGarantia.tsx` | Buscar dados do produto pendente quando origem e "Estoque" para preencher modelo/IMEI |
+| `src/pages/OSAssistencia.tsx` | Alterar navegacao do botao Edit para incluir `?edit=true` |
+| `src/pages/OSAssistenciaNova.tsx` | Remover validacao de Origem da Compra; alterar Unidade de Servico para filtrar por tipo "Assistencia"; verificar persistencia de solicitacoes |
 

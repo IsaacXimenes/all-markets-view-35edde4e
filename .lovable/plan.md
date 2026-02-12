@@ -1,39 +1,43 @@
 
-# Plano - Integrar Solicitacoes de Pecas no Fluxo da Nova Assistencia
+# Plano - Adicionar Campo de Colaborador Responsavel por Atividade
 
-## Problema Identificado
+## Objetivo
 
-Tres falhas conectadas impedem o fluxo de solicitacao de pecas de funcionar:
+Adicionar um campo de selecao de colaborador em cada linha do checklist de atividades, permitindo que o gestor atribua qual colaborador da loja vai realizar cada atividade. O filtro de colaboradores sera automatico conforme a loja do quadro.
 
-1. **Solicitacoes nao sao persistidas**: A tela "Nova Assistencia" permite cadastrar solicitacoes de pecas localmente, mas ao registrar a OS, essas solicitacoes nunca sao enviadas para a API (`addSolicitacao` de `solicitacaoPecasApi.ts` nunca e importada nem chamada).
+## Alteracoes
 
-2. **Status da OS nao muda**: Quando ha solicitacoes de pecas, o status da OS deveria ser alterado para "Solicitacao Enviada", mas isso nao acontece porque as solicitacoes nao sao processadas.
+### 1. Ampliar a interface ExecucaoAtividade (`src/utils/atividadesGestoresApi.ts`)
 
-3. **Detalhes da OS nao mostram solicitacoes**: A tela de detalhes (`OSAssistenciaDetalhes.tsx`) nao consulta nem exibe as solicitacoes vinculadas a OS, entao mesmo que fossem salvas, o usuario nao saberia quais pecas foram solicitadas.
+Adicionar dois novos campos opcionais:
+- `colaboradorDesignadoId?: string` - ID do colaborador selecionado
+- `colaboradorDesignadoNome?: string` - Nome do colaborador (para exibicao em logs e historico)
+
+Atualizar a funcao `toggleExecucao` para incluir o nome do colaborador designado nos detalhes do log, quando houver.
+
+### 2. Adicionar coluna "Colaborador" na tabela do checklist (`src/pages/GestaoAdmAtividades.tsx`)
+
+- Adicionar uma nova coluna "Colaborador" entre "Atividade" e "Horario Previsto"
+- Utilizar o componente `AutocompleteColaborador` inline na celula da tabela, com a prop `filtrarPorLoja` preenchida automaticamente com o `lojaId` do quadro correspondente
+- O campo sera editavel enquanto a atividade estiver pendente, permitindo trocar o colaborador mesmo apos a selecao
+- Ao selecionar um colaborador, a execucao sera atualizada via uma nova funcao `atualizarColaboradorExecucao` na API
+- O colaborador designado nao altera a logica de pontuacao nem status - serve como registro de quem foi designado para realizar a tarefa
+
+### 3. Nova funcao na API (`src/utils/atividadesGestoresApi.ts`)
+
+Criar `atualizarColaboradorExecucao(data, atividadeId, lojaId, colaboradorId, colaboradorNome)` que:
+- Localiza a execucao no localStorage
+- Atualiza os campos `colaboradorDesignadoId` e `colaboradorDesignadoNome`
+- Salva de volta no localStorage
 
 ---
 
-## Correcao 1: Persistir solicitacoes ao registrar OS
+## Secao Tecnica
 
-**Arquivo:** `src/pages/OSAssistenciaNova.tsx`
+**Arquivos alterados:**
+1. `src/utils/atividadesGestoresApi.ts` - Adicionar campos na interface e funcao de atualizacao
+2. `src/pages/GestaoAdmAtividades.tsx` - Adicionar coluna com AutocompleteColaborador filtrado por loja
 
-- Importar `addSolicitacao` de `@/utils/solicitacaoPecasApi`
-- Dentro de `handleRegistrarOS`, apos criar a OS, iterar sobre `solicitacoesPecas` e chamar `addSolicitacao()` para cada uma, passando `osId`, `peca`, `quantidade`, `justificativa`, `modeloImei` (IMEI do aparelho) e `lojaSolicitante` (loja da OS)
-- Se houver solicitacoes, alterar o status da OS para "Solicitacao Enviada" via `updateOrdemServico`
-- Adicionar entrada na timeline registrando o envio das solicitacoes
+**Componente reutilizado:** `AutocompleteColaborador` com prop `filtrarPorLoja={lojaId}` para exibir apenas colaboradores vinculados aquela unidade.
 
-## Correcao 2: Exibir solicitacoes nos Detalhes da OS
-
-**Arquivo:** `src/pages/OSAssistenciaDetalhes.tsx`
-
-- Importar `getSolicitacoesByOS` de `@/utils/solicitacaoPecasApi`
-- Consultar as solicitacoes vinculadas a OS ao carregar a pagina
-- Adicionar um novo Card "Solicitacoes de Pecas" entre o card de Pecas/Servicos e o de Pagamentos, contendo uma tabela com: Peca, Quantidade, Justificativa, Status (com badge colorido) e data da solicitacao
-- O card so aparece se houver ao menos uma solicitacao vinculada
-
----
-
-## Arquivos alterados
-
-1. `src/pages/OSAssistenciaNova.tsx` - Importar e chamar `addSolicitacao`, atualizar status para "Solicitacao Enviada"
-2. `src/pages/OSAssistenciaDetalhes.tsx` - Importar `getSolicitacoesByOS`, exibir card de solicitacoes vinculadas
+**Estilo:** O autocomplete inline na tabela tera tamanho compacto (classe `text-sm`) para manter a legibilidade do quadro.

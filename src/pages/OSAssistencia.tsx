@@ -34,9 +34,6 @@ export default function OSAssistencia() {
 
   const ordensFiltradas = useMemo(() => {
     return ordensServico.filter(os => {
-      // Excluir OS concluídas (agora aparecem na Área do Gestor)
-      if (os.status === 'Serviço concluído') return false;
-
       // Filtro por data início
       if (filtroDataInicio) {
         const dataOS = new Date(os.dataHora).toISOString().split('T')[0];

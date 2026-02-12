@@ -1,120 +1,65 @@
 
+# Plano - Correcoes no Modulo de Assistencia e Retirada de Pecas
 
-# Plano - Melhorias no Modulo de Assistencia (6 itens)
+## Problema 1: OS criada pela Analise de Tratativas sem dados completos
 
-## 1. Origem da Compra "Thiago Imports" - Campo ID da Venda Antiga
+A OS criada pelo fluxo de aprovacao na Analise de Tratativas (`OSAnaliseGarantia.tsx`) chega na tela de detalhes (`OSAssistenciaDetalhes.tsx`) com:
+- `pecas: []` (array vazio, sem pecas/servicos)
+- `clienteId` pode estar vazio se o match por nome falhar
+- `pagamentos: []` (array vazio)
 
-**Arquivo:** `src/pages/OSAssistenciaNova.tsx`
+Isso faz com que o quadro de Cliente apareca em branco e o quadro de Pecas/Servicos esteja vazio e sem possibilidade de insercao.
 
-- Adicionar novo estado `idVendaAntiga` (string)
-- Quando `origemAparelho === 'Thiago Imports'`, exibir um campo de texto `Input` rotulado "ID da Venda Antiga" logo abaixo do bloco informativo verde
-- O campo sera um input livre (type="text") para o usuario inserir o ID do sistema antigo
-- Persistir o valor no rascunho (draft) e na OS criada via campo customizado `idVendaAntiga` no objeto da OS
-- Na tela de edicao (`OSAssistenciaEditar.tsx`) e detalhes (`OSAssistenciaDetalhes.tsx`), exibir o campo quando preenchido
+**Correcao:** A tela de detalhes da OS (`OSAssistenciaDetalhes.tsx`) precisa permitir a edicao completa das pecas, pagamentos e cliente quando a OS esta aberta (status diferente de "Servico concluido"). Atualmente o modo de edicao (`isEditing`) so permite alterar cliente, loja, tecnico, status, setor e descricao - falta a edicao inline de pecas/servicos e o quadro de solicitacoes.
 
-**Arquivo:** `src/utils/assistenciaApi.ts` - Adicionar campo opcional `idVendaAntiga?: string` na interface `OrdemServico`
-
----
-
-## 2. Persistencia de Dados na Transicao (Analise de Tratativas -> Nova Assistencia)
-
-**Problema atual:** A tela `OSAnaliseGarantia.tsx` cria a OS diretamente via `addOrdemServico` com `clienteId: ''` (vazio), sem passar dados do cliente nem do aparelho para a Nova Assistencia. Nao ha navegacao para a tela de Nova Assistencia com parametros.
-
-**Correcao em `src/pages/OSAnaliseGarantia.tsx`:**
-- Em vez de chamar `addOrdemServico` diretamente no `handleConfirmarAprovacao`, alterar o fluxo para:
-  1. Aprovar o registro (chamar `aprovarAnaliseGarantia`)
-  2. Atualizar o `statusGeral` do produto pendente
-  3. Navegar para `/os/assistencia/nova` passando query params relevantes: `?analiseId={registroId}&origemAnalise=true`
-  4. Remover a criacao automatica da OS nesta tela
-
-**Correcao em `src/pages/OSAssistenciaNova.tsx`:**
-- Detectar o parametro `analiseId` via `useSearchParams`
-- Buscar os dados do registro de analise via `getRegistrosAnaliseGarantia()` para encontrar `origemId`, `origem`, `clienteDescricao`
-- Se `origem === 'Garantia'`, buscar a garantia completa via `getGarantiaById(origemId)` para obter `clienteId`, `modelo`, `imei`, `lojaVenda`
-- Pre-preencher os campos (cliente, modelo, IMEI, loja, setor) e bloquear os que vierem da origem
+### Alteracoes em `src/pages/OSAssistenciaDetalhes.tsx`:
+- Adicionar botoes "Adicionar Peca/Servico" e "Remover" no card de Pecas/Servicos quando `isEditing === true`
+- Permitir edicao inline dos campos de cada peca (descricao, valor, desconto, checkboxes)
+- Integrar o formulario de Solicitacao de Pecas (mesmo layout da Nova Assistencia) sempre visivel, nao apenas quando `solicitacoesOS.length > 0`
+- Exibir o formulario para adicionar novas solicitacoes quando em modo edicao
 
 ---
 
-## 3. Quadro de Pecas/Servicos Editavel (modelo Nova Garantia)
+## Problema 2: Quadro de Solicitacao de Pecas nao aparece
 
-**Problema:** O quadro atual de Pecas/Servicos na Nova Assistencia ja e editavel (adicionar, remover, modificar itens). A solicitacao pode se referir a replicar a flexibilidade de edicao inline que existe na Nova Garantia Manual.
+O codigo atual so renderiza o card de Solicitacoes se `solicitacoesOS.length > 0`. Como a OS recem-criada nao tem solicitacoes, o quadro nao aparece.
 
-**Acao:** O quadro atual ja suporta adicionar/remover/editar pecas com campos de valor, desconto, fornecedor, estoque e servico terceirizado. Validar que todas as acoes de edicao (alterar nome, valor, desconto, checkboxes) estao funcionais. Nenhuma alteracao estrutural necessaria - o quadro ja e editavel.
-
----
-
-## 4. Quadro de Pagamentos - Replicar PagamentoQuadro da Nova Venda
-
-**Problema:** O quadro de pagamentos na Nova Assistencia e simplificado (apenas meio, valor, parcelas), enquanto a Nova Venda usa o componente `PagamentoQuadro` completo com taxas de cartao, conta destino, maquina, comprovante, calculo de liquido, etc.
-
-**Correcao em `src/pages/OSAssistenciaNova.tsx`:**
-- Importar o componente `PagamentoQuadro` de `@/components/vendas/PagamentoQuadro`
-- Substituir o quadro simplificado de pagamentos pelo componente `PagamentoQuadro`, passando:
-  - `valorTotalProdutos={valorTotalPecas}` 
-  - `custoTotalProdutos={0}`
-  - `lojaVendaId={lojaId}`
-  - `onPagamentosChange` para capturar os pagamentos formatados
-- Remover o estado local `pagamentos` e handlers manuais (`handlePagamentoChange`, `addPagamento`, `removePagamento`)
-- Manter compatibilidade com os pagamentos formatados na funcao `handleRegistrarOS`
+### Alteracao em `src/pages/OSAssistenciaDetalhes.tsx`:
+- Remover a condicional `solicitacoesOS.length > 0` e sempre exibir o card de Solicitacoes de Pecas
+- Quando vazio, exibir mensagem "Nenhuma solicitacao registrada" com botao para adicionar
+- Quando `isEditing`, exibir formulario para adicionar novas solicitacoes (peca, quantidade, justificativa, prioridade)
 
 ---
 
-## 5. Bug de Campo Obrigatorio "Setor"
+## Problema 3: Retirada de Pecas em Aparelhos Pendentes mostra "Aparelho indisponivel"
 
-**Problema:** O campo Setor foi removido da UI, mas a validacao ainda exige que esteja preenchido.
+O `ModalRetiradaPecas` chama `verificarDisponibilidadeRetirada(produto.id)` que usa `getProdutoById` do `estoqueApi.ts`. Essa funcao busca apenas no inventario principal (produtos ja liberados), mas itens em Aparelhos Pendentes estao no `osApi.ts` como `ProdutoPendente` e ainda nao migraram para o estoque.
 
-**Correcao em `src/pages/OSAssistenciaNova.tsx`:**
-- Na funcao `validarFormulario` (linha ~548): remover a validacao que exige `setor` (nao existe mais checagem explicita de setor nesta funcao, mas existe na UI de alerta de campos obrigatorios)
-- No bloco de alerta de campos obrigatorios (linha ~1468): remover a linha `if (!setor) camposFaltando.push('Setor');`
-- Na funcao `handleRegistrarOS`: usar um valor padrao `'ASSISTENCIA'` para setor caso esteja vazio, garantindo que a OS sera criada sem erro
-- O campo `setor` continua existindo no formulario (linha ~920 com Select), entao verificar se a remocao se refere a visibilidade ou apenas a obrigatoriedade. Como o usuario diz que "o campo Setor foi removido", mas ele ainda existe na UI, a correcao sera remover a **obrigatoriedade** (remover do alerta e da validacao)
+### Alteracao em `src/utils/retiradaPecasApi.ts`:
+- Na funcao `verificarDisponibilidadeRetirada`, alem de buscar em `getProdutoById`, tambem buscar em `getProdutoPendenteById` do `osApi.ts`
+- Se o aparelho for encontrado como ProdutoPendente, considerar disponivel (sem verificar quantidade, pois pendentes tem quantidade implicita de 1)
 
----
-
-## 6. Melhorias na Retirada de Pecas e Edicao de OS
-
-### 6.1 Botao de Edicao na Retirada de Pecas
-
-**Arquivo:** `src/pages/AssistRetiradaPecas.tsx`
-- Adicionar botao "Editar" ao lado do botao "Ver" (Eye) na coluna de acoes da tabela
-- O botao navega para a pagina de detalhes com um parametro `?editar=true` para abrir em modo de edicao
-
-**Arquivo:** `src/pages/AssistRetiradaPecasDetalhes.tsx`
-- Detectar o parametro `?editar=true` e habilitar edicao dos campos editaveis (motivo, pecas)
-- Registrar cada alteracao no array de timeline da retirada com data/hora, usuario e detalhes da mudanca
-
-### 6.2 Logs de Auditoria na Retirada de Pecas
-
-**Arquivo:** `src/pages/AssistRetiradaPecasDetalhes.tsx`
-- Adicionar um Card "Logs de Auditoria" apos o Card de Timeline existente
-- O card exibe uma tabela com colunas: Data/Hora, Usuario, Detalhes da Alteracao
-- Cada acao (iniciar desmonte, adicionar peca, remover peca, finalizar, cancelar, editar) gera uma entrada no log
-
-**Arquivo:** `src/utils/retiradaPecasApi.ts`
-- Adicionar interface `LogAuditoriaRetirada` com campos `id`, `dataHora`, `usuario`, `detalhes`, `tipoAlteracao`
-- Adicionar campo `logsAuditoria: LogAuditoriaRetirada[]` na interface `RetiradaPecas`
-- Registrar logs em cada funcao que modifica o registro (iniciarDesmonte, finalizarDesmonte, adicionarPecaRetirada, removerPecaRetirada, cancelarRetiradaPecas)
-
-### 6.3 Exibir Solicitacoes de Pecas na Edicao de OS
-
-**Arquivo:** `src/pages/OSAssistenciaEditar.tsx`
-- Importar `getSolicitacoesByOS` e `addSolicitacao` de `@/utils/solicitacaoPecasApi`
-- Ao carregar a OS, buscar as solicitacoes vinculadas via `getSolicitacoesByOS(id)`
-- Exibir o quadro de "Solicitacoes de Pecas" (mesmo layout da Nova Assistencia) com a lista existente e formulario para adicionar novas
-- Ao salvar, persistir novas solicitacoes via `addSolicitacao`
+### Alteracao em `src/utils/retiradaPecasApi.ts`:
+- Na funcao `solicitarRetiradaPecas`, tambem aceitar aparelhos do tipo ProdutoPendente
+- Ao iniciar retirada de um ProdutoPendente, atualizar seu `statusGeral` para "Retirada de Pecas" via `updateProdutoPendente`
 
 ---
 
-## Secao Tecnica - Arquivos Alterados
+## Secao Tecnica
 
 | Arquivo | Alteracoes |
 |---------|-----------|
-| `src/utils/assistenciaApi.ts` | Adicionar `idVendaAntiga?: string` na interface `OrdemServico` |
-| `src/utils/retiradaPecasApi.ts` | Adicionar interface `LogAuditoriaRetirada`, campo `logsAuditoria` em `RetiradaPecas`, registrar logs nas funcoes |
-| `src/pages/OSAssistenciaNova.tsx` | Campo ID Venda Antiga, detectar `analiseId`, integrar `PagamentoQuadro`, remover obrigatoriedade de Setor |
-| `src/pages/OSAnaliseGarantia.tsx` | Navegar para Nova Assistencia com params em vez de criar OS diretamente |
-| `src/pages/OSAssistenciaEditar.tsx` | Exibir e gerenciar solicitacoes de pecas |
-| `src/pages/OSAssistenciaDetalhes.tsx` | Exibir campo ID Venda Antiga quando preenchido |
-| `src/pages/AssistRetiradaPecas.tsx` | Adicionar botao Editar na tabela |
-| `src/pages/AssistRetiradaPecasDetalhes.tsx` | Modo edicao, card de Logs de Auditoria |
+| `src/pages/OSAssistenciaDetalhes.tsx` | Adicionar edicao inline de pecas/servicos no modo edicao; sempre exibir card de solicitacoes; adicionar formulario de novas solicitacoes; importar addSolicitacao |
+| `src/utils/retiradaPecasApi.ts` | Em `verificarDisponibilidadeRetirada` e `solicitarRetiradaPecas`, buscar tambem em `getProdutoPendenteById`; atualizar statusGeral do ProdutoPendente ao iniciar retirada |
 
+**Logica da verificacao de disponibilidade corrigida:**
+```text
+verificarDisponibilidadeRetirada(id)
+  |
+  +-- Buscar em getProdutoById (estoque principal)
+  |     Se encontrado -> verificacoes normais (bloqueio, movimentacao, etc.)
+  |
+  +-- Se nao encontrado -> Buscar em getProdutoPendenteById (pendentes)
+        Se encontrado -> disponivel (sem check de quantidade)
+        Se nao encontrado -> "Aparelho nao encontrado"
+```

@@ -1,75 +1,52 @@
 
-# Plano - Ajustes no Modulo Financeiro (4 problemas)
 
-## Problema 1: Remover abas "Lotes de Pagamento" e "Execucao de Lotes"
+# Plano - Fluxo Fiado: Gestor envia para Conferencia Fiado (nao Financeiro)
 
-Remover as duas entradas do array `tabs` em `src/components/layout/FinanceiroLayout.tsx` (linhas 16-17) e os imports de icones nao utilizados (`Package`, `CreditCard`).
+## Resumo
 
-**Arquivo:** `src/components/layout/FinanceiroLayout.tsx`
+O fluxo atual de vendas Fiado segue: Lancamento -> Gestor -> Financeiro -> Finalizado. O correto e: **Lancamento -> Gestor -> Conferencia Fiado -> Finalizado**. A venda deve aparecer na aba "Conferencias - Fiado" apos aprovacao do Gestor, onde sera finalizada (criando a divida automaticamente) sem passar pela Conferencia Financeira.
 
----
+## Alteracoes
 
-## Problema 2: Conferencia do Fiado navegando para a aba errada
+### 1. Novo status no fluxo (`src/utils/fluxoVendasApi.ts`)
 
-A aba "Conferencias - Fiado" tem `href: '/financeiro/fiado'` que esta correto. A rota em `App.tsx` tambem esta correta. O problema esta na logica de ativacao do `CarouselTabsNavigation.tsx` (linha 71):
+- Adicionar `'Conferência Fiado'` ao tipo `StatusVenda`
+- Na funcao `aprovarGestor`: detectar se a venda tem pagamento Fiado (`venda.pagamentos.some(p => p.isFiado)`). Se sim, definir `statusFluxo: 'Conferência Fiado'` em vez de `'Conferência Financeiro'`
+- Criar nova funcao `finalizarVendaFiado(vendaId, usuarioId, usuarioNome)` que:
+  - Valida status `'Conferência Fiado'`
+  - Muda status para `'Finalizado'`
+  - Chama `criarDividaFiado` do `fiadoApi.ts` para registrar a divida automaticamente (usando dados da venda: clienteId, clienteNome, lojaId, lojaNome, valor, parcelas, recorrencia)
+  - Migra trade-ins se houver
+  - Registra timeline
+- Adicionar cor de badge para `'Conferência Fiado'` (ex: roxo, consistente com o badge Fiado em VendaDetalhes)
 
-```
-const isActive = location.pathname === tab.href || 
-  (tab.href !== tabs[0]?.href && location.pathname.startsWith(tab.href + '/'));
-```
+### 2. Aprovacao do Gestor (`src/pages/VendasConferenciaGestor.tsx`)
 
-Quando o usuario esta em `/financeiro/fiado`, a aba "Conferencia de Contas" (`/financeiro/conferencia`) nao deveria estar ativa pois usa comparacao `===` (e a tab do fiado). Porem, ao navegar diretamente pela URL, a tab correta e destacada. O problema reportado pode ser que algum link/botao em outra parte do sistema que deveria levar para o Fiado esta apontando para `/financeiro/conferencia`.
+- No handler `handleAprovarGestor`, apos o check de Downgrade, adicionar check de Fiado:
+  - Se a venda tem pagamento Fiado: chamar `aprovarGestor` (que internamente ja vai setar o status correto) e exibir toast "Enviada para Conferencia - Fiado"
+  - Caso contrario: fluxo normal para Conferencia Financeiro
 
-Apos investigacao, a navegacao via tabs esta funcionando corretamente. Nao ha links em outras paginas apontando incorretamente. Vou garantir que nao haja conflito verificando que a logica de `isActive` funcione sem ambiguidade e que a rota esteja corretamente configurada. Se necessario, posso ajustar a ordem dos tabs ou a logica de `startsWith` para evitar falsos positivos.
+### 3. Tela Conferencia Fiado (`src/pages/FinanceiroFiado.tsx`)
 
-**Verificacao adicional necessaria durante implementacao** - testar o comportamento real clicando na aba.
+- Importar `useFluxoVendas` e as funcoes de fluxo necessarias
+- Adicionar nova aba/secao "Pendentes de Conferencia" que lista vendas com `statusFluxo === 'Conferência Fiado'`
+- Para cada venda pendente, exibir botao "Finalizar / Aprovar" que:
+  - Chama `finalizarVendaFiado`
+  - Cria a divida no sistema de Fiado automaticamente
+  - Recarrega a lista de dividas
+- Manter o funcionamento atual das dividas ja criadas (pagamentos, agenda, etc.)
 
----
+### 4. Hook useFluxoVendas (`src/hooks/useFluxoVendas.ts`)
 
-## Problema 3: Pagamento Downgrade sumindo o registro apos conclusao
-
-O pagamento e processado por `finalizarVendaDowngrade` que muda o status para `'Finalizado'`. Na pagina `FinanceiroPagamentosDowngrade.tsx`, a aba "Historico" filtra vendas finalizadas (linha 42-46):
-
-```typescript
-vendas.filter(v => 
-  v.statusFluxo === 'Finalizado' && 
-  ((v as any).tipoOperacao === 'Downgrade' || (v as any).saldoDevolver)
-)
-```
-
-O problema e que apos a finalizacao, a venda tem `statusFluxo: 'Finalizado'` mas o filtro adicional falha porque:
-- `tipoOperacao` pode nao estar definido como `'Downgrade'` no fluxo
-- `saldoDevolver` pode ser `0` (falsy) se nao foi persistido
-
-Alem disso, o `useFluxoVendas` com `incluirHistorico: true` adiciona vendas finalizadas de TODOS os tipos, mas o filtro local da pagina deveria capturar apenas as downgrade.
-
-**Correcao em `src/utils/fluxoVendasApi.ts`:** Na funcao `finalizarVendaDowngrade`, adicionar `tipoOperacao: 'Downgrade'` e preservar `saldoDevolver` no objeto salvo, e tambem salvar `contaOrigemDowngrade: contaOrigem` para que a coluna "Conta Utilizada" funcione.
-
-**Correcao em `src/pages/FinanceiroPagamentosDowngrade.tsx`:** Ajustar o filtro de `vendasFinalizadas` para verificar tambem `(v as any).pagamentoDowngrade` como indicador de que a venda passou pelo fluxo de downgrade.
-
----
-
-## Problema 4: Pagamento Downgrade nao aparece no Extrato por Conta
-
-A funcao `finalizarVendaDowngrade` em `fluxoVendasApi.ts` nao registra nenhuma saida financeira. O Extrato le dados de `getDespesas()` do `financeApi.ts`.
-
-**Correcao em `src/utils/fluxoVendasApi.ts`:** Na funcao `finalizarVendaDowngrade`, apos finalizar a venda, chamar `addDespesa` do `financeApi.ts` para registrar a saida financeira com:
-- tipo: 'Variavel'
-- descricao: "Pagamento PIX Downgrade - Venda [ID]"
-- valor: saldoDevolver
-- conta: contaOrigem (ID da conta informada)
-- categoria: "Downgrade"
-- status: "Pago"
-- data/dataVencimento/dataPagamento: data atual
-- lojaId: loja da venda
-- competencia: mes/ano atual
-
----
+- Adicionar `conferenciaFiado` ao objeto `contadores`
 
 ## Secao Tecnica
 
 | Arquivo | Alteracoes |
 |---------|-----------|
-| `src/components/layout/FinanceiroLayout.tsx` | Remover 2 tabs (Lotes de Pagamento e Execucao de Lotes) e imports de icones nao usados |
-| `src/utils/fluxoVendasApi.ts` | Em `finalizarVendaDowngrade`: (1) salvar `tipoOperacao: 'Downgrade'`, `contaOrigemDowngrade`, preservar `saldoDevolver`; (2) chamar `addDespesa` para registrar saida financeira |
-| `src/pages/FinanceiroPagamentosDowngrade.tsx` | Ajustar filtro de `vendasFinalizadas` para usar `pagamentoDowngrade` como indicador |
+| `src/utils/fluxoVendasApi.ts` | Adicionar `'Conferência Fiado'` ao StatusVenda; modificar `aprovarGestor` para detectar Fiado; criar `finalizarVendaFiado`; adicionar cor badge roxo |
+| `src/pages/VendasConferenciaGestor.tsx` | Ajustar toast na aprovacao de venda Fiado |
+| `src/pages/FinanceiroFiado.tsx` | Adicionar secao de vendas pendentes de conferencia Fiado com botao de finalizacao |
+| `src/hooks/useFluxoVendas.ts` | Adicionar contador `conferenciaFiado` |
+| `src/utils/fiadoApi.ts` | Sem alteracoes (ja tem `criarDividaFiado` pronto) |
+

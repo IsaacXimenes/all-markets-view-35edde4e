@@ -13,7 +13,7 @@ import { getClientes } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { getProdutosPendentes, ProdutoPendente } from '@/utils/osApi';
-import { Plus, Eye, FileText, Download, AlertTriangle, Clock, Edit, RefreshCcw, Wrench, DollarSign, UserCheck, CreditCard, CheckCircle } from 'lucide-react';
+import { Plus, Eye, FileText, Download, AlertTriangle, Clock, Edit, RefreshCcw, Wrench, DollarSign, UserCheck, CreditCard, CheckCircle, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatIMEI, unformatIMEI } from '@/utils/imeiMask';
 
@@ -73,6 +73,10 @@ export default function OSAssistencia() {
           if (os.proximaAtuacao !== 'Vendedor: Registrar Pagamento') return false;
         } else if (filtroAtuacao === 'pendentes_financeiro') {
           if (os.proximaAtuacao !== 'Financeiro: Conferir Lançamento') return false;
+        } else if (filtroAtuacao === 'gestor') {
+          if (os.proximaAtuacao !== 'Gestor: Aprovar Peça') return false;
+        } else if (filtroAtuacao === 'logistica') {
+          if (os.proximaAtuacao !== 'Logística: Enviar Peça') return false;
         }
       }
 
@@ -94,8 +98,10 @@ export default function OSAssistencia() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'Em Aberto':
+        return <Badge className="bg-slate-500 hover:bg-slate-600">Em Aberto</Badge>;
       case 'Serviço concluído':
-        return <Badge className="bg-green-500 hover:bg-green-600">Concluído</Badge>;
+        return <Badge className="bg-green-500 hover:bg-green-600">Serviço Concluído</Badge>;
       case 'Em serviço':
         return <Badge className="bg-blue-500 hover:bg-blue-600">Em serviço</Badge>;
       case 'Aguardando Peça':
@@ -106,14 +112,20 @@ export default function OSAssistencia() {
         return <Badge className="bg-purple-500 hover:bg-purple-600">Em Análise</Badge>;
       case 'Peça Recebida':
         return <Badge className="bg-teal-500 hover:bg-teal-600">Peça Recebida</Badge>;
+      case 'Pagamento Concluído':
+        return <Badge className="bg-teal-600 hover:bg-teal-700">Pagamento Concluído</Badge>;
       case 'Aguardando Recebimento':
         return <Badge className="bg-cyan-500 hover:bg-cyan-600">Aguardando Recebimento</Badge>;
       case 'Em Execução':
         return <Badge className="bg-indigo-500 hover:bg-indigo-600">Em Execução</Badge>;
       case 'Aguardando Pagamento':
         return <Badge className="bg-amber-500 hover:bg-amber-600">Aguardando Pagamento</Badge>;
+      case 'Aguardando Conferência':
+        return <Badge className="bg-violet-500 hover:bg-violet-600">Aguardando Conferência</Badge>;
       case 'Concluído':
         return <Badge className="bg-emerald-600 hover:bg-emerald-700">Concluído</Badge>;
+      case 'Finalizado':
+        return <Badge className="bg-emerald-700 hover:bg-emerald-800">Finalizado</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -127,6 +139,10 @@ export default function OSAssistencia() {
         return <Badge variant="outline" className="border-amber-500 text-amber-600 text-xs">Vendedor</Badge>;
       case 'Financeiro: Conferir Lançamento':
         return <Badge variant="outline" className="border-purple-500 text-purple-600 text-xs">Financeiro</Badge>;
+      case 'Gestor: Aprovar Peça':
+        return <Badge variant="outline" className="border-orange-500 text-orange-600 text-xs">Gestor</Badge>;
+      case 'Logística: Enviar Peça':
+        return <Badge variant="outline" className="border-cyan-500 text-cyan-600 text-xs">Logística</Badge>;
       case 'Concluído':
         return <Badge variant="outline" className="border-green-500 text-green-600 text-xs">Concluído</Badge>;
       default:
@@ -388,6 +404,24 @@ export default function OSAssistencia() {
           <CheckCircle className="h-3.5 w-3.5" />
           Pendentes Financeiro
         </Button>
+        <Button
+          variant={filtroAtuacao === 'gestor' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFiltroAtuacao('gestor')}
+          className="gap-1"
+        >
+          <UserCheck className="h-3.5 w-3.5" />
+          Gestor
+        </Button>
+        <Button
+          variant={filtroAtuacao === 'logistica' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFiltroAtuacao('logistica')}
+          className="gap-1"
+        >
+          <Package className="h-3.5 w-3.5" />
+          Logística
+        </Button>
       </div>
 
       {/* Filtros */}
@@ -433,16 +467,16 @@ export default function OSAssistencia() {
                 <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="Em Aberto">Em Aberto</SelectItem>
                   <SelectItem value="Serviço concluído">Serviço concluído</SelectItem>
                   <SelectItem value="Em serviço">Em serviço</SelectItem>
                   <SelectItem value="Em Execução">Em Execução</SelectItem>
                   <SelectItem value="Aguardando Peça">Aguardando Peça</SelectItem>
-                  <SelectItem value="Aguardando Recebimento">Aguardando Recebimento</SelectItem>
-                  <SelectItem value="Aguardando Pagamento">Aguardando Pagamento</SelectItem>
-                  <SelectItem value="Solicitação Enviada">Solicitação Enviada</SelectItem>
-                  <SelectItem value="Em Análise">Em Análise</SelectItem>
                   <SelectItem value="Peça Recebida">Peça Recebida</SelectItem>
-                  <SelectItem value="Concluído">Concluído</SelectItem>
+                  <SelectItem value="Pagamento Concluído">Pagamento Concluído</SelectItem>
+                  <SelectItem value="Solicitação Enviada">Solicitação Enviada</SelectItem>
+                  <SelectItem value="Aguardando Conferência">Aguardando Conferência</SelectItem>
+                  <SelectItem value="Finalizado">Finalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -144,12 +144,22 @@ export default function OSHistoricoAssistencia() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'Em Aberto':
+        return <Badge className="bg-slate-500 hover:bg-slate-600">Em Aberto</Badge>;
       case 'Serviço concluído':
-        return <Badge className="bg-green-500 hover:bg-green-600">Concluído</Badge>;
+        return <Badge className="bg-green-500 hover:bg-green-600">Serviço Concluído</Badge>;
       case 'Em serviço':
         return <Badge className="bg-blue-500 hover:bg-blue-600">Em serviço</Badge>;
       case 'Aguardando Peça':
         return <Badge className="bg-yellow-500 hover:bg-yellow-600">Aguardando Peça</Badge>;
+      case 'Pagamento Concluído':
+        return <Badge className="bg-teal-500 hover:bg-teal-600">Pagamento Concluído</Badge>;
+      case 'Peça Recebida':
+        return <Badge className="bg-emerald-500 hover:bg-emerald-600">Peça Recebida</Badge>;
+      case 'Aguardando Conferência':
+        return <Badge className="bg-violet-500 hover:bg-violet-600">Aguardando Conferência</Badge>;
+      case 'Finalizado':
+        return <Badge className="bg-emerald-700 hover:bg-emerald-800">Finalizado</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -291,9 +301,13 @@ export default function OSHistoricoAssistencia() {
                 <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="Serviço concluído">Concluído</SelectItem>
+                  <SelectItem value="Em Aberto">Em Aberto</SelectItem>
+                  <SelectItem value="Serviço concluído">Serviço Concluído</SelectItem>
                   <SelectItem value="Em serviço">Em serviço</SelectItem>
                   <SelectItem value="Aguardando Peça">Aguardando Peça</SelectItem>
+                  <SelectItem value="Pagamento Concluído">Pagamento Concluído</SelectItem>
+                  <SelectItem value="Aguardando Conferência">Aguardando Conferência</SelectItem>
+                  <SelectItem value="Finalizado">Finalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>

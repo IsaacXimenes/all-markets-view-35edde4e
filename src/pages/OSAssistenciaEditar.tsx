@@ -15,7 +15,6 @@ import {
   updateOrdemServico,
   formatCurrency,
   PecaServico,
-  Pagamento,
   TimelineOS,
   OrdemServico
 } from '@/utils/assistenciaApi';
@@ -55,7 +54,7 @@ interface PagamentoForm {
   parcelas: string;
 }
 
-type OSStatus = 'Serviço concluído' | 'Em serviço' | 'Aguardando Peça' | 'Solicitação Enviada' | 'Em Análise' | 'Peça Recebida' | 'Aguardando Aprovação do Gestor' | 'Rejeitado pelo Gestor' | 'Pagamento - Financeiro' | 'Pagamento Finalizado' | 'Aguardando Chegada da Peça' | 'Peça em Estoque / Aguardando Reparo' | 'Aguardando Recebimento' | 'Em Execução' | 'Aguardando Pagamento' | 'Concluído';
+type OSStatus = 'Em Aberto' | 'Serviço concluído' | 'Em serviço' | 'Aguardando Peça' | 'Solicitação Enviada' | 'Em Análise' | 'Peça Recebida' | 'Aguardando Aprovação do Gestor' | 'Rejeitado pelo Gestor' | 'Pagamento - Financeiro' | 'Pagamento Finalizado' | 'Pagamento Concluído' | 'Aguardando Chegada da Peça' | 'Peça em Estoque / Aguardando Reparo' | 'Aguardando Recebimento' | 'Em Execução' | 'Aguardando Pagamento' | 'Aguardando Conferência' | 'Concluído' | 'Finalizado';
 
 export default function OSAssistenciaEditar() {
   const navigate = useNavigate();
@@ -78,7 +77,7 @@ export default function OSAssistenciaEditar() {
   const [setor, setSetor] = useState<'GARANTIA' | 'ASSISTÊNCIA' | 'TROCA' | ''>('');
   const [clienteId, setClienteId] = useState('');
   const [descricao, setDescricao] = useState('');
-  const [status, setStatus] = useState<OSStatus>('Em serviço');
+  const [status, setStatus] = useState<OSStatus>('Em Aberto');
   
   // Aparelho
   const [modeloAparelho, setModeloAparelho] = useState('');
@@ -86,9 +85,10 @@ export default function OSAssistenciaEditar() {
   
   // Peças
   const [pecas, setPecas] = useState<PecaForm[]>([]);
-  
-  // Pagamentos
-  const [pagamentos, setPagamentos] = useState<PagamentoForm[]>([]);
+
+  // Avaliação Técnica
+  const [valorCustoTecnicoLocal, setValorCustoTecnicoLocal] = useState<number>(0);
+  const [valorVendaTecnicoLocal, setValorVendaTecnicoLocal] = useState<number>(0);
 
   // Timeline
   const [timeline, setTimeline] = useState<TimelineOS[]>([]);
@@ -125,6 +125,8 @@ export default function OSAssistenciaEditar() {
     setStatus(os.status);
     setModeloAparelho(os.modeloAparelho || '');
     setImeiAparelho(os.imeiAparelho || '');
+    setValorCustoTecnicoLocal(os.valorCustoTecnico || 0);
+    setValorVendaTecnicoLocal(os.valorVendaTecnico || 0);
     setTimeline(os.timeline || []);
 
     // Carregar solicitações de peças vinculadas à OS
@@ -150,18 +152,6 @@ export default function OSAssistenciaEditar() {
       setPecas([createEmptyPeca()]);
     }
 
-    // Converter pagamentos
-    if (os.pagamentos && os.pagamentos.length > 0) {
-      setPagamentos(os.pagamentos.map((p: Pagamento) => ({
-        id: p.id,
-        meio: p.meio,
-        valor: p.valor.toString(),
-        parcelas: p.parcelas?.toString() || ''
-      })));
-    } else {
-      setPagamentos([createEmptyPagamento()]);
-    }
-
     setLoading(false);
   }, [id, navigate, toast]);
 
@@ -179,12 +169,6 @@ export default function OSAssistenciaEditar() {
     pecaDeFornecedor: false
   });
 
-  const createEmptyPagamento = (): PagamentoForm => ({
-    id: `PAG-NEW-${Date.now()}`,
-    meio: '',
-    valor: '',
-    parcelas: ''
-  });
 
   const getClienteNome = (clienteId: string) => {
     return clientes.find(c => c.id === clienteId)?.nome || '-';
@@ -211,34 +195,10 @@ export default function OSAssistenciaEditar() {
     setPecas(newPecas);
   };
 
-  // Pagamentos handlers
-  const addPagamento = () => {
-    setPagamentos([...pagamentos, createEmptyPagamento()]);
-  };
-
-  const removePagamento = (index: number) => {
-    if (pagamentos.length > 1) {
-      setPagamentos(pagamentos.filter((_, i) => i !== index));
-    }
-  };
-
-  const updatePagamento = (index: number, field: keyof PagamentoForm, value: string) => {
-    const newPagamentos = [...pagamentos];
-    newPagamentos[index] = { ...newPagamentos[index], [field]: value };
-    setPagamentos(newPagamentos);
-  };
-
   // Cálculos
   const calcularValorTotalPecas = () => {
     return pecas.reduce((acc, peca) => {
       const valor = parseFloat(peca.valor.replace(',', '.')) || 0;
-      return acc + valor;
-    }, 0);
-  };
-
-  const calcularValorTotalPagamentos = () => {
-    return pagamentos.reduce((acc, pag) => {
-      const valor = parseFloat(pag.valor.replace(',', '.')) || 0;
       return acc + valor;
     }, 0);
   };
@@ -270,21 +230,40 @@ export default function OSAssistenciaEditar() {
         pecaDeFornecedor: p.pecaDeFornecedor
       }));
 
-    const pagamentosFormatados: Pagamento[] = pagamentos
-      .filter(p => p.meio && p.valor)
-      .map(p => ({
-        id: p.id,
-        meio: p.meio,
-        valor: parseFloat(p.valor.replace(',', '.')) || 0,
-        parcelas: p.parcelas ? parseInt(p.parcelas) : undefined
-      }));
-
     const valorTotal = calcularValorTotalPecas();
 
     // Adicionar evento na timeline se houver mudança de status
     let novaTimeline = [...timeline];
     if (osOriginal && osOriginal.status !== status) {
       novaTimeline.push({
+        data: new Date().toISOString(),
+        tipo: 'status',
+        descricao: `Status alterado de "${osOriginal.status}" para "${status}"`,
+        responsavel: getTecnicoNome(tecnicoId)
+      });
+    }
+
+    // Forçar proximaAtuacao com base no status
+    let proximaAtuacao = osOriginal?.proximaAtuacao;
+    if (status === 'Serviço concluído') {
+      proximaAtuacao = 'Vendedor: Registrar Pagamento';
+    } else if (status === 'Em Aberto' || status === 'Em serviço' || status === 'Peça Recebida') {
+      proximaAtuacao = 'Técnico: Avaliar/Executar';
+    } else if (status === 'Aguardando Peça' || status === 'Solicitação Enviada') {
+      proximaAtuacao = 'Gestor: Aprovar Peça';
+    } else if (status === 'Pagamento Concluído') {
+      proximaAtuacao = 'Logística: Enviar Peça';
+    } else if (status === 'Aguardando Conferência') {
+      proximaAtuacao = 'Financeiro: Conferir Lançamento';
+    } else if (status === 'Finalizado') {
+      proximaAtuacao = 'Concluído';
+    }
+
+    // Recarregar a OS para obter a timeline mais atualizada (proteger dados imutáveis)
+    const osAtual = getOrdemServicoById(id!);
+    const timelineAtualizada = osAtual ? [...osAtual.timeline] : [...timeline];
+    if (osOriginal && osOriginal.status !== status) {
+      timelineAtualizada.push({
         data: new Date().toISOString(),
         tipo: 'status',
         descricao: `Status alterado de "${osOriginal.status}" para "${status}"`,
@@ -302,9 +281,11 @@ export default function OSAssistenciaEditar() {
       modeloAparelho,
       imeiAparelho: imeiAparelho.replace(/-/g, ''),
       pecas: pecasFormatadas,
-      pagamentos: pagamentosFormatados,
       valorTotal,
-      timeline: novaTimeline
+      timeline: timelineAtualizada,
+      proximaAtuacao,
+      valorCustoTecnico: valorCustoTecnicoLocal,
+      valorVendaTecnico: valorVendaTecnicoLocal,
     };
 
     const result = updateOrdemServico(id!, osAtualizada);
@@ -400,7 +381,7 @@ export default function OSAssistenciaEditar() {
                   <AutocompleteLoja
                     value={lojaId}
                     onChange={setLojaId}
-                    apenasLojasTipoLoja={true}
+                    filtrarPorTipo="Assistência"
                     placeholder="Selecione a loja..."
                   />
                 </div>
@@ -436,12 +417,16 @@ export default function OSAssistenciaEditar() {
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="Em Aberto">Em Aberto</SelectItem>
                       <SelectItem value="Em serviço">Em serviço</SelectItem>
                       <SelectItem value="Aguardando Peça">Aguardando Peça</SelectItem>
                       <SelectItem value="Solicitação Enviada">Solicitação Enviada</SelectItem>
                       <SelectItem value="Em Análise">Em Análise</SelectItem>
                       <SelectItem value="Peça Recebida">Peça Recebida</SelectItem>
+                      <SelectItem value="Pagamento Concluído">Pagamento Concluído</SelectItem>
                       <SelectItem value="Serviço concluído">Serviço concluído</SelectItem>
+                      <SelectItem value="Aguardando Conferência">Aguardando Conferência</SelectItem>
+                      <SelectItem value="Finalizado">Finalizado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -604,87 +589,47 @@ export default function OSAssistenciaEditar() {
           </CardContent>
         </Card>
 
-        {/* Pagamentos */}
+        {/* Avaliação Técnica */}
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Pagamentos</CardTitle>
-              <Button variant="outline" size="sm" onClick={addPagamento}>
-                <Plus className="h-4 w-4 mr-1" />
-                Adicionar
-              </Button>
-            </div>
+            <CardTitle className="text-lg">Avaliação Técnica</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {pagamentos.map((pag, index) => (
-                <div key={pag.id} className="flex gap-4 items-end">
-                  <div className="flex-1 space-y-2">
-                    <Label>Meio de Pagamento</Label>
-                    <Select 
-                      value={pag.meio} 
-                      onValueChange={(v) => updatePagamento(index, 'meio', v)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Pix">Pix</SelectItem>
-                        <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-                        <SelectItem value="Cartão Crédito">Cartão Crédito</SelectItem>
-                        <SelectItem value="Cartão Débito">Cartão Débito</SelectItem>
-                        <SelectItem value="Transferência">Transferência</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="w-32 space-y-2">
-                    <Label>Valor</Label>
-                    <Input 
-                      value={pag.valor}
-                      onChange={(e) => updatePagamento(index, 'valor', e.target.value)}
-                      placeholder="0,00"
-                    />
-                  </div>
-                  {(pag.meio === 'Cartão Crédito') && (
-                    <div className="w-24 space-y-2">
-                      <Label>Parcelas</Label>
-                      <Input 
-                        value={pag.parcelas}
-                        onChange={(e) => updatePagamento(index, 'parcelas', e.target.value)}
-                        placeholder="1"
-                        type="number"
-                        min="1"
-                      />
-                    </div>
-                  )}
-                  {pagamentos.length > 1 && (
-                    <Button variant="ghost" size="icon" onClick={() => removePagamento(index)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 pt-4 border-t">
-              <div className="flex justify-between items-center">
-                <div>
-                  <span className="text-muted-foreground text-sm">Valor Pendente:</span>
-                  <p className={cn(
-                    "text-lg font-bold",
-                    calcularValorTotalPecas() - calcularValorTotalPagamentos() > 0 
-                      ? "text-destructive" 
-                      : "text-green-600"
-                  )}>
-                    {formatCurrency(Math.max(0, calcularValorTotalPecas() - calcularValorTotalPagamentos()))}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-muted-foreground text-sm">Total Pago:</span>
-                  <p className="text-xl font-bold text-green-600">{formatCurrency(calcularValorTotalPagamentos())}</p>
-                </div>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Valor de Custo (R$)</Label>
+                <Input 
+                  type="number"
+                  value={valorCustoTecnicoLocal || ''}
+                  onChange={(e) => setValorCustoTecnicoLocal(parseFloat(e.target.value) || 0)}
+                  placeholder="0,00"
+                />
+                <p className="text-xs text-muted-foreground">Custo de peças/insumos utilizados</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Valor de Venda (R$)</Label>
+                <Input 
+                  type="number"
+                  value={valorVendaTecnicoLocal || ''}
+                  onChange={(e) => setValorVendaTecnicoLocal(parseFloat(e.target.value) || 0)}
+                  placeholder="0,00"
+                />
+                <p className="text-xs text-muted-foreground">Valor cobrado do cliente</p>
               </div>
             </div>
+            <Button 
+              className="w-full"
+              onClick={() => {
+                if (!valorCustoTecnicoLocal || !valorVendaTecnicoLocal) {
+                  toast({ title: 'Preencha os valores de Custo e Venda antes de concluir.', variant: 'destructive' });
+                  return;
+                }
+                setStatus('Serviço concluído');
+                toast({ title: 'Status alterado para Serviço Concluído. Salve para confirmar.' });
+              }}
+            >
+              Concluir Serviço
+            </Button>
           </CardContent>
         </Card>
 

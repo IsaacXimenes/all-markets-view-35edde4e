@@ -81,7 +81,7 @@ export interface OrdemServico {
   setor: 'GARANTIA' | 'ASSISTÊNCIA' | 'TROCA';
   tecnicoId: string;
   lojaId: string;
-  status: 'Serviço concluído' | 'Em serviço' | 'Aguardando Peça' | 'Solicitação Enviada' | 'Em Análise' | 'Peça Recebida' | 'Aguardando Aprovação do Gestor' | 'Rejeitado pelo Gestor' | 'Pagamento - Financeiro' | 'Pagamento Finalizado' | 'Aguardando Chegada da Peça' | 'Peça em Estoque / Aguardando Reparo' | 'Aguardando Recebimento' | 'Em Execução' | 'Aguardando Pagamento' | 'Concluído';
+  status: 'Em Aberto' | 'Serviço concluído' | 'Em serviço' | 'Aguardando Peça' | 'Solicitação Enviada' | 'Em Análise' | 'Peça Recebida' | 'Aguardando Aprovação do Gestor' | 'Rejeitado pelo Gestor' | 'Pagamento - Financeiro' | 'Pagamento Finalizado' | 'Pagamento Concluído' | 'Aguardando Chegada da Peça' | 'Peça em Estoque / Aguardando Reparo' | 'Aguardando Recebimento' | 'Em Execução' | 'Aguardando Pagamento' | 'Aguardando Conferência' | 'Concluído' | 'Finalizado';
   pecas: PecaServico[];
   pagamentos: Pagamento[];
   descricao: string;
@@ -98,7 +98,7 @@ export interface OrdemServico {
   imeiAparelho?: string;
   idVendaAntiga?: string; // ID da venda no sistema antigo (quando origem = Thiago Imports)
   // Campos do fluxo de 3 etapas
-  proximaAtuacao?: 'Técnico: Avaliar/Executar' | 'Vendedor: Registrar Pagamento' | 'Financeiro: Conferir Lançamento' | 'Concluído';
+  proximaAtuacao?: 'Técnico: Avaliar/Executar' | 'Vendedor: Registrar Pagamento' | 'Financeiro: Conferir Lançamento' | 'Gestor: Aprovar Peça' | 'Logística: Enviar Peça' | 'Concluído';
   valorCustoTecnico?: number;
   valorVendaTecnico?: number;
   fotosEntrada?: string[];
@@ -394,7 +394,7 @@ export const getHistoricoOSCliente = (clienteId: string): HistoricoOSCliente[] =
 
 export const verificarIMEIEmOSAtiva = (imei: string): OrdemServico | null => {
   return ordensServico.find(os => 
-    os.status !== 'Serviço concluído' && 
+    os.status !== 'Serviço concluído' && os.status !== 'Finalizado' && 
     os.pecas.some(p => p.imei === imei)
   ) || null;
 };

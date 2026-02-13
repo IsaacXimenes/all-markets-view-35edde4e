@@ -185,7 +185,7 @@ export default function OSAnaliseGarantia() {
         lojaId: lojaSelecionada,
         tecnicoId: tecnicoSelecionado,
         setor: registroAprovado.origem === 'Garantia' ? 'GARANTIA' : 'ASSISTÊNCIA',
-        status: 'Em serviço',
+        status: 'Em Aberto' as any,
         pecas: [],
         pagamentos: [],
         valorTotal: 0,

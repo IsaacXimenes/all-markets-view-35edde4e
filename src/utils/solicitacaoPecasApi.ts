@@ -356,12 +356,13 @@ export const aprovarSolicitacao = (id: string, dados: {
     status: 'Aprovada'
   };
 
-  // Atualizar status da OS correspondente para "Aguardando Recebimento"
+  // Atualizar status da OS - manter Aguardando Peça, atuação = Gestor: Aprovar Peça
   const osId = solicitacoes[index].osId;
   const os = getOrdemServicoById(osId);
   if (os) {
     updateOrdemServico(osId, {
-      status: 'Aguardando Recebimento',
+      status: 'Aguardando Peça',
+      proximaAtuacao: 'Gestor: Aprovar Peça',
       timeline: [...os.timeline, {
         data: new Date().toISOString(),
         tipo: 'peca',
@@ -552,12 +553,13 @@ export const finalizarNotaAssistencia = (notaId: string, dados: {
       if (idx !== -1) {
         solicitacoes[idx].status = 'Recebida';
         
-        // Atualizar OS correspondente para "Peça Recebida"
+        // Atualizar OS correspondente para "Peça Recebida" com proximaAtuacao correta
         const osId = solicitacoes[idx].osId;
         const os = getOrdemServicoById(osId);
         if (os) {
           updateOrdemServico(osId, {
             status: 'Peça Recebida',
+            proximaAtuacao: 'Técnico: Avaliar/Executar',
             timeline: [...os.timeline, {
               data: new Date().toISOString(),
               tipo: 'peca',
@@ -576,6 +578,7 @@ export const finalizarNotaAssistencia = (notaId: string, dados: {
     if (os && os.status !== 'Peça Recebida') {
       updateOrdemServico(nota.osId, {
         status: 'Peça Recebida',
+        proximaAtuacao: 'Técnico: Avaliar/Executar',
         timeline: [...os.timeline, {
           data: new Date().toISOString(),
           tipo: 'peca',

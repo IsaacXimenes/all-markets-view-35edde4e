@@ -126,7 +126,7 @@ export default function OSAssistenciaNova() {
   const [setor, setSetor] = useState<'GARANTIA' | 'ASSISTÊNCIA' | 'TROCA' | ''>('');
   const [clienteId, setClienteId] = useState('');
   const [descricao, setDescricao] = useState('');
-  const [status, setStatus] = useState<'Serviço concluído' | 'Em serviço' | 'Aguardando Peça'>('Em serviço');
+  const [status, setStatus] = useState<'Serviço concluído' | 'Em serviço' | 'Aguardando Peça' | 'Em Aberto'>('Em Aberto');
 
   // Peças
   const [pecas, setPecas] = useState<PecaForm[]>([

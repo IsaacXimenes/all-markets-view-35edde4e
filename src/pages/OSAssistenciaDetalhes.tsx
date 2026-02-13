@@ -171,8 +171,10 @@ export default function OSAssistenciaDetalhes() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'Em Aberto':
+        return <Badge className="bg-slate-500 hover:bg-slate-600">Em Aberto</Badge>;
       case 'Serviço concluído':
-        return <Badge className="bg-green-500 hover:bg-green-600">Concluído</Badge>;
+        return <Badge className="bg-green-500 hover:bg-green-600">Serviço Concluído</Badge>;
       case 'Em serviço':
         return <Badge className="bg-blue-500 hover:bg-blue-600">Em serviço</Badge>;
       case 'Aguardando Peça':
@@ -189,6 +191,8 @@ export default function OSAssistenciaDetalhes() {
         return <Badge className="bg-purple-500 hover:bg-purple-600">Pagamento - Financeiro</Badge>;
       case 'Pagamento Finalizado':
         return <Badge className="bg-teal-500 hover:bg-teal-600">Pagamento Finalizado</Badge>;
+      case 'Pagamento Concluído':
+        return <Badge className="bg-teal-500 hover:bg-teal-600">Pagamento Concluído</Badge>;
       case 'Aguardando Chegada da Peça':
         return <Badge className="bg-cyan-500 hover:bg-cyan-600">Aguardando Chegada</Badge>;
       case 'Peça Recebida':
@@ -201,8 +205,12 @@ export default function OSAssistenciaDetalhes() {
         return <Badge className="bg-indigo-500 hover:bg-indigo-600">Em Execução</Badge>;
       case 'Aguardando Pagamento':
         return <Badge className="bg-amber-500 hover:bg-amber-600">Aguardando Pagamento</Badge>;
+      case 'Aguardando Conferência':
+        return <Badge className="bg-violet-500 hover:bg-violet-600">Aguardando Conferência</Badge>;
       case 'Concluído':
         return <Badge className="bg-emerald-600 hover:bg-emerald-700">Concluído</Badge>;
+      case 'Finalizado':
+        return <Badge className="bg-emerald-700 hover:bg-emerald-800">Finalizado</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -210,12 +218,12 @@ export default function OSAssistenciaDetalhes() {
 
   const handleConcluirServico = () => {
     if (!os) return;
-    if (!valorCustoTecnico && !valorVendaTecnico) {
+    if (!valorCustoTecnico || !valorVendaTecnico) {
       toast.error('Preencha os valores de Custo e Venda antes de concluir o serviço.');
       return;
     }
     updateOrdemServico(os.id, {
-      status: 'Aguardando Pagamento',
+      status: 'Serviço concluído',
       proximaAtuacao: 'Vendedor: Registrar Pagamento',
       valorCustoTecnico,
       valorVendaTecnico,
@@ -233,7 +241,7 @@ export default function OSAssistenciaDetalhes() {
 
   const handleSalvarPagamentoVendedor = () => {
     if (!os) return;
-    if (!os.valorCustoTecnico && !os.valorVendaTecnico) {
+    if (!os.valorCustoTecnico || !os.valorVendaTecnico) {
       toast.error('O técnico precisa preencher os campos de Valor de Custo e Valor de Venda antes do registro de pagamento.');
       return;
     }
@@ -247,6 +255,7 @@ export default function OSAssistenciaDetalhes() {
     updateOrdemServico(os.id, {
       pagamentos: pagamentosConvertidos,
       valorTotal,
+      status: 'Aguardando Conferência' as any,
       proximaAtuacao: 'Financeiro: Conferir Lançamento',
       timeline: [...os.timeline, {
         data: new Date().toISOString(),
@@ -263,7 +272,7 @@ export default function OSAssistenciaDetalhes() {
   const handleValidarFinanceiro = () => {
     if (!os) return;
     updateOrdemServico(os.id, {
-      status: 'Concluído',
+      status: 'Finalizado' as any,
       proximaAtuacao: 'Concluído',
       timeline: [...os.timeline, {
         data: new Date().toISOString(),
@@ -831,7 +840,7 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
               </CardHeader>
               <CardContent>
                 {os.proximaAtuacao === 'Vendedor: Registrar Pagamento' ? (
-                  (!os.valorCustoTecnico && !os.valorVendaTecnico) ? (
+                  (!os.valorCustoTecnico || !os.valorVendaTecnico) ? (
                     <div className="bg-destructive/10 p-4 rounded-lg text-destructive text-sm flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4" />
                       O técnico precisa preencher os campos de Valor de Custo e Valor de Venda antes do registro de pagamento.
@@ -1055,18 +1064,17 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                           <SelectValue placeholder="Selecione o status" />
                         </SelectTrigger>
                       <SelectContent>
+                          <SelectItem value="Em Aberto">Em Aberto</SelectItem>
                           <SelectItem value="Em serviço">Em serviço</SelectItem>
                           <SelectItem value="Em Execução">Em Execução</SelectItem>
                           <SelectItem value="Aguardando Peça">Aguardando Peça</SelectItem>
                           <SelectItem value="Solicitação Enviada">Solicitação Enviada</SelectItem>
                           <SelectItem value="Em Análise">Em Análise</SelectItem>
-                          <SelectItem value="Aguardando Aprovação do Gestor">Aguardando Aprovação do Gestor</SelectItem>
-                          <SelectItem value="Aguardando Recebimento">Aguardando Recebimento</SelectItem>
                           <SelectItem value="Peça Recebida">Peça Recebida</SelectItem>
-                          <SelectItem value="Peça em Estoque / Aguardando Reparo">Peça em Estoque / Aguardando Reparo</SelectItem>
-                          <SelectItem value="Aguardando Pagamento">Aguardando Pagamento</SelectItem>
+                          <SelectItem value="Pagamento Concluído">Pagamento Concluído</SelectItem>
                           <SelectItem value="Serviço concluído">Serviço concluído</SelectItem>
-                          <SelectItem value="Concluído">Concluído</SelectItem>
+                          <SelectItem value="Aguardando Conferência">Aguardando Conferência</SelectItem>
+                          <SelectItem value="Finalizado">Finalizado</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1106,6 +1114,8 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                             os.proximaAtuacao === 'Técnico: Avaliar/Executar' ? 'bg-blue-500 hover:bg-blue-600' :
                             os.proximaAtuacao === 'Vendedor: Registrar Pagamento' ? 'bg-amber-500 hover:bg-amber-600' :
                             os.proximaAtuacao === 'Financeiro: Conferir Lançamento' ? 'bg-purple-500 hover:bg-purple-600' :
+                            os.proximaAtuacao === 'Gestor: Aprovar Peça' ? 'bg-orange-500 hover:bg-orange-600' :
+                            os.proximaAtuacao === 'Logística: Enviar Peça' ? 'bg-cyan-500 hover:bg-cyan-600' :
                             'bg-emerald-600 hover:bg-emerald-700'
                           )}>
                             {os.proximaAtuacao}

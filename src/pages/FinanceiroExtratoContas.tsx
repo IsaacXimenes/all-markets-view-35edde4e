@@ -307,6 +307,12 @@ export default function FinanceiroExtratoContas() {
             <Building2 className="h-3 w-3 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">{obterNomeLoja(conta.lojaVinculada)}</span>
           </div>
+          <div className="mt-2 p-2 bg-muted/50 rounded-lg">
+            <p className="text-xs font-semibold uppercase text-muted-foreground">Saldo da Conta:</p>
+            <span className={`text-lg font-bold ${(conta.saldoInicial || 0) + entradas - saidas >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {formatCurrency((conta.saldoInicial || 0) + entradas - saidas)}
+            </span>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Linha de Entrada (Verde) */}
@@ -339,15 +345,6 @@ export default function FinanceiroExtratoContas() {
             />
           </div>
           
-          {/* Saldo */}
-          <div className="pt-2 border-t">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Saldo Atual</span>
-              <span className={`font-bold ${(conta.saldoInicial || 0) + entradas - saidas >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency((conta.saldoInicial || 0) + entradas - saidas)}
-              </span>
-            </div>
-          </div>
         </CardContent>
       </Card>
     );

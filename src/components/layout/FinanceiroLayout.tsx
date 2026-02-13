@@ -1,6 +1,6 @@
 import { PageLayout } from '@/components/layout/PageLayout';
 import { CarouselTabsNavigation } from '@/components/layout/CarouselTabsNavigation';
-import { FileCheck, MinusCircle, Wrench, Receipt, Wallet, Package, CreditCard, ArrowDownCircle, Building2, ReceiptText, Clock } from 'lucide-react';
+import { FileCheck, MinusCircle, Wrench, Receipt, Wallet, ArrowDownCircle, Building2, ReceiptText, Clock } from 'lucide-react';
 
 interface FinanceiroLayoutProps {
   children: React.ReactNode;
@@ -13,8 +13,6 @@ const tabs = [
   { name: 'Notas - Pendentes', href: '/financeiro/notas-pendencias', icon: Clock },
   { name: 'Notas Pendentes - Assistência', href: '/financeiro/notas-assistencia', icon: Wrench },
   { name: 'Central de Despesas', href: '/financeiro/despesas', icon: MinusCircle },
-  { name: 'Lotes de Pagamento', href: '/financeiro/lotes-pagamento', icon: Package },
-  { name: 'Execução de Lotes', href: '/financeiro/execucao-lotes', icon: CreditCard },
   { name: 'Pagamentos Downgrade', href: '/financeiro/pagamentos-downgrade', icon: ArrowDownCircle },
   { name: 'Teto Bancário', href: '/financeiro/teto-bancario', icon: Building2 },
   { name: 'Extrato por Conta', href: '/financeiro/extrato-contas', icon: ReceiptText },

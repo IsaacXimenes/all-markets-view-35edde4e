@@ -44,14 +44,14 @@ export interface VendaDigital {
 
 // Mock de colaboradores com permissão Digital
 export const colaboradoresDigital = [
-  { id: 'COL-007', nome: 'Rafael Digital', cargo: 'CARGO-009', permissao: 'Digital' },
-  { id: 'COL-008', nome: 'Camila Online', cargo: 'CARGO-009', permissao: 'Digital' },
-  { id: 'COL-009', nome: 'Bruno Web', cargo: 'CARGO-009', permissao: 'Digital' },
+  { id: '143ac0c2', nome: 'Antonio Sousa Silva Filho', cargo: 'Vendedor (a)', permissao: 'Digital' },
+  { id: '1b9137c8', nome: 'Evelyn Cordeiro de Oliveira', cargo: 'Vendedor (a)', permissao: 'Digital' },
+  { id: '62312809', nome: 'Izaquiel Costa Santos', cargo: 'Vendedor (a)', permissao: 'Digital' },
 ];
 
 export const colaboradoresFinalizador = [
-  { id: 'COL-010', nome: 'Lucas Finalizador', cargo: 'CARGO-010', permissao: 'Finalizador Digital' },
-  { id: 'COL-001', nome: 'Lucas Mendes', cargo: 'CARGO-001', permissao: 'Finalizador Digital' },
+  { id: '143ac0c2', nome: 'Antonio Sousa Silva Filho', cargo: 'Vendedor (a)', permissao: 'Finalizador Digital' },
+  { id: '1b9137c8', nome: 'Evelyn Cordeiro de Oliveira', cargo: 'Vendedor (a)', permissao: 'Finalizador Digital' },
 ];
 
 // Calcula dias desde registro
@@ -68,9 +68,9 @@ let vendasDigitais: VendaDigital[] = [
   {
     id: 'VEN-DIG-2025-0001',
     numero: 1,
-    dataHora: new Date(Date.now() - 0.5 * 60 * 60 * 1000).toISOString(), // 30 min atrás (mais recente)
-    responsavelVendaId: 'COL-007',
-    responsavelVendaNome: 'Rafael Digital',
+    dataHora: new Date(Date.now() - 0.5 * 60 * 60 * 1000).toISOString(),
+    responsavelVendaId: '143ac0c2',
+    responsavelVendaNome: 'Antonio Sousa Silva Filho',
     clienteNome: 'Carlos Mendes',
     valorTotal: 8500.00,
     status: 'Pendente',
@@ -79,17 +79,17 @@ let vendasDigitais: VendaDigital[] = [
         id: 'TL-001',
         data: new Date(Date.now() - 0.5 * 60 * 60 * 1000).toISOString(),
         acao: 'Pré-cadastro enviado',
-        responsavel: 'Rafael Digital',
-        responsavelId: 'COL-007'
+        responsavel: 'Antonio Sousa Silva Filho',
+        responsavelId: '143ac0c2'
       }
     ]
   },
   {
     id: 'VEN-DIG-2025-0002',
     numero: 2,
-    dataHora: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), // 4 horas atrás
-    responsavelVendaId: 'COL-008',
-    responsavelVendaNome: 'Camila Online',
+    dataHora: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    responsavelVendaId: '1b9137c8',
+    responsavelVendaNome: 'Evelyn Cordeiro de Oliveira',
     clienteNome: 'Patricia Lima',
     valorTotal: 12300.00,
     status: 'Pendente',
@@ -98,17 +98,17 @@ let vendasDigitais: VendaDigital[] = [
         id: 'TL-002',
         data: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
         acao: 'Pré-cadastro enviado',
-        responsavel: 'Camila Online',
-        responsavelId: 'COL-008'
+        responsavel: 'Evelyn Cordeiro de Oliveira',
+        responsavelId: '1b9137c8'
       }
     ]
   },
   {
     id: 'VEN-DIG-2025-0003',
     numero: 3,
-    dataHora: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 dia atrás
-    responsavelVendaId: 'COL-009',
-    responsavelVendaNome: 'Bruno Web',
+    dataHora: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    responsavelVendaId: '62312809',
+    responsavelVendaNome: 'Izaquiel Costa Santos',
     clienteNome: 'Fernando Souza',
     valorTotal: 5200.00,
     status: 'Pendente',
@@ -117,17 +117,17 @@ let vendasDigitais: VendaDigital[] = [
         id: 'TL-003',
         data: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
         acao: 'Pré-cadastro enviado',
-        responsavel: 'Bruno Web',
-        responsavelId: 'COL-009'
+        responsavel: 'Izaquiel Costa Santos',
+        responsavelId: '62312809'
       }
     ]
   },
   {
     id: 'VEN-DIG-2025-0004',
     numero: 4,
-    dataHora: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 dias atrás
-    responsavelVendaId: 'COL-007',
-    responsavelVendaNome: 'Rafael Digital',
+    dataHora: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    responsavelVendaId: '143ac0c2',
+    responsavelVendaNome: 'Antonio Sousa Silva Filho',
     clienteNome: 'Amanda Torres',
     valorTotal: 9800.00,
     status: 'Pendente',
@@ -136,17 +136,17 @@ let vendasDigitais: VendaDigital[] = [
         id: 'TL-004',
         data: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
         acao: 'Pré-cadastro enviado',
-        responsavel: 'Rafael Digital',
-        responsavelId: 'COL-007'
+        responsavel: 'Antonio Sousa Silva Filho',
+        responsavelId: '143ac0c2'
       }
     ]
   },
   {
     id: 'VEN-DIG-2025-0005',
     numero: 5,
-    dataHora: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 dias atrás (mais antigo)
-    responsavelVendaId: 'COL-008',
-    responsavelVendaNome: 'Camila Online',
+    dataHora: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    responsavelVendaId: '1b9137c8',
+    responsavelVendaNome: 'Evelyn Cordeiro de Oliveira',
     clienteNome: 'Roberto Almeida',
     valorTotal: 14500.00,
     status: 'Pendente',
@@ -155,8 +155,8 @@ let vendasDigitais: VendaDigital[] = [
         id: 'TL-005',
         data: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
         acao: 'Pré-cadastro enviado',
-        responsavel: 'Camila Online',
-        responsavelId: 'COL-008'
+        responsavel: 'Evelyn Cordeiro de Oliveira',
+        responsavelId: '1b9137c8'
       }
     ]
   }

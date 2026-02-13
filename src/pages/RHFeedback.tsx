@@ -530,7 +530,7 @@ export default function RHFeedback() {
 
       {/* Modal de Registro de Feedback */}
       <Dialog open={isRegistrarDialogOpen} onOpenChange={setIsRegistrarDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus className="h-5 w-5" />
@@ -538,7 +538,7 @@ export default function RHFeedback() {
             </DialogTitle>
           </DialogHeader>
           
-          <ScrollArea className="flex-1 pr-4 overflow-x-hidden">
+          <div className="pr-1">
             <div className="space-y-6 min-w-0 overflow-hidden">
               {/* Seleção do colaborador */}
               <div className="space-y-2">
@@ -752,7 +752,7 @@ export default function RHFeedback() {
                 </>
               )}
             </div>
-          </ScrollArea>
+          </div>
 
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setIsRegistrarDialogOpen(false)}>

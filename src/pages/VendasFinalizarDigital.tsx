@@ -150,6 +150,8 @@ export default function VendasFinalizarDigital() {
         setVenda(vendaData);
         // Pré-preencher cliente nome do pré-cadastro
         setClienteNome(vendaData.clienteNome);
+        // Loja de Venda fixa como Loja Online para vendas digitais
+        setLojaVenda('fcc78c1a');
         
         // Verificar se existe rascunho após carregar a venda
         setTimeout(() => {
@@ -679,16 +681,10 @@ export default function VendasFinalizarDigital() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className={`text-sm font-medium ${!lojaVenda ? 'text-destructive' : ''}`}>
+                <label className="text-sm font-medium">
                   Loja de Venda *
                 </label>
-                <AutocompleteLoja
-                  value={lojaVenda}
-                  onChange={setLojaVenda}
-                  placeholder="Selecione a loja"
-                  apenasLojasTipoLoja={true}
-                  className={!lojaVenda ? 'border-destructive' : ''}
-                />
+                <Input value="Loja Online" disabled className="bg-muted" />
               </div>
               <div>
                 <label className="text-sm font-medium">Origem da Venda</label>

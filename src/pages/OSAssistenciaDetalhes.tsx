@@ -779,7 +779,49 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
               </CardContent>
             </Card>
 
-            {/* Pagamentos */}
+            {/* Avaliação Técnica - Etapa 2 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Avaliação Técnica
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Valor de Custo (R$)</label>
+                    <Input
+                      type="number"
+                      value={valorCustoTecnico || ''}
+                      onChange={(e) => setValorCustoTecnico(parseFloat(e.target.value) || 0)}
+                      placeholder="0,00"
+                      disabled={os.proximaAtuacao !== 'Técnico: Avaliar/Executar' && !!os.valorCustoTecnico}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Custo de peças/insumos utilizados</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Valor de Venda (R$)</label>
+                    <Input
+                      type="number"
+                      value={valorVendaTecnico || ''}
+                      onChange={(e) => setValorVendaTecnico(parseFloat(e.target.value) || 0)}
+                      placeholder="0,00"
+                      disabled={os.proximaAtuacao !== 'Técnico: Avaliar/Executar' && !!os.valorVendaTecnico}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Valor cobrado do cliente</p>
+                  </div>
+                </div>
+                {os.proximaAtuacao === 'Técnico: Avaliar/Executar' && (
+                  <Button onClick={handleConcluirServico} className="w-full">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Concluir Serviço
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Pagamentos - Etapa 3 (Vendedor) */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -788,7 +830,60 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {isEditing ? (
+                {os.proximaAtuacao === 'Vendedor: Registrar Pagamento' ? (
+                  (!os.valorCustoTecnico && !os.valorVendaTecnico) ? (
+                    <div className="bg-destructive/10 p-4 rounded-lg text-destructive text-sm flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      O técnico precisa preencher os campos de Valor de Custo e Valor de Venda antes do registro de pagamento.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <PagamentoQuadro
+                        valorTotalProdutos={os.valorVendaTecnico || 0}
+                        custoTotalProdutos={os.valorCustoTecnico || 0}
+                        lojaVendaId={os.lojaId}
+                        onPagamentosChange={setEditPagamentosQuadro}
+                        pagamentosIniciais={editPagamentosQuadro}
+                        ocultarCards={true}
+                      />
+                      <Button onClick={handleSalvarPagamentoVendedor} className="w-full">
+                        <Save className="h-4 w-4 mr-2" />
+                        Registrar Pagamento
+                      </Button>
+                    </div>
+                  )
+                ) : os.proximaAtuacao === 'Financeiro: Conferir Lançamento' || os.proximaAtuacao === 'Concluído' ? (
+                  <>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Meio de Pagamento</TableHead>
+                          <TableHead>Parcelas</TableHead>
+                          <TableHead>Valor</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {os.pagamentos.map((pag, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">{pag.meio}</TableCell>
+                            <TableCell>{pag.parcelas || '-'}</TableCell>
+                            <TableCell className="font-medium">{formatCurrency(pag.valor)}</TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted/50">
+                          <TableCell colSpan={2} className="font-bold">Total</TableCell>
+                          <TableCell className="font-bold text-lg">{formatCurrency(os.valorTotal)}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                    {os.proximaAtuacao === 'Financeiro: Conferir Lançamento' && (
+                      <Button onClick={handleValidarFinanceiro} className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700">
+                        <ShieldCheck className="h-4 w-4 mr-2" />
+                        Validar Lançamento (Financeiro)
+                      </Button>
+                    )}
+                  </>
+                ) : isEditing ? (
                   <PagamentoQuadro
                     valorTotalProdutos={editPecas.reduce((acc, p) => acc + p.valorTotal, 0)}
                     custoTotalProdutos={0}
@@ -853,17 +948,44 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {/* Fotos de Entrada */}
+                  {os.fotosEntrada && os.fotosEntrada.length > 0 && (
+                    <div className="p-3 bg-muted rounded-lg space-y-2">
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        <ImageIcon className="h-4 w-4" />
+                        Fotos de Entrada ({os.fotosEntrada.length})
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {os.fotosEntrada.map((foto, i) => (
+                          <img key={i} src={foto} alt={`Foto entrada ${i + 1}`} className="w-20 h-20 object-cover rounded-md border" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {os.timeline.map((item, index) => (
                     <div key={index} className="flex gap-4">
                       <div className="flex flex-col items-center">
-                        <div className="w-3 h-3 rounded-full bg-primary" />
+                        <div className={cn(
+                          "w-3 h-3 rounded-full",
+                          item.tipo === 'conclusao_servico' ? 'bg-green-500' :
+                          item.tipo === 'pagamento' ? 'bg-amber-500' :
+                          item.tipo === 'validacao_financeiro' ? 'bg-emerald-600' :
+                          'bg-primary'
+                        )} />
                         {index < os.timeline.length - 1 && (
                           <div className="w-0.5 h-full bg-border" />
                         )}
                       </div>
                       <div className="pb-4">
-                        <p className="font-medium capitalize">{item.tipo}</p>
+                        <p className="font-medium capitalize">{item.tipo.replace(/_/g, ' ')}</p>
                         <p className="text-sm text-muted-foreground">{item.descricao}</p>
+                        {item.fotos && item.fotos.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {item.fotos.map((foto, i) => (
+                              <img key={i} src={foto} alt={`Foto ${i + 1}`} className="w-16 h-16 object-cover rounded border" />
+                            ))}
+                          </div>
+                        )}
                         <p className="text-xs text-muted-foreground mt-1">
                           {new Date(item.data).toLocaleString('pt-BR')} - {item.responsavel}
                         </p>
@@ -934,13 +1056,17 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                         </SelectTrigger>
                       <SelectContent>
                           <SelectItem value="Em serviço">Em serviço</SelectItem>
+                          <SelectItem value="Em Execução">Em Execução</SelectItem>
                           <SelectItem value="Aguardando Peça">Aguardando Peça</SelectItem>
                           <SelectItem value="Solicitação Enviada">Solicitação Enviada</SelectItem>
                           <SelectItem value="Em Análise">Em Análise</SelectItem>
                           <SelectItem value="Aguardando Aprovação do Gestor">Aguardando Aprovação do Gestor</SelectItem>
+                          <SelectItem value="Aguardando Recebimento">Aguardando Recebimento</SelectItem>
                           <SelectItem value="Peça Recebida">Peça Recebida</SelectItem>
                           <SelectItem value="Peça em Estoque / Aguardando Reparo">Peça em Estoque / Aguardando Reparo</SelectItem>
+                          <SelectItem value="Aguardando Pagamento">Aguardando Pagamento</SelectItem>
                           <SelectItem value="Serviço concluído">Serviço concluído</SelectItem>
+                          <SelectItem value="Concluído">Concluído</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -970,6 +1096,24 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                     <div>
                       <p className="text-xs text-muted-foreground">Status</p>
                       <div className="mt-1">{getStatusBadge(os.status)}</div>
+                    </div>
+                    <Separator />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Próxima Atuação</p>
+                      <div className="mt-1">
+                        {os.proximaAtuacao ? (
+                          <Badge className={cn(
+                            os.proximaAtuacao === 'Técnico: Avaliar/Executar' ? 'bg-blue-500 hover:bg-blue-600' :
+                            os.proximaAtuacao === 'Vendedor: Registrar Pagamento' ? 'bg-amber-500 hover:bg-amber-600' :
+                            os.proximaAtuacao === 'Financeiro: Conferir Lançamento' ? 'bg-purple-500 hover:bg-purple-600' :
+                            'bg-emerald-600 hover:bg-emerald-700'
+                          )}>
+                            {os.proximaAtuacao}
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </div>
                     </div>
                     <Separator />
                     <div>

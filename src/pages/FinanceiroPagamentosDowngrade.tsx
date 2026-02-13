@@ -42,7 +42,7 @@ export default function FinanceiroPagamentosDowngrade() {
   const vendasFinalizadas = useMemo(() => {
     return vendas.filter(v => 
       v.statusFluxo === 'Finalizado' && 
-      ((v as any).tipoOperacao === 'Downgrade' || (v as any).saldoDevolver)
+      ((v as any).tipoOperacao === 'Downgrade' || (v as any).pagamentoDowngrade || (v as any).contaOrigemDowngrade)
     );
   }, [vendas]);
   

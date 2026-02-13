@@ -3,6 +3,7 @@
 import { Venda, getVendas, getVendaById, updateVenda as updateVendaBase } from './vendasApi';
 import { migrarTradeInsParaPendentes } from './osApi';
 import { enviarNotificacaoVenda, DadosVendaNotificacao } from './whatsappNotificacaoApi';
+import { addDespesa } from './financeApi';
 
 // Novo tipo para status de venda no fluxo de conferência
 export type StatusVenda = 
@@ -55,6 +56,7 @@ export interface VendaComFluxo extends Venda {
   tipoOperacao?: 'Upgrade' | 'Downgrade'; // Tipo de operação de troca
   saldoDevolver?: number; // Valor a devolver ao cliente em downgrade
   chavePix?: string; // Chave PIX para devolução em downgrade
+  contaOrigemDowngrade?: string; // Conta usada para pagamento do downgrade
 }
 
 // Armazena o estado do fluxo no localStorage
@@ -591,9 +593,14 @@ export const finalizarVendaDowngrade = (
     descricao: `Pagamento PIX Downgrade executado por ${usuarioNome}. Conta: ${contaOrigem}${observacoes ? `. Obs: ${observacoes}` : ''}`
   };
 
+  const saldoDevolver = dadosFluxo.saldoDevolver || 0;
+
   fluxoData[vendaId] = {
     ...dadosFluxo,
     statusFluxo: 'Finalizado',
+    tipoOperacao: 'Downgrade',
+    saldoDevolver,
+    contaOrigemDowngrade: contaOrigem,
     pagamentoDowngrade: {
       usuarioId,
       usuarioNome,
@@ -606,6 +613,33 @@ export const finalizarVendaDowngrade = (
   };
 
   saveFluxoData(fluxoData);
+
+  // Registrar saída financeira no extrato
+  if (saldoDevolver > 0) {
+    const hoje = new Date();
+    const competencia = hoje.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('. de ', '-').replace('.', '').toUpperCase();
+    const mesAbrev = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+    const comp = `${mesAbrev[hoje.getMonth()]}-${hoje.getFullYear()}`;
+    
+    addDespesa({
+      tipo: 'Variável',
+      data: hoje.toISOString().split('T')[0],
+      descricao: `Pagamento PIX Downgrade - Venda ${vendaId}`,
+      valor: saldoDevolver,
+      competencia: comp,
+      conta: contaOrigem,
+      observacoes: observacoes || '',
+      lojaId: venda?.lojaVenda || '',
+      status: 'Pago',
+      categoria: 'Downgrade',
+      dataVencimento: hoje.toISOString().split('T')[0],
+      dataPagamento: hoje.toISOString().split('T')[0],
+      recorrente: false,
+      periodicidade: null,
+      pagoPor: usuarioNome
+    });
+    console.log(`[Fluxo Vendas - Downgrade] Despesa de R$ ${saldoDevolver} registrada na conta ${contaOrigem}`);
+  }
   
   // MIGRAÇÃO AUTOMÁTICA: Após pagamento PIX, trade-ins vão para Aparelhos Pendentes - Estoque
   if (venda && venda.tradeIns && venda.tradeIns.length > 0) {

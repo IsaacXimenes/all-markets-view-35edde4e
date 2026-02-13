@@ -1,92 +1,144 @@
 
-# Plano - Correcoes em Vendas, Estoque, Financeiro e RH
+# Plano - Maquina de Estados da Assistencia e Correcoes de Persistencia
 
-## Problema 1: Pendentes Digitais - Coluna Responsavel mostra "COL-007"
+## Resumo
 
-Os mocks em `vendasDigitalApi.ts` usam IDs falsos (`COL-007`, `COL-008`, `COL-009`) que nao existem no `useCadastroStore`. O componente `VendasPendentesDigitais.tsx` ja usa `obterNomeColaborador(venda.responsavelVendaId)` (linha 161), mas como os IDs nao existem no store, retorna `undefined` e o fallback `venda.responsavelVendaNome` mostra nomes falsos como "Rafael Digital".
-
-**Correcao em `src/utils/vendasDigitalApi.ts`:**
-- Substituir os IDs `COL-007`, `COL-008`, `COL-009` por UUIDs reais do `useCadastroStore` (colaboradores ativos existentes)
-- Atualizar os nomes correspondentes nos mocks e no array `colaboradoresDigital`
+Implementar a maquina de estados correta com transicoes rigidas via `proximaAtuacao`, corrigir persistencia de solicitacoes de pecas na edicao, remover quadro de pagamentos da tela do tecnico, e adicionar novos status (`Em Aberto`, `Pagamento Concluído`, `Aguardando Conferência`, `Finalizado`).
 
 ---
 
-## Problema 2: Finalizar Venda Digital - Loja de Venda sempre sera "Loja Online"
+## 1. Maquina de Estados - Tabela de Transicoes
 
-Em `VendasFinalizarDigital.tsx` (linhas 685-691), o campo "Loja de Venda" usa `AutocompleteLoja` editavel. Para vendas digitais, a loja deve ser fixa como "Loja Online" (ID: `fcc78c1a`).
+A tabela de transicoes estrita que sera implementada:
 
-**Correcao em `src/pages/VendasFinalizarDigital.tsx`:**
-- No `useEffect` de carregamento da venda (linha 146), setar `setLojaVenda('fcc78c1a')` automaticamente
-- Substituir o `AutocompleteLoja` por um `Input` desabilitado exibindo "Loja Online"
-- Garantir que o valor `fcc78c1a` seja usado no registro da venda
+| Evento | Status da OS | Proxima Atuacao |
+|--------|-------------|-----------------|
+| Registro da OS | Em Aberto | Tecnico: Avaliar/Executar |
+| Tecnico solicita peca | Aguardando Peca | Gestor: Aprovar Peca |
+| Financeiro paga a peca | Pagamento Concluido | Logistica: Enviar Peca |
+| Peca recebida na loja | Peca Recebida | Tecnico: Avaliar/Executar |
+| Tecnico clica em Concluir | Servico Concluido | Vendedor: Registrar Pagamento |
+| Vendedor registra pagamento | Aguardando Conferencia | Financeiro: Conferir Lancamento |
+| Financeiro valida lancamento | Finalizado | - |
 
----
+### 1.1 Alteracoes na interface `OrdemServico` (assistenciaApi.ts)
 
-## Problema 3: Finalizar Venda Digital - Adequar quadros e modais conforme Nova Venda
+- Adicionar novos status ao tipo union: `'Em Aberto'`, `'Pagamento Concluído'`, `'Aguardando Conferência'`, `'Finalizado'`
+- Adicionar novas opcoes de `proximaAtuacao`: `'Gestor: Aprovar Peça'`, `'Logística: Enviar Peça'`
+- Atualizar mocks existentes para usar os novos nomes de status conforme a tabela
 
-A tela `VendasFinalizarDigital.tsx` precisa ser alinhada com `VendasNova.tsx` em todos os quadros e modais.
+### 1.2 Correcao critica: Tecnico Concluir -> Vendedor
 
-**Correcao em `src/pages/VendasFinalizarDigital.tsx`:**
-- Verificar e alinhar o modal de selecao de produtos (max-w-4xl, colunas, filtros identicos ao VendasNova)
-- Garantir que o quadro de acessorios tenha os mesmos controles (+/- quantidade)
-- Alinhar o quadro de Trade-In com campos identicos
-- Verificar que a secao de Garantia Extendida existe e segue o mesmo modelo
-- Verificar o resumo financeiro (Lucro, Margem, Custo, prejuizo)
-- Garantir que o PagamentoQuadro usa os mesmos parametros
+Em `OSAssistenciaDetalhes.tsx`, a funcao `handleConcluirServico` ja seta corretamente `proximaAtuacao: 'Vendedor: Registrar Pagamento'` (linha 219). Porem, na tela de edicao (`OSAssistenciaEditar.tsx`), ao alterar o status manualmente para "Servico concluido", o `proximaAtuacao` NAO e atualizado automaticamente.
 
----
+**Correcao em `OSAssistenciaEditar.tsx` (handleSave, ~linha 295):**
+- Adicionar logica: se o novo status for `'Serviço concluído'`, forcar `proximaAtuacao = 'Vendedor: Registrar Pagamento'`
 
-## Problema 4: Estoque - Tipo Produto "Acessorio" nao filtra modelos
+### 1.3 Novas transicoes automaticas
 
-Nas telas `EstoqueNotaCadastrar.tsx` e `EstoqueNotaCadastrarProdutos.tsx`, ao selecionar "Acessorio" no campo Tipo Produto, o dropdown de Modelo continua mostrando modelos de aparelhos. A funcao `getModelosAparelhos(marca)` busca em `produtosCadastro` que so contem aparelhos.
+**Em `solicitacaoPecasApi.ts`:**
+- `aprovarSolicitacao`: Ja atualiza OS para `'Aguardando Recebimento'`. Alterar para manter o fluxo: status permanece `'Aguardando Peça'`, `proximaAtuacao = 'Gestor: Aprovar Peça'` ate o pagamento do financeiro
+- Criar funcao `registrarPagamentoPeca`: Muda status para `'Pagamento Concluído'`, `proximaAtuacao = 'Logística: Enviar Peça'`
+- Na funcao de recebimento (quando peca chega na loja): Status `'Peça Recebida'`, `proximaAtuacao = 'Técnico: Avaliar/Executar'`
 
-**Correcao em `src/pages/EstoqueNotaCadastrar.tsx` e `src/pages/EstoqueNotaCadastrarProdutos.tsx`:**
-- Importar `getAcessorios` de `acessoriosApi`
-- Quando `tipoProduto === 'Acessorio'`:
-  - Ocultar o campo Marca (ou tornar opcional)
-  - Substituir o dropdown de Modelo por um dropdown listando as descricoes dos acessorios do cadastro
-  - Desabilitar campos IMEI, Cor e Categoria (ja desabilitados)
-- Quando `tipoProduto === 'Aparelho'`, manter o comportamento atual
+### 1.4 Status de Registro
 
----
+**Em `OSAssistenciaNova.tsx`:**
+- Alterar o status inicial de `'Em serviço'` para `'Em Aberto'`
+- Confirmar que `proximaAtuacao` e setado para `'Técnico: Avaliar/Executar'`
 
-## Problema 5: Estoque - Botao Voltar da Nova Nota navega para pagina inacessivel
+### 1.5 Finalizacao
 
-Em `EstoqueNotaCadastrar.tsx` (linha 309), o botao "Voltar" navega para `/estoque/notas-compra`. Embora esta rota exista, ela nao faz parte das tabs do `EstoqueLayout`, o que pode confundir o usuario que acessou a nova nota a partir de `/estoque/notas-pendencias`.
-
-**Correcao em `src/pages/EstoqueNotaCadastrar.tsx`:**
-- Alterar o `navigate('/estoque/notas-compra')` para `navigate('/estoque/notas-pendencias')` (linha 309)
-- Atualizar o texto para "Voltar para Notas Pendencias"
-
----
-
-## Problema 6: Financeiro - Pagamento Downgrade sumindo apos execucao
-
-Dois problemas identificados:
-
-**6a) Registro desaparecendo do historico:**
-Em `FinanceiroPagamentosDowngrade.tsx` (linhas 42-47), o filtro de `vendasFinalizadas` verifica `tipoOperacao === 'Downgrade' || pagamentoDowngrade || contaOrigemDowngrade`. Esses campos sao armazenados em `fluxoData` (localStorage). O `useFluxoVendas` com `incluirHistorico: true` inclui vendas finalizadas adicionais, porem o filtro pode falhar se os dados nao forem carregados corretamente apos a execucao. Verificar que o `recarregar()` esta refrescando corretamente.
-
-**6b) Extrato por Conta nao registra saida:**
-Em `FinanceiroExtratoContas.tsx` (linha 138-139), a correspondencia de despesas com contas usa `c.nome === despesa.conta`. Porem, `finalizarVendaDowngrade` (em `fluxoVendasApi.ts`, linha 640) salva `conta: contaOrigem` onde `contaOrigem` e o **ID da conta** (ex: `CTA-002`), nao o nome. Isso causa a falha de match e a despesa nao aparece no extrato.
-
-**Correcao em `src/pages/FinanceiroExtratoContas.tsx`:**
-- Na linha 138, alterar o match para verificar tanto por nome quanto por ID:
-  `const contaEncontrada = contasFinanceiras.find(c => c.nome === despesa.conta || c.id === despesa.conta);`
-
-**Correcao em `src/pages/FinanceiroPagamentosDowngrade.tsx`:**
-- Garantir que apos executar o PIX, o registro permanece visivel na aba "Historico" com status "FINALIZADO"
+**Em `OSAssistenciaDetalhes.tsx`:**
+- `handleSalvarPagamentoVendedor`: Alterar status de `'Aguardando Pagamento'` para `'Aguardando Conferência'`
+- `handleValidarFinanceiro`: Alterar status final de `'Concluído'` para `'Finalizado'`
 
 ---
 
-## Problema 7: RH Feedback - Modal de Registro sem scroll vertical
+## 2. Persistencia de Solicitacoes de Pecas
 
-Em `RHFeedback.tsx` (linha 533), o modal de "Registrar Novo FeedBack" ja usa `ScrollArea` (linha 541) dentro de um `DialogContent` com `max-h-[90vh] overflow-hidden flex flex-col`. O scroll ja esta implementado, mas pode nao estar funcionando corretamente.
+### 2.1 Problema
 
-**Correcao em `src/pages/RHFeedback.tsx`:**
-- Garantir que o `ScrollArea` tenha uma altura maxima definida (ex: `max-h-[70vh]`)
-- Verificar que o `DialogContent` permite overflow correto
-- Adicionar `overflow-y-auto` como fallback se o ScrollArea nao funcionar
+Na tela de edicao (`OSAssistenciaEditar.tsx`), as solicitacoes de pecas ja sao carregadas via `getSolicitacoesByOS(id)` no useEffect (linha 131). Porem, ao salvar a OS via `handleSave`, a funcao `updateOrdemServico` sobrescreve a timeline sem incluir os eventos de solicitacao, causando perda de historico.
+
+### 2.2 Correcoes em `OSAssistenciaEditar.tsx`
+
+- **Fetch completo no carregamento**: Ja implementado (linha 131). Garantir que a lista e recarregada apos adicionar nova solicitacao (ja feito, linha 768).
+- **Protecao na funcao handleSave**: Ao salvar, recarregar solicitacoes para garantir sincronismo: `setSolicitacoesOS(getSolicitacoesByOS(id!))` apos o save.
+- **Timeline imutavel**: Nunca sobrescrever entradas existentes na timeline. No `handleSave`, usar spread do array original da OS recarregada (nao do state local que pode estar desatualizado).
+
+### 2.3 Timeline automatica para movimentacao de pecas
+
+Cada transicao gera log na timeline:
+- Solicitada: "Peca X solicitada pelo tecnico Y"
+- Aprovada: "Solicitacao aprovada pelo gestor"
+- Paga: "Pagamento da peca registrado pelo financeiro"
+- Recebida: "Peca recebida na loja Z"
+
+Estes logs ja sao gerados parcialmente em `solicitacaoPecasApi.ts`. Garantir que TODOS os estados geram timeline.
+
+---
+
+## 3. Refinamento da Interface
+
+### 3.1 Remover Quadro de Pagamentos da Edicao do Tecnico
+
+**Em `OSAssistenciaEditar.tsx` (linhas 607-689):**
+- Remover completamente o card "Pagamentos" com os campos de meio de pagamento, valor e parcelas
+- A tela do tecnico deve conter apenas: Dados do Atendimento, Aparelho, Pecas/Servicos, Solicitacoes de Pecas, Avaliacao Tecnica (Valor Custo/Venda) e Timeline
+
+**Em `OSAssistenciaDetalhes.tsx` (linhas 886-918):**
+- Quando `proximaAtuacao === 'Técnico: Avaliar/Executar'`, ocultar completamente a secao de pagamentos (nao exibir nem em modo leitura)
+
+### 3.2 Adicionar campos Valor de Custo e Valor de Venda na Edicao
+
+**Em `OSAssistenciaEditar.tsx`:**
+- Adicionar card "Avaliacao Tecnica" com campos `valorCustoTecnico` e `valorVendaTecnico` (similar ao que ja existe em `OSAssistenciaDetalhes.tsx`)
+- Incluir botao "Concluir Servico" que valida os valores e faz a transicao de estado
+- Salvar estes valores via `updateOrdemServico`
+
+### 3.3 Campo Loja - Filtro Assistencia
+
+**Em `OSAssistenciaEditar.tsx` (linha 400-405):**
+- O `AutocompleteLoja` ja usa `apenasLojasTipoLoja={true}`, mas esta funcao pode nao filtrar por "Assistencia". Verificar e alterar para `filtrarPorTipo="Assistência"` (mesmo padrao do Detalhes, linha 1018)
+
+### 3.4 Camera na tela de edicao
+
+**Em `OSAssistenciaEditar.tsx`:**
+- Adicionar o mesmo componente de camera que existe em `OSAssistenciaNova.tsx` para documentar progresso durante a atuacao tecnica
+- As novas fotos devem ser adicionadas a timeline como eventos tipo `'foto'`
+
+---
+
+## 4. Regras de Pagamento (Etapa Vendedor)
+
+### 4.1 Trava de Seguranca
+
+Ja implementado em `OSAssistenciaDetalhes.tsx` (linhas 833-854). A validacao verifica `!os.valorCustoTecnico && !os.valorVendaTecnico`. Corrigir para usar `||` em vez de `&&` (ambos devem estar preenchidos, nao apenas um):
+```
+if (!os.valorCustoTecnico || !os.valorVendaTecnico)
+```
+
+### 4.2 Metodos de Pagamento
+
+O `PagamentoQuadro` ja e usado com `lojaVendaId={os.lojaId}`. Verificar que internamente filtra maquinas pela loja. Adicionar prop para restringir metodos a Dinheiro, Pix e Cartao (se ainda nao implementado).
+
+---
+
+## 5. Atualizacao de Badges e Status em Telas de Listagem
+
+### 5.1 `OSAssistencia.tsx`
+
+- Adicionar badges para novos status: `'Em Aberto'`, `'Pagamento Concluído'`, `'Aguardando Conferência'`, `'Finalizado'`
+- Adicionar badges para novas atuacoes: `'Gestor: Aprovar Peça'`, `'Logística: Enviar Peça'`
+- Atualizar filtros de status no select para incluir os novos status
+- Atualizar filtros rapidos de atuacao para incluir "Gestor" e "Logistica" se necessario
+
+### 5.2 `OSAssistenciaDetalhes.tsx` e `OSAssistenciaEditar.tsx`
+
+- Atualizar `getStatusBadge` para cobrir todos os novos status
+- Atualizar select de Status na edicao para incluir os novos status
+- Atualizar select de Status na barra lateral de detalhes
 
 ---
 
@@ -94,10 +146,11 @@ Em `RHFeedback.tsx` (linha 533), o modal de "Registrar Novo FeedBack" ja usa `Sc
 
 | Arquivo | Alteracoes |
 |---------|-----------|
-| `src/utils/vendasDigitalApi.ts` | Substituir IDs falsos (COL-007/008/009) por UUIDs reais do cadastro de colaboradores |
-| `src/pages/VendasFinalizarDigital.tsx` | Fixar Loja de Venda como "Loja Online" (fcc78c1a, disabled). Alinhar modais/quadros com VendasNova |
-| `src/pages/EstoqueNotaCadastrar.tsx` | Filtrar modelos por tipo produto (Aparelho vs Acessorio). Corrigir botao Voltar para /estoque/notas-pendencias |
-| `src/pages/EstoqueNotaCadastrarProdutos.tsx` | Filtrar modelos por tipo produto (Aparelho vs Acessorio) |
-| `src/pages/FinanceiroExtratoContas.tsx` | Corrigir match de despesas: comparar tanto por nome quanto por ID da conta |
-| `src/pages/FinanceiroPagamentosDowngrade.tsx` | Garantir persistencia do registro no historico apos finalizacao |
-| `src/pages/RHFeedback.tsx` | Corrigir scroll vertical no modal de registro de feedback |
+| `src/utils/assistenciaApi.ts` | Novos status no type union: `'Em Aberto'`, `'Pagamento Concluído'`, `'Aguardando Conferência'`, `'Finalizado'`. Novas atuacoes: `'Gestor: Aprovar Peça'`, `'Logística: Enviar Peça'`. Atualizar mocks |
+| `src/pages/OSAssistenciaNova.tsx` | Status inicial = `'Em Aberto'` em vez de `'Em serviço'` |
+| `src/pages/OSAssistenciaEditar.tsx` | Remover card Pagamentos. Adicionar card Avaliacao Tecnica (Custo/Venda + botao Concluir). Adicionar camera. Corrigir AutocompleteLoja para `filtrarPorTipo="Assistência"`. Forcar proximaAtuacao ao mudar status para concluido. Proteger timeline ao salvar |
+| `src/pages/OSAssistenciaDetalhes.tsx` | Ocultar pagamentos quando atuacao = Tecnico. Corrigir trava `&&` para `\|\|`. Status `'Aguardando Conferência'` no pagamento vendedor. Status `'Finalizado'` na validacao financeiro. Novos badges |
+| `src/pages/OSAssistencia.tsx` | Novos badges de status e atuacao. Filtros atualizados |
+| `src/utils/solicitacaoPecasApi.ts` | Ajustar proximaAtuacao para `'Gestor: Aprovar Peça'` na solicitacao. Criar funcao registrarPagamentoPeca. Timeline automatica em todas as transicoes |
+| `src/pages/OSHistoricoAssistencia.tsx` | Novos badges de status |
+| `src/pages/OSAnaliseGarantia.tsx` | Status inicial `'Em Aberto'` ao criar OS |

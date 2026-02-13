@@ -1,101 +1,145 @@
 
+# Plano - Reestruturacao do Modulo de Assistencia em 3 Etapas com "Proxima Atuacao"
 
-# Plano - Ajustes no Modulo de Vendas (8 problemas)
+## Resumo
 
-## Problema 1: Conferencia do Gestor - Painel lateral deve seguir o modelo do Financeiro
-
-O painel lateral do Gestor (`VendasConferenciaGestor.tsx`, linhas 772-1003) usa `w-[30%] sticky top-4` com layout simples. O painel do Financeiro (`FinanceiroConferencia.tsx`, linhas 1088-1345) usa `xl:fixed xl:right-0 xl:h-screen xl:w-[480px]` com drawer lateral full-height e sections mais detalhadas (Aprovacao do Gestor, Rastreabilidade, Observacoes read-only e editaveis, Data de Finalizacao).
-
-**Correcao em `src/pages/VendasConferenciaGestor.tsx`:**
-- Substituir o container do painel de `w-[30%] sticky top-4 h-fit min-w-[350px]` para `w-full xl:w-[480px] xl:min-w-[460px] xl:max-w-[520px] xl:fixed xl:right-0 xl:top-0 xl:bottom-0 h-fit xl:h-screen flex-shrink-0 xl:z-30`
-- Substituir `<Card className="max-h-[calc(100vh-120px)] overflow-y-auto">` para `<Card className="xl:h-full xl:rounded-none xl:border-l xl:border-t-0 xl:border-b-0 xl:border-r-0 overflow-y-auto">`
-- Ajustar o container principal de `w-[70%]` para `w-full xl:flex-1` com `flex-col xl:flex-row gap-4 xl:gap-6`
-- Adicionar secao de "Acessorios" abaixo dos Itens da Venda (listar `vendaSelecionada.acessorios` se existir)
-- Adicionar secao de "Trade-Ins" com abatimento
-- Adicionar secao com comprovantes de pagamento (usando `ComprovantePreview`)
+Reestruturar o modulo de Assistencia (OS) para seguir um fluxo guiado por 3 etapas com o campo `proximaAtuacao` controlando a progressao: Registro (Entrada) -> Atuacao (Tecnico) -> Finalizacao (Vendedor e Financeiro). Inclui captura de fotos, campos de Valor de Custo/Venda, filtros rapidos de atuacao, remocao de mensagens e correcoes de consistencia.
 
 ---
 
-## Problema 2: Garantia estendida sumindo apos lancamento na Conferencia Gestor
+## Etapa 1: Registro (Entrada)
 
-O campo `garantiaExtendida` nao esta sendo incluido no objeto `vendaData` em `VendasNova.tsx` (linha 950-983). Ao criar a venda, os dados de garantia extendida sao perdidos e nao aparecem na conferencia.
+### 1.1 Novo campo `proximaAtuacao` na interface `OrdemServico`
 
-**Correcao em `src/pages/VendasNova.tsx`:**
-- Adicionar `garantiaExtendida` ao objeto `vendaData` (linha ~982)
-- Adicionar `garantiaItens` ao objeto `vendaData`
+Adicionar ao `assistenciaApi.ts`:
+- `proximaAtuacao?: 'Técnico: Avaliar/Executar' | 'Vendedor: Registrar Pagamento' | 'Financeiro: Conferir Lançamento' | 'Concluído'`
+- `valorCustoTecnico?: number` (valor de custo registrado pelo tecnico)
+- `valorVendaTecnico?: number` (valor de venda/cobrado do cliente registrado pelo tecnico)
+- `fotosEntrada?: string[]` (URLs/base64 das fotos capturadas na entrada)
 
-**Correcao em `src/utils/vendasApi.ts`:**
-- Adicionar campos `garantiaExtendida` e `garantiaItens` a interface `Venda` como opcionais
+### 1.2 Renomear "Avulso" para "Balcao"
 
-**Correcao em `src/pages/VendasConferenciaGestor.tsx`:**
-- Exibir secao de "Garantia Extendida" no painel lateral quando `vendaSelecionada.garantiaExtendida` existir, mostrando plano, valor, e vigencia
+Em `assistenciaApi.ts`:
+- Alterar o tipo `origemOS` de `'Avulso'` para `'Balcão'`
+- Atualizar os mocks existentes que usam `'Avulso'`
 
----
+Em `OSAssistenciaNova.tsx`:
+- Na linha ~675, trocar `'Avulso' as const` por `'Balcão' as const`
 
-## Problema 3: Venda Balcao - Opcao de aumentar/diminuir quantidade de acessorios
+Em `OSAssistencia.tsx`:
+- Na funcao `getOrigemBadge` (linhas 148-162), trocar referencia de `'Avulso'` para `'Balcão'`
 
-Atualmente a quantidade e definida no modal de selecao e so pode ser removida. Na tabela de acessorios da Venda Balcao (`VendasAcessorios.tsx`, linhas 640-714), a coluna "Qtd" mostra apenas o numero sem controles de incremento/decremento.
+### 1.3 Componente de Camera para fotos do aparelho
 
-**Correcao em `src/pages/VendasAcessorios.tsx`:**
-- Na coluna "Qtd" da tabela de acessorios, substituir `{item.quantidade}` por controles +/- com botoes e validacao de estoque maximo
-- Ao alterar a quantidade, recalcular `valorTotal = valorUnitario * novaQuantidade`
-- Botao "-" nao permite ir abaixo de 1 (remover usa o botao X)
-- Botao "+" valida contra o estoque disponivel do acessorio
+Em `OSAssistenciaNova.tsx`:
+- Adicionar estado `fotosEntrada: string[]`
+- Criar secao "Fotos do Estado Fisico" dentro do Card "Aparelho" (abaixo dos campos de IMEI)
+- Botao "Tirar Foto" que abre a camera do dispositivo via `<input type="file" accept="image/*" capture="environment" />`
+- Quantidade de fotos livre - exibir miniaturas com opcao de remover
+- As fotos sao armazenadas como base64 temporario (mock, nao em DB) e salvas no objeto da OS
+- Exibir fotos na Timeline da OS nos Detalhes
 
----
+### 1.4 Gatilho ao Salvar
 
-## Problema 4: Historico de Vendas - Filtro "Modelo" e coluna "Produto" - retornar se venda de aparelho ou acessorio
-
-O filtro esta nomeado "Modelo" (linha 317) mas a coluna da tabela diz "Produto" (linha 394). Alem disso, vendas de acessorios (via Venda Balcao) nao mostram a informacao de que sao vendas de acessorios na coluna Produto.
-
-**Correcao em `src/pages/Vendas.tsx`:**
-- Renomear o label do filtro de "Modelo" para "Produto" (linha 317)
-- Na celula da coluna "Produto" (linha 446): se `venda.itens.length === 0` e `venda.acessorios?.length > 0`, exibir "Acessorio" (com badge diferenciada) seguido dos nomes dos acessorios. Se tiver itens normais, manter o modelo do aparelho
-- Ajustar o filtro `modeloFiltro` para tambem buscar nos nomes dos acessorios (`venda.acessorios?.some(a => a.descricao...)`)
-
----
-
-## Problema 5: Pendentes Digitais - Responsavel com nomes errados
-
-Na tabela de Pendentes Digitais (`VendasPendentesDigitais.tsx`, linha 159), o "Responsavel" usa `venda.responsavelVendaNome` que vem dos mocks hardcoded em `vendasDigitalApi.ts` (nomes como "Rafael Digital", "Camila Online"). Esses nomes nao existem no cadastro real de colaboradores.
-
-**Correcao em `src/pages/VendasPendentesDigitais.tsx`:**
-- Importar `useCadastroStore` e usar `obterNomeColaborador(venda.responsavelVendaId)` para resolver o nome real do colaborador
-- Se o ID nao existir no cadastro, fazer fallback para `venda.responsavelVendaNome`
+Em `OSAssistenciaNova.tsx` na funcao `handleRegistrarOS`:
+- Ao criar a OS, definir `proximaAtuacao: 'Técnico: Avaliar/Executar'`
+- Incluir `fotosEntrada` no objeto da OS
 
 ---
 
-## Problema 6: Pendentes Digitais - Origem da Venda sempre "Loja Online"
+## Etapa 2: Atuacao (Tecnico)
 
-Na tela de Nova Venda Digital (`VendasNovaDigital.tsx`, linha 91), a origem da venda e definida como `'Digital'` hardcoded. Ao finalizar na tela `VendasFinalizarDigital.tsx`, o campo de origem tambem inicia com `'Digital'`.
+### 2.1 Campos de Valor de Custo e Valor de Venda
 
-**Correcao em `src/pages/VendasNovaDigital.tsx`:**
-- Alterar o valor default de `origemVenda` de `'Digital'` para `'Loja Online'`
+Em `OSAssistenciaDetalhes.tsx`:
+- Adicionar campos editaveis `valorCustoTecnico` e `valorVendaTecnico` no card de Pecas/Servicos ou em card dedicado "Avaliacao Tecnica"
+- Estes campos sao informativos (guardados para consulta) e devem ser preenchidos pelo tecnico antes de concluir
 
-**Correcao em `src/pages/VendasFinalizarDigital.tsx`:**
-- Alterar o valor default de `origemVenda` de `'Digital'` para `'Loja Online'` (linha 91)
-- Tornar o campo de Origem da Venda readonly/desabilitado com valor fixo "Loja Online"
+### 2.2 Gestao de Pecas com Status Automaticos
+
+Em `solicitacaoPecasApi.ts` > funcao `aprovarSolicitacao`:
+- Alterar o status da OS de `'Em Análise'` para `'Aguardando Recebimento'` (novo status)
+
+Em `OSAssistenciaNova.tsx` e `OSAssistenciaDetalhes.tsx`:
+- Ao usar "Solicitar Pecas", status da OS muda para `'Aguardando Peça'` (ja existe)
+- Ao registrar recebimento de peca dentro da OS, status retorna para `'Em Execução'` (renomear `'Em serviço'` para `'Em Execução'`)
+- Todas as mudancas geram registros automaticos na Timeline
+
+Adicionar `'Aguardando Recebimento'` e `'Em Execução'` ao tipo de status em `assistenciaApi.ts`
+
+### 2.3 Gatilho de Conclusao
+
+Em `OSAssistenciaDetalhes.tsx`:
+- Botao "Concluir Servico" visivel quando status = `'Em Execução'`
+- Ao clicar, `proximaAtuacao` muda para `'Vendedor: Registrar Pagamento'`
+- Status da OS muda para `'Aguardando Pagamento'` (novo status)
+- Registra na Timeline
 
 ---
 
-## Problema 7: Finalizar Venda Digital - Adequar quadros e modais conforme Nova Venda
+## Etapa 3: Finalizacao (Vendedor e Financeiro)
 
-A tela `VendasFinalizarDigital.tsx` (1943 linhas) precisa ser verificada para garantir que todos os quadros (Cliente, Produtos, Acessorios, Trade-In, Pagamentos, Garantias, Resumo) e modais (Buscar Cliente, Novo Cliente, Selecionar Produto, etc.) seguem exatamente o mesmo modelo visual e funcional da `VendasNova.tsx`.
+### 3.1 Acao do Vendedor
 
-**Correcao em `src/pages/VendasFinalizarDigital.tsx`:**
-- Verificar e alinhar visualmente os modais de selecao de produto (max-w, colunas, filtros)
-- Verificar presenca da secao de Garantia Extendida (existente na VendasNova mas pode estar ausente ou diferente na FinalizarDigital)
-- Garantir que o quadro de pagamentos usa `PagamentoQuadro` com os mesmos parametros
-- Verificar a secao de resumo financeiro (Lucro, Margem, Custo)
-- Adicionar secao de Garantia Extendida se nao existir
+Em `OSAssistenciaDetalhes.tsx`:
+- Quando `proximaAtuacao === 'Vendedor: Registrar Pagamento'`, exibir secao de pagamento habilitada
+- **Trava de Seguranca**: Bloquear registro de pagamento se `valorCustoTecnico` ou `valorVendaTecnico` nao foram preenchidos. Exibir alerta informando que o tecnico precisa preencher esses campos primeiro
+- **Quadro de Pagamentos**: Usar `PagamentoQuadro` com restricoes:
+  - Metodos permitidos: Dinheiro, Pix, Cartao (filtrar no componente ou via prop)
+  - Maquinas de Cartao: filtrar para exibir apenas as vinculadas a Loja da OS (prop `lojaVendaId` ja existe no PagamentoQuadro)
+- Ao salvar pagamento, `proximaAtuacao` muda para `'Financeiro: Conferir Lançamento'`
+
+### 3.2 Acao do Financeiro
+
+Em `OSAssistenciaDetalhes.tsx` ou em tela dedicada:
+- Quando `proximaAtuacao === 'Financeiro: Conferir Lançamento'`, exibir botao "Validar Lancamento"
+- Apos validacao, status final = `'Concluído'`, `proximaAtuacao = 'Concluído'`
+- Registra na Timeline
 
 ---
 
-## Problema 8: Venda Balcao registra acessorio mas coluna Produto no Historico nao identifica como "Acessorio"
+## Interface e Usabilidade
 
-Quando uma venda e registrada pela aba Venda Balcao (`VendasAcessorios.tsx`), os dados sao salvos com `itens: []` e `acessorios: [...]`. No Historico de Vendas (`Vendas.tsx`), a coluna Produto mostra `modelos` que vem de `venda.itens.map(i => i.produto)`, resultando em "-" ou vazio para vendas so de acessorios.
+### 4.1 Filtros Rapidos de Atuacao
 
-**Correcao**: ja coberta pelo Problema 4 - a logica de exibicao da coluna Produto sera ajustada para identificar e exibir "Acessorio" quando a venda so tem acessorios.
+Em `OSAssistencia.tsx`:
+- Adicionar botoes de filtro rapido acima da tabela (abaixo dos stats cards):
+  - "Minhas Atuacoes" - filtra por `proximaAtuacao` cruzado com perfil logado (tecnico, vendedor ou financeiro)
+  - "Aguardando Pagamento" - filtra por `proximaAtuacao === 'Vendedor: Registrar Pagamento'`
+  - "Pendentes Financeiro" - filtra por `proximaAtuacao === 'Financeiro: Conferir Lançamento'`
+- Adicionar coluna "Proxima Atuacao" na tabela com badge colorido
+
+### 4.2 Timeline com Fotos
+
+Em `OSAssistenciaDetalhes.tsx`:
+- Na secao de Timeline, exibir miniaturas das fotos de entrada (`fotosEntrada`) como item especial da timeline (tipo `'foto'`)
+
+### 4.3 Campo Loja - apenas tipo Assistencia
+
+- Ja implementado em `OSAssistenciaNova.tsx` (usa `apenasLojasTipoLoja` no AutocompleteLoja) e em `OSAssistenciaDetalhes.tsx` (usa `filtrarPorTipo="Assistência"`)
+- Verificar e garantir consistencia
+
+---
+
+## Regras de Negocio Adicionais
+
+### 5.1 Remover mensagens de origem do aparelho
+
+Em `OSAssistenciaNova.tsx` (linhas 937-946):
+- Remover o bloco condicional que exibe:
+  - "O aparelho foi adquirido na Thiago Imports..."
+  - "O aparelho foi adquirido externamente..."
+
+### 5.2 Solicitar Pecas identico na criacao e edicao
+
+- O quadro "Solicitar Pecas" ja existe em ambos `OSAssistenciaNova.tsx` (linhas 1279-1409) e `OSAssistenciaDetalhes.tsx` (linhas 589-697)
+- Verificar e garantir que ambos usam o mesmo layout e funcionalidades (campos, validacoes, tabela)
+
+### 5.3 Persistencia de dados do cliente da Analise de Tratativas
+
+Em `OSAssistenciaNova.tsx` (linhas 258-287):
+- No bloco de pre-preenchimento da Analise de Tratativas, garantir que `clienteId` e persistido corretamente
+- Para origem "Estoque", buscar dados do cliente associado ao produto pendente e preencher `clienteId`
 
 ---
 
@@ -103,12 +147,8 @@ Quando uma venda e registrada pela aba Venda Balcao (`VendasAcessorios.tsx`), os
 
 | Arquivo | Alteracoes |
 |---------|-----------|
-| `src/pages/VendasConferenciaGestor.tsx` | Redesenhar painel lateral: layout fixed full-height (modelo Financeiro); adicionar secoes de Acessorios, Trade-Ins, Comprovantes, Garantia Extendida |
-| `src/utils/vendasApi.ts` | Adicionar campos opcionais `garantiaExtendida` e `garantiaItens` na interface `Venda` |
-| `src/pages/VendasNova.tsx` | Incluir `garantiaExtendida` e `garantiaItens` no objeto `vendaData` ao registrar venda |
-| `src/pages/VendasAcessorios.tsx` | Adicionar botoes +/- na coluna Qtd dos acessorios com validacao de estoque |
-| `src/pages/Vendas.tsx` | Renomear filtro "Modelo" para "Produto"; exibir "Acessorio" na coluna quando venda e so de acessorios; ajustar busca do filtro para incluir acessorios |
-| `src/pages/VendasPendentesDigitais.tsx` | Usar `obterNomeColaborador` do cadastroStore para resolver nomes reais |
-| `src/pages/VendasNovaDigital.tsx` | Alterar origemVenda default para "Loja Online" |
-| `src/pages/VendasFinalizarDigital.tsx` | Alterar origemVenda default para "Loja Online"; campo desabilitado; alinhar modais e quadros com VendasNova; adicionar Garantia Extendida se ausente |
-
+| `src/utils/assistenciaApi.ts` | Adicionar campos `proximaAtuacao`, `valorCustoTecnico`, `valorVendaTecnico`, `fotosEntrada` na interface. Renomear `'Avulso'` para `'Balcão'`. Adicionar novos status: `'Aguardando Recebimento'`, `'Em Execução'`, `'Aguardando Pagamento'` |
+| `src/pages/OSAssistenciaNova.tsx` | Componente de camera para fotos. Remover mensagens de origem. Setar `proximaAtuacao` ao salvar. Renomear `'Avulso'` para `'Balcão'`. Garantir persistencia de `clienteId` da Analise |
+| `src/pages/OSAssistencia.tsx` | Filtros rapidos (Minhas Atuacoes, Aguardando Pagamento, Pendentes Financeiro). Coluna "Proxima Atuacao" na tabela. Renomear badge `'Avulso'` para `'Balcão'`. Novos badges de status |
+| `src/pages/OSAssistenciaDetalhes.tsx` | Campos Valor de Custo/Venda. Botao "Concluir Servico". Secao de pagamento com trava. Validacao financeira. Fotos na Timeline. Novos badges de status |
+| `src/utils/solicitacaoPecasApi.ts` | Alterar `aprovarSolicitacao` para setar OS status para `'Aguardando Recebimento'` |

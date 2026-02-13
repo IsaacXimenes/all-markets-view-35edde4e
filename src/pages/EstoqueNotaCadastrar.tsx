@@ -28,6 +28,7 @@ import { useAuthStore } from '@/store/authStore';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { BufferAnexos, AnexoTemporario } from '@/components/estoque/BufferAnexos';
 import { getProdutosCadastro } from '@/utils/cadastrosApi';
+import { getAcessorios } from '@/utils/acessoriosApi';
 
 interface ProdutoLinha {
   tipoProduto: 'Aparelho' | 'Acessorio';
@@ -60,6 +61,7 @@ const produtoLinhaVazia = (): ProdutoLinha => ({
 export default function EstoqueNotaCadastrar() {
   const navigate = useNavigate();
   const produtosCadastro = getProdutosCadastro();
+  const acessoriosCadastro = getAcessorios();
   const { user } = useAuthStore();
   
   const DRAFT_KEY = 'draft_nota_entrada';
@@ -306,9 +308,9 @@ export default function EstoqueNotaCadastrar() {
   return (
     <EstoqueLayout title="Cadastrar Nova Nota de Compra">
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => navigate('/estoque/notas-compra')}>
+        <Button variant="ghost" onClick={() => navigate('/estoque/notas-pendencias')}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Voltar para Notas de Compra
+          Voltar para Notas Pendências
         </Button>
 
         {/* Banner de Rascunho */}
@@ -582,19 +584,23 @@ export default function EstoqueNotaCadastrar() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Select 
-                          value={produto.marca}
-                          onValueChange={(value) => atualizarProduto(index, 'marca', value)}
-                        >
-                          <SelectTrigger className="w-28">
-                            <SelectValue placeholder="Selecione" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {marcasAparelhos.map(marca => (
-                              <SelectItem key={marca} value={marca}>{marca}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {produto.tipoProduto === 'Aparelho' ? (
+                          <Select 
+                            value={produto.marca}
+                            onValueChange={(value) => atualizarProduto(index, 'marca', value)}
+                          >
+                            <SelectTrigger className="w-28">
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {marcasAparelhos.map(marca => (
+                                <SelectItem key={marca} value={marca}>{marca}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input disabled placeholder="N/A" className="w-28 bg-muted" />
+                        )}
                       </TableCell>
                       <TableCell>
                         <Select 
@@ -605,9 +611,14 @@ export default function EstoqueNotaCadastrar() {
                             <SelectValue placeholder="Selecione" />
                           </SelectTrigger>
                           <SelectContent>
-                            {getModelosAparelhos(produto.marca).map(p => (
-                              <SelectItem key={p.id} value={p.produto}>{p.produto}</SelectItem>
-                            ))}
+                            {produto.tipoProduto === 'Acessorio' 
+                              ? acessoriosCadastro.map(a => (
+                                  <SelectItem key={a.id} value={a.descricao}>{a.descricao}</SelectItem>
+                                ))
+                              : getModelosAparelhos(produto.marca).map(p => (
+                                  <SelectItem key={p.id} value={p.produto}>{p.produto}</SelectItem>
+                                ))
+                            }
                           </SelectContent>
                         </Select>
                       </TableCell>
@@ -732,7 +743,7 @@ export default function EstoqueNotaCadastrar() {
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate('/estoque/notas-compra')}>
+            <Button variant="outline" onClick={() => navigate('/estoque/notas-pendencias')}>
               Cancelar
             </Button>
             <Button onClick={handleSalvar}>

@@ -135,7 +135,7 @@ export default function FinanceiroExtratoContas() {
         if (mesDespesa !== mesSelecionado || anoDespesa !== anoSelecionado) return;
         
         // Encontrar conta pelo nome
-        const contaEncontrada = contasFinanceiras.find(c => c.nome === despesa.conta);
+        const contaEncontrada = contasFinanceiras.find(c => c.nome === despesa.conta || c.id === despesa.conta);
         const contaId = contaEncontrada?.id;
         
         if (contaId) {

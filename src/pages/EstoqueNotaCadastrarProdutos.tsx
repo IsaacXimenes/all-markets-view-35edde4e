@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { InputComMascara } from '@/components/ui/InputComMascara';
 import { formatCurrency } from '@/utils/formatUtils';
 import { getCores } from '@/utils/coresApi';
+import { getAcessorios } from '@/utils/acessoriosApi';
 import { formatIMEI } from '@/utils/imeiMask';
 
 const categoriasAparelho = ['Novo', 'Seminovo'];
@@ -47,6 +48,7 @@ export default function EstoqueNotaCadastrarProdutos() {
   const [nota, setNota] = useState<NotaEntrada | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const produtosCadastro = getProdutosCadastro();
+  const acessoriosCadastro = getAcessorios();
   
   const cores = getCores().filter(c => c.status === 'Ativo');
   
@@ -432,19 +434,23 @@ export default function EstoqueNotaCadastrarProdutos() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Select 
-                          value={produto.marca}
-                          onValueChange={(value) => atualizarProduto(index, 'marca', value)}
-                        >
-                          <SelectTrigger className="w-28">
-                            <SelectValue placeholder="Selecione" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {marcasAparelhos.map(marca => (
-                              <SelectItem key={marca} value={marca}>{marca}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {produto.tipoProduto === 'Aparelho' ? (
+                          <Select 
+                            value={produto.marca}
+                            onValueChange={(value) => atualizarProduto(index, 'marca', value)}
+                          >
+                            <SelectTrigger className="w-28">
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {marcasAparelhos.map(marca => (
+                                <SelectItem key={marca} value={marca}>{marca}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input disabled placeholder="N/A" className="w-28 bg-muted" />
+                        )}
                       </TableCell>
                       <TableCell>
                         <Select 
@@ -455,9 +461,14 @@ export default function EstoqueNotaCadastrarProdutos() {
                             <SelectValue placeholder="Selecione" />
                           </SelectTrigger>
                           <SelectContent>
-                            {getModelosAparelhos(produto.marca).map(p => (
-                              <SelectItem key={p.id} value={p.produto}>{p.produto}</SelectItem>
-                            ))}
+                            {produto.tipoProduto === 'Acessorio'
+                              ? acessoriosCadastro.map(a => (
+                                  <SelectItem key={a.id} value={a.descricao}>{a.descricao}</SelectItem>
+                                ))
+                              : getModelosAparelhos(produto.marca).map(p => (
+                                  <SelectItem key={p.id} value={p.produto}>{p.produto}</SelectItem>
+                                ))
+                            }
                           </SelectContent>
                         </Select>
                       </TableCell>

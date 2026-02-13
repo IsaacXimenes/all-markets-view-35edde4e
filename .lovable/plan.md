@@ -1,33 +1,68 @@
 
+# Plano - Ajustes no Modulo Financeiro (4 problemas)
 
-# Plano - Correcoes no Modulo de Recursos Humanos (2 problemas)
+## Problema 1: Remover abas "Lotes de Pagamento" e "Execucao de Lotes"
 
-## Problema 1: Modal "Registrar Novo FeedBack" com scroll horizontal
+Remover as duas entradas do array `tabs` em `src/components/layout/FinanceiroLayout.tsx` (linhas 16-17) e os imports de icones nao utilizados (`Package`, `CreditCard`).
 
-O `DialogContent` do modal de registro (linha 533) usa `max-w-2xl` com `overflow-hidden`, e o `ScrollArea` interno (linha 541) permite scroll vertical. Porem, os elementos internos como o grid de anexos (`grid-cols-2`, linha 627) e os cards de info/timeline podem ultrapassar a largura disponivel em telas menores ou no preview mobile, gerando scroll horizontal indesejado.
-
-**Correcao em `src/pages/RHFeedback.tsx`:**
-- Adicionar `overflow-x-hidden` no ScrollArea ou no container interno para impedir scroll horizontal
-- Garantir que os elementos internos usem `min-w-0` e `overflow-hidden` para respeitar os limites do container
-- Aplicar `w-full` explicito nos containers de grid para forcar confinamento
+**Arquivo:** `src/components/layout/FinanceiroLayout.tsx`
 
 ---
 
-## Problema 2: Adicionar campo "Conta de Saida" no modal de Adiantamentos
+## Problema 2: Conferencia do Fiado navegando para a aba errada
 
-O modal de Novo/Editar Adiantamento (linhas 590-704) nao possui campo para selecionar a conta financeira de onde o dinheiro sera retirado. O usuario precisa de um seletor de contas financeiras (usando as contas do cadastroStore).
+A aba "Conferencias - Fiado" tem `href: '/financeiro/fiado'` que esta correto. A rota em `App.tsx` tambem esta correta. O problema esta na logica de ativacao do `CarouselTabsNavigation.tsx` (linha 71):
 
-**Correcao em `src/utils/adiantamentosApi.ts`:**
-- Adicionar campo `contaSaidaId: string` na interface `Adiantamento`
-- Atualizar os mocks existentes com valores de conta validos (ex: CTA-015 a CTA-019, que sao contas Dinheiro)
+```
+const isActive = location.pathname === tab.href || 
+  (tab.href !== tabs[0]?.href && location.pathname.startsWith(tab.href + '/'));
+```
 
-**Correcao em `src/pages/RHAdiantamentos.tsx`:**
-- Adicionar `contaSaidaId` ao estado do formulario (`formData`)
-- Adicionar um campo `Select` ou usar as contas financeiras do `cadastroStore` (via `obterContasFinanceiras()`) para selecionar a conta de saida
-- Incluir o campo na validacao de campos obrigatorios
-- Exibir a conta na tabela principal (nova coluna "Conta de Saida")
-- Incluir no registro de historico de alteracoes ao editar
-- Incluir no export CSV
+Quando o usuario esta em `/financeiro/fiado`, a aba "Conferencia de Contas" (`/financeiro/conferencia`) nao deveria estar ativa pois usa comparacao `===` (e a tab do fiado). Porem, ao navegar diretamente pela URL, a tab correta e destacada. O problema reportado pode ser que algum link/botao em outra parte do sistema que deveria levar para o Fiado esta apontando para `/financeiro/conferencia`.
+
+Apos investigacao, a navegacao via tabs esta funcionando corretamente. Nao ha links em outras paginas apontando incorretamente. Vou garantir que nao haja conflito verificando que a logica de `isActive` funcione sem ambiguidade e que a rota esteja corretamente configurada. Se necessario, posso ajustar a ordem dos tabs ou a logica de `startsWith` para evitar falsos positivos.
+
+**Verificacao adicional necessaria durante implementacao** - testar o comportamento real clicando na aba.
+
+---
+
+## Problema 3: Pagamento Downgrade sumindo o registro apos conclusao
+
+O pagamento e processado por `finalizarVendaDowngrade` que muda o status para `'Finalizado'`. Na pagina `FinanceiroPagamentosDowngrade.tsx`, a aba "Historico" filtra vendas finalizadas (linha 42-46):
+
+```typescript
+vendas.filter(v => 
+  v.statusFluxo === 'Finalizado' && 
+  ((v as any).tipoOperacao === 'Downgrade' || (v as any).saldoDevolver)
+)
+```
+
+O problema e que apos a finalizacao, a venda tem `statusFluxo: 'Finalizado'` mas o filtro adicional falha porque:
+- `tipoOperacao` pode nao estar definido como `'Downgrade'` no fluxo
+- `saldoDevolver` pode ser `0` (falsy) se nao foi persistido
+
+Alem disso, o `useFluxoVendas` com `incluirHistorico: true` adiciona vendas finalizadas de TODOS os tipos, mas o filtro local da pagina deveria capturar apenas as downgrade.
+
+**Correcao em `src/utils/fluxoVendasApi.ts`:** Na funcao `finalizarVendaDowngrade`, adicionar `tipoOperacao: 'Downgrade'` e preservar `saldoDevolver` no objeto salvo, e tambem salvar `contaOrigemDowngrade: contaOrigem` para que a coluna "Conta Utilizada" funcione.
+
+**Correcao em `src/pages/FinanceiroPagamentosDowngrade.tsx`:** Ajustar o filtro de `vendasFinalizadas` para verificar tambem `(v as any).pagamentoDowngrade` como indicador de que a venda passou pelo fluxo de downgrade.
+
+---
+
+## Problema 4: Pagamento Downgrade nao aparece no Extrato por Conta
+
+A funcao `finalizarVendaDowngrade` em `fluxoVendasApi.ts` nao registra nenhuma saida financeira. O Extrato le dados de `getDespesas()` do `financeApi.ts`.
+
+**Correcao em `src/utils/fluxoVendasApi.ts`:** Na funcao `finalizarVendaDowngrade`, apos finalizar a venda, chamar `addDespesa` do `financeApi.ts` para registrar a saida financeira com:
+- tipo: 'Variavel'
+- descricao: "Pagamento PIX Downgrade - Venda [ID]"
+- valor: saldoDevolver
+- conta: contaOrigem (ID da conta informada)
+- categoria: "Downgrade"
+- status: "Pago"
+- data/dataVencimento/dataPagamento: data atual
+- lojaId: loja da venda
+- competencia: mes/ano atual
 
 ---
 
@@ -35,7 +70,6 @@ O modal de Novo/Editar Adiantamento (linhas 590-704) nao possui campo para selec
 
 | Arquivo | Alteracoes |
 |---------|-----------|
-| `src/pages/RHFeedback.tsx` | Adicionar `overflow-x-hidden` e `min-w-0` no ScrollArea do modal de registro para eliminar scroll horizontal |
-| `src/utils/adiantamentosApi.ts` | Adicionar campo `contaSaidaId` na interface `Adiantamento` e nos mocks |
-| `src/pages/RHAdiantamentos.tsx` | Adicionar campo Select de "Conta de Saida" no modal; nova coluna na tabela; incluir na validacao, historico e CSV |
-
+| `src/components/layout/FinanceiroLayout.tsx` | Remover 2 tabs (Lotes de Pagamento e Execucao de Lotes) e imports de icones nao usados |
+| `src/utils/fluxoVendasApi.ts` | Em `finalizarVendaDowngrade`: (1) salvar `tipoOperacao: 'Downgrade'`, `contaOrigemDowngrade`, preservar `saldoDevolver`; (2) chamar `addDespesa` para registrar saida financeira |
+| `src/pages/FinanceiroPagamentosDowngrade.tsx` | Ajustar filtro de `vendasFinalizadas` para usar `pagamentoDowngrade` como indicador |

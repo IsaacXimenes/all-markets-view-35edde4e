@@ -71,7 +71,7 @@ export default function OSOficina() {
   const aguardandoCheckin = osTecnico.filter(os => os.status === 'Aguardando Análise' || os.status === 'Em Aberto').length;
   const emServico = osTecnico.filter(os => os.status === 'Em serviço').length;
   const aguardandoPeca = osTecnico.filter(os => 
-    os.proximaAtuacao === 'Técnico (Recebimento)' || os.status === 'Peça Recebida'
+    os.proximaAtuacao === 'Técnico (Recebimento)' || os.status === 'Peça Recebida' || os.status === 'Solicitação de Peça'
   ).length;
 
   const recarregar = () => setOrdensServico(getOrdensServico());
@@ -226,6 +226,9 @@ export default function OSOficina() {
     }
     if (status === 'Em serviço') {
       return <Badge className="bg-blue-500 hover:bg-blue-600">Em Serviço</Badge>;
+    }
+    if (status === 'Solicitação de Peça') {
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Aguardando Peça</Badge>;
     }
     if (os.proximaAtuacao === 'Técnico (Recebimento)' || status === 'Peça Recebida' || status === 'Pagamento Concluído') {
       return <Badge className="bg-emerald-500 hover:bg-emerald-600">Peça Recebida</Badge>;

@@ -123,6 +123,8 @@ export default function OSAssistencia() {
         return <Badge className="bg-amber-500 hover:bg-amber-600">Aguardando Pagamento</Badge>;
       case 'Aguardando Conferência':
         return <Badge className="bg-violet-500 hover:bg-violet-600">Aguardando Conferência</Badge>;
+      case 'Conferência do Gestor':
+        return <Badge className="bg-orange-500 hover:bg-orange-600">Conferência do Gestor</Badge>;
       case 'Concluído':
         return <Badge className="bg-emerald-600 hover:bg-emerald-700">Concluído</Badge>;
       case 'Finalizado':
@@ -142,6 +144,8 @@ export default function OSAssistencia() {
         return <Badge variant="outline" className="border-amber-500 text-amber-600 text-xs">Vendedor</Badge>;
       case 'Atendente':
         return <Badge variant="outline" className="border-amber-500 text-amber-600 text-xs">Atendente</Badge>;
+      case 'Gestor':
+        return <Badge variant="outline" className="border-orange-500 text-orange-600 text-xs">Gestor</Badge>;
       case 'Financeiro: Conferir Lançamento':
         return <Badge variant="outline" className="border-purple-500 text-purple-600 text-xs">Financeiro</Badge>;
       case 'Gestor: Aprovar Peça':
@@ -484,6 +488,7 @@ export default function OSAssistencia() {
                   <SelectItem value="Finalizado">Finalizado</SelectItem>
                   <SelectItem value="Aguardando Pagamento">Aguardando Pagamento</SelectItem>
                   <SelectItem value="Pendente de Pagamento">Pendente de Pagamento</SelectItem>
+                  <SelectItem value="Conferência do Gestor">Conferência do Gestor</SelectItem>
                   <SelectItem value="Aguardando Financeiro">Aguardando Financeiro</SelectItem>
                   <SelectItem value="Liquidado">Liquidado</SelectItem>
                   <SelectItem value="Recusada pelo Técnico">Recusada pelo Técnico</SelectItem>

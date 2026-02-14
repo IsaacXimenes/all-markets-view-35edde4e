@@ -138,6 +138,10 @@ export interface NotaEntrada {
   
   // Flag de urgência
   urgente?: boolean;
+  
+  // Flag de rejeição pelo Financeiro
+  rejeitada?: boolean;
+  motivoRejeicao?: string;
 }
 
 // ============= ARMAZENAMENTO =============
@@ -515,6 +519,8 @@ export const rejeitarNota = (
   
   const atuacaoAnterior = nota.atuacaoAtual;
   nota.atuacaoAtual = 'Estoque';
+  nota.rejeitada = true;
+  nota.motivoRejeicao = motivo;
   
   // Registrar rejeição na timeline
   registrarTimeline(

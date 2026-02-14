@@ -163,6 +163,8 @@ export function TabelaNotasPendencias({
   const podeEditar = (nota: NotaEntrada) => podeEditarNota(nota, modulo);
 
   const getRowClass = (nota: NotaEntrada) => {
+    // Notas rejeitadas pelo financeiro ficam com fundo vermelho
+    if (nota.rejeitada) return 'bg-red-500/15';
     // Notas finalizadas ficam com fundo verde claro
     if (nota.status === 'Finalizada' || nota.atuacaoAtual === 'Encerrado') return 'bg-green-500/10';
     if (nota.status === 'Com Divergencia') return 'bg-destructive/10';
@@ -263,7 +265,26 @@ export function TabelaNotasPendencias({
                   </TableCell>
                   <TableCell>{getTipoPagamentoBadge(nota.tipoPagamento)}</TableCell>
                   <TableCell>{getAtuacaoBadge(nota.atuacaoAtual)}</TableCell>
-                  <TableCell>{getStatusBadge(nota.status)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      {getStatusBadge(nota.status)}
+                      {nota.rejeitada && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="destructive" className="gap-1 text-[10px]">
+                                <XCircle className="h-3 w-3" />
+                                Recusada
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {nota.motivoRejeicao ? `Motivo: ${nota.motivoRejeicao}` : 'Nota recusada pelo Financeiro'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-center">
                     <span className="text-xs text-muted-foreground">
                       {nota.qtdInformada} / {nota.qtdCadastrada} / {nota.qtdConferida}

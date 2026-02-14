@@ -99,7 +99,7 @@ function SidebarContent({
       </div>
       
       <ScrollArea className="flex-1 py-4">
-        <nav className="grid gap-1 px-2">
+        <nav className="grid gap-0.5 px-2">
           {navItems.map((item, index) => {
             const isActive = isActiveModule(item.href);
             return (

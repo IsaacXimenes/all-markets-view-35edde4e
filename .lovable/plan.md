@@ -1,103 +1,91 @@
 
 
-## Ajustes no Fluxo: "Finalizar Servico" e Persistencia Historica
+## Correcoes no Fluxo de Assistencia - 4 Problemas
 
-### Resumo das Mudancas
+### Problemas Identificados
 
-Tres ajustes principais para alinhar o fluxo operacional:
-1. Renomear "Finalizar OS" para "Finalizar Servico" na aba de Servicos
-2. Usar o status "Servico concluido" na aba de Servicos, e "Aguardando Pagamento" na aba Nova Assistencia
-3. Garantir que todos os registros permanecem visiveis em todas as abas, apenas alternando status
+1. **Status "Peca Recebida" ao solicitar peca (deveria ser "Aguardando Peca")**
+   - Em `OSOficina.tsx`, o `getStatusBadge` (linha 230) trata `proximaAtuacao === 'Tecnico (Recebimento)'` OU `status === 'Peca Recebida'` como "Peca Recebida".
+   - Quando o status muda para `'Solicitacao de Peca'`, nao existe badge especifico para esse status, e dependendo da atuacao pode cair no badge errado.
+   - **Correcao:** Adicionar badge "Aguardando Peca" (amarelo) para status `'Solicitacao de Peca'` ANTES da condicao de "Peca Recebida" no `getStatusBadge`.
 
-### Fluxo Atualizado
+2. **"Confirmar Recebimento" limpa o quadro de Solicitacoes de Pecas**
+   - Em `handleConfirmarRecebimento` (linha 94-107), o status muda para `'Em servico'` e chama `recarregar()`. As solicitacoes sao armazenadas separadamente no `solicitacaoPecasApi` (array em memoria), portanto nao devem ser afetadas.
+   - O problema pode estar no `handleSaveChanges` em `OSAssistenciaDetalhes.tsx` (linha 119) que salva `pecas: editPecas` - se o usuario editar a OS e salvar, o array `editPecas` pode estar vazio e sobrescreve as pecas da OS.
+   - **Correcao:** Verificar que ao salvar alteracoes em OSAssistenciaDetalhes, os dados de pecas/servicos nao sejam apagados. Tambem garantir que ao confirmar recebimento, a timeline registre a peca associada.
 
-```text
-Tecnico finaliza servico (aba Servicos)
-    Status: "Servico concluido" | Atuacao: "Atendente"
-    -> Registro permanece visivel na aba Servicos com badge "Servico Concluido"
-    -> Registro aparece na aba Nova Assistencia com botao "Registrar Pagamento"
-         |
-Atendente registra pagamento (aba Nova Assistencia)
-    Status: "Pendente de Pagamento" | Atuacao: "Gestor (Conferencia)"
-    -> Registro vai para aba Conferencia Gestor da Assistencia
-         |
-Gestor confere (aba Conferencia Gestor)
-    Status: "Aguardando Financeiro" | Atuacao: "Financeiro"
-    -> Registro vai para Conferencia de Contas no Financeiro
-         |
-Financeiro finaliza
-    Status: "Liquidado" | Atuacao: "-"
-    -> Historico em todas as abas
-```
+3. **Status apos pagamento: deve ser "Conferencia do Gestor" / "Gestor"**
+   - Atualmente, apos registrar pagamento em `OSAssistenciaDetalhes.tsx` linha 266-277, salva `status: 'Pendente de Pagamento'` e `proximaAtuacao: 'Gestor (Conferencia)'`.
+   - O usuario quer que o status visivel na aba Nova Assistencia seja **"Conferencia do Gestor"** e a prox atuacao seja **"Gestor"**.
+   - **Correcao:** Alterar o status para `'Conferencia do Gestor'` e proximaAtuacao para `'Gestor'`. Ajustar os badges e filtros correspondentes em OSAssistencia.tsx, OSConferenciaGestor.tsx e FinanceiroConferencia.tsx para usar o novo status.
+
+4. **Observacao do gestor nao aparece no Financeiro**
+   - `OSConferenciaGestor.tsx` salva com chave `observacao_gestor_os_${osId}` (linha 233)
+   - `FinanceiroConferencia.tsx` le com chave `observacao_gestor_${venda.id}` (linha 501) - **sem o `_os_`**
+   - **Correcao:** Alinhar as chaves. No `FinanceiroConferencia.tsx`, ao carregar observacao para registros de OS (ID comeca com "OS-"), usar a chave `observacao_gestor_os_${id}`.
 
 ---
 
-### Detalhes das Alteracoes
+### Detalhes Tecnicos
 
-#### 1. OSOficina.tsx - Renomear e ajustar status
+#### 1. OSOficina.tsx - Badge "Aguardando Peca"
 
-**Textos a alterar:**
-- Titulo do modal: "Finalizar OS {id}" -> "Finalizar Servico - {id}"
-- Botao de acao na tabela: "Finalizar" -> "Finalizar Servico"
-- Botao do modal footer: "Finalizar OS" -> "Finalizar Servico"
-- Toast de sucesso: mensagem atualizada
+No `getStatusBadge` (linha 222), adicionar ANTES da linha 230:
+```
+if (status === 'Solicitacao de Peca') {
+  return <Badge className="bg-yellow-500 hover:bg-yellow-600">Aguardando Peca</Badge>;
+}
+```
 
-**Status ao finalizar:**
-- Alterar de `status: 'Aguardando Pagamento'` para `status: 'Servico concluido'`
-- Manter `proximaAtuacao: 'Atendente'`
-- Timeline: "Servico finalizado pelo tecnico" em vez de "OS finalizada"
+Tambem ajustar a condicao da linha 230 para separar "Peca Recebida" de "Solicitacao de Peca".
 
-**Badge na aba Servicos:**
-- Adicionar badge "Servico Concluido" (verde) no `getStatusBadge` para status `'Servico concluido'`
-- Registro continua visivel na lista do tecnico (ja funciona via `osFinalizadas`)
+Ajustar o stat `aguardandoPeca` (linha 73) para incluir `status === 'Solicitacao de Peca'`.
 
-#### 2. OSAssistencia.tsx - Ajustar exibicao e botao de pagamento
+#### 2. OSAssistenciaDetalhes.tsx - Preservar pecas ao salvar
 
-**Condicao do botao "Registrar Pagamento":**
-- Alterar de `os.status === 'Aguardando Pagamento'` para `os.status === 'Servico concluido'`
-- Manter condicao `os.proximaAtuacao === 'Atendente'`
+No `handleSaveChanges` (linha 109), garantir que se `editPecas` estiver vazio mas a OS ja tinha pecas, manter as pecas originais.
 
-**Badge de status:**
-- Quando `status === 'Servico concluido'` e `proximaAtuacao === 'Atendente'`, exibir badge "Aguardando Pagamento" (amber) na aba Nova Assistencia, pois e o que o atendente precisa ver
+#### 3. Status "Conferencia do Gestor" / "Gestor"
 
-**Filtro de status:**
-- Adicionar "Servico concluido" nas opcoes de filtro
-- Adicionar "Pendente de Pagamento", "Aguardando Financeiro", "Liquidado" para acompanhamento historico completo
+**OSAssistenciaDetalhes.tsx** (linha 266-277): Alterar:
+- `status: 'Pendente de Pagamento'` -> `status: 'Conferencia do Gestor'`
+- `proximaAtuacao: 'Gestor (Conferencia)'` -> `proximaAtuacao: 'Gestor'`
 
-#### 3. OSAssistenciaDetalhes.tsx - Ajustar condicao do PagamentoQuadro
+**OSConferenciaGestor.tsx** (linha 70-73): Atualizar filtro:
+- `os.status === 'Pendente de Pagamento' && os.proximaAtuacao === 'Gestor (Conferencia)'`
+  -> `os.status === 'Conferencia do Gestor' && os.proximaAtuacao === 'Gestor'`
 
-- A condicao de exibicao do quadro de pagamento deve verificar `status === 'Servico concluido'` em vez de `'Aguardando Pagamento'`
-- Apos registrar pagamento, atualizar para `status: 'Pendente de Pagamento'`, `proximaAtuacao: 'Gestor (Conferencia)'`
+**OSConferenciaGestor.tsx** (linha 258-261 - handleRecusar): Ao recusar:
+- Manter `status: 'Servico concluido'` (voltar para o atendente registrar pagamento novamente)
+- `proximaAtuacao: 'Atendente'`
 
-#### 4. Persistencia historica em todas as abas
+**OSAssistencia.tsx**: Ajustar badges e filtros para incluir `'Conferencia do Gestor'`.
 
-**OSOficina.tsx (Servicos):**
-- O filtro `osTecnico` ja inclui `osFinalizadas` para manter registros da sessao
-- Adicionar tambem OS com status finais ('Servico concluido', 'Pendente de Pagamento', 'Aguardando Financeiro', 'Liquidado') que pertencam ao tecnico logado, para que o historico persista entre sessoes
+**FinanceiroConferencia.tsx**: Ajustar o mapeamento de OS para usar novo status na filtragem.
 
-**OSAssistencia.tsx (Nova Assistencia):**
-- Ja mostra todas as OS sem filtro de atuacao, apenas filtros do usuario
-- Registros em qualquer status ja aparecem - sem alteracao necessaria
+**statusColors.ts**: Adicionar cor para `'Conferencia do Gestor'`.
 
-**OSConferenciaGestor.tsx (Conferencia Gestor):**
-- Ja busca OS com status 'Pendente de Pagamento' para conferencia e mostra historico de conferidos/liquidados
+#### 4. FinanceiroConferencia.tsx - Chave da observacao
+
+Na funcao `handleSelecionarVenda` (linha 500-506), trocar:
+```
+const storedObsGestor = localStorage.getItem(`observacao_gestor_${venda.id}`);
+```
+Para:
+```
+const isOS = venda.id.startsWith('OS-');
+const obsKey = isOS ? `observacao_gestor_os_${venda.id}` : `observacao_gestor_${venda.id}`;
+const storedObsGestor = localStorage.getItem(obsKey);
+```
 
 ---
 
 ### Arquivos a Editar
 
-1. **src/pages/OSOficina.tsx**
-   - Renomear textos: "Finalizar" -> "Finalizar Servico"
-   - Alterar status de `'Aguardando Pagamento'` para `'Servico concluido'` no handleFinalizar
-   - Adicionar badge verde "Servico Concluido" no getStatusBadge
-   - Expandir filtro osTecnico para incluir historico do tecnico
-
-2. **src/pages/OSAssistencia.tsx**
-   - Alterar condicao do botao de pagamento para `status === 'Servico concluido'`
-   - Ajustar badge para mostrar "Aguardando Pagamento" quando servico concluido + atuacao Atendente
-   - Adicionar novos status ao filtro
-
-3. **src/pages/OSAssistenciaDetalhes.tsx**
-   - Ajustar condicao do PagamentoQuadro para `status === 'Servico concluido'`
-   - Apos pagamento registrado: status -> 'Pendente de Pagamento', atuacao -> 'Gestor (Conferencia)'
+1. **src/pages/OSOficina.tsx** - Badge "Aguardando Peca", stat counter
+2. **src/pages/OSAssistenciaDetalhes.tsx** - Status "Conferencia do Gestor" / "Gestor", preservar pecas
+3. **src/pages/OSAssistencia.tsx** - Badge e filtro para novo status
+4. **src/pages/OSConferenciaGestor.tsx** - Filtro e recusa para novo status
+5. **src/pages/FinanceiroConferencia.tsx** - Chave localStorage da observacao do gestor, filtro OS
+6. **src/utils/statusColors.ts** - Cor para "Conferencia do Gestor"
 

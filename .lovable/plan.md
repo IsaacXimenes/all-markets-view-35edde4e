@@ -1,81 +1,51 @@
 
-
-# Integracao Garantia - Assistencia, Emprestimos e Trocas
+# Formatacao de Datas e Otimizacao de Desempenho - Dados Sistema Antigo
 
 ## Resumo
 
-Este plano implementa a integracao automatica entre o modulo de Garantias e os modulos de Assistencia (OS) e Estoque, cobrindo 4 cenarios: criacao automatica de OS, gestao de emprestimos com rastreabilidade, fluxo de troca com status correto, e validacoes de interface com timeline unificada.
+Duas melhorias: (1) formatar colunas de data como DD/MM/AAAA em 6 abas, e (2) otimizar o desempenho do parsing dos arquivos Excel com cache e opcao `cellDates`.
 
 ---
 
-## 1. Criacao Automatica de OS ao Registrar Tratativa
+## 1. Formatacao de Datas
 
-**Onde:** `src/pages/GarantiaDetalhes.tsx` (funcao `handleRegistrarTratativa`)
+O problema atual e que o Excel armazena datas como numeros seriais (ex: `45234`) ou strings inconsistentes. O `useXlsxData` nao faz nenhum tratamento -- apenas converte tudo para string via `String()`.
 
-Atualmente, quando o tipo e "Encaminhado Assistencia" ou "Assistencia + Emprestimo", o sistema define `osId: 'OS-AUTO'` como placeholder. Sera alterado para:
+### Solucao
 
-- Chamar `addOrdemServico()` de `assistenciaApi.ts` com:
-  - `status`: "Aguardando Analise"
-  - `origemOS`: "Garantia"
-  - `garantiaId`: ID da garantia
-  - `clienteId`, `modeloAparelho`, `imeiAparelho`: dados importados da garantia
-  - `descricao`: descricao do problema informada pelo usuario
-  - `proximaAtuacao`: "Tecnico: Avaliar/Executar"
-  - `setor`: "GARANTIA"
-  - `lojaId`: loja da garantia
-- Atualizar a tratativa com o ID real da OS criada
-- Adicionar entrada na timeline da garantia com o ID da OS
-- A OS aparecera automaticamente na aba "Analise de Tratativas" por ter status "Aguardando Analise" e origem "Garantia"
+Adicionar um novo parametro `dateColumns` ao hook `useXlsxData` que recebe uma lista de nomes de colunas (ja mapeados) que devem ser formatados como data DD/MM/AAAA.
 
----
+No momento do mapeamento dos dados, ao encontrar uma coluna listada em `dateColumns`, o hook tentara converter o valor:
+- Se for numero serial do Excel: converter usando `XLSX.SSF.parse_date_code()` ou `new Date((valor - 25569) * 86400000)`
+- Se for string de data reconhecivel: converter com `new Date()`
+- Se falhar: manter o valor original
 
-## 2. Gestao de Emprestimos (Assistencia + Emprestimo)
+### Abas afetadas e colunas:
 
-**Onde:** `src/pages/GarantiaDetalhes.tsx` e `src/utils/estoqueApi.ts`
+| Aba | Coluna mapeada | Chave original |
+|-----|---------------|----------------|
+| Compras | Data Compra | DATA_COMPRA |
+| Compras Pagamentos | Data Pagamento | DATA_PAGAMETO |
+| Entradas | Data Entrada | DATA DE ENTRADA |
+| Ordem de Servico | Data | DATA |
+| Vendas | Data Venda | DATA VENDA |
+| Vendas Pagamentos | Data Pagamento | DATA_PAGAMETO |
 
-Quando o tipo for "Assistencia + Emprestimo":
-
-- Alterar o status do aparelho emprestado para `statusEmprestimo: 'Emprestimo - Assistencia'` (campo ja existente na interface `Produto`)
-- Preencher os campos de rastreabilidade ja existentes: `emprestimoGarantiaId`, `emprestimoClienteId`, `emprestimoClienteNome`, `emprestimoOsId`, `emprestimoDataHora`
-- Adicionar observacao interna na OS criada informando que o cliente possui aparelho de emprestimo (modelo + IMEI)
-- Registrar entrada na timeline unificada (`timelineApi.ts`) com tipo 'Colaborador' vinculada ao cliente
+Cada pagina passara `dateColumns: ['Data Compra']` (ou equivalente) ao hook.
 
 ---
 
-## 3. Fluxo de Troca de Aparelho
+## 2. Otimizacao de Desempenho
 
-**Onde:** `src/pages/GarantiaDetalhes.tsx`
+### Problema
+Cada vez que o usuario navega entre abas, o hook refaz o `fetch` + parsing do Excel do zero, mesmo que o arquivo ja tenha sido carregado antes.
 
-### Aparelho com Defeito (Entrada):
-- Chamar `encaminharParaAnaliseGarantia()` (ja existe em `garantiasApi.ts`) para criar registro na aba "Analise de Tratativas" com:
-  - `origem`: "Garantia"
-  - `origemId`: ID da garantia
-  - `clienteDescricao`: modelo + IMEI do aparelho defeituoso
+### Solucao: Cache em memoria
 
-### Aparelho Novo (Saida):
-- **Correcao:** Em vez de zerar a quantidade (`quantidade: 0`), alterar para um novo status intermediario
-- Adicionar campo `statusTroca` ao produto no estoqueApi ou reutilizar `bloqueadoEmVendaId` com valor do ID da garantia
-- O aparelho ficara com status derivado "Reservado para Troca" via `getStatusAparelho()`
-- Validar selecao obrigatoria do aparelho novo via busca de IMEI antes de salvar
-
----
-
-## 4. Validacoes e Timeline Unificada
-
-### Validacoes de Interface:
-- Botao "Registrar Tratativa" desabilitado se tipo "Troca Direta" ou "Assistencia + Emprestimo" sem aparelho selecionado (ja existe parcialmente)
-- Para "Troca Direta": exigir selecao do aparelho novo antes de salvar
-
-### Timeline Automatica:
-Todas as acoes geram entradas na timeline da garantia (`addTimelineEntry` de `garantiasApi.ts`):
-- Criacao da OS (tipo: `os_criada`, com ID da OS)
-- Emprestimo de aparelho (tipo: `emprestimo`, com modelo/IMEI)
-- Reserva de estoque para troca (tipo: `troca`, com modelo/IMEI do novo)
-- Registro do aparelho defeituoso em pendencias
-
-### Atomicidade:
-- Encapsular todas as operacoes (criar OS + atualizar estoque + registrar timeline + atualizar garantia) em uma funcao dedicada `processarTratativaGarantia()` no `garantiasApi.ts`
-- Se qualquer etapa falhar, exibir toast de erro sem salvar parcialmente
+- Criar um cache simples (objeto `Map` no modulo do hook) com chave = URL do arquivo
+- Na primeira carga, armazenar o resultado parseado (data + headers)
+- Nas cargas seguintes, retornar do cache instantaneamente
+- Adicionar `{ cellDates: true }` ao `XLSX.read()` para que datas ja venham como objetos Date nativos, simplificando a conversao
 
 ---
 
@@ -85,23 +55,33 @@ Todas as acoes geram entradas na timeline da garantia (`addTimelineEntry` de `ga
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/utils/garantiasApi.ts` | Nova funcao `processarTratativaGarantia()` que orquestra todas as operacoes atomicamente |
-| `src/utils/estoqueApi.ts` | Adicionar campo `bloqueadoEmTrocaGarantiaId` na interface `Produto` e atualizar `getStatusAparelho()` para retornar "Reservado para Troca" |
-| `src/pages/GarantiaDetalhes.tsx` | Refatorar `handleRegistrarTratativa` para usar a nova funcao orquestradora, importar `addOrdemServico` |
-| `src/utils/timelineApi.ts` | Adicionar funcao `registrarEmprestimoGarantia()` para timeline do cliente |
+| `src/hooks/useXlsxData.ts` | Adicionar parametro `dateColumns`, cache por URL, opcao `cellDates: true` |
+| `src/pages/DadosAntigoCompras.tsx` | Adicionar `dateColumns: ['Data Compra']` |
+| `src/pages/DadosAntigoComprasPagamentos.tsx` | Adicionar `dateColumns: ['Data Pagamento']` |
+| `src/pages/DadosAntigoEntradas.tsx` | Adicionar `dateColumns: ['Data Entrada']` |
+| `src/pages/DadosAntigoOrdemServico.tsx` | Adicionar `dateColumns: ['Data']` |
+| `src/pages/DadosAntigoVendas.tsx` | Adicionar `dateColumns: ['Data Venda']` |
+| `src/pages/DadosAntigoVendasPagamentos.tsx` | Adicionar `dateColumns: ['Data Pagamento']` |
 
-### Fluxo de dados:
+### Logica de conversao de data no hook:
 
 ```text
-GarantiaDetalhes.tsx
-  |
-  +-> processarTratativaGarantia() [garantiasApi.ts]
-       |
-       +-> addTratativa()           -> Registra tratativa
-       +-> addTimelineEntry()       -> Timeline da garantia
-       +-> addOrdemServico()        -> Cria OS (se Assistencia)
-       +-> updateProduto()          -> Emprestimo ou Reserva (estoqueApi)
-       +-> addMovimentacao()        -> Registro de movimentacao
-       +-> updateGarantia()         -> Status "Em Tratativa"
+Para cada celula em dateColumns:
+  1. Se valor for Date -> formatar DD/MM/AAAA
+  2. Se valor for numero -> converter serial Excel para Date -> formatar
+  3. Se valor for string parseavel -> new Date() -> formatar
+  4. Senao -> manter original
 ```
 
+### Cache:
+
+```text
+const xlsxCache = new Map<string, { data: any[], headers: string[] }>();
+
+// No inicio do fetch:
+if (xlsxCache.has(cacheKey)) {
+  // retorna do cache, pula fetch
+}
+```
+
+Isso eliminara o tempo de espera ao navegar entre abas ja visitadas.

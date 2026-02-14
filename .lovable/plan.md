@@ -1,113 +1,73 @@
 
+## Observacao Obrigatoria no Parecer Estoque + Recusa pelo Tecnico na Aba Servicos
 
-## Correções e Melhorias na Aba de Serviços (Oficina) e Fluxo de Finalização
+### Resumo
 
-### Problemas Identificados
-
-1. **Botao "Solicitar Peca" nas acoes da tabela**: O botao aparece diretamente na coluna de acoes da tabela, ocupando espaco. Deve ser movido para dentro do modal/quadro de detalhes do servico, nao na listagem.
-
-2. **Observacao do Estoque nao aparece para o tecnico**: Quando um produto e encaminhado do Estoque para a Assistencia com observacoes no parecer, essas observacoes nao sao repassadas para a OS criada na Analise de Tratativas. O tecnico nao sabe o que precisa fazer.
-
-3. **Quadro de Pagamento visivel na aba de Servicos**: O tecnico so deve preencher a "Avaliacao Tecnica" (resumo, custo, venda). O quadro de pagamento deve ficar bloqueado enquanto estiver na atuacao do tecnico.
-
-4. **Campos de Valor de Custo e Valor de Venda sem mascara R$**: Os inputs usam `type="number"` sem mascara monetaria brasileira. Devem usar o componente `InputComMascara` com mascara "moeda".
-
-5. **Registro some da tela ao finalizar**: Ao clicar "Finalizar" na aba Servicos, o `recarregar()` faz o registro desaparecer pois muda o status/atuacao. O registro deve permanecer visivel com o status atualizado.
-
-6. **Fluxo pos-finalizacao incorreto**: Ao finalizar na aba Servicos, a OS deve ir para status "Aguardando Pagamento" com proximaAtuacao "Atendente", aparecendo na aba Nova Assistencia onde o atendente registra o pagamento.
+Tres mudancas principais:
+1. Tornar o campo "Observacao" obrigatorio no Parecer Estoque quando encaminhar para assistencia
+2. Garantir que a observacao apareca no quadro de descricao detalhada quando o tecnico clicar no olho (detalhes da OS)
+3. Adicionar opcao de "Recusar" na aba de Servicos com campo de motivo obrigatorio, atualizando o registro na aba Nova Assistencia com indicacao visual
 
 ---
 
-### Plano de Implementacao
+### 1. Observacao obrigatoria no Parecer Estoque
 
-#### 1. Remover botao "Solicitar Peca" das acoes da tabela
+**Arquivo:** `src/pages/EstoqueProdutoPendenteDetalhes.tsx`
 
-**Arquivo:** `src/pages/OSOficina.tsx`
+- Na funcao `handleAbrirConfirmacao`, adicionar validacao: quando o status for "Encaminhado para conferencia da Assistencia", exigir que `parecerObservacoes` esteja preenchido
+- Exibir toast de erro "Preencha a Observacao com as tratativas que o tecnico deve realizar"
+- Adicionar indicacao visual de campo obrigatorio (asterisco e borda vermelha quando vazio)
 
-- Na funcao `getAcoes()`, remover o botao "Solicitar Peca" do bloco `status === 'Em servico'`
-- Manter apenas o botao "Finalizar" nas acoes
-- Mover a funcionalidade de solicitar peca para um botao dentro do modal de finalizacao ou como acao secundaria acessivel via detalhes (botao Eye)
+### 2. Observacao visivel nos detalhes da OS (tecnico)
 
-#### 2. Passar observacoes do Estoque para a OS
+**Arquivo:** `src/pages/OSAssistenciaDetalhes.tsx`
+
+- No quadro de descricao/detalhes da OS, verificar se o campo `observacaoOrigem` ja esta sendo exibido
+- Se nao estiver, adicionar um card/alerta destacado (estilo amber, igual ao do modal de finalizacao no OSOficina) mostrando "Observacao do Estoque" com o conteudo de `os.observacaoOrigem`
+- Este card deve aparecer de forma proeminente para que o tecnico saiba exatamente quais tratativas deve conferir
+
+### 3. Opcao de Recusar na aba Servicos
 
 **Arquivo:** `src/utils/assistenciaApi.ts`
-- Adicionar campo opcional `observacaoOrigem?: string` na interface `OrdemServico`
 
-**Arquivo:** `src/utils/garantiasApi.ts`
-- Adicionar campo `observacao?: string` na interface `RegistroAnaliseGarantia`
-- Na funcao `encaminharParaAnaliseGarantia`, aceitar e persistir o parametro de observacao
-
-**Arquivo:** `src/utils/osApi.ts`
-- Em `salvarParecerEstoque`, passar as `observacoes` do parecer para `encaminharParaAnaliseGarantia`
-
-**Arquivo:** `src/pages/OSAnaliseGarantia.tsx`
-- Ao criar a OS via `addOrdemServico`, incluir o campo `observacaoOrigem` com a observacao do registro
-- Exibir a observacao na tabela e no modal de detalhes
-
-**Arquivo:** `src/pages/OSOficina.tsx`
-- Exibir a `observacaoOrigem` (quando existir) em um card de alerta visivel ao tecnico, tanto na tabela quanto no modal de finalizacao
-
-#### 3. Bloquear quadro de Pagamento na aba Servicos
+- Adicionar campos opcionais na interface `OrdemServico`:
+  - `recusadaTecnico?: boolean`
+  - `motivoRecusaTecnico?: string`
+- Adicionar `'Recusada pelo Técnico'` ao union type de `status`
 
 **Arquivo:** `src/pages/OSOficina.tsx`
 
-- No modal de finalizacao, garantir que NAO ha campos de pagamento. O modal atual ja mostra apenas "Resumo da Conclusao", "Valor de Custo" e "Valor de Venda" -- confirmar que nao ha quadro de pagamento e que o layout esta correto.
-- Se houver referencia ao PagamentoQuadro neste arquivo, remover/bloquear.
-
-#### 4. Aplicar mascara R$ nos campos de Valor de Custo e Valor de Venda
-
-**Arquivo:** `src/pages/OSOficina.tsx`
-
-- Substituir `<Input type="number">` por `<InputComMascara mascara="moeda">` nos campos:
-  - "Valor de Custo (R$)" 
-  - "Valor de Venda (R$)"
-- Ajustar os handlers para usar `onChange(formatted, rawValue)` do `InputComMascara`
-- Importar `InputComMascara` de `@/components/ui/InputComMascara`
-
-#### 5. Manter registro visivel apos finalizar
-
-**Arquivo:** `src/pages/OSOficina.tsx`
-
-- Ajustar o filtro `osTecnico` para incluir tambem OS com status "Aguardando Pagamento" que acabaram de ser finalizadas pelo tecnico (ou usar um estado local para manter a OS visivel temporariamente)
-- Alternativa mais simples: ao finalizar, nao chamar `recarregar()` imediatamente, e sim atualizar o estado local para refletir o novo status na linha da tabela, mantendo-a visivel com o badge atualizado
-
-#### 6. Corrigir fluxo de finalizacao: status e atuacao
-
-**Arquivo:** `src/pages/OSOficina.tsx`
-
-- Na funcao `handleFinalizar`, alterar:
-  - `status`: de `'Finalizado'` para `'Aguardando Pagamento'`
-  - `proximaAtuacao`: de `'Gestor/Vendedor'` para `'Atendente'`
-- Isso faz a OS aparecer na aba "Nova Assistencia" com o filtro de "Aguardando Pagamento"
+- Adicionar botao "Recusar" (vermelho) nas acoes da tabela, visivel apenas quando a OS tem `origemOS === 'Estoque'` ou `origemOS === 'Garantia'` (encaminhada da Analise de Tratativas) e status "Em servico" ou "Aguardando Analise"
+- Ao clicar em "Recusar", abrir um modal com:
+  - Campo "Motivo da Recusa" (Textarea, obrigatorio)
+  - Botoes Cancelar e Confirmar Recusa
+- Ao confirmar:
+  - Atualizar a OS com `status: 'Recusada pelo Técnico'`, `proximaAtuacao: 'Atendente'`, `recusadaTecnico: true`, `motivoRecusaTecnico: motivo`
+  - Registrar na timeline
+  - Manter o registro visivel na tela (mesma logica das finalizadas)
+  - A OS vai para a aba Nova Assistencia
 
 **Arquivo:** `src/pages/OSAssistencia.tsx`
 
-- Verificar que o filtro de atuacao "Aguardando Pagamento" funciona corretamente para o novo valor `'Atendente'`
-- Adicionar `'Atendente'` ao tipo `proximaAtuacao` na interface `OrdemServico` se necessario
-- Garantir que o quadro de pagamento (PagamentoQuadro) esta disponivel quando status = "Aguardando Pagamento"
+- Na renderizacao da tabela (`TableRow`), adicionar classe condicional: se `os.recusadaTecnico === true`, aplicar `bg-red-500/15` no fundo da linha
+- Ao lado do badge de status, exibir badge "Recusada" (destructive) com Tooltip mostrando o motivo, usando o mesmo padrao visual da Nota de Entrada rejeitada (XCircle + Badge + Tooltip)
+- Adicionar "Recusada pelo Tecnico" como opcao no filtro de Status
 
 ---
 
 ### Detalhes Tecnicos
 
 **Interface `OrdemServico` (assistenciaApi.ts):**
-- Adicionar `'Atendente'` ao union type de `proximaAtuacao`
-- Adicionar `observacaoOrigem?: string`
+- Adicionar ao union type de status: `'Recusada pelo Técnico'`
+- Adicionar campos: `recusadaTecnico?: boolean`, `motivoRecusaTecnico?: string`
 
-**Interface `RegistroAnaliseGarantia` (garantiasApi.ts):**
-- Adicionar `observacao?: string`
+**OSOficina.tsx - Novo modal de recusa:**
+- Estados: `recusarModal`, `osParaRecusar`, `motivoRecusa`
+- Funcao `handleConfirmarRecusa`: valida motivo, atualiza OS, adiciona ao `osFinalizadas`, recarrega
 
-**Funcao `encaminharParaAnaliseGarantia` (garantiasApi.ts):**
-- Adicionar 4o parametro opcional `observacao?: string`
+**OSAssistencia.tsx - Indicacao visual:**
+- `TableRow className`: adicionar condicao `os.recusadaTecnico ? 'bg-red-500/15' : ''`
+- Na celula de Status: badge "Recusada" com tooltip do motivo (mesmo padrao de `TabelaNotasPendencias.tsx`)
 
-**Funcao `salvarParecerEstoque` (osApi.ts):**
-- Passar `observacoes` como 4o argumento para `encaminharParaAnaliseGarantia`
-
-**Componente `OSOficina` (OSOficina.tsx):**
-- Importar `InputComMascara`
-- Trocar estados `valorCusto`/`valorVenda` de `number` para `string` (formatado) + manter raw value
-- Remover botao "Solicitar Peca" da funcao `getAcoes`
-- Exibir card com observacao de origem quando disponivel
-- Alterar `handleFinalizar` para novo status/atuacao
-- Manter registro na tela apos finalizar (atualizar estado local em vez de recarregar)
-
+**EstoqueProdutoPendenteDetalhes.tsx - Validacao:**
+- Condicional no `handleAbrirConfirmacao`: se status === 'Encaminhado para conferencia da Assistencia' e `!parecerObservacoes.trim()`, bloquear com toast

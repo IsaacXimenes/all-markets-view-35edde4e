@@ -497,8 +497,10 @@ export default function FinanceiroConferencia() {
       setDataFinalizacao(null);
     }
     
-    // Carregar observação do gestor
-    const storedObsGestor = localStorage.getItem(`observacao_gestor_${venda.id}`);
+    // Carregar observação do gestor (chave diferente para OS vs Vendas)
+    const isOS = venda.id.startsWith('OS-');
+    const obsKey = isOS ? `observacao_gestor_os_${venda.id}` : `observacao_gestor_${venda.id}`;
+    const storedObsGestor = localStorage.getItem(obsKey);
     if (storedObsGestor) {
       setObservacaoGestorCarregada(JSON.parse(storedObsGestor));
     } else {

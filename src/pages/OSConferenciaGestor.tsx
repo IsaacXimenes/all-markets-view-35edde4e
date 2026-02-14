@@ -68,7 +68,7 @@ export default function OSConferenciaGestor() {
   // Filtrar OSs para conferência (pendente, aguardando financeiro, liquidado)
   const osConferencia = useMemo(() => {
     let resultado = ordensServico.filter(os => {
-      return (os.status === 'Pendente de Pagamento' && os.proximaAtuacao === 'Gestor (Conferência)') ||
+      return (os.status === 'Conferência do Gestor' && os.proximaAtuacao === 'Gestor') ||
              (os.status === 'Aguardando Financeiro' && os.proximaAtuacao === 'Financeiro') ||
              os.status === 'Liquidado';
     });
@@ -93,7 +93,7 @@ export default function OSConferenciaGestor() {
 
     resultado.sort((a, b) => {
       const ordem: Record<string, number> = {
-        'Pendente de Pagamento': 0,
+        'Conferência do Gestor': 0,
         'Aguardando Financeiro': 1,
         'Liquidado': 2,
       };
@@ -114,7 +114,7 @@ export default function OSConferenciaGestor() {
     };
 
     osConferencia.forEach(os => {
-      const isPendente = os.status === 'Pendente de Pagamento';
+      const isPendente = os.status === 'Conferência do Gestor';
       const target = isPendente ? totais.pendente : totais.conferido;
 
       os.pagamentos?.forEach(pag => {
@@ -137,7 +137,7 @@ export default function OSConferenciaGestor() {
   }, [osConferencia]);
 
   // Contadores
-  const pendentes = osConferencia.filter(os => os.status === 'Pendente de Pagamento').length;
+  const pendentes = osConferencia.filter(os => os.status === 'Conferência do Gestor').length;
   const aguardandoFinanceiro = osConferencia.filter(os => os.status === 'Aguardando Financeiro').length;
   const liquidadas = osConferencia.filter(os => os.status === 'Liquidado').length;
 
@@ -256,7 +256,7 @@ export default function OSConferenciaGestor() {
       return;
     }
     updateOrdemServico(osSelecionada.id, {
-      status: 'Pendente de Pagamento',
+      status: 'Serviço concluído' as any,
       proximaAtuacao: 'Atendente',
       timeline: [...osSelecionada.timeline, {
         data: new Date().toISOString(),
@@ -273,7 +273,7 @@ export default function OSConferenciaGestor() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'Pendente de Pagamento':
+      case 'Conferência do Gestor':
         return <Badge className="bg-orange-500 hover:bg-orange-600">Pendente Conferência</Badge>;
       case 'Aguardando Financeiro':
         return <Badge className="bg-purple-500 hover:bg-purple-600">Aguardando Financeiro</Badge>;
@@ -286,7 +286,7 @@ export default function OSConferenciaGestor() {
 
   const getRowClassName = (status: string) => {
     switch (status) {
-      case 'Pendente de Pagamento':
+      case 'Conferência do Gestor':
         return 'bg-orange-50 dark:bg-orange-950/30 hover:bg-orange-100 dark:hover:bg-orange-950/50';
       case 'Aguardando Financeiro':
         return 'bg-yellow-50 dark:bg-yellow-950/30 hover:bg-yellow-100 dark:hover:bg-yellow-950/50';
@@ -298,7 +298,7 @@ export default function OSConferenciaGestor() {
   };
 
   const podeAprovar = (os: OrdemServico) => {
-    return os.status === 'Pendente de Pagamento' && os.proximaAtuacao === 'Gestor (Conferência)';
+    return os.status === 'Conferência do Gestor' && os.proximaAtuacao === 'Gestor';
   };
 
   return (

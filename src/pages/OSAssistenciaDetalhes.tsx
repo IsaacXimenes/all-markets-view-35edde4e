@@ -116,6 +116,9 @@ export default function OSAssistenciaDetalhes() {
       valor: p.valor,
       parcelas: p.parcelas
     }));
+    // Preservar peças originais se editPecas estiver vazio mas OS já tinha peças
+    const pecasParaSalvar = editPecas.length > 0 ? editPecas : (os.pecas.length > 0 ? os.pecas : editPecas);
+    
     updateOrdemServico(os.id, {
       clienteId: editClienteId,
       lojaId: editLojaId,
@@ -123,7 +126,7 @@ export default function OSAssistenciaDetalhes() {
       status: editStatus as any,
       setor: editSetor as 'GARANTIA' | 'ASSISTÊNCIA' | 'TROCA',
       descricao: editDescricao,
-      pecas: editPecas,
+      pecas: pecasParaSalvar,
       pagamentos: pagamentosConvertidos,
       valorTotal
     });
@@ -212,6 +215,8 @@ export default function OSAssistenciaDetalhes() {
       case 'Aguardando Conferência':
       case 'Pendente de Pagamento':
         return <Badge className="bg-violet-500 hover:bg-violet-600">Pendente de Pagamento</Badge>;
+      case 'Conferência do Gestor':
+        return <Badge className="bg-orange-500 hover:bg-orange-600">Conferência do Gestor</Badge>;
       case 'Concluído':
         return <Badge className="bg-emerald-600 hover:bg-emerald-700">Concluído</Badge>;
       case 'Finalizado':
@@ -266,8 +271,8 @@ export default function OSAssistenciaDetalhes() {
     updateOrdemServico(os.id, {
       pagamentos: pagamentosConvertidos,
       valorTotal,
-      status: 'Pendente de Pagamento' as any,
-      proximaAtuacao: 'Gestor (Conferência)',
+      status: 'Conferência do Gestor' as any,
+      proximaAtuacao: 'Gestor',
       timeline: [...os.timeline, {
         data: new Date().toISOString(),
         tipo: 'pagamento',

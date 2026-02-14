@@ -9,15 +9,16 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Eye, Check, Clock, AlertTriangle, AlertCircle, 
-  Shield, Package
+  Shield, Package, XCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { 
-  getRegistrosAnaliseGarantia, aprovarAnaliseGarantia, 
+  getRegistrosAnaliseGarantia, aprovarAnaliseGarantia, recusarAnaliseGarantia,
   RegistroAnaliseGarantia, getGarantiaById
 } from '@/utils/garantiasApi';
 import { updateProdutoPendente, getProdutoPendenteById } from '@/utils/osApi';
@@ -52,6 +53,11 @@ export default function OSAnaliseGarantia() {
   // Modal detalhes
   const [showDetalhesModal, setShowDetalhesModal] = useState(false);
   const [detalheRegistro, setDetalheRegistro] = useState<RegistroAnaliseGarantia | null>(null);
+
+  // Modal recusar
+  const [showRecusarModal, setShowRecusarModal] = useState(false);
+  const [registroParaRecusar, setRegistroParaRecusar] = useState<RegistroAnaliseGarantia | null>(null);
+  const [motivoRecusa, setMotivoRecusa] = useState('');
 
   const calcularSLA = (dataChegada: string): number => {
     const hoje = new Date();
@@ -89,6 +95,8 @@ export default function OSAnaliseGarantia() {
         return <Badge className="bg-yellow-500 hover:bg-yellow-600">Pendente</Badge>;
       case 'Solicitação Aprovada':
         return <Badge className="bg-green-500 hover:bg-green-600">Solicitação Aprovada</Badge>;
+      case 'Recusada':
+        return <Badge className="bg-red-500 hover:bg-red-600">Recusada</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -215,10 +223,36 @@ export default function OSAnaliseGarantia() {
   };
 
   // Stats
+  const handleConfirmarRecusa = () => {
+    if (!registroParaRecusar) return;
+    if (!motivoRecusa.trim()) {
+      toast.error('Informe o motivo da recusa.');
+      return;
+    }
+
+    const registroRecusado = recusarAnaliseGarantia(registroParaRecusar.id, motivoRecusa);
+    if (registroRecusado) {
+      // Reverter origem
+      if (registroRecusado.origem === 'Estoque' && registroRecusado.origemId) {
+        updateProdutoPendente(registroRecusado.origemId, {
+          statusGeral: 'Pendente Estoque'
+        });
+      }
+      // Para Garantia, poderia atualizar a garantia correspondente se necessário
+      
+      toast.success('Solicitação recusada e devolvida à origem.');
+    }
+
+    setRegistros(getRegistrosAnaliseGarantia());
+    setShowRecusarModal(false);
+  };
+
+  // Stats
   const totalRegistros = registros.length;
   const pendentes = registros.filter(r => r.status === 'Pendente').length;
   const aprovados = registros.filter(r => r.status === 'Solicitação Aprovada').length;
-  const slaCritico = registros.filter(r => calcularSLA(r.dataChegada) > 3).length;
+  const recusados = registros.filter(r => r.status === 'Recusada').length;
+  const slaCritico = registros.filter(r => r.status === 'Pendente' && calcularSLA(r.dataChegada) > 3).length;
 
   return (
     <OSLayout title="Análise de Tratativas">
@@ -244,8 +278,8 @@ export default function OSAnaliseGarantia() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">{slaCritico}</div>
-            <div className="text-xs text-muted-foreground">SLA Crítico (&gt;3 dias)</div>
+            <div className="text-2xl font-bold text-red-600">{recusados}</div>
+            <div className="text-xs text-muted-foreground">Recusados</div>
           </CardContent>
         </Card>
       </div>
@@ -281,6 +315,7 @@ export default function OSAnaliseGarantia() {
                   <SelectItem value="todos">Todos</SelectItem>
                   <SelectItem value="Pendente">Pendente</SelectItem>
                   <SelectItem value="Solicitação Aprovada">Solicitação Aprovada</SelectItem>
+                  <SelectItem value="Recusada">Recusada</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -328,14 +363,30 @@ export default function OSAnaliseGarantia() {
                         <Eye className="h-4 w-4" />
                       </Button>
                       {registro.status === 'Pendente' && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-green-600 hover:text-green-700"
-                          onClick={() => handleAbrirAprovar(registro)}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
+                        <>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => {
+                              setRegistroParaRecusar(registro);
+                              setMotivoRecusa('');
+                              setShowRecusarModal(true);
+                            }}
+                            title="Recusar"
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-green-600 hover:text-green-700"
+                            onClick={() => handleAbrirAprovar(registro)}
+                            title="Aprovar"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        </>
                       )}
                     </div>
                   </TableCell>
@@ -454,11 +505,55 @@ export default function OSAnaliseGarantia() {
                     </div>
                   </div>
                 )}
+                {detalheRegistro.motivoRecusa && (
+                  <div className="col-span-2">
+                    <Label className="text-xs text-muted-foreground">Motivo da Recusa</Label>
+                    <div className="mt-1 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                      <p className="text-sm text-red-800 dark:text-red-300">{detalheRegistro.motivoRecusa}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDetalhesModal(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Recusar */}
+      <Dialog open={showRecusarModal} onOpenChange={setShowRecusarModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <XCircle className="h-5 w-5" />
+              Recusar Solicitação {registroParaRecusar?.id}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {registroParaRecusar?.observacao && (
+              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">Observação de Origem</p>
+                <p className="text-sm text-amber-800 dark:text-amber-200">{registroParaRecusar.observacao}</p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Motivo da Recusa *</Label>
+              <Textarea
+                value={motivoRecusa}
+                onChange={(e) => setMotivoRecusa(e.target.value)}
+                placeholder="Descreva o motivo da recusa..."
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRecusarModal(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleConfirmarRecusa}>
+              <XCircle className="h-4 w-4 mr-2" />
+              Confirmar Recusa
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

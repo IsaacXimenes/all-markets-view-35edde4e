@@ -103,12 +103,14 @@ export interface RegistroAnaliseGarantia {
   origemId: string;
   clienteDescricao: string;
   dataChegada: string;
-  status: 'Pendente' | 'Solicitação Aprovada';
+  status: 'Pendente' | 'Solicitação Aprovada' | 'Recusada';
   tecnicoId?: string;
   tecnicoNome?: string;
   dataAprovacao?: string;
   usuarioAprovacao?: string;
   observacao?: string;
+  motivoRecusa?: string;
+  dataRecusa?: string;
 }
 
 // Dados mockados para Contatos Ativos
@@ -878,6 +880,20 @@ export const aprovarAnaliseGarantia = (id: string, dados: { tecnicoId: string; t
       ...registrosAnaliseGarantia[index],
       status: 'Solicitação Aprovada',
       ...dados
+    };
+    return registrosAnaliseGarantia[index];
+  }
+  return null;
+};
+
+export const recusarAnaliseGarantia = (id: string, motivo: string): RegistroAnaliseGarantia | null => {
+  const index = registrosAnaliseGarantia.findIndex(r => r.id === id);
+  if (index !== -1) {
+    registrosAnaliseGarantia[index] = {
+      ...registrosAnaliseGarantia[index],
+      status: 'Recusada',
+      motivoRecusa: motivo,
+      dataRecusa: new Date().toISOString()
     };
     return registrosAnaliseGarantia[index];
   }

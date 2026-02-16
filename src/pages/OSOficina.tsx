@@ -15,6 +15,7 @@ import { addSolicitacao, getSolicitacoesByOS } from '@/utils/solicitacaoPecasApi
 import { useCadastroStore } from '@/store/cadastroStore';
 import { useAuthStore } from '@/store/authStore';
 import { InputComMascara } from '@/components/ui/InputComMascara';
+import { formatIMEI } from '@/utils/imeiMask';
 import { Eye, Play, CheckCircle, Clock, Wrench, AlertTriangle, Package, Plus, ShoppingCart, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -461,7 +462,7 @@ export default function OSOficina() {
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">IMEI</Label>
-                <p className="font-medium text-sm font-mono">{osParaFinalizar?.imeiAparelho || '-'}</p>
+                <p className="font-medium text-sm font-mono">{formatIMEI(osParaFinalizar?.imeiAparelho || '')}</p>
               </div>
             </div>
 

@@ -125,6 +125,8 @@ export default function CadastrosContasFinanceiras() {
   };
 
   const getLojaName = (lojaId: string) => {
+    if (lojaId === 'geral-dinheiro') return 'Geral - Dinheiro';
+    if (lojaId === 'geral-assistencia') return 'Geral - Assistência';
     const loja = lojas.find(l => l.id === lojaId);
     return loja?.nome || lojaId;
   };

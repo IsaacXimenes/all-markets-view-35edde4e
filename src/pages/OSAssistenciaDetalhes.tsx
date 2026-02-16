@@ -24,7 +24,8 @@ import { getPecas } from '@/utils/pecasApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
-import { ArrowLeft, FileText, Clock, AlertTriangle, User, Wrench, MapPin, Calendar, CreditCard, Save, Edit, Package, Plus, Trash2, CheckCircle, ImageIcon, DollarSign, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, FileText, Clock, AlertTriangle, User, Wrench, MapPin, Calendar, CreditCard, Save, Edit, Package, Plus, Trash2, CheckCircle, ImageIcon, DollarSign, ShieldCheck, Smartphone } from 'lucide-react';
+import { formatIMEI } from '@/utils/imeiMask';
 import { cn } from '@/lib/utils';
 import QRCode from 'qrcode';
 import { toast } from 'sonner';
@@ -525,7 +526,7 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">IMEI</p>
-                    <p className="font-medium font-mono">{os.imeiAparelho || '-'}</p>
+                    <p className="font-medium font-mono">{formatIMEI(os.imeiAparelho || '')}</p>
                   </div>
                 </div>
               </CardContent>

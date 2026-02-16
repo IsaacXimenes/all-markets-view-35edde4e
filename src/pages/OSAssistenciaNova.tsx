@@ -1020,28 +1020,33 @@ export default function OSAssistenciaNova() {
                 <Input value={new Date(dataHora).toLocaleString('pt-BR')} disabled className="bg-muted" />
               </div>
               <div className="space-y-2">
-                <Label className={!lojaId ? 'text-destructive' : ''}>Loja *</Label>
-                <AutocompleteLoja
-                  value={lojaId}
-                  onChange={(v) => {
-                    setLojaId(v);
-                    if (v !== lojaId) setTecnicoId('');
-                  }}
-                  filtrarPorTipo="Assistência"
-                  className={!lojaId ? 'border-destructive' : ''}
-                  placeholder="Selecione a loja..."
-                />
-              </div>
-              <div className="space-y-2">
                 <Label className={!tecnicoId ? 'text-destructive' : ''}>Técnico *</Label>
                 <AutocompleteColaborador
                   value={tecnicoId}
-                  onChange={setTecnicoId}
+                  onChange={(colId) => {
+                    setTecnicoId(colId);
+                    if (colId) {
+                      const tecnico = obterTecnicos().find(t => t.id === colId);
+                      if (tecnico) {
+                        setLojaId(tecnico.loja_id);
+                      }
+                    } else {
+                      setLojaId('');
+                    }
+                  }}
                   filtrarPorTipo="tecnicos"
-                  filtrarPorLoja={lojaId || undefined}
                   className={!tecnicoId ? 'border-destructive' : ''}
-                  placeholder={lojaId ? "Selecione o técnico..." : "Selecione a loja primeiro..."}
-                  disabled={!lojaId}
+                  placeholder="Selecione o técnico..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Loja *</Label>
+                <AutocompleteLoja
+                  value={lojaId}
+                  onChange={() => {}}
+                  filtrarPorTipo="Assistência"
+                  placeholder={tecnicoId ? obterNomeLoja(lojaId) : "Selecione o técnico primeiro..."}
+                  disabled
                 />
               </div>
               <div className="space-y-2">

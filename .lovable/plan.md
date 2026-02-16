@@ -1,28 +1,71 @@
 
 
-## Plano de Implementacao - 5 Pendencias ✅ CONCLUÍDO
+## Correcoes em 4 Modulos
 
-Todas as 6 pendências foram implementadas com sucesso.
+### 1. Parecer Estoque - Campos Automaticos e Read-Only
 
-### ✅ 1. Sincronização de Status: Recusa na Análise de Tratativas -> Estoque
-- Parecer Assistência com status "Recusado" adicionado ao produto pendente
-- Timeline atualizada com registro da recusa
-- Status revertido para "Pendente Estoque"
+**Arquivo:** `src/pages/EstoqueProdutoPendenteDetalhes.tsx`
 
-### ✅ 2. Lookup Automático de Loja ao Selecionar Técnico
-- onChange do Select de técnico faz lookup via obterColaboradorById
-- Loja preenchida automaticamente, editável para exceções
+**Problema atual:** O modal de confirmacao dupla (linhas 493-517) tem um Select editavel para "Responsavel" e um Input editavel para "Data". O usuario pode alterar ambos.
 
-### ✅ 3. Preenchimento Automático do Parecer Estoque
-- Responsável obtido via useAuthStore (usuário logado)
-- Data e hora gravados automaticamente no ParecerEstoque (dataConfirmacao, hora)
+**Correcao:**
+- Remover o Select de `confirmResponsavel` e substituir por um Input `disabled` pre-preenchido com `usuarioLogado.nome`
+- No `handleAbrirConfirmacao`, auto-preencher `setConfirmResponsavel(usuarioLogado.nome)` ao abrir o modal (em vez de string vazia)
+- Tornar o campo de Data (`confirmData`) tambem `disabled` com `className="bg-muted"`
+- Remover `onChange` do campo de data
+- Atualizar `confirmacaoValida` para nao depender de selecao manual (ja estara preenchido)
 
-### ✅ 4. Correção de Persistência de Solicitações de Peças
-- handleSaveChanges preserva explicitamente timeline, valorCustoTecnico, valorVendaTecnico, observacaoOrigem, etc.
+### 2. Sincronizacao de Recusa - Parecer Assistencia "Recusado"
 
-### ✅ 5. Conferência do Gestor: Conta de Destino e Comprovante
-- Conta de destino resolvida via contasFinanceiras.find() e exibida no painel lateral
-- Comprovante e comprovanteNome persistidos no handleSalvarPagamentoVendedor
+**Arquivo:** `src/utils/osApi.ts`
 
-### ✅ 6. Crédito no Saldo ao Liquidar OS (Financeiro)
-- Validações financeiras salvas no localStorage antes de liquidar OS (mesmo fluxo das vendas)
+**Problema atual:** A interface `ParecerAssistencia` (linha 22) so aceita `'Validado pela assistencia' | 'Aguardando peca' | 'Ajustes realizados'`. Nao tem "Recusado".
+
+**Correcao:** Adicionar `'Recusado - Assistencia'` ao union type de `status` na interface `ParecerAssistencia`.
+
+**Arquivo:** `src/pages/OSAnaliseGarantia.tsx`
+
+**Problema atual:** Na funcao `handleConfirmarRecusa` (linhas 240-252), o status do parecer assistencia esta hardcoded como `'Aguardando peca' as any` com um comentario de placeholder. Isso causa a exibicao incorreta "Aguardando Peca" no Estoque.
+
+**Correcao:** Substituir `'Aguardando peca' as any` por `'Recusado - Assistencia'` (novo valor valido no union type). Remover os comentarios de placeholder e o cast `as any`.
+
+### 3. Lookup de Loja por Tecnico
+
+**Status:** Ja implementado corretamente (linhas 442-450 de `OSAnaliseGarantia.tsx`). O `onValueChange` do Select de tecnico ja chama `obterColaboradorById(val)` e preenche `setLojaSelecionada(colaborador.loja_id)`.
+
+**Verificacao:** Confirmar que `obterColaboradorById` retorna o campo `loja_id` corretamente. O store (linha 223-224) faz `find` por ID, e o tipo `ColaboradorMockado` inclui `loja_id`. Nenhuma alteracao necessaria.
+
+### 4. Regra Visual do Financeiro - Linha Verde so para "Finalizado"
+
+**Arquivo:** `src/pages/FinanceiroConferencia.tsx`
+
+**Problema atual:** A funcao `getRowClassName` (linhas 837-841) aplica verde para `linha.conferido === true` e vermelho para todos os outros. Isso colore de verde linhas "Conferidas" que ainda nao foram "Finalizadas".
+
+**Correcao:** Alterar a logica de `getRowClassName` para:
+- Verde (`bg-green-50`) somente quando o `statusFluxo` da venda associada for `'Finalizado'` ou `'Liquidado'`
+- Manter sem cor (default) para os demais status
+- Remover a coloracao vermelha para "Pendente" (manter neutro)
+
+A funcao ficara:
+```
+const getRowClassName = (linha: LinhaConferencia) => {
+  const status = linha.venda?.statusFluxo;
+  if (status === 'Finalizado' || status === 'Liquidado') {
+    return 'bg-green-50 dark:bg-green-950/30';
+  }
+  return '';
+};
+```
+
+Para linhas de OS (Assistencia), verificar se `linha.osData?.status === 'Liquidado'`.
+
+---
+
+### Resumo de Arquivos
+
+| Arquivo | Alteracao |
+|---|---|
+| `src/pages/EstoqueProdutoPendenteDetalhes.tsx` | Modal: auto-preencher responsavel/data, tornar read-only |
+| `src/utils/osApi.ts` | Adicionar 'Recusado - Assistencia' ao tipo ParecerAssistencia |
+| `src/pages/OSAnaliseGarantia.tsx` | Corrigir status de 'Aguardando peca' para 'Recusado - Assistencia' |
+| `src/pages/FinanceiroConferencia.tsx` | Linha verde apenas para status Finalizado/Liquidado |

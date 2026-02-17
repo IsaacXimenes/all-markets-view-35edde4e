@@ -319,11 +319,14 @@ export default function FinanceiroExtratoContas() {
       return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
     });
 
-    // Ordenar segregadas: assistência primeiro, depois dinheiro
+    // Ordenar segregadas: 1) Dinheiro Loja, 2) Dinheiro Assistência, 3) Bradesco Assistência
     const ordemSegregadas = [
-      'CTA-014', 'CTA-012', 'CTA-013', 'CTA-011',
-      'CTA-015', 'CTA-019', 'CTA-018', 'CTA-016',
+      // Linha 1: Dinheiro + Loja
+      'CTA-015', 'CTA-016', 'CTA-017', 'CTA-018', 'CTA-019',
+      // Linha 2: Dinheiro + Assistência
       'CTA-022', 'CTA-023', 'CTA-024', 'CTA-025',
+      // Linha 3: Bradesco Assistência
+      'CTA-014', 'CTA-012', 'CTA-013', 'CTA-011',
     ];
     segregadas.sort((a, b) => {
       const idxA = ordemSegregadas.indexOf(a.id);
@@ -626,8 +629,34 @@ export default function FinanceiroExtratoContas() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-              {contasSegregadas.map(renderContaCard)}
+            <div className="space-y-4">
+              {/* Linha 1: Dinheiro + Loja */}
+              {contasSegregadas.filter(c => CONTAS_DINHEIRO_SEGREGADAS.includes(c.id) && !['CTA-022','CTA-023','CTA-024','CTA-025'].includes(c.id)).length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground mb-2">Dinheiro - Loja</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                    {contasSegregadas.filter(c => ['CTA-015','CTA-016','CTA-017','CTA-018','CTA-019'].includes(c.id)).map(renderContaCard)}
+                  </div>
+                </div>
+              )}
+              {/* Linha 2: Dinheiro + Assistência */}
+              {contasSegregadas.filter(c => ['CTA-022','CTA-023','CTA-024','CTA-025'].includes(c.id)).length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground mb-2">Dinheiro - Assistência</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                    {contasSegregadas.filter(c => ['CTA-022','CTA-023','CTA-024','CTA-025'].includes(c.id)).map(renderContaCard)}
+                  </div>
+                </div>
+              )}
+              {/* Linha 3: Bradesco Assistência */}
+              {contasSegregadas.filter(c => CONTAS_ASSISTENCIA_SEGREGADAS.includes(c.id)).length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground mb-2">Bradesco - Assistência</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                    {contasSegregadas.filter(c => CONTAS_ASSISTENCIA_SEGREGADAS.includes(c.id)).map(renderContaCard)}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

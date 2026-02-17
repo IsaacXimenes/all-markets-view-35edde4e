@@ -1,79 +1,55 @@
 
 
-## Corrigir Seleção de Peça na Edição + Histórico de Movimentação no Estoque
+## Correcoes: Integracao Estoque na Edicao + Redimensionar Modal Historico
 
-### Parte 1: Bug na Edição de OS - Peça no Estoque não carrega descrições
+### Parte 1: Integracao do Estoque na Edicao de OS (Aba Servico)
 
-**Problema:** No arquivo `OSAssistenciaEditar.tsx` (linhas 530-532), ao selecionar "Peça no estoque", o `updatePeca` é chamado 3 vezes em sequência para campos diferentes (`pecaNoEstoque`, `pecaDeFornecedor`, `servicoTerceirizado`). Cada chamada cria uma cópia do estado atual, então apenas a última atualização prevalece - as anteriores são perdidas. Isso faz com que `pecaNoEstoque` nunca fique `true`.
+**Problema:** No `handleSave` de `OSAssistenciaEditar.tsx`, ao salvar a OS com pecas do tipo "Peca no estoque", a funcao `darBaixaPeca` nao e chamada. Na tela de Nova Assistencia isso funciona porque `darBaixaPeca` e chamada ao salvar. Na edicao, simplesmente nao foi implementado.
 
-Na tela de Nova Assistência, isso funciona porque as 3 propriedades são atualizadas em um único objeto batch (linhas 1168-1175).
+**Correcao:** No `handleSave` de `src/pages/OSAssistenciaEditar.tsx`, antes de chamar `updateOrdemServico`, adicionar logica para dar baixa nas pecas do estoque que sao novas (que nao existiam na OS original). Isso evita dar baixa duplicada em pecas que ja foram descontadas.
 
-**Correção:** Arquivo `src/pages/OSAssistenciaEditar.tsx` - Substituir as 3 chamadas `updatePeca` por uma atualização batch idêntica ao padrão da Nova Assistência:
-
-```text
-onValueChange={(val) => {
-  const newPecas = [...pecas];
-  newPecas[index] = {
-    ...newPecas[index],
-    pecaNoEstoque: val === 'estoque',
-    pecaDeFornecedor: val === 'fornecedor',
-    servicoTerceirizado: val === 'terceirizado',
-  };
-  setPecas(newPecas);
-}}
-```
+Logica:
+1. Identificar pecas com `pecaNoEstoque === true` e `pecaEstoqueId` preenchido
+2. Comparar com as pecas originais da OS (`osOriginal.pecas`) para encontrar apenas as novas
+3. Para cada peca nova do estoque, chamar `darBaixaPeca(pecaEstoqueId, quantidadePeca, osId)`
+4. Se falhar (estoque insuficiente), mostrar toast de erro e abortar
 
 ---
 
-### Parte 2: Histórico de Movimentação de Peças no Estoque
+### Parte 2: Redimensionar Modal de Historico de Movimentacao
 
-**Arquivo: `src/utils/pecasApi.ts`**
+**Problema:** No `src/pages/OSPecas.tsx`, o modal de historico (linhas 498-566) tem componentes que ultrapassam os limites do modal em telas menores. O `DialogContent` usa `max-w-2xl` mas a tabela interna com 5 colunas pode transbordar.
 
-1. Criar interface `MovimentacaoPeca` com campos:
-   - `id`, `pecaId`, `tipo` ("Entrada" | "Saída" | "Reserva"), `quantidade`, `data`, `osId?`, `descricao`
-2. Criar array `movimentacoesPecas` para armazenar o histórico
-3. Criar dados mockados iniciais (entradas iniciais das peças base)
-4. Atualizar `darBaixaPeca` para registrar automaticamente uma movimentação de saída com o ID da OS
-5. Atualizar `addPeca` para registrar automaticamente uma movimentação de entrada
-6. Exportar funções: `getMovimentacoesByPecaId()` e `addMovimentacaoPeca()`
-
-**Arquivo: `src/pages/OSPecas.tsx`**
-
-1. Adicionar botão de ícone (History) na coluna de Ações, ao lado do botão "Visualizar" existente
-2. Criar modal "Histórico de Movimentação" que exibe:
-   - Quantidade inicial (entrada)
-   - Lista de movimentações com: data, tipo (badge colorido), quantidade, OS que usou, descrição
-   - Quantidade atual restante (em destaque)
-3. O modal mostra a timeline completa da peça: de onde veio, quem usou e quanto resta
-
-**Arquivo: `src/pages/OSAssistenciaNova.tsx`**
-
-1. Atualizar a chamada de `darBaixaPeca` para passar também o ID da OS, registrando qual OS consumiu a peça
+**Correcao no `src/pages/OSPecas.tsx`:**
+1. Alterar `DialogContent` de `max-w-2xl` para `max-w-3xl max-h-[85vh]`
+2. Envolver o conteudo interno em um `ScrollArea` com altura controlada
+3. Adicionar `overflow-x-auto` na div da tabela para scroll horizontal em telas pequenas
+4. Reduzir o padding e tamanho de fontes dos itens da tabela para melhor encaixe
 
 ---
 
-### Detalhes Técnicos
+### Detalhes Tecnicos
 
-**Interface MovimentacaoPeca:**
+**Arquivo `src/pages/OSAssistenciaEditar.tsx` - handleSave (apos linha ~264):**
+
 ```text
-interface MovimentacaoPeca {
-  id: string;
-  pecaId: string;
-  tipo: 'Entrada' | 'Saída' | 'Reserva';
-  quantidade: number;
-  data: string;
-  osId?: string;
-  descricao: string;
+// Dar baixa no estoque para pecas novas
+const pecasOriginaisIds = osOriginal?.pecas?.map(p => p.pecaEstoqueId).filter(Boolean) || [];
+
+for (const peca of pecas) {
+  if (peca.pecaNoEstoque && peca.pecaEstoqueId && !pecasOriginaisIds.includes(peca.pecaEstoqueId)) {
+    const resultado = darBaixaPeca(peca.pecaEstoqueId, peca.quantidadePeca || 1, id);
+    if (!resultado.sucesso) {
+      toast({ title: 'Erro no estoque', description: resultado.mensagem, variant: 'destructive' });
+      return;
+    }
+  }
 }
 ```
 
-**Assinatura atualizada de darBaixaPeca:**
-```text
-darBaixaPeca(id: string, quantidade?: number, osId?: string)
-```
+**Arquivo `src/pages/OSPecas.tsx` - Modal Historico (linhas 499-565):**
 
-**Modal no OSPecas - informações exibidas:**
-- Cabecalho: nome da peça, modelo, loja
-- Tabela de movimentações ordenada por data (mais recente primeiro)
-- Colunas: Data, Tipo (badge), Qtd, OS/Referência, Descrição
-- Rodapé: "Quantidade disponível atual: X unidades"
+- `DialogContent`: adicionar `max-w-3xl max-h-[85vh] flex flex-col`
+- Conteudo do modal: envolver em `ScrollArea` com `className="flex-1 overflow-auto"`
+- Div da tabela: adicionar `overflow-x-auto` para garantir scroll horizontal
+

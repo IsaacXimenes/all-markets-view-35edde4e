@@ -398,6 +398,33 @@ export default function FinanceiroNotasAssistencia() {
                   {notaSelecionada.status === 'Pendente' && (
                     <div className="border-t pt-4">
                       <h3 className="font-semibold mb-3 text-primary">Seção "Pagamento" (Habilitada)</h3>
+                      
+                      {/* Dados Pix das solicitações */}
+                      {notaSelecionada.osId && (() => {
+                        const solicitacoesOS = getSolicitacoesByOS(notaSelecionada.osId!);
+                        const solicitacoesComPix = solicitacoesOS.filter(s => s.formaPagamento === 'Pix' && (s.bancoDestinatario || s.chavePix));
+                        if (solicitacoesComPix.length === 0) return null;
+                        return (
+                          <div className="mb-4 space-y-2">
+                            {solicitacoesComPix.map(sol => (
+                              <div key={sol.id} className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                                <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">Dados Pix — {sol.peca}</p>
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                  <div>
+                                    <span className="text-xs text-muted-foreground">Banco do Destinatário</span>
+                                    <p className="font-medium">{sol.bancoDestinatario || '-'}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-muted-foreground">Chave Pix</span>
+                                    <p className="font-medium font-mono text-xs">{sol.chavePix || '-'}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                      
                       <div className="grid gap-4">
                         <div>
                           <Label htmlFor="contaPagamento">Conta de Pagamento *</Label>

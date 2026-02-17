@@ -206,7 +206,9 @@ export default function OSSolicitacoesPecas() {
         dataEnvio: dataEnvioGlobal,
         formaPagamento: dados.formaPagamento,
         origemPeca: 'Fornecedor',
-        observacao: dados.observacao
+        observacao: dados.observacao,
+        bancoDestinatario: dados.bancoDestinatario,
+        chavePix: dados.chavePix
       });
 
       // Timeline já é atualizada pela API aprovarSolicitacao()

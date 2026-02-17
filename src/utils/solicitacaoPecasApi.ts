@@ -23,6 +23,8 @@ export interface SolicitacaoPeca {
   formaPagamento?: 'Pix' | 'Dinheiro';
   origemPeca?: 'Fornecedor' | 'Estoque Assistência Thiago';
   observacao?: string;
+  bancoDestinatario?: string;
+  chavePix?: string;
 }
 
 export interface LoteTimeline {
@@ -344,6 +346,8 @@ export const aprovarSolicitacao = (id: string, dados: {
   formaPagamento?: string;
   origemPeca?: string;
   observacao?: string;
+  bancoDestinatario?: string;
+  chavePix?: string;
 }): SolicitacaoPeca | null => {
   const index = solicitacoes.findIndex(s => s.id === id);
   if (index === -1) return null;
@@ -553,17 +557,17 @@ export const finalizarNotaAssistencia = (notaId: string, dados: {
       if (idx !== -1) {
         solicitacoes[idx].status = 'Recebida';
         
-        // Atualizar OS correspondente para "Peça Recebida" com proximaAtuacao correta
+        // Atualizar OS correspondente para "Pagamento Concluído" - técnico deve confirmar recebimento
         const osId = solicitacoes[idx].osId;
         const os = getOrdemServicoById(osId);
         if (os) {
           updateOrdemServico(osId, {
-            status: 'Peça Recebida',
-            proximaAtuacao: 'Técnico: Avaliar/Executar',
+            status: 'Pagamento Concluído',
+            proximaAtuacao: 'Técnico (Recebimento)',
             timeline: [...os.timeline, {
               data: new Date().toISOString(),
               tipo: 'peca',
-              descricao: `Peça recebida via nota ${notaId} - ${solicitacoes[idx].peca}`,
+              descricao: `Pagamento concluído via nota ${notaId} - ${solicitacoes[idx].peca}. Aguardando confirmação de recebimento pelo técnico.`,
               responsavel: dados.responsavelFinanceiro
             }]
           });
@@ -575,14 +579,14 @@ export const finalizarNotaAssistencia = (notaId: string, dados: {
   // Também atualizar OS se a nota tiver osId diretamente
   if (nota.osId) {
     const os = getOrdemServicoById(nota.osId);
-    if (os && os.status !== 'Peça Recebida') {
+    if (os && os.status !== 'Pagamento Concluído' && os.status !== 'Peça Recebida') {
       updateOrdemServico(nota.osId, {
-        status: 'Peça Recebida',
-        proximaAtuacao: 'Técnico: Avaliar/Executar',
+        status: 'Pagamento Concluído',
+        proximaAtuacao: 'Técnico (Recebimento)',
         timeline: [...os.timeline, {
           data: new Date().toISOString(),
           tipo: 'peca',
-          descricao: `Peça recebida via nota ${notaId}`,
+          descricao: `Pagamento concluído via nota ${notaId}. Aguardando confirmação de recebimento pelo técnico.`,
           responsavel: dados.responsavelFinanceiro
         }]
       });

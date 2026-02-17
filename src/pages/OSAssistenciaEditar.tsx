@@ -302,6 +302,21 @@ export default function OSAssistenciaEditar() {
       });
     }
 
+    // Dar baixa no estoque para peças novas (que não existiam na OS original)
+    const pecasOriginaisIds = osOriginal?.pecas?.map(p => p.pecaEstoqueId).filter(Boolean) || [];
+    for (let i = 0; i < pecasFormatadas.length; i++) {
+      const pf = pecasFormatadas[i];
+      const pecaForm = pecas[i];
+      if (pf.pecaNoEstoque && pf.pecaEstoqueId && !pecasOriginaisIds.includes(pf.pecaEstoqueId)) {
+        const qtd = pecaForm?.quantidadePeca || 1;
+        const resultado = darBaixaPeca(pf.pecaEstoqueId, qtd, id);
+        if (!resultado.sucesso) {
+          toast({ title: 'Erro no estoque', description: resultado.mensagem, variant: 'destructive' });
+          return;
+        }
+      }
+    }
+
     const osAtualizada: Partial<OrdemServico> = {
       lojaId,
       tecnicoId,

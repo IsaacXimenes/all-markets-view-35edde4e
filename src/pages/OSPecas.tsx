@@ -497,7 +497,7 @@ export default function OSPecas() {
 
       {/* Modal Histórico de Movimentação */}
       <Dialog open={showHistoricoModal} onOpenChange={setShowHistoricoModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
@@ -505,8 +505,8 @@ export default function OSPecas() {
             </DialogTitle>
           </DialogHeader>
           {pecaHistorico && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4 p-3 bg-muted rounded-lg">
+            <div className="space-y-4 flex-1 overflow-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-3 bg-muted rounded-lg">
                 <div>
                   <Label className="text-xs text-muted-foreground">Peça</Label>
                   <p className="font-medium text-sm">{pecaHistorico.descricao}</p>
@@ -521,7 +521,7 @@ export default function OSPecas() {
                 </div>
               </div>
 
-              <div className="rounded-md border max-h-64 overflow-y-auto">
+              <div className="rounded-md border max-h-64 overflow-y-auto overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

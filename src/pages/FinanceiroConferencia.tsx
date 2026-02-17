@@ -1211,11 +1211,7 @@ const getContaNome = (contaId: string) => contasFinanceiras.find(c => c.id === c
                       <TableCell>{getStatusBadge(linha.venda.statusFluxo as StatusVenda)}</TableCell>
                       <TableCell>
                         {linha.comprovante ? (
-                          linha.tipoOrigem === 'Assistência' ? (
-                            <ComprovantePreview comprovante={linha.comprovante} comprovanteNome={linha.comprovanteNome} size="sm" />
-                          ) : (
-                            <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/30 text-xs">Contém Anexo</Badge>
-                          )
+                          <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/30 text-xs">Contém Anexo</Badge>
                         ) : (
                           <ComprovanteBadgeSemAnexo />
                         )}
@@ -1314,6 +1310,27 @@ const getContaNome = (contaId: string) => contasFinanceiras.find(c => c.id === c
                     ))}
                   </div>
                 </div>
+
+                {/* Comprovantes de Pagamento */}
+                {vendaSelecionada.pagamentos && vendaSelecionada.pagamentos.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2">Comprovantes de Pagamento</h4>
+                    <div className="space-y-2">
+                      {vendaSelecionada.pagamentos.some(p => p.comprovante) ? (
+                        vendaSelecionada.pagamentos.filter(p => p.comprovante).map((pag, idx) => (
+                          <div key={idx} className="flex items-center gap-3 p-2 bg-muted/50 rounded">
+                            <ComprovantePreview comprovante={pag.comprovante} comprovanteNome={pag.comprovanteNome} size="md" />
+                            <div className="text-xs text-muted-foreground">
+                              <span>{pag.meioPagamento}</span> — <span className="font-medium">{formatCurrency(pag.valor)}</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Nenhum comprovante anexado</p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Validação de Pagamentos com Checkbox */}
                 {validacoesPagamento.length > 0 && vendaSelecionada.statusFluxo === 'Conferência Financeiro' && (

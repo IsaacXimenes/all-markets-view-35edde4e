@@ -112,6 +112,7 @@ export interface OrdemServico {
   // Campos de recusa pelo técnico
   recusadaTecnico?: boolean;
   motivoRecusaTecnico?: string;
+  conclusaoServico?: string;
 }
 
 // Mock data

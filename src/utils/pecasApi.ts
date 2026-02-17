@@ -91,6 +91,97 @@ const pecasBase: Omit<Peca, 'lojaId'>[] = [
     dataEntrada: '2024-12-05T16:00:00',
     origem: 'Solicitação',
     status: 'Disponível'
+  },
+  {
+    id: 'PEC-0006',
+    descricao: 'Tela OLED iPhone 13 Pro',
+    modelo: 'iPhone 13 Pro',
+    valorCusto: 380.00,
+    valorRecomendado: 550.00,
+    quantidade: 1,
+    dataEntrada: '2024-12-22T08:30:00',
+    origem: 'Retirada de Peça',
+    status: 'Reservada'
+  },
+  {
+    id: 'PEC-0007',
+    descricao: 'Bateria iPhone 11',
+    modelo: 'iPhone 11',
+    valorCusto: 95.00,
+    valorRecomendado: 170.00,
+    quantidade: 0,
+    dataEntrada: '2024-11-28T13:00:00',
+    origem: 'Nota de Compra',
+    notaCompraId: 'NC-003',
+    status: 'Utilizada'
+  },
+  {
+    id: 'PEC-0008',
+    descricao: 'Flex Power iPhone 15 Pro Max',
+    modelo: 'iPhone 15 Pro Max',
+    valorCusto: 160.00,
+    valorRecomendado: 280.00,
+    quantidade: 3,
+    dataEntrada: '2024-12-25T10:00:00',
+    origem: 'Solicitação',
+    status: 'Disponível'
+  },
+  {
+    id: 'PEC-0009',
+    descricao: 'Módulo Câmera Frontal iPhone 14',
+    modelo: 'iPhone 14',
+    valorCusto: 210.00,
+    valorRecomendado: 350.00,
+    quantidade: 2,
+    dataEntrada: '2024-12-19T15:00:00',
+    origem: 'Retirada de Peça',
+    status: 'Disponível'
+  },
+  {
+    id: 'PEC-0010',
+    descricao: 'Adesivo Bateria iPhone 12 Pro',
+    modelo: 'iPhone 12 Pro',
+    valorCusto: 15.00,
+    valorRecomendado: 30.00,
+    quantidade: 12,
+    dataEntrada: '2024-12-01T09:00:00',
+    origem: 'Nota de Compra',
+    notaCompraId: 'NC-002',
+    status: 'Disponível'
+  },
+  {
+    id: 'PEC-0011',
+    descricao: 'Tela LCD iPhone 11',
+    modelo: 'iPhone 11',
+    valorCusto: 220.00,
+    valorRecomendado: 380.00,
+    quantidade: 0,
+    dataEntrada: '2024-11-15T11:00:00',
+    origem: 'Solicitação',
+    status: 'Utilizada'
+  },
+  {
+    id: 'PEC-0012',
+    descricao: 'Conector de Carga USB-C iPhone 15',
+    modelo: 'iPhone 15',
+    valorCusto: 90.00,
+    valorRecomendado: 160.00,
+    quantidade: 1,
+    dataEntrada: '2024-12-28T14:00:00',
+    origem: 'Produto Thiago',
+    status: 'Reservada'
+  },
+  {
+    id: 'PEC-0013',
+    descricao: 'Alto-falante Auricular iPhone 13',
+    modelo: 'iPhone 13',
+    valorCusto: 65.00,
+    valorRecomendado: 120.00,
+    quantidade: 6,
+    dataEntrada: '2024-12-12T16:30:00',
+    origem: 'Nota de Compra',
+    notaCompraId: 'NC-004',
+    status: 'Disponível'
   }
 ];
 
@@ -114,7 +205,7 @@ export const initializePecasWithLojaIds = (lojaIds: string[]): void => {
   }));
 };
 
-let nextPecaId = 6;
+let nextPecaId = 14;
 
 export const getPecas = (): Peca[] => {
   return [...pecas];

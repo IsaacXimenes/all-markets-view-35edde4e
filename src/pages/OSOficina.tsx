@@ -36,6 +36,7 @@ export default function OSOficina() {
   // Modal de Finalização
   const [finalizarModal, setFinalizarModal] = useState(false);
   const [osParaFinalizar, setOsParaFinalizar] = useState<OrdemServico | null>(null);
+  const [conclusaoServico, setConclusaoServico] = useState('');
   const [resumoConclusao, setResumoConclusao] = useState('');
   const [valorCustoFormatado, setValorCustoFormatado] = useState('');
   const [valorCustoRaw, setValorCustoRaw] = useState<number>(0);
@@ -130,6 +131,7 @@ export default function OSOficina() {
     }
 
     setOsParaFinalizar(os);
+    setConclusaoServico(os.conclusaoServico || '');
     setResumoConclusao(os.resumoConclusao || '');
     setValorCustoRaw(os.valorCustoTecnico || 0);
     setValorCustoFormatado(os.valorCustoTecnico ? String(os.valorCustoTecnico) : '');
@@ -142,6 +144,10 @@ export default function OSOficina() {
 
   const handleFinalizar = () => {
     if (!osParaFinalizar) return;
+    if (!conclusaoServico.trim()) {
+      toast.error('Preencha a Conclusão do Serviço para finalizar.');
+      return;
+    }
     if (!resumoConclusao.trim()) {
       toast.error('Preencha o Resumo da Conclusão para finalizar.');
       return;
@@ -163,6 +169,7 @@ export default function OSOficina() {
     updateOrdemServico(osParaFinalizar.id, {
       status: 'Serviço concluído',
       proximaAtuacao: 'Atendente',
+      conclusaoServico,
       resumoConclusao,
       valorCustoTecnico: valorCustoRaw,
       valorVendaTecnico: valorVendaCalculado,
@@ -170,7 +177,7 @@ export default function OSOficina() {
       timeline: [...osFresh.timeline, {
         data: new Date().toISOString(),
         tipo: 'conclusao_servico',
-        descricao: `Serviço finalizado pelo técnico. Custo: R$ ${valorCustoRaw.toFixed(2)}, Venda: R$ ${valorVendaCalculado.toFixed(2)}. Resumo: ${resumoConclusao}`,
+        descricao: `Serviço finalizado pelo técnico. Conclusão: ${conclusaoServico}. Custo: R$ ${valorCustoRaw.toFixed(2)}, Venda: R$ ${valorVendaCalculado.toFixed(2)}. Resumo: ${resumoConclusao}`,
         responsavel: user?.colaborador?.nome || 'Técnico'
       }]
     });
@@ -397,13 +404,26 @@ export default function OSOficina() {
       );
     }
 
-    // Peça recebida - confirmar recebimento
-    if (atuacao === 'Técnico (Recebimento)') {
+    // Peça recebida / Pagamento concluído - confirmar recebimento + gerenciar peça
+    if (atuacao === 'Técnico (Recebimento)' || 
+        atuacao === 'Técnico: Avaliar/Executar' || 
+        status === 'Peça Recebida' || 
+        status === 'Pagamento Concluído') {
+      const solicitacoesOS = getSolicitacoesByOS(os.id).filter(s => 
+        !['Cancelada', 'Rejeitada'].includes(s.status)
+      );
       return (
-        <Button size="sm" variant="outline" onClick={() => handleConfirmarRecebimento(os)} className="gap-1">
-          <Package className="h-3.5 w-3.5" />
-          Confirmar Recebimento
-        </Button>
+        <div className="flex gap-1">
+          {solicitacoesOS.length > 0 && (
+            <Button size="sm" variant="outline" onClick={() => handleAbrirGerenciarPeca(os)} title="Gerenciar Peça Não Utilizada" className="gap-1">
+              <Undo2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => handleConfirmarRecebimento(os)} className="gap-1">
+            <Package className="h-3.5 w-3.5" />
+            Confirmar Recebimento
+          </Button>
+        </div>
       );
     }
 
@@ -601,6 +621,16 @@ export default function OSOficina() {
               </div>
             )}
 
+            <div className="space-y-2">
+              <Label>Conclusão do Serviço *</Label>
+              <Textarea
+                value={conclusaoServico}
+                onChange={(e) => setConclusaoServico(e.target.value)}
+                placeholder="Descreva a conclusão técnica do reparo realizado..."
+                rows={3}
+                className={cn(!conclusaoServico && 'border-destructive')}
+              />
+            </div>
             <div className="space-y-2">
               <Label>Resumo da Conclusão *</Label>
               <Textarea

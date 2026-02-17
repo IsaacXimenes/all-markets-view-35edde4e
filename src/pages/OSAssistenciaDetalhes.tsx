@@ -72,6 +72,9 @@ export default function OSAssistenciaDetalhes() {
   const [modalConfirmarRecebimento, setModalConfirmarRecebimento] = useState(false);
   const [recebimentoConfirmado, setRecebimentoConfirmado] = useState(false);
   const [checkRecebimento, setCheckRecebimento] = useState(false);
+  const [modalConfirmarFinalizacao, setModalConfirmarFinalizacao] = useState(false);
+  const [finalizacaoConfirmada, setFinalizacaoConfirmada] = useState(false);
+  const [checkFinalizacao, setCheckFinalizacao] = useState(false);
 
   const { user } = useAuthStore();
 
@@ -294,7 +297,7 @@ export default function OSAssistenciaDetalhes() {
     }
   };
 
-  const handleConcluirServico = () => {
+  const handleConcluirServicoClick = () => {
     if (!os) return;
     const valorVendaCalculado = valorCustoTecnico + valorServico;
     if (!valorCustoTecnico) {
@@ -305,7 +308,13 @@ export default function OSAssistenciaDetalhes() {
       toast.error('O Valor a ser cobrado deve ser maior que 0.');
       return;
     }
-    // Ler OS mais recente do store para evitar dados obsoletos
+    setCheckFinalizacao(false);
+    setModalConfirmarFinalizacao(true);
+  };
+
+  const handleConfirmarFinalizacao = () => {
+    if (!os) return;
+    const valorVendaCalculado = valorCustoTecnico + valorServico;
     const osFresh = getOrdemServicoById(os.id);
     if (!osFresh) return;
     
@@ -320,11 +329,14 @@ export default function OSAssistenciaDetalhes() {
         data: new Date().toISOString(),
         tipo: 'conclusao_servico',
         descricao: `Serviço finalizado pelo técnico. Custo: R$ ${valorCustoTecnico.toFixed(2)}, Venda: R$ ${valorVendaCalculado.toFixed(2)}`,
-        responsavel: tecnico?.nome || 'Técnico'
+        responsavel: user?.colaborador?.nome || tecnico?.nome || 'Técnico'
       }]
     });
     const updatedOS = getOrdemServicoById(os.id);
     setOS(updatedOS || null);
+    setFinalizacaoConfirmada(true);
+    setModalConfirmarFinalizacao(false);
+    setCheckFinalizacao(false);
     toast.success('Serviço finalizado! Aguardando pagamento do atendente.');
   };
 
@@ -1069,9 +1081,13 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                   </div>
                 </div>
                 {(os.proximaAtuacao === 'Técnico: Avaliar/Executar' || os.proximaAtuacao === 'Técnico') && os.status !== 'Finalizado' && os.status !== 'Liquidado' && os.status !== 'Serviço concluído' && (
-                  <Button onClick={handleConcluirServico} className="w-full">
+                  <Button 
+                    onClick={handleConcluirServicoClick} 
+                    className="w-full"
+                    disabled={finalizacaoConfirmada}
+                  >
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    Finalizar Serviço
+                    {finalizacaoConfirmada ? 'Serviço Finalizado' : 'Finalizar Serviço'}
                   </Button>
                 )}
               </CardContent>
@@ -1534,6 +1550,59 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                 setCheckRecebimento(false);
                 toast.success('Recebimento confirmado! OS retornou para Em serviço.');
               }}
+            >
+              Confirmar
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal Dupla Confirmação - Finalizar Serviço */}
+      <AlertDialog open={modalConfirmarFinalizacao} onOpenChange={setModalConfirmarFinalizacao}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Finalização do Serviço</AlertDialogTitle>
+            <AlertDialogDescription>
+              Confirme a finalização do serviço para a OS <strong>#{os.id}</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground">Responsável</label>
+                <p className="text-sm font-medium">{user?.colaborador?.nome || tecnico?.nome || 'Técnico'}</p>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Data/Hora</label>
+                <p className="text-sm font-medium">{new Date().toLocaleString('pt-BR')}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground">Valor Custo</label>
+                <p className="text-sm font-medium">R$ {valorCustoTecnico.toFixed(2)}</p>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Valor a Cobrar</label>
+                <p className="text-sm font-medium">R$ {(valorCustoTecnico + valorServico).toFixed(2)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <Checkbox
+                id="check-finalizacao"
+                checked={checkFinalizacao}
+                onCheckedChange={(v) => setCheckFinalizacao(v === true)}
+              />
+              <label htmlFor="check-finalizacao" className="text-sm">
+                Confirmo a finalização do serviço da OS <strong>#{os.id}</strong>
+              </label>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCheckFinalizacao(false)}>Cancelar</AlertDialogCancel>
+            <Button
+              disabled={!checkFinalizacao}
+              onClick={handleConfirmarFinalizacao}
             >
               Confirmar
             </Button>

@@ -846,8 +846,12 @@ export function PagamentoQuadro({
                 <SelectContent>
                   {contasFinanceiras
                     .filter(c => c.status === 'Ativo')
-                    .filter(c => !lojaVendaId || c.lojaVinculada === lojaVendaId)
-                    .filter(c => !apenasContasAssistencia || c.nome.toLowerCase().includes('assistência') || c.nome.toLowerCase().includes('assistencia'))
+                    .filter(c => {
+                      if (apenasContasAssistencia) {
+                        return c.nome.toLowerCase().includes('assistência') || c.nome.toLowerCase().includes('assistencia');
+                      }
+                      return !lojaVendaId || c.lojaVinculada === lojaVendaId;
+                    })
                     .map(conta => {
                       const lojaNome = conta.lojaVinculada ? obterNomeLoja(conta.lojaVinculada) : '';
                       const displayName = lojaNome ? `${lojaNome} - ${conta.nome}` : conta.nome;

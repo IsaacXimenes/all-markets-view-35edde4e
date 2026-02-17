@@ -1,42 +1,79 @@
 
 
-## Corrigir Exibicao de Comprovantes na Conferencia Financeira para Assistencia
+## Corrigir Seleção de Peça na Edição + Histórico de Movimentação no Estoque
 
-### Problema
+### Parte 1: Bug na Edição de OS - Peça no Estoque não carrega descrições
 
-1. Na tabela de Conferencia de Contas, quando a OS e de Assistencia, a coluna "Comprovante" mostra o nome do arquivo ao inves de exibir o badge "Contem Anexo" (como faz para vendas).
-2. No painel lateral de detalhes, ao clicar na acao, nao aparece a miniatura do comprovante clicavel para expandir.
+**Problema:** No arquivo `OSAssistenciaEditar.tsx` (linhas 530-532), ao selecionar "Peça no estoque", o `updatePeca` é chamado 3 vezes em sequência para campos diferentes (`pecaNoEstoque`, `pecaDeFornecedor`, `servicoTerceirizado`). Cada chamada cria uma cópia do estado atual, então apenas a última atualização prevalece - as anteriores são perdidas. Isso faz com que `pecaNoEstoque` nunca fique `true`.
 
-### Solucao
+Na tela de Nova Assistência, isso funciona porque as 3 propriedades são atualizadas em um único objeto batch (linhas 1168-1175).
 
-**Arquivo: `src/pages/FinanceiroConferencia.tsx`**
+**Correção:** Arquivo `src/pages/OSAssistenciaEditar.tsx` - Substituir as 3 chamadas `updatePeca` por uma atualização batch idêntica ao padrão da Nova Assistência:
 
-**Correcao 1 - Coluna da tabela (linhas 1213-1218):**
-Remover a condicao que diferencia Assistencia de Venda. Ambos devem mostrar o badge "Contem Anexo" quando ha comprovante.
-
-De:
 ```text
-{linha.comprovante ? (
-  linha.tipoOrigem === 'Assistência' ? (
-    <ComprovantePreview ... />
-  ) : (
-    <Badge ...>Contém Anexo</Badge>
-  )
-) : ( <ComprovanteBadgeSemAnexo /> )}
+onValueChange={(val) => {
+  const newPecas = [...pecas];
+  newPecas[index] = {
+    ...newPecas[index],
+    pecaNoEstoque: val === 'estoque',
+    pecaDeFornecedor: val === 'fornecedor',
+    servicoTerceirizado: val === 'terceirizado',
+  };
+  setPecas(newPecas);
+}}
 ```
 
-Para:
+---
+
+### Parte 2: Histórico de Movimentação de Peças no Estoque
+
+**Arquivo: `src/utils/pecasApi.ts`**
+
+1. Criar interface `MovimentacaoPeca` com campos:
+   - `id`, `pecaId`, `tipo` ("Entrada" | "Saída" | "Reserva"), `quantidade`, `data`, `osId?`, `descricao`
+2. Criar array `movimentacoesPecas` para armazenar o histórico
+3. Criar dados mockados iniciais (entradas iniciais das peças base)
+4. Atualizar `darBaixaPeca` para registrar automaticamente uma movimentação de saída com o ID da OS
+5. Atualizar `addPeca` para registrar automaticamente uma movimentação de entrada
+6. Exportar funções: `getMovimentacoesByPecaId()` e `addMovimentacaoPeca()`
+
+**Arquivo: `src/pages/OSPecas.tsx`**
+
+1. Adicionar botão de ícone (History) na coluna de Ações, ao lado do botão "Visualizar" existente
+2. Criar modal "Histórico de Movimentação" que exibe:
+   - Quantidade inicial (entrada)
+   - Lista de movimentações com: data, tipo (badge colorido), quantidade, OS que usou, descrição
+   - Quantidade atual restante (em destaque)
+3. O modal mostra a timeline completa da peça: de onde veio, quem usou e quanto resta
+
+**Arquivo: `src/pages/OSAssistenciaNova.tsx`**
+
+1. Atualizar a chamada de `darBaixaPeca` para passar também o ID da OS, registrando qual OS consumiu a peça
+
+---
+
+### Detalhes Técnicos
+
+**Interface MovimentacaoPeca:**
 ```text
-{linha.comprovante ? (
-  <Badge ...>Contém Anexo</Badge>
-) : ( <ComprovanteBadgeSemAnexo /> )}
+interface MovimentacaoPeca {
+  id: string;
+  pecaId: string;
+  tipo: 'Entrada' | 'Saída' | 'Reserva';
+  quantidade: number;
+  data: string;
+  osId?: string;
+  descricao: string;
+}
 ```
 
-**Correcao 2 - Painel lateral de detalhes (apos linha ~1316, dentro da secao de pagamentos):**
-Adicionar uma secao que exibe os comprovantes de cada pagamento como miniaturas clicaveis usando o componente `ComprovantePreview` com `size="md"`. Isso permite ao financeiro ver e expandir o comprovante ao clicar.
+**Assinatura atualizada de darBaixaPeca:**
+```text
+darBaixaPeca(id: string, quantidade?: number, osId?: string)
+```
 
-A secao sera adicionada entre os "Itens da Venda" e a "Validacao de Pagamentos", exibindo:
-- Titulo "Comprovantes de Pagamento"
-- Para cada pagamento que tenha comprovante: miniatura clicavel (ComprovantePreview size="md") com o metodo de pagamento e valor
-- Se nenhum comprovante existir: mensagem "Nenhum comprovante anexado"
-
+**Modal no OSPecas - informações exibidas:**
+- Cabecalho: nome da peça, modelo, loja
+- Tabela de movimentações ordenada por data (mais recente primeiro)
+- Colunas: Data, Tipo (badge), Qtd, OS/Referência, Descrição
+- Rodapé: "Quantidade disponível atual: X unidades"

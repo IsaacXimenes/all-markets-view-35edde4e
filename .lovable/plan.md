@@ -1,119 +1,130 @@
 
 
-## Plano: Remover "Abrir OS" + Gerenciar Peca Nao Utilizada na Oficina + Indicador de Anexo na Conferencia Gestor
+## Plano: Conclusao do Servico + Mock Estoque + Pix no Financeiro + Bug Gerenciar Peca + Confirmar Recebimento
 
-### Parte 1: Remover botao "Abrir OS" do VendaDetalhes
-
-**Arquivo: `src/pages/VendaDetalhes.tsx` (linhas 127-141)**
-
-Remover o bloco do botao que navega para `/os/assistencia/nova?vendaId=...`. Manter apenas o botao "Imprimir Recibo".
-
----
-
-### Parte 2: Botao "Gerenciar Peca Nao Utilizada" na Oficina
+### Problema 1: Campo "Conclusao do Servico" no modal de Finalizacao (Aba Oficina)
 
 **Arquivo: `src/pages/OSOficina.tsx`**
 
-**Novos estados:**
-- `pecaNaoUtilizadaModal: boolean`
-- `osParaGerenciarPeca: OrdemServico | null`
-- `solicitacoesParaGerenciar: SolicitacaoPeca[]`
-- `justificativaNaoUso: string`
-- `solicitacaoSelecionada: SolicitacaoPeca | null`
+Adicionar um campo de texto obrigatorio "Conclusao do Servico" no modal de Finalizar Servico (quadro de avaliacao tecnica). Esse campo e separado do "Resumo da Conclusao" existente e serve para descrever a conclusao tecnica do reparo.
 
-**Imports adicionais:**
-- `cancelarSolicitacao` de `solicitacaoPecasApi`
-- `addPeca`, `addMovimentacaoPeca` de `pecasApi`
-- `Undo2` (ou icone similar) de `lucide-react`
+- Novo estado: `conclusaoServico: string`
+- Novo campo `Textarea` no modal, antes do Resumo, com label "Conclusao do Servico *"
+- Validacao no `handleFinalizar`: se vazio, exibir toast de erro
+- Persistir na OS via `updateOrdemServico` com novo campo `conclusaoServico`
+- Incluir na timeline: "Conclusao: [texto]"
 
-**Botao na tabela:** Dentro de `getAcoes`, para OSs com status "Em servico", adicionar botao "Gerenciar Peca" ao lado de "Finalizar Servico". O botao so aparece se houver solicitacoes vinculadas a OS.
+**Arquivo: `src/utils/assistenciaApi.ts`**
 
-**Modal "Gerenciar Peca Nao Utilizada":**
-- Lista as solicitacoes de pecas vinculadas a OS (via `getSolicitacoesByOS`)
-- Para cada solicitacao, exibir: nome da peca, quantidade, status, valor (se paga)
-- Botao "Marcar Nao Utilizada" com campo obrigatorio de justificativa
-
-**Cenario A - Peca NAO Paga** (`Pendente`, `Aprovada`, `Enviada`, `Aguardando Aprovacao`):
-- Chamar `cancelarSolicitacao(id, justificativa)`
-- OS retorna para "Em servico"
-- Timeline: "Solicitacao de peca [Nome] cancelada. Motivo: [Justificativa]"
-
-**Cenario B - Peca JA PAGA** (`Pagamento Finalizado`, `Recebida`, `Em Estoque`):
-- Chamar `addPeca()` para criar entrada no estoque da loja com status "Disponivel"
-- Chamar `addMovimentacaoPeca()` para registrar entrada
-- Recalcular `valorVendaTecnico` e `valorCustoTecnico` subtraindo o valor da peca
-- Atualizar a OS com `updateOrdemServico`
-- OS retorna para "Em servico"
-- Timeline: "Peca [Nome] (Paga) nao utilizada. Incorporada ao estoque. Motivo: [Justificativa]"
-
-**Trava de Finalizacao:** Em `handleAbrirFinalizar`, verificar se existem solicitacoes com status pendente (`Pendente`, `Aprovada`, `Enviada`, `Aguardando Chegada`, `Pagamento - Financeiro`). Se houver, exibir toast de erro.
+Adicionar campo opcional `conclusaoServico?: string` na interface `OrdemServico`.
 
 ---
 
-### Parte 3: Indicador de Anexo na Conferencia do Gestor
+### Problema 2: Dados Mockados na aba Estoque - Assistencia
 
-**Arquivo: `src/pages/OSConferenciaGestor.tsx`**
+**Arquivo: `src/utils/pecasApi.ts`**
 
-**Na tabela (entre colunas "Status" e "Acoes"):**
-- Adicionar coluna "Anexo" com icone `Paperclip`
-- Para cada OS, verificar se `os.pagamentos` possui pelo menos um pagamento com `comprovante` preenchido
-- Se sim: exibir badge verde "Contém Anexo"
-- Se nao: exibir badge amarelo "Sem Anexo" (usando `ComprovanteBadgeSemAnexo` ja existente)
+A lista `pecasBase` ja possui 5 pecas mockadas (PEC-0001 a PEC-0005), porem so sao inicializadas quando `initializePecasWithLojaIds` e chamada. Adicionar mais itens mockados para enriquecer a visualizacao:
 
-**No painel lateral de conferencia (linhas 693-735):**
-- Ja exibe `ComprovantePreview` para cada pagamento (linhas 714-719) - isso ja funciona corretamente
-- Garantir que a miniatura do comprovante apareca com `size="md"` para melhor visualizacao (ja esta implementado)
+- Adicionar 5-8 pecas extras com variedade de modelos, origens e status
+- Incluir pecas com origem "Retirada de Peca" e "Solicitacao" 
+- Incluir pecas com status "Reservada" e "Utilizada" alem de "Disponivel"
+- Atualizar `nextPecaId` para refletir os novos itens
 
 ---
 
-### Detalhes Tecnicos
+### Problema 3: Dados de Pix (Banco/Chave) da Aprovacao devem aparecer no Financeiro
 
-**VendaDetalhes.tsx - Remover linhas 128-141:**
-Remover todo o bloco `<Button variant="outline" onClick={...}>Abrir OS</Button>`.
+**Problema:** Na aprovacao de solicitacoes de pecas (`OSSolicitacoesPecas.tsx`), o gestor preenche `bancoDestinatario` e `chavePix`, mas esses campos NAO sao salvos na interface `SolicitacaoPeca` nem passados para `aprovarSolicitacao()`. O financeiro nao tem acesso a essas informacoes.
 
-**OSOficina.tsx - getAcoes (linhas 296-304):**
-```text
-if (status === 'Em servico') {
-  const solicitacoesOS = getSolicitacoesByOS(os.id);
+**Correcoes:**
+
+1. **`src/utils/solicitacaoPecasApi.ts`** - Adicionar campos na interface:
+   ```
+   bancoDestinatario?: string;
+   chavePix?: string;
+   ```
+   E na funcao `aprovarSolicitacao`, aceitar e persistir esses campos.
+
+2. **`src/pages/OSSolicitacoesPecas.tsx`** - Passar `bancoDestinatario` e `chavePix` na chamada de `aprovarSolicitacao`:
+   ```
+   aprovarSolicitacao(sol.id, {
+     ...dados existentes,
+     bancoDestinatario: dados.bancoDestinatario,
+     chavePix: dados.chavePix
+   });
+   ```
+
+3. **`src/pages/FinanceiroNotasAssistencia.tsx`** - Na secao de pagamento do modal de conferir nota, exibir os dados de Pix vindos das solicitacoes vinculadas:
+   - Buscar solicitacoes da OS via `getSolicitacoesByOS(nota.osId)`
+   - Para cada solicitacao com `formaPagamento === 'Pix'`, exibir:
+     - Banco do Destinatario
+     - Chave Pix
+   - Exibir em um card informativo acima dos campos de pagamento
+
+---
+
+### Problema 4: Botao "Gerenciar Peca Nao Utilizada" desaparece apos pagamento
+
+**Problema:** O botao so aparece quando `status === 'Em servico'` (linha 411 de OSOficina.tsx). Apos o pagamento no financeiro, `finalizarNotaAssistencia` muda o status da OS para 'Peca Recebida' com `proximaAtuacao: 'Tecnico: Avaliar/Executar'`. Nesse ponto, a condicao `status === 'Em servico'` falha e o botao some.
+
+**Correcao em `src/pages/OSOficina.tsx` - funcao `getAcoes`:**
+
+Alterar a logica para exibir o botao "Gerenciar Peca Nao Utilizada" tambem nos status de peca recebida:
+
+```
+// Peça recebida - confirmar recebimento + gerenciar peça
+if (atuacao === 'Técnico (Recebimento)' || 
+    atuacao === 'Técnico: Avaliar/Executar' || 
+    status === 'Peça Recebida' || 
+    status === 'Pagamento Concluído') {
+  const solicitacoesOS = getSolicitacoesByOS(os.id).filter(s => 
+    !['Cancelada', 'Rejeitada'].includes(s.status)
+  );
   return (
     <div className="flex gap-1">
       {solicitacoesOS.length > 0 && (
-        <Button size="sm" variant="outline" onClick={() => handleAbrirGerenciarPeca(os)}>
-          <Undo2 className="h-3.5 w-3.5" />
-        </Button>
+        <Button ... Gerenciar Peça Não Utilizada />
       )}
-      <Button size="sm" onClick={() => handleAbrirFinalizar(os)}>
-        <CheckCircle className="h-3.5 w-3.5" /> Finalizar
-      </Button>
+      <Button ... Confirmar Recebimento />
     </div>
   );
 }
+
+// Em serviço - finalizar + gerenciar peça (manter logica existente)
+if (status === 'Em serviço') { ... }
 ```
 
-**OSConferenciaGestor.tsx - Coluna Anexo na tabela (apos linha 544):**
-```text
-<TableHead>Anexo</TableHead>
+---
+
+### Problema 5: Status "Peca Recebida" nao deve ser condicionado ao pagamento
+
+**Problema:** A funcao `finalizarNotaAssistencia` no `solicitacaoPecasApi.ts` (linhas 556-570) muda automaticamente o status da OS para "Peca Recebida" quando o financeiro finaliza a nota. Porem, segundo a regra de negocio, o status "Peca Recebida" deve ser atribuido APENAS quando o tecnico clica em "Confirmar Recebimento" na tabela de Servicos.
+
+**Correcao em `src/utils/solicitacaoPecasApi.ts` - funcao `finalizarNotaAssistencia`:**
+
+Ao finalizar a nota, em vez de mudar para "Peca Recebida", manter o status em "Pagamento Concluido" e mudar a `proximaAtuacao` para "Tecnico (Recebimento)" para sinalizar que o tecnico precisa confirmar fisicamente o recebimento.
+
+```
+// ANTES:
+status: 'Peça Recebida',
+proximaAtuacao: 'Técnico: Avaliar/Executar'
+
+// DEPOIS:
+status: 'Pagamento Concluído',
+proximaAtuacao: 'Técnico (Recebimento)'
 ```
 
-**OSConferenciaGestor.tsx - Celula Anexo (apos linha 578):**
-```text
-<TableCell>
-  {os.pagamentos.some(p => p.comprovante) ? (
-    <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
-      <Paperclip className="h-3 w-3 mr-1" /> Contém Anexo
-    </Badge>
-  ) : (
-    <ComprovanteBadgeSemAnexo />
-  )}
-</TableCell>
-```
+Dessa forma, o tecnico vera o botao "Confirmar Recebimento" na aba Oficina, e ao clicar, a OS mudara para "Em servico" (logica ja existente em `handleConfirmarRecebimento`).
 
-**Imports adicionais no OSConferenciaGestor.tsx:**
-- `Paperclip` de `lucide-react`
-- `ComprovanteBadgeSemAnexo` de `@/components/vendas/ComprovantePreview`
+---
 
-**Arquivos modificados:**
-1. `src/pages/VendaDetalhes.tsx` - Remover botao "Abrir OS"
-2. `src/pages/OSOficina.tsx` - Adicionar botao, modal, logica de bifurcacao, trava de finalizacao
-3. `src/pages/OSConferenciaGestor.tsx` - Adicionar coluna e badge de anexo na tabela
+### Resumo de Arquivos Modificados
+
+1. `src/utils/assistenciaApi.ts` - Adicionar campo `conclusaoServico` na interface OrdemServico
+2. `src/pages/OSOficina.tsx` - Campo obrigatorio de conclusao + botao de gerenciar peca em mais status
+3. `src/utils/pecasApi.ts` - Mais dados mockados de pecas
+4. `src/utils/solicitacaoPecasApi.ts` - Campos `bancoDestinatario`/`chavePix` na interface + correcao do status pos-pagamento
+5. `src/pages/OSSolicitacoesPecas.tsx` - Passar `bancoDestinatario`/`chavePix` na aprovacao
+6. `src/pages/FinanceiroNotasAssistencia.tsx` - Exibir dados Pix no modal de pagamento
 

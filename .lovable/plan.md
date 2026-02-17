@@ -1,45 +1,41 @@
 
 
-## Filtrar Contas de Destino para Assistencia no Quadro de Pagamento
+## Filtrar Contas de Assistencia por Loja Especifica
 
-### Contexto
+### Problema
 
-No modulo de Assistencia (Nova OS, Detalhes OS, Editar OS), o componente `PagamentoQuadro` ja filtra as contas de destino pelo `lojaVendaId` (ID da loja de assistencia). Porem, e necessario garantir que apenas contas vinculadas a assistencia aparecam (Bradesco Assistencia + Dinheiro Assistencia), e nao contas de lojas regulares.
+Atualmente, quando `apenasContasAssistencia` esta ativo, o filtro ignora o `lojaVendaId` e mostra TODAS as contas de assistencia de todas as lojas. O correto e mostrar apenas as contas da loja de assistencia onde a OS esta sendo feita.
 
-### O que sera feito
+### Solucao
 
-Adicionar uma prop `apenasContasAssistencia` ao componente `PagamentoQuadro` para filtrar explicitamente apenas contas de assistencia (Bradesco Assistencia e Dinheiro Assistencia) no dropdown de Conta de Destino.
+Combinar os dois filtros: verificar que a conta pertence a loja (`lojaVinculada === lojaVendaId`) E que o nome contem "Assistencia".
 
 **Exemplo pratico:**
-- OS na Assistencia - Shopping JK: dropdown mostra apenas:
-  - "Assistencia - Shopping JK - Bradesco Assistencia" (CTA-012)
-  - "Assistencia - Shopping JK - Dinheiro - Assistencia JK Shopping" (CTA-022)
+- OS na "Assistencia - Shopping JK" (lojaId = `94dbe2b1`)
+- Dropdown mostrara apenas:
+  - CTA-012: Bradesco Assistencia (lojaVinculada: `94dbe2b1`)
+  - CTA-022: Dinheiro - Assistencia JK Shopping (lojaVinculada: `94dbe2b1`)
 
 ### Detalhes Tecnicos
 
-**Arquivo 1: `src/components/vendas/PagamentoQuadro.tsx`**
-- Adicionar prop `apenasContasAssistencia?: boolean` na interface `PagamentoQuadroProps`
-- No filtro do Select de "Conta de Destino" (linha ~845), quando `apenasContasAssistencia` for true, filtrar apenas contas cujo nome contenha "Assistencia" ou "Assistência" (abrange tanto "Bradesco Assistencia" quanto "Dinheiro - Assistencia...")
-- Isso garante que contas de loja regular (Santander, Bradesco Thiago, etc.) nao aparecam
+**Arquivo: `src/components/vendas/PagamentoQuadro.tsx` (linhas 849-854)**
 
-**Arquivo 2: `src/pages/OSAssistenciaNova.tsx`**
-- Passar `apenasContasAssistencia={true}` no componente `PagamentoQuadro` (linha ~1490)
-
-**Arquivo 3: `src/pages/OSAssistenciaDetalhes.tsx`**
-- Passar `apenasContasAssistencia={true}` nas duas instancias de `PagamentoQuadro` (linhas ~1113 e ~1167)
-
-**Arquivo 4: `src/pages/OSAssistenciaEditar.tsx`** (se usar PagamentoQuadro)
-- Passar `apenasContasAssistencia={true}` tambem
-
-### Logica do filtro
-
+Alterar a logica do filtro de:
 ```text
-contasFinanceiras
-  .filter(c => c.status === 'Ativo')
-  .filter(c => !lojaVendaId || c.lojaVinculada === lojaVendaId)
-  .filter(c => !apenasContasAssistencia || 
-    c.nome.toLowerCase().includes('assistência') || 
-    c.nome.toLowerCase().includes('assistencia'))
+if (apenasContasAssistencia) {
+  return nome inclui "assistencia"   // mostra TODAS as contas de assistencia
+}
+return lojaVinculada === lojaVendaId
 ```
 
-Isso garante que mesmo que futuras contas sejam adicionadas a uma loja de assistencia, apenas as que contenham "Assistencia" no nome serao exibidas no contexto de OS.
+Para:
+```text
+if (apenasContasAssistencia) {
+  return lojaVinculada === lojaVendaId 
+    AND (nome inclui "assistencia" OR nome inclui "assistência")
+}
+return lojaVinculada === lojaVendaId
+```
+
+Isso combina ambos os criterios: pertencer a loja correta E ser conta de assistencia.
+

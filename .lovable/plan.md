@@ -1,71 +1,100 @@
 
 
-## Restyling da Sidebar - Visual Premium Thiago Imports
+## Remoção de Lotes e Implementação de Ações em Massa
 
 ### Resumo
 
-Transformar a sidebar atual em um visual premium e tecnologico, com fundo preto (#111111), padrao de circuitos sutil usando a imagem existente (`login_screen_v2_thiago_imports.png`), e esquema de cores amarelo (#F7BB05) para itens ativos.
+Remover toda a infraestrutura de "Lotes" (criação, agrupamento, envio) e substituir por um sistema direto de "Encaminhar Selecionados" com checkboxes, onde cada registro é processado individualmente e chega ao financeiro sem agrupamento.
 
 ---
 
-### 1. Fundo com Padrao de Circuitos
+### 1. Arquivos a EXCLUIR
 
-**Arquivo: `src/components/layout/Sidebar.tsx`**
-
-- No `<aside>` (desktop) e no `<SheetContent>` (mobile), aplicar:
-  - `background-color: #111111` (substituir `bg-sidebar`).
-  - Adicionar um pseudo-elemento `::before` via uma div overlay posicionada absolutamente com:
-    - A imagem `login_screen_v2_thiago_imports.png` como background.
-    - `background-size: cover`, `background-position: center`.
-    - `opacity: 0.08` (bem sutil para nao atrapalhar leitura).
-    - `pointer-events: none` para nao bloquear cliques.
+| Arquivo | Motivo |
+|---------|--------|
+| `src/utils/lotesPagamentoApi.ts` | API de lotes de pagamento (entidade inteira) |
+| `src/pages/FinanceiroLotesPagamento.tsx` | Página "Lotes de Pagamento" no Financeiro |
+| `src/pages/FinanceiroExecucaoLotes.tsx` | Página "Execução de Lotes" no Financeiro |
+| `src/pages/AssistenciaLotesPagamento.tsx` | Página "Lotes de Pagamento" na Assistência |
 
 ---
 
-### 2. Estilizacao dos Itens de Menu
+### 2. Remover Rotas e Imports em `src/App.tsx`
 
-**Arquivo: `src/components/layout/Sidebar.tsx`**
-
-- **Texto/icone padrao**: Cor branca (`text-white` ou `text-[#E0E0E0]`).
-- **Item ativo**:
-  - Remover o `bg-primary` atual azul.
-  - Texto e icone em amarelo `text-[#F7BB05]`.
-  - Borda esquerda de 4px amarela (`border-l-4 border-[#F7BB05]`).
-  - Fundo sutil: `bg-[#F7BB05]/10`.
-  - Remover o `animate-pulse` do icone ativo (substituir por brilho estatico).
-- **Hover (nao ativo)**:
-  - `hover:bg-[#212121]` ou `hover:bg-[#F7BB05]/10`.
-  - Texto permanece branco.
-- **Indicador lateral**: Substituir a barra branca atual por `border-l-4 border-[#F7BB05]` no proprio link, removendo a div absoluta.
+- Remover imports de `FinanceiroLotesPagamento`, `FinanceiroExecucaoLotes`, `AssistenciaLotesPagamento`
+- Remover as 3 rotas: `/financeiro/lotes-pagamento`, `/financeiro/execucao-lotes`, `/assistencia/lotes-pagamento`
 
 ---
 
-### 3. Cabecalho e Rodape
+### 3. Limpar Referências de Navegação
 
-**Arquivo: `src/components/layout/Sidebar.tsx`**
+**`src/pages/OSAssistencia.tsx`** (linha ~514):
+- Remover o botão que navega para `/assistencia/lotes-pagamento`
 
-- Titulo "Navegacao": cor branca `text-white`.
-- Borda inferior do cabecalho: `border-[#222222]` (sutil no fundo preto).
-- Botao de toggle (chevron): `text-white hover:text-[#F7BB05]`.
-- Rodape "Status da Loja": fundo `bg-[#1a1a1a]`, texto `text-[#E0E0E0]`.
-
----
-
-### 4. Variaveis CSS (opcional)
-
-**Arquivo: `src/index.css`**
-
-- Atualizar as variaveis `--sidebar-*` para refletir a nova paleta:
-  - `--sidebar-background`: manter ou ajustar para `#111111`.
-  - `--sidebar-accent`: ajustar para `#212121`.
-  - As cores amarelas serao aplicadas diretamente via classes Tailwind nos itens ativos, sem criar nova variavel.
+**`src/components/layout/FinanceiroLayout.tsx`**:
+- As abas de "Lotes de Pagamento" e "Execução de Lotes" ja NAO existem neste layout (confirmado na leitura). Nenhuma alteração necessária aqui.
 
 ---
 
-### Resumo de Arquivos
+### 4. Refatorar `src/pages/OSSolicitacoesPecas.tsx` - Substituir Lotes por Encaminhar em Massa
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/components/layout/Sidebar.tsx` | Fundo #111111, overlay de circuitos com opacidade 0.08, itens ativos amarelo #F7BB05 com border-left, hover escuro, remover animate-pulse |
-| `src/index.css` | Ajustar variaveis --sidebar-background e --sidebar-accent para a nova paleta |
+Esta é a maior alteração. O fluxo atual usa checkboxes para selecionar solicitações aprovadas e criar um lote. O novo fluxo:
+
+**Remover:**
+- Import de `criarLote`, `enviarLote`, `getLotes`, `editarLote`, `getLoteById`, `LotePecas`, `LoteTimeline`
+- Estado `lotes`, `loteSelecionado`, `verLoteOpen`, `editarLoteOpen`, `editLoteValorTotal`
+- Aba "Lotes" inteira (`TabsTrigger value="lotes"` e `TabsContent value="lotes"`)
+- Card de stats "Lotes"
+- Funções `handleCriarLote`, `handleEnviarLote`, `handleEditarLote`, `handleSalvarEdicaoLote`, `handleVerLote`
+- Modais de ver/editar lote
+
+**Adicionar:**
+- Botão "Encaminhar Selecionados (N)" que substitui "Criar Lote (N)"
+- Ao clicar, percorre cada solicitação selecionada e chama uma nova função `encaminharParaFinanceiro` que:
+  - Atualiza status para `'Pagamento - Financeiro'`
+  - Cria uma nota individual no financeiro
+  - Registra na timeline da OS: "Registro encaminhado para conferência financeira por [Usuário] via ação em massa"
+- Os checkboxes permanecem apenas para solicitações com status `'Aprovada'` (sem filtro por `loteId`)
+
+---
+
+### 5. Refatorar `src/utils/solicitacaoPecasApi.ts` - Remover Lotes, Adicionar Encaminhar Individual
+
+**Remover:**
+- Interface `LotePecas`, `LoteTimeline`
+- Array `lotes` e `loteCounter`
+- Funções: `criarLote`, `editarLote`, `getLoteById` (da solicitacaoPecasApi), `enviarLote`, `getLotes`
+- Campo `loteId` da interface `SolicitacaoPeca` (e referências nos dados mockados)
+- Lógica de `finalizarNotaAssistencia` que referencia lotes
+
+**Adicionar:**
+- Função `encaminharParaFinanceiro(solicitacaoIds: string[], usuarioNome: string)`:
+  - Para cada ID, atualiza status para `'Pagamento - Financeiro'`
+  - Cria nota individual de assistência para cada solicitação
+  - Registra timeline na OS: "Registro encaminhado para conferência financeira por [usuarioNome] via ação em massa"
+  - Retorna array de notas criadas
+
+**Adaptar:**
+- `finalizarNotaAssistencia` para funcionar sem referência a lotes - processar diretamente a solicitação vinculada à nota
+
+---
+
+### 6. Conferência Individual no Financeiro
+
+A página `src/pages/FinanceiroNotasAssistencia.tsx` já lista notas individualmente. Com a remoção dos lotes, cada nota terá exatamente 1 solicitação, garantindo conferência individual. Nenhuma alteração estrutural necessária nesta página, apenas confirmar que os dados fluem corretamente.
+
+---
+
+### Resumo de Impacto
+
+| Arquivo | Ação |
+|---------|------|
+| `src/utils/lotesPagamentoApi.ts` | EXCLUIR |
+| `src/pages/FinanceiroLotesPagamento.tsx` | EXCLUIR |
+| `src/pages/FinanceiroExecucaoLotes.tsx` | EXCLUIR |
+| `src/pages/AssistenciaLotesPagamento.tsx` | EXCLUIR |
+| `src/App.tsx` | Remover 3 imports e 3 rotas |
+| `src/pages/OSAssistencia.tsx` | Remover botão de navegação para lotes |
+| `src/pages/OSSolicitacoesPecas.tsx` | Refatorar: remover aba Lotes, trocar "Criar Lote" por "Encaminhar Selecionados" |
+| `src/utils/solicitacaoPecasApi.ts` | Remover entidade Lote, adicionar `encaminharParaFinanceiro`, adaptar `finalizarNotaAssistencia` |
 

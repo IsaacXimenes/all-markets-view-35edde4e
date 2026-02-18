@@ -110,7 +110,10 @@ export default function EstoqueProdutoPendenteDetalhes() {
       if (data) {
         const ordensServico = getOrdensServico();
         const os = ordensServico.find(o => 
-          o.origemOS === 'Estoque' && o.imeiAparelho === data.imei
+          o.origemOS === 'Estoque' && (
+            o.imeiAparelho === data.imei || 
+            (o as any).produtoId === data.id
+          )
         );
         setOsVinculada(os || null);
       }
@@ -533,6 +536,7 @@ export default function EstoqueProdutoPendenteDetalhes() {
                         <thead>
                           <tr className="bg-muted/50">
                             <th className="text-left p-2 text-xs text-muted-foreground font-medium">Descrição</th>
+                            <th className="text-center p-2 text-xs text-muted-foreground font-medium">Qtd</th>
                             <th className="text-right p-2 text-xs text-muted-foreground font-medium">Valor</th>
                             <th className="text-left p-2 text-xs text-muted-foreground font-medium">Origem</th>
                           </tr>
@@ -540,8 +544,9 @@ export default function EstoqueProdutoPendenteDetalhes() {
                         <tbody>
                           {osVinculada.pecas.map((peca: any, idx: number) => (
                             <tr key={idx} className="border-t">
-                              <td className="p-2">{peca.descricao || peca.nome || '-'}</td>
-                              <td className="p-2 text-right font-medium">{formatCurrency(peca.valorCusto || peca.valor || 0)}</td>
+                              <td className="p-2">{peca.peca || peca.descricao || '-'}</td>
+                              <td className="p-2 text-center">{peca.percentual || 1}</td>
+                              <td className="p-2 text-right font-medium">{formatCurrency(peca.valorTotal || peca.valor || 0)}</td>
                               <td className="p-2">
                                 <Badge variant="outline" className="text-xs">{peca.origem || 'Estoque'}</Badge>
                               </td>

@@ -35,16 +35,20 @@ import {
   Calendar,
   User,
   DollarSign,
-  ShieldCheck
+  ShieldCheck,
+  Wrench,
+  RotateCcw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   getProdutoPendenteById, 
   salvarParecerEstoque, 
+  atualizarStatusProdutoPendente,
   ProdutoPendente,
   TimelineEntry,
   calcularSLA
 } from '@/utils/osApi';
+import { getOrdensServico } from '@/utils/assistenciaApi';
 import { getColaboradores, getCargos } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { useAuthStore } from '@/store/authStore';
@@ -69,6 +73,7 @@ export default function EstoqueProdutoPendenteDetalhes() {
   
   const [produto, setProduto] = useState<ProdutoPendente | null>(null);
   const [colaboradoresEstoque, setColaboradoresEstoque] = useState<{ id: string; nome: string }[]>([]);
+  const [osVinculada, setOsVinculada] = useState<any>(null);
   
   // Usuário logado via authStore
   const user = useAuthStore((s) => s.user);
@@ -100,6 +105,15 @@ export default function EstoqueProdutoPendenteDetalhes() {
     if (id) {
       const data = getProdutoPendenteById(id);
       setProduto(data);
+      
+      // Buscar OS vinculada ao produto (por IMEI e origemOS === 'Estoque')
+      if (data) {
+        const ordensServico = getOrdensServico();
+        const os = ordensServico.find(o => 
+          o.origemOS === 'Estoque' && o.imeiAparelho === data.imei
+        );
+        setOsVinculada(os || null);
+      }
     }
 
     // Carregar colaboradores com permissão de Estoque
@@ -131,11 +145,13 @@ export default function EstoqueProdutoPendenteDetalhes() {
       return;
     }
 
-    // Observação obrigatória ao encaminhar para assistência
-    if (parecerStatus === 'Encaminhado para conferência da Assistência' && !parecerObservacoes.trim()) {
+    // Observação obrigatória ao encaminhar para assistência ou retrabalho
+    if ((parecerStatus === 'Encaminhado para conferência da Assistência' || parecerStatus === 'Retrabalho - Devolver para Oficina') && !parecerObservacoes.trim()) {
       toast({
         title: "Observação obrigatória",
-        description: "Preencha a Observação com as tratativas que o técnico deve realizar.",
+        description: parecerStatus === 'Retrabalho - Devolver para Oficina'
+          ? "Informe o motivo da recusa para o retrabalho."
+          : "Preencha a Observação com as tratativas que o técnico deve realizar.",
         variant: "destructive"
       });
       return;
@@ -156,14 +172,63 @@ export default function EstoqueProdutoPendenteDetalhes() {
       return;
     }
 
+    setConfirmDialogOpen(false);
+
+    // Fluxo de Validação pós-oficina (Aprovar / Retrabalho)
+    if (parecerStatus === 'Aparelho Aprovado - Retornar ao Estoque') {
+      // Aprovar: somar custo assistência e deferir
+      const resultado = salvarParecerEstoque(id, 'Produto revisado e deferido', parecerObservacoes, parecerResponsavel);
+      if (resultado.produto) {
+        toast({
+          title: "Aparelho aprovado!",
+          description: `Produto ${id} aprovado e retornado ao estoque. Custo composto atualizado.`,
+          className: "bg-green-500 text-white border-green-600"
+        });
+        navigate('/estoque/produtos-pendentes');
+      }
+      return;
+    }
+
+    if (parecerStatus === 'Retrabalho - Devolver para Oficina') {
+      // Retrabalho: atualizar status do produto pendente e da OS vinculada
+      if (produto) {
+        atualizarStatusProdutoPendente(produto.imei, 'Retrabalho - Recusado pelo Estoque', {
+          osId: osVinculada?.id || 'N/A',
+          resumo: `Recusado pelo Estoque: ${parecerObservacoes}`,
+          tecnico: parecerResponsavel
+        });
+
+        // Atualizar a OS vinculada para retrabalho
+        if (osVinculada) {
+          const ordensServico = getOrdensServico();
+          const os = ordensServico.find((o: any) => o.id === osVinculada.id);
+          if (os) {
+            os.status = 'Retrabalho - Recusado pelo Estoque';
+            os.proximaAtuacao = 'Técnico';
+            os.timeline.push({
+              data: new Date().toISOString(),
+              tipo: 'status',
+              descricao: `Retrabalho solicitado pelo Estoque: ${parecerObservacoes}`,
+              responsavel: parecerResponsavel
+            });
+          }
+        }
+      }
+      toast({
+        title: "Retrabalho solicitado",
+        description: `Produto ${id} devolvido para a oficina. Motivo: ${parecerObservacoes}`,
+        variant: "destructive"
+      });
+      navigate('/estoque/produtos-pendentes');
+      return;
+    }
+
+    // Fluxo padrão (análise inicial)
     const statusParecer = parecerStatus as 'Análise Realizada – Produto em ótimo estado' | 'Encaminhado para conferência da Assistência';
     
     const resultado = salvarParecerEstoque(id, statusParecer, parecerObservacoes, parecerResponsavel);
-    
-    setConfirmDialogOpen(false);
 
     if (resultado.produto) {
-      // Se foi aprovado direto e migrado para o estoque
       if (resultado.migrado && statusParecer === 'Análise Realizada – Produto em ótimo estado') {
         toast({
           title: "Produto deferido!",
@@ -326,6 +391,58 @@ export default function EstoqueProdutoPendenteDetalhes() {
             </CardContent>
           </Card>
 
+          {/* Card Custo Composto + Resumo Técnico (aparece quando status = Validar Aparelho) */}
+          {produto.statusGeral === 'Serviço Concluído - Validar Aparelho' && (
+            <Card className="border-orange-500/30 col-span-1 lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wrench className="h-5 w-5 text-orange-500" />
+                  Serviço Concluído - Validação Pendente
+                </CardTitle>
+                <CardDescription>
+                  {osVinculada ? `OS Vinculada: ${osVinculada.id}` : 'Aguardando validação do gestor de estoque'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {osVinculada && (
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-muted-foreground">Resumo do Técnico</Label>
+                      <p className="mt-1 p-3 rounded-lg bg-muted/50 text-sm">
+                        {osVinculada.resumoConclusao || 'Sem resumo disponível'}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-muted-foreground">Custo Peças/Insumos (OS)</Label>
+                        <p className="text-lg font-bold text-orange-600">{formatCurrency(osVinculada.custoTotal || 0)}</p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">OS ID</Label>
+                        <p className="font-mono">{osVinculada.id}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <Separator />
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-3 rounded-lg bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Custo Aquisição</p>
+                    <p className="text-lg font-bold">{formatCurrency(produto.valorCustoOriginal)}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-orange-500/10 text-center">
+                    <p className="text-xs text-muted-foreground">Custo Assistência</p>
+                    <p className="text-lg font-bold text-orange-600">{formatCurrency(produto.custoAssistencia || 0)}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-primary/10 text-center">
+                    <p className="text-xs text-muted-foreground">Custo Composto</p>
+                    <p className="text-lg font-bold text-primary">{formatCurrency(produto.valorCustoOriginal + (produto.custoAssistencia || 0))}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Quadro Parecer Estoque */}
           <Card className={produto.parecerEstoque ? 'border-green-500/30' : 'border-yellow-500/30'}>
             <CardHeader>
@@ -347,8 +464,17 @@ export default function EstoqueProdutoPendenteDetalhes() {
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o status" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {produto.statusGeral === 'Retornado da Assistência' ? (
+                       <SelectContent>
+                        {produto.statusGeral === 'Serviço Concluído - Validar Aparelho' ? (
+                          <>
+                            <SelectItem value="Aparelho Aprovado - Retornar ao Estoque">
+                              Aparelho Aprovado - Retornar ao Estoque
+                            </SelectItem>
+                            <SelectItem value="Retrabalho - Devolver para Oficina">
+                              Retrabalho - Devolver para Oficina
+                            </SelectItem>
+                          </>
+                        ) : produto.statusGeral === 'Retornado da Assistência' ? (
                           <SelectItem value="Produto revisado e deferido">
                             Produto revisado e deferido
                           </SelectItem>
@@ -362,23 +488,28 @@ export default function EstoqueProdutoPendenteDetalhes() {
                             </SelectItem>
                           </>
                         )}
-                      </SelectContent>
+                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
                     <Label>
-                      Observações {parecerStatus === 'Encaminhado para conferência da Assistência' && <span className="text-destructive">*</span>}
+                      Observações {(parecerStatus === 'Encaminhado para conferência da Assistência' || parecerStatus === 'Retrabalho - Devolver para Oficina') && <span className="text-destructive">*</span>}
                     </Label>
                     <Textarea
-                      placeholder={parecerStatus === 'Encaminhado para conferência da Assistência' 
+                      placeholder={parecerStatus === 'Retrabalho - Devolver para Oficina'
+                        ? "Informe o motivo da recusa (obrigatório)..."
+                        : parecerStatus === 'Encaminhado para conferência da Assistência' 
                         ? "Descreva as tratativas que o técnico deve realizar..." 
                         : "Descreva as observações sobre o produto..."}
                       value={parecerObservacoes}
                       onChange={(e) => setParecerObservacoes(e.target.value)}
                       rows={3}
-                      className={parecerStatus === 'Encaminhado para conferência da Assistência' && !parecerObservacoes.trim() ? 'border-destructive' : ''}
+                      className={(parecerStatus === 'Encaminhado para conferência da Assistência' || parecerStatus === 'Retrabalho - Devolver para Oficina') && !parecerObservacoes.trim() ? 'border-destructive' : ''}
                     />
+                    {parecerStatus === 'Retrabalho - Devolver para Oficina' && (
+                      <p className="text-xs text-destructive">Motivo obrigatório ao solicitar retrabalho</p>
+                    )}
                     {parecerStatus === 'Encaminhado para conferência da Assistência' && (
                       <p className="text-xs text-destructive">Campo obrigatório ao encaminhar para assistência</p>
                     )}
@@ -400,7 +531,11 @@ export default function EstoqueProdutoPendenteDetalhes() {
 
                   <Button onClick={handleAbrirConfirmacao} className="w-full">
                     <ShieldCheck className="h-4 w-4 mr-2" />
-                    {produto.statusGeral === 'Retornado da Assistência' ? 'Deferir Produto' : 'Salvar Parecer Estoque'}
+                    {produto.statusGeral === 'Serviço Concluído - Validar Aparelho' 
+                      ? 'Validar Aparelho' 
+                      : produto.statusGeral === 'Retornado da Assistência' 
+                      ? 'Deferir Produto' 
+                      : 'Salvar Parecer Estoque'}
                   </Button>
             </CardContent>
           </Card>

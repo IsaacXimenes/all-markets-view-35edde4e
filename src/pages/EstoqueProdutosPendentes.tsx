@@ -54,7 +54,9 @@ type StatusAparelhosPendentes =
   | 'Em Análise Assistência' 
   | 'Aguardando Peça' 
   | 'Retornado da Assistência' 
-  | 'Devolvido para Fornecedor';
+  | 'Devolvido para Fornecedor'
+  | 'Serviço Concluído - Validar Aparelho'
+  | 'Retrabalho - Recusado pelo Estoque';
 
 export default function EstoqueProdutosPendentes() {
   const navigate = useNavigate();
@@ -177,6 +179,10 @@ export default function EstoqueProdutosPendentes() {
         return <Badge variant="outline" className="bg-destructive/10 text-destructive">Aguardando Peça</Badge>;
       case 'Retornado da Assistência':
         return <Badge variant="outline" className="bg-primary/20 text-primary">Revisão Final</Badge>;
+      case 'Serviço Concluído - Validar Aparelho':
+        return <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/30">🔧 Validar Aparelho</Badge>;
+      case 'Retrabalho - Recusado pelo Estoque':
+        return <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/30">🔄 Retrabalho</Badge>;
       case 'Devolvido para Fornecedor':
         return <Badge variant="outline" className="bg-muted text-muted-foreground">Devolvido p/ Fornecedor</Badge>;
       default:
@@ -253,6 +259,7 @@ export default function EstoqueProdutosPendentes() {
     emAssistencia: filteredProdutos.filter(p => p.statusGeral === 'Em Análise Assistência' || p.statusGeral === 'Aguardando Recebimento Assistência').length,
     aguardandoPeca: filteredProdutos.filter(p => p.statusGeral === 'Aguardando Peça').length,
     retornados: filteredProdutos.filter(p => p.statusGeral === 'Retornado da Assistência').length,
+    validarAparelho: filteredProdutos.filter(p => p.statusGeral === 'Serviço Concluído - Validar Aparelho').length,
     devolvidos: filteredProdutos.filter(p => p.statusGeral === 'Devolvido para Fornecedor').length,
   };
 
@@ -514,6 +521,8 @@ export default function EstoqueProdutosPendentes() {
                   <SelectItem value="Em Análise Assistência">Em Assistência</SelectItem>
                   <SelectItem value="Aguardando Peça">Aguardando Peça</SelectItem>
                   <SelectItem value="Retornado da Assistência">Revisão Final</SelectItem>
+                  <SelectItem value="Serviço Concluído - Validar Aparelho">Validar Aparelho</SelectItem>
+                  <SelectItem value="Retrabalho - Recusado pelo Estoque">Retrabalho</SelectItem>
                   <SelectItem value="Devolvido para Fornecedor">Devolvido p/ Fornecedor</SelectItem>
                 </SelectContent>
               </Select>

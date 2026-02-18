@@ -367,7 +367,7 @@ export default function OSAssistenciaNova() {
       setSetor(draft.setor || '');
       setClienteId(draft.clienteId || '');
       setDescricao(draft.descricao || '');
-      setStatus(draft.status || 'Em serviço');
+      setDescricao(draft.descricao || '');
       setPecas(draft.pecas || [{ peca: '', pecaEstoqueId: '', valor: '', percentual: '', servicoTerceirizado: false, descricaoTerceirizado: '', fornecedorId: '', unidadeServico: '', pecaNoEstoque: false, pecaDeFornecedor: false, nomeRespFornecedor: '', quantidadePeca: 1 }]);
       setPagamentos(draft.pagamentos || [{ meio: '', valor: '', parcelas: '' }]);
       toast({ title: "Rascunho carregado", description: "Dados da OS anterior foram restaurados" });
@@ -404,7 +404,6 @@ export default function OSAssistenciaNova() {
         setor,
         clienteId,
         descricao,
-        status,
         pecas,
         pagamentos
       });
@@ -412,7 +411,7 @@ export default function OSAssistenciaNova() {
     }, 2000);
 
     return () => clearTimeout(timeout);
-  }, [origemAparelho, modeloAparelho, imeiAparelho, lojaId, tecnicoId, vendedorId, setor, clienteId, descricao, status, pecas, pagamentos]);
+  }, [origemAparelho, modeloAparelho, imeiAparelho, lojaId, tecnicoId, vendedorId, setor, clienteId, descricao, pecas, pagamentos]);
 
   // Timer effect
   useEffect(() => {
@@ -1058,17 +1057,6 @@ export default function OSAssistenciaNova() {
                   filtrarPorTipo="vendedoresEGestores"
                   placeholder="Selecione o vendedor..."
                 />
-              </div>
-              <div className="space-y-2">
-                <Label className={!status ? 'text-destructive' : ''}>Status *</Label>
-                <Select value={status} onValueChange={(v) => setStatus(v as any)}>
-                  <SelectTrigger className={!status ? 'border-destructive' : ''}><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Serviço concluído">Serviço concluído</SelectItem>
-                    <SelectItem value="Em serviço">Em serviço</SelectItem>
-                    <SelectItem value="Aguardando Peça">Aguardando Peça</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
           </CardContent>

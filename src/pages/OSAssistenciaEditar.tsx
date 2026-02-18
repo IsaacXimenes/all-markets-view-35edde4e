@@ -29,7 +29,7 @@ import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
 import { getPecas, Peca, darBaixaPeca, initializePecasWithLojaIds } from '@/utils/pecasApi';
 import { InputComMascara } from '@/components/ui/InputComMascara';
-import { Plus, Trash2, Save, ArrowLeft, History, Package } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, History, Package, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { applyIMEIMask } from '@/utils/imeiMask';
@@ -110,6 +110,7 @@ export default function OSAssistenciaEditar() {
 
   // Solicitações de Peças
   const [solicitacoesOS, setSolicitacoesOS] = useState<SolicitacaoPeca[]>([]);
+  const [solicitacoesPendentesLocal, setSolicitacoesPendentesLocal] = useState<{peca: string; quantidade: number; justificativa: string}[]>([]);
   const [novaSolPeca, setNovaSolPeca] = useState('');
   const [novaSolQtd, setNovaSolQtd] = useState(1);
   const [novaSolJustificativa, setNovaSolJustificativa] = useState('');
@@ -334,6 +335,31 @@ export default function OSAssistenciaEditar() {
       valorVendaTecnico: valorVendaTecnicoLocal,
     };
 
+    // Persistir solicitações pendentes locais
+    if (solicitacoesPendentesLocal.length > 0) {
+      for (const sol of solicitacoesPendentesLocal) {
+        addSolicitacao({
+          osId: id!,
+          peca: sol.peca,
+          quantidade: sol.quantidade,
+          justificativa: sol.justificativa,
+          modeloImei: osOriginal?.imeiAparelho || osOriginal?.modeloAparelho || '',
+          lojaSolicitante: lojaId
+        });
+      }
+      // Atualizar status para Solicitação de Peça
+      osAtualizada.status = 'Solicitação de Peça' as OSStatus;
+      osAtualizada.proximaAtuacao = 'Gestor (Suprimentos)';
+      timelineAtualizada.push({
+        data: new Date().toISOString(),
+        tipo: 'peca',
+        descricao: `Solicitação de ${solicitacoesPendentesLocal.length} peça(s): ${solicitacoesPendentesLocal.map(s => `${s.peca} x${s.quantidade}`).join(', ')}`,
+        responsavel: obterNomeColaborador(tecnicoId) || 'Técnico'
+      });
+      osAtualizada.timeline = timelineAtualizada;
+      setSolicitacoesPendentesLocal([]);
+    }
+
     const result = updateOrdemServico(id!, osAtualizada);
 
     if (result) {
@@ -468,7 +494,7 @@ export default function OSAssistenciaEditar() {
                       <SelectItem value="Aguardando Peça">Aguardando Peça</SelectItem>
                       <SelectItem value="Solicitação Enviada">Solicitação Enviada</SelectItem>
                       <SelectItem value="Em Análise">Em Análise</SelectItem>
-                      <SelectItem value="Peça Recebida">Peça Recebida</SelectItem>
+                      <SelectItem value="Peça Recebida">Pagamento Realizado</SelectItem>
                       <SelectItem value="Pagamento Concluído">Pagamento Concluído</SelectItem>
                       <SelectItem value="Serviço concluído">Serviço concluído</SelectItem>
                       <SelectItem value="Aguardando Conferência">Aguardando Conferência</SelectItem>
@@ -804,7 +830,7 @@ export default function OSAssistenciaEditar() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {solicitacoesOS.length > 0 ? (
+            {(solicitacoesOS.length > 0 || solicitacoesPendentesLocal.length > 0) ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -813,6 +839,7 @@ export default function OSAssistenciaEditar() {
                     <TableHead>Justificativa</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Data</TableHead>
+                    <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -828,13 +855,71 @@ export default function OSAssistenciaEditar() {
                             case 'Aprovada': return <Badge className="bg-green-500">Aprovada</Badge>;
                             case 'Rejeitada': return <Badge className="bg-red-500">Rejeitada</Badge>;
                             case 'Enviada': return <Badge className="bg-blue-500">Enviada</Badge>;
-                            case 'Recebida': return <Badge className="bg-emerald-500">Recebida</Badge>;
+                            case 'Recebida': return <Badge className="bg-emerald-500">Pagamento Realizado</Badge>;
                             case 'Cancelada': return <Badge className="bg-gray-500">Cancelada</Badge>;
+                            case 'Pagamento Finalizado': return <Badge className="bg-emerald-500">Pagamento Realizado</Badge>;
                             default: return <Badge variant="secondary">{sol.status}</Badge>;
                           }
                         })()}
                       </TableCell>
                       <TableCell className="text-sm">{new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}</TableCell>
+                      <TableCell>
+                        {(['Pendente', 'Aprovada', 'Enviada', 'Pagamento Finalizado', 'Pagamento - Financeiro', 'Aguardando Chegada', 'Pagamento Concluído'] as string[]).includes(sol.status) && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="gap-1 text-emerald-600"
+                            onClick={() => {
+                              // Atualizar solicitação para Recebida
+                              const { updateSolicitacaoPeca } = require('@/utils/solicitacaoPecasApi');
+                              if (typeof updateSolicitacaoPeca === 'function') {
+                                updateSolicitacaoPeca(sol.id, { status: 'Recebida' });
+                              }
+                              // Fresh fetch e atualizar OS
+                              const osAtual = getOrdemServicoById(id!);
+                              if (osAtual) {
+                                updateOrdemServico(id!, {
+                                  status: 'Em serviço',
+                                  proximaAtuacao: 'Técnico',
+                                  timeline: [...osAtual.timeline, {
+                                    data: new Date().toISOString(),
+                                    tipo: 'peca',
+                                    descricao: `Recebimento confirmado: ${sol.peca} x${sol.quantidade}`,
+                                    responsavel: obterNomeColaborador(tecnicoId) || 'Técnico'
+                                  }]
+                                });
+                                setStatus('Em serviço' as OSStatus);
+                                setOsOriginal(getOrdemServicoById(id!) || osOriginal);
+                              }
+                              // Atualizar lista local
+                              setSolicitacoesOS(getSolicitacoesByOS(id!));
+                              toast({ title: 'Recebimento confirmado! OS retornada para Em Serviço.' });
+                            }}
+                          >
+                            <CheckCircle className="h-3.5 w-3.5" />
+                            Confirmar Recebimento
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {solicitacoesPendentesLocal.map((sol, idx) => (
+                    <TableRow key={`local-${idx}`} className="bg-amber-50 dark:bg-amber-900/10">
+                      <TableCell className="font-medium">{sol.peca}</TableCell>
+                      <TableCell>{sol.quantidade}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{sol.justificativa}</TableCell>
+                      <TableCell><Badge className="bg-orange-500">Não salva</Badge></TableCell>
+                      <TableCell className="text-sm">-</TableCell>
+                      <TableCell>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          className="text-destructive"
+                          onClick={() => setSolicitacoesPendentesLocal(prev => prev.filter((_, i) => i !== idx))}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -864,35 +949,15 @@ export default function OSAssistenciaEditar() {
                     toast({ title: 'Preencha peça e justificativa', variant: 'destructive' });
                     return;
                   }
-                  const nova = addSolicitacao({
-                    osId: id!,
+                  setSolicitacoesPendentesLocal(prev => [...prev, {
                     peca: novaSolPeca,
                     quantidade: novaSolQtd,
-                    justificativa: novaSolJustificativa,
-                    modeloImei: osOriginal?.imeiAparelho || osOriginal?.modeloAparelho || '',
-                    lojaSolicitante: lojaId
-                  });
-                  // Atualizar status da OS para Solicitação de Peça
-                  const osAtual = getOrdemServicoById(id!);
-                  if (osAtual) {
-                    updateOrdemServico(id!, {
-                      status: 'Solicitação de Peça',
-                      proximaAtuacao: 'Gestor (Suprimentos)',
-                      timeline: [...osAtual.timeline, {
-                        data: new Date().toISOString(),
-                        tipo: 'peca',
-                        descricao: `Solicitação de peça: ${novaSolPeca} x${novaSolQtd} – ${novaSolJustificativa}`,
-                        responsavel: obterNomeColaborador(tecnicoId) || 'Técnico'
-                      }]
-                    });
-                    setStatus('Solicitação de Peça' as OSStatus);
-                    setOsOriginal(getOrdemServicoById(id!) || osOriginal);
-                  }
-                  setSolicitacoesOS([...solicitacoesOS, nova]);
+                    justificativa: novaSolJustificativa
+                  }]);
                   setNovaSolPeca('');
                   setNovaSolQtd(1);
                   setNovaSolJustificativa('');
-                  toast({ title: 'Solicitação adicionada! Status alterado para Aguardando Peça.' });
+                  toast({ title: 'Solicitação adicionada localmente. Clique "Salvar Alterações" para persistir.' });
                 }}>
                   <Plus className="h-4 w-4 mr-1" />
                   Adicionar

@@ -365,7 +365,7 @@ export default function OSOficina() {
       return <Badge className="bg-yellow-500 hover:bg-yellow-600">Aguardando Peça</Badge>;
     }
     if (os.proximaAtuacao === 'Técnico (Recebimento)' || status === 'Peça Recebida' || status === 'Pagamento Concluído') {
-      return <Badge className="bg-emerald-500 hover:bg-emerald-600">Peça Recebida</Badge>;
+      return <Badge className="bg-emerald-500 hover:bg-emerald-600">Pagamento Realizado</Badge>;
     }
     if (status === 'Serviço concluído') {
       return <Badge className="bg-green-500 hover:bg-green-600">Serviço Concluído</Badge>;

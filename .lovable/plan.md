@@ -1,38 +1,73 @@
 
 
-## Correcao: Campo "Resumo da Conclusao" bloqueando finalizacao
+## Incorporar Custo de Reparo ao Custo do Produto na Aprovacao
 
-### Problema
+### Problema Atual
 
-A validacao do campo `resumoConclusao` foi colocada em `handleConcluirServicoClick` (linha 319), que e executada **antes** de abrir o modal. Porem, o campo Textarea foi adicionado **dentro** do modal (linha 1637). Resultado: a validacao impede o modal de abrir, e o usuario nunca consegue preencher o campo.
+Quando o Gestor de Estoque aprova um produto apos reparo, a funcao `migrarParaEstoque` (em `src/utils/osApi.ts`, linha 435) usa **apenas** o `valorCustoOriginal`, ignorando o custo de assistencia acumulado. Ou seja, um aparelho que custou R$ 3.100 e teve R$ 400 de reparo continua com custo de R$ 3.100 no estoque, quando deveria ser R$ 3.500.
 
-### Correcao
+### Correcao Proposta
 
-Mover a validacao do `resumoConclusao` de `handleConcluirServicoClick` para `handleConfirmarFinalizacao` (linha 327). Assim:
+**Arquivo: `src/utils/osApi.ts`**
 
-1. O usuario clica em "Finalizar Servico" - o modal abre normalmente
-2. O usuario preenche o campo "Resumo da Conclusao" dentro do modal
-3. Ao clicar "Confirmar", a validacao verifica se o campo esta preenchido
+1. **Calcular custo composto**: Somar `custoAssistencia` ao `valorCustoOriginal` para definir o novo `valorCusto` do produto migrado
+2. **Atualizar `valorVendaSugerido`**: Basear no custo composto (nao mais no original)
+3. **Registrar na timeline**: Adicionar entrada detalhando a composicao do custo (aquisicao + reparo = total)
+4. **Incluir no `historicoCusto`**: Adicionar registro do investimento em reparo
 
 ### Detalhes Tecnicos
 
-**Arquivo: `src/pages/OSAssistenciaDetalhes.tsx`**
+**`src/utils/osApi.ts` - funcao `migrarParaEstoque` (linhas 424-455)**
 
-1. **Remover** o bloco de validacao nas linhas 319-322 (dentro de `handleConcluirServicoClick`):
+Alteracoes:
+
+```text
+ANTES:
+  valorCusto: produto.valorCustoOriginal,              // linha 435
+  valorVendaSugerido: produto.valorCustoOriginal * 1.8, // linha 436
+
+DEPOIS:
+  const custoReparo = produto.custoAssistencia || 0;
+  const custoComposto = produto.valorCustoOriginal + custoReparo;
+
+  valorCusto: custoComposto,
+  valorVendaSugerido: custoComposto * 1.8,
 ```
-if (!resumoConclusao.trim()) {
-  toast.error('Preencha o Resumo da Conclusão antes de finalizar.');
-  return;
+
+Adicionar ao `historicoCusto` (quando houver custo de reparo):
+
+```typescript
+historicoCusto: [
+  { data: ..., fornecedor: produto.origemEntrada, valor: produto.valorCustoOriginal },
+  // Se houve reparo, adicionar entrada separada:
+  ...(custoReparo > 0 ? [{
+    data: new Date().toISOString().split('T')[0],
+    fornecedor: 'Assistência Técnica',
+    valor: custoReparo
+  }] : [])
+],
+```
+
+Adicionar entrada na timeline (quando houver custo de reparo):
+
+```typescript
+// Timeline entry mostrando composicao do custo
+{
+  id: `TL-CUSTO-${Date.now()}`,
+  tipo: 'parecer_estoque',
+  data: new Date().toISOString(),
+  titulo: 'Custo Composto Atualizado',
+  descricao: `Aquisição: R$ ${valorCustoOriginal} + Reparo: R$ ${custoReparo} = Custo Final: R$ ${custoComposto}`,
+  responsavel
 }
 ```
 
-2. **Adicionar** a mesma validacao no inicio de `handleConfirmarFinalizacao` (linha 328, apos `if (!os) return;`):
-```
-if (!resumoConclusao.trim()) {
-  toast.error('Preencha o Resumo da Conclusão antes de finalizar.');
-  return;
-}
-```
+Tambem preservar `custoAssistencia` no produto migrado para o campo existente em `estoqueApi.ts`.
 
-Nenhum outro arquivo precisa ser alterado.
+### Resultado Esperado
+
+- Aparelho com custo original R$ 3.100 + reparo R$ 400 = custo final R$ 3.500 no estoque
+- Timeline mostra a composicao do custo
+- Historico de custo registra ambas as entradas (aquisicao e reparo)
+- Valor de venda sugerido calculado sobre o custo composto
 

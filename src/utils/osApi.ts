@@ -250,6 +250,61 @@ let produtosPendentes: ProdutoPendente[] = [
     custoAssistencia: 0,
     statusGeral: 'Aguardando Recebimento Assistência',
     contadorEncaminhamentos: 1
+  },
+  // Produto de teste para validação pós-oficina (vinculado à OS-2025-0009)
+  {
+    id: 'PROD-0006',
+    imei: '999888777666555',
+    marca: 'Apple',
+    modelo: 'iPhone 15 Pro Max',
+    cor: 'Titânio Natural',
+    tipo: 'Seminovo',
+    condicao: 'Semi-novo',
+    origemEntrada: 'Base de Troca',
+    notaOuVendaId: 'VEN-2025-0060',
+    valorCusto: 5500.00,
+    valorCustoOriginal: 5500.00,
+    valorOrigem: 5500.00,
+    saudeBateria: 88,
+    loja: 'db894e7d',
+    dataEntrada: '2025-01-20',
+    parecerEstoque: {
+      id: 'PE-006',
+      data: '2025-01-20T14:00:00',
+      status: 'Encaminhado para conferência da Assistência',
+      observacoes: 'Tela com defeito, encaminhar para reparo.',
+      responsavel: 'Roberto Alves'
+    },
+    timeline: [
+      {
+        id: 'TL-020',
+        data: '2025-01-20T10:00:00',
+        tipo: 'entrada',
+        titulo: 'Entrada via Base de Troca',
+        descricao: 'Produto PROD-0006 recebido como base de troca na venda VEN-2025-0060',
+        responsavel: 'Vendedor João'
+      },
+      {
+        id: 'TL-021',
+        data: '2025-01-20T14:00:00',
+        tipo: 'parecer_estoque',
+        titulo: 'Parecer Estoque - Encaminhado Assistência',
+        descricao: 'Tela com defeito, encaminhar para reparo.',
+        responsavel: 'Roberto Alves'
+      },
+      {
+        id: 'TL-022',
+        data: '2025-01-22T16:00:00',
+        tipo: 'parecer_assistencia',
+        titulo: 'Serviço Concluído na Oficina – OS-2025-0009',
+        descricao: 'Tela OLED substituída com sucesso. Aparelho testado e funcionando normalmente.',
+        responsavel: 'Jeferson Sousa Cabral',
+        valor: 450
+      }
+    ],
+    custoAssistencia: 450,
+    statusGeral: 'Serviço Concluído - Validar Aparelho',
+    contadorEncaminhamentos: 1
   }
 ];
 

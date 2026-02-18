@@ -1,71 +1,48 @@
 
 
-## Reestruturacao do Fluxo de Assistencia com Ramificacao "Origem: Estoque" e Valorizacao de Ativos
+## Remocao da Aba Duplicada e Centralizacao no Modulo Estoque
 
-### Resumo
+### Problema
 
-Este plano implementa um fluxo especializado para OSs com **Origem: Estoque**, onde aparelhos internos passam pela assistencia sem cobranca ao cliente, com ciclo de retrabalho (ping-pong) entre tecnico e gestor de estoque, e acumulo de custos de reparo no cadastro do aparelho.
-
----
-
-### 1. Regras de Negocio para Origem: Estoque
-
-Quando `origemOS === 'Estoque'`:
-
-- **Mao de Obra Zero**: Campo "Valor do servico (R$)" fixado em R$ 0,00 e desabilitado
-- **Pagamento Oculto**: Quadro de pagamentos (PagamentoQuadro) e botao "Registrar Pagamento" sao escondidos
-- **Finalizacao redireciona para Estoque**: Ao finalizar, status muda para `"Servico Concluido - Validar Aparelho"` com `proximaAtuacao: "Gestor (Estoque)"`
-- **Resumo obrigatorio**: Tecnico deve preencher "Resumo da Conclusao" antes de finalizar
+Foi criada uma aba "Aparelhos Pendentes" duplicada dentro do modulo de Assistencia (`/os/aparelhos-pendentes`) com uma pagina propria (`OSAparelhosPendentes.tsx`). Porem, ja existe a aba "Aparelhos Pendentes" no modulo de Estoque (`/estoque/produtos-pendentes`) com fluxo completo de parecer, timeline e detalhamento. O ciclo de vida do aparelho deve ser centralizado nesta aba existente do Estoque.
 
 ---
 
-### 2. Nova Aba "Aparelhos Pendentes" no Modulo OS
+### O que sera feito
 
-Uma nova aba no layout de abas da Assistencia (OSLayout/AssistenciaLayout) para o gestor de estoque validar retornos.
+**1. Remover a aba duplicada do modulo Assistencia**
 
-**Funcionalidades:**
-- Lista OSs com status `"Servico Concluido - Validar Aparelho"`
-- **Aprovar**: Calcula Custo Composto (Custo Original + Custo de Reparo), atualiza o aparelho no estoque como "Disponivel"
-- **Recusar/Retrabalho**: Gestor informa motivo. OS volta para Oficina com status `"Retrabalho - Recusado pelo Estoque"`
+- Remover a linha "Aparelhos Pendentes" do array `tabs` em `OSLayout.tsx`
+- Remover a mesma linha em `AssistenciaLayout.tsx`
+- Remover a rota `/os/aparelhos-pendentes` de `App.tsx`
+- O arquivo `OSAparelhosPendentes.tsx` pode ser mantido como referencia ou removido
 
----
+**2. Adicionar status "Servico Concluido - Validar Aparelho" na aba existente do Estoque**
 
-### 3. Maquina de Estados - Ping-Pong de Retrabalho
+No `EstoqueProdutosPendentes.tsx`:
+- Adicionar o novo status ao tipo `StatusAparelhosPendentes`
+- Adicionar badge correspondente (laranja) no `getStatusBadge`
+- Adicionar opcao no filtro de Status
 
-```text
-Oficina (Tecnico)
-    |
-    v  [Finalizar OS]
-"Servico Concluido - Validar Aparelho" (Gestor Estoque)
-    |
-    +-- [Aprovar] --> Atualiza estoque, OS finalizada
-    |
-    +-- [Recusar] --> "Retrabalho - Recusado pelo Estoque" (Tecnico)
-                          |
-                          v  [Tecnico refaz e finaliza]
-                    "Servico Concluido - Validar Aparelho" (Gestor Estoque)
-                          |
-                          +-- [Aprovar / Recusar novamente...]
-```
+**3. Atualizar o detalhamento do produto pendente para validacao pos-oficina**
 
----
+No `EstoqueProdutoPendenteDetalhes.tsx`:
+- Quando `statusGeral === 'Servico Concluido - Validar Aparelho'`, exibir:
+  - Resumo do tecnico (vindo da OS vinculada)
+  - Custo das pecas/insumos utilizados
+  - Calculo do Custo Composto (Aquisicao + Reparos)
+- Adicionar novas opcoes no select de Parecer:
+  - "Aparelho Aprovado - Retornar ao Estoque" (aprova, soma custo, marca como Disponivel)
+  - "Retrabalho - Devolver para Oficina" (recusa com motivo obrigatorio, OS volta para o tecnico)
 
-### 4. Timeline de Auditoria e Acumulo de Custos
+**4. Sincronizacao entre OS e Produto Pendente**
 
-- Cada recusa gera registro na timeline: `"Retrabalho solicitado por [Usuario] - Motivo: [Texto]"`
-- Cada ciclo de retrabalho com novas pecas **soma** ao custo total do aparelho
-- O custo final eh atomico: `Custo Aquisicao + SUM(todos custos de reparo de todas as idas)`
+No `assistenciaApi.ts` (logica de finalizacao da OS com origem Estoque):
+- Ao mudar status para "Servico Concluido - Validar Aparelho", localizar o produto pendente correspondente pelo IMEI e atualizar seu `statusGeral` para o mesmo valor
+- Adicionar entrada na timeline do produto pendente com os dados do servico
 
----
-
-### 5. Visualizacao de Custo no Cadastro do Aparelho
-
-No detalhamento do produto (`EstoqueProdutoDetalhes.tsx`):
-
-- Novo campo **"Custo Total"**: Exibe `valorCusto + custoAssistencia`
-- Novo botao **"Ver Detalhes do Custo"**: Abre modal com:
-  - Custo de Aquisicao: R$ [valor original]
-  - Investimento em Reparo (OS #[ID]): R$ [valor] (para cada OS vinculada)
+No `osApi.ts` (funcoes de produto pendente):
+- Adicionar funcao `atualizarStatusProdutoPendente(imei, novoStatus, dadosOS)` para atualizar o registro na lista de pendentes
 
 ---
 
@@ -73,57 +50,28 @@ No detalhamento do produto (`EstoqueProdutoDetalhes.tsx`):
 
 #### Arquivos a modificar:
 
-**1. `src/utils/assistenciaApi.ts`**
-- Adicionar novos status ao tipo `OrdemServico.status`: `'Servico Concluido - Validar Aparelho'` e `'Retrabalho - Recusado pelo Estoque'`
-- Adicionar `'Gestor (Estoque)'` ao tipo `proximaAtuacao`
-- Na funcao `updateOrdemServico`: quando status muda para `'Servico Concluido - Validar Aparelho'` com origem Estoque, acumular custos no produto via `estoqueApi`
+1. **`src/components/layout/OSLayout.tsx`** - Remover linha 14 (Aparelhos Pendentes)
+2. **`src/components/layout/AssistenciaLayout.tsx`** - Remover linha 14 (Aparelhos Pendentes)
+3. **`src/App.tsx`** - Remover rota `/os/aparelhos-pendentes` e import do `OSAparelhosPendentes`
+4. **`src/pages/EstoqueProdutosPendentes.tsx`** - Adicionar status e badge para "Servico Concluido - Validar Aparelho"
+5. **`src/pages/EstoqueProdutoPendenteDetalhes.tsx`** - Adicionar opcoes de parecer para validacao pos-oficina (Aprovar/Retrabalho) com exibicao de custo composto
+6. **`src/utils/osApi.ts`** - Funcao para atualizar status do produto pendente via IMEI
+7. **`src/utils/assistenciaApi.ts`** - Na finalizacao de OS com origem Estoque, chamar a atualizacao do produto pendente
 
-**2. `src/components/layout/OSLayout.tsx` e `AssistenciaLayout.tsx`**
-- Adicionar nova aba "Aparelhos Pendentes" com icone `Package` e href `/os/aparelhos-pendentes`
+#### Fluxo resultante:
 
-**3. Nova pagina: `src/pages/OSAparelhosPendentes.tsx`**
-- Listagem de OSs com status `"Servico Concluido - Validar Aparelho"`
-- Cards com info do aparelho (modelo, IMEI, tecnico, resumo)
-- Modal de Aprovacao: exibe calculo do Custo Composto, botao confirmar
-- Modal de Recusa: campo de motivo obrigatorio, botao recusar
+```text
+Estoque (Aparelhos Pendentes)
+    |
+    v  [Encaminhar para Assistencia]
+Oficina (Tecnico executa)
+    |
+    v  [Finalizar OS]
+Estoque (Aparelhos Pendentes) - Status: "Servico Concluido - Validar Aparelho"
+    |
+    +-- [Aprovar] --> Custo somado, aparelho "Disponivel"
+    |
+    +-- [Retrabalho] --> OS volta para Oficina, status "Retrabalho - Recusado pelo Estoque"
+```
 
-**4. `src/pages/OSOficina.tsx`**
-- Exibir OSs com status `"Retrabalho - Recusado pelo Estoque"` na fila do tecnico com badge vermelho "Retrabalho"
-- Na finalizacao: detectar se `origemOS === 'Estoque'` para redirecionar para validacao em vez de Atendente
-
-**5. `src/pages/OSAssistenciaDetalhes.tsx`**
-- Quando `origemOS === 'Estoque'`:
-  - Esconder quadro de pagamentos
-  - Fixar valor de servico em R$ 0,00
-  - Alterar destino da finalizacao para Gestor (Estoque)
-
-**6. `src/pages/OSAssistenciaNova.tsx`**
-- Quando `origemOS === 'estoque'` (ja existe parcialmente):
-  - Esconder campo de pagamento
-  - Desabilitar campo valor do servico
-
-**7. `src/utils/estoqueApi.ts`**
-- Nova funcao `atualizarCustoAssistencia(produtoId, osId, custoReparo)`: soma `custoReparo` ao campo `custoAssistencia` do produto
-- Nova funcao `getHistoricoCustosReparo(produtoId)`: retorna lista de OSs e seus custos vinculados ao IMEI/produto
-- Ao aprovar retorno: atualizar status do produto para "Disponivel" e somar custos
-
-**8. `src/pages/EstoqueProdutoDetalhes.tsx`**
-- Novo card "Custo Total" exibindo `valorCusto + custoAssistencia`
-- Novo botao "Ver Detalhes do Custo" com modal listando aquisicao + reparos por OS
-
-**9. `src/App.tsx`**
-- Adicionar rota `/os/aparelhos-pendentes` apontando para `OSAparelhosPendentes`
-
-**10. `src/components/ui/badge.tsx` (sem alteracao)**
-- Reutilizar badges existentes para novos status
-
-#### Novos status e badges:
-- `"Servico Concluido - Validar Aparelho"` - Badge amarelo/laranja
-- `"Retrabalho - Recusado pelo Estoque"` - Badge vermelho com icone de retorno
-
-#### Travas de seguranca:
-- Tecnico nao pode finalizar sem preencher resumo e valores de pecas (ja existente, mantido)
-- Campo "Loja" filtra apenas tipo "Assistencia" (ja existente, mantido)
-- Calculo de custo composto eh atomico (leitura + soma + escrita em uma unica operacao)
-- Campo "Responsavel" auto-preenchido pelo usuario logado (regra global mantida)
-
+Toda a validacao acontece na mesma aba `/estoque/produtos-pendentes`, no detalhamento do registro existente, sem criar abas ou paginas novas.

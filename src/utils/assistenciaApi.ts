@@ -3,6 +3,7 @@
 import { getClientes, getLojas, getColaboradoresByPermissao, getFornecedores, addCliente, Cliente } from './cadastrosApi';
 import { getPecaById, getPecaByDescricao, updatePeca } from './pecasApi';
 import { formatCurrency } from './formatUtils';
+import { marcarSolicitacoesOSCancelada } from './solicitacaoPecasApi';
 
 // Sistema centralizado de IDs para OS
 let globalOSIdCounter = 100;
@@ -85,7 +86,7 @@ export interface OrdemServico {
   setor: 'GARANTIA' | 'ASSISTÊNCIA' | 'TROCA';
   tecnicoId: string;
   lojaId: string;
-  status: 'Em Aberto' | 'Serviço concluído' | 'Em serviço' | 'Aguardando Peça' | 'Solicitação Enviada' | 'Em Análise' | 'Peça Recebida' | 'Aguardando Aprovação do Gestor' | 'Rejeitado pelo Gestor' | 'Pagamento - Financeiro' | 'Pagamento Finalizado' | 'Pagamento Concluído' | 'Aguardando Chegada da Peça' | 'Peça em Estoque / Aguardando Reparo' | 'Aguardando Recebimento' | 'Em Execução' | 'Aguardando Pagamento' | 'Aguardando Conferência' | 'Concluído' | 'Finalizado' | 'Aguardando Análise' | 'Solicitação de Peça' | 'Pendente de Pagamento' | 'Aguardando Financeiro' | 'Liquidado' | 'Recusada pelo Técnico' | 'Conferência do Gestor' | 'Serviço Concluído - Validar Aparelho' | 'Retrabalho - Recusado pelo Estoque';
+  status: 'Em Aberto' | 'Serviço concluído' | 'Em serviço' | 'Aguardando Peça' | 'Solicitação Enviada' | 'Em Análise' | 'Peça Recebida' | 'Aguardando Aprovação do Gestor' | 'Rejeitado pelo Gestor' | 'Pagamento - Financeiro' | 'Pagamento Finalizado' | 'Pagamento Concluído' | 'Aguardando Chegada da Peça' | 'Peça em Estoque / Aguardando Reparo' | 'Aguardando Recebimento' | 'Em Execução' | 'Aguardando Pagamento' | 'Aguardando Conferência' | 'Concluído' | 'Finalizado' | 'Aguardando Análise' | 'Solicitação de Peça' | 'Pendente de Pagamento' | 'Aguardando Financeiro' | 'Liquidado' | 'Recusada pelo Técnico' | 'Conferência do Gestor' | 'Serviço Concluído - Validar Aparelho' | 'Retrabalho - Recusado pelo Estoque' | 'Cancelada';
   pecas: PecaServico[];
   pagamentos: Pagamento[];
   descricao: string;
@@ -443,11 +444,9 @@ export const updateOrdemServico = (id: string, updates: Partial<OrdemServico>) =
     }
     
     // Se OS foi cancelada, marcar solicitações de peças ativas
-    if (updates.status === 'Cancelada' as any && osAnterior.status !== ('Cancelada' as any)) {
-      import('./solicitacaoPecasApi').then(({ marcarSolicitacoesOSCancelada }) => {
-        marcarSolicitacoesOSCancelada(id);
-        console.log(`[ASSISTÊNCIA] OS ${id} cancelada - solicitações de peças marcadas`);
-      });
+    if (updates.status === 'Cancelada' && osAnterior.status !== 'Cancelada') {
+      marcarSolicitacoesOSCancelada(id);
+      console.log(`[ASSISTÊNCIA] OS ${id} cancelada - solicitações de peças marcadas`);
     }
     
     return ordensServico[index];

@@ -126,7 +126,7 @@ export default function OSAssistenciaDetalhes() {
     }
   }, [os]);
 
-  const canEdit = os && os.status !== 'Serviço concluído';
+  const canEdit = os && os.status !== 'Serviço concluído' && os.status !== 'Cancelada';
 
   const handleSaveChanges = () => {
     if (!os) return;
@@ -298,6 +298,8 @@ export default function OSAssistenciaDetalhes() {
         return <Badge className="bg-red-600 hover:bg-red-700">🔄 Retrabalho</Badge>;
       case 'Recusada pelo Técnico':
         return <Badge variant="destructive">Recusada pelo Técnico</Badge>;
+      case 'Cancelada':
+        return <Badge className="bg-red-700 hover:bg-red-800">Cancelada</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }

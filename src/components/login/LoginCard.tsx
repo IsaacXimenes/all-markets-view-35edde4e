@@ -14,35 +14,32 @@ export const LoginCard = () => {
   const handleLoginSuccess = () => {
     setBgPulse(true);
     setFormVisible(false);
-    setTimeout(() => setIsTransitioning(true), 600);
+    setTimeout(() => setIsTransitioning(true), 1000);
   };
 
   return (
     <>
-      {/* Full-screen background image — the image IS the card */}
       <motion.div
         className="h-screen w-full bg-cover bg-center bg-no-repeat flex items-center justify-center"
         style={{ backgroundImage: `url(${loginBg})` }}
         animate={bgPulse ? {
-          filter: ['brightness(1)', 'brightness(1.5)', 'brightness(1.1)'],
-          scale: [1, 1.1, 1.1],
+          filter: ['brightness(1)', 'brightness(1.3)', 'brightness(1.05)'],
+          scale: [1, 1.05, 1.05],
         } : {}}
-        transition={{ duration: 0.8, ease: 'easeInOut' }}
+        transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1] }}
       >
-        {/* Golden pulse overlay on success */}
         <AnimatePresence>
           {bgPulse && (
             <motion.div
               className="fixed inset-0 z-10 pointer-events-none"
-              style={{ backgroundColor: 'rgba(247, 187, 5, 0.12)' }}
+              style={{ backgroundColor: 'rgba(247, 187, 5, 0.1)' }}
               initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 0.4, 0] }}
-              transition={{ duration: 0.6 }}
+              animate={{ opacity: [0, 0.3, 0] }}
+              transition={{ duration: 1, ease: 'easeInOut' }}
             />
           )}
         </AnimatePresence>
 
-        {/* Invisible overlay container — positioned over the dark right side of the image */}
         <AnimatePresence>
           {formVisible && (
             <motion.div
@@ -53,8 +50,8 @@ export const LoginCard = () => {
                 marginLeft: isMobile ? '0' : '28%',
               }}
               initial={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
             >
               <LoginForm onLoginSuccess={handleLoginSuccess} />
             </motion.div>

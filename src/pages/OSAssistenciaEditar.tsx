@@ -24,12 +24,15 @@ import {
 } from '@/utils/cadastrosApi';
 import { getSolicitacoesByOS, addSolicitacao, SolicitacaoPeca } from '@/utils/solicitacaoPecasApi';
 import { useCadastroStore } from '@/store/cadastroStore';
+import { useAuthStore } from '@/store/authStore';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
 import { getPecas, Peca, darBaixaPeca, initializePecasWithLojaIds } from '@/utils/pecasApi';
 import { InputComMascara } from '@/components/ui/InputComMascara';
-import { Plus, Trash2, Save, ArrowLeft, History, Package, CheckCircle } from 'lucide-react';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
+import { Plus, Trash2, Save, ArrowLeft, History, Package, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { applyIMEIMask } from '@/utils/imeiMask';
@@ -59,12 +62,13 @@ interface PagamentoForm {
   parcelas: string;
 }
 
-type OSStatus = 'Em Aberto' | 'Serviço concluído' | 'Em serviço' | 'Aguardando Peça' | 'Solicitação Enviada' | 'Em Análise' | 'Peça Recebida' | 'Aguardando Aprovação do Gestor' | 'Rejeitado pelo Gestor' | 'Pagamento - Financeiro' | 'Pagamento Finalizado' | 'Pagamento Concluído' | 'Aguardando Chegada da Peça' | 'Peça em Estoque / Aguardando Reparo' | 'Aguardando Recebimento' | 'Em Execução' | 'Aguardando Pagamento' | 'Aguardando Conferência' | 'Concluído' | 'Finalizado' | 'Aguardando Análise' | 'Solicitação de Peça' | 'Pendente de Pagamento' | 'Aguardando Financeiro' | 'Liquidado' | 'Recusada pelo Técnico' | 'Conferência do Gestor' | 'Serviço Concluído - Validar Aparelho' | 'Retrabalho - Recusado pelo Estoque';
+type OSStatus = 'Em Aberto' | 'Serviço concluído' | 'Em serviço' | 'Aguardando Peça' | 'Solicitação Enviada' | 'Em Análise' | 'Peça Recebida' | 'Aguardando Aprovação do Gestor' | 'Rejeitado pelo Gestor' | 'Pagamento - Financeiro' | 'Pagamento Finalizado' | 'Pagamento Concluído' | 'Aguardando Chegada da Peça' | 'Peça em Estoque / Aguardando Reparo' | 'Aguardando Recebimento' | 'Em Execução' | 'Aguardando Pagamento' | 'Aguardando Conferência' | 'Concluído' | 'Finalizado' | 'Aguardando Análise' | 'Solicitação de Peça' | 'Pendente de Pagamento' | 'Aguardando Financeiro' | 'Liquidado' | 'Recusada pelo Técnico' | 'Conferência do Gestor' | 'Serviço Concluído - Validar Aparelho' | 'Retrabalho - Recusado pelo Estoque' | 'Cancelada';
 
 export default function OSAssistenciaEditar() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
+  const { user } = useAuthStore();
   
   const clientes = getClientes();
   const { obterLojasTipoLoja, obterTecnicos, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
@@ -114,6 +118,11 @@ export default function OSAssistenciaEditar() {
   const [novaSolPeca, setNovaSolPeca] = useState('');
   const [novaSolQtd, setNovaSolQtd] = useState(1);
   const [novaSolJustificativa, setNovaSolJustificativa] = useState('');
+
+  // Modal cancelar OS
+  const [modalCancelarOS, setModalCancelarOS] = useState(false);
+  const [motivoCancelamento, setMotivoCancelamento] = useState('');
+  const [checkCancelamento, setCheckCancelamento] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -378,6 +387,32 @@ export default function OSAssistenciaEditar() {
     }
   };
 
+  const handleCancelarOS = () => {
+    if (!id || !osOriginal) return;
+    if (motivoCancelamento.trim().length < 10) {
+      toast({ title: 'Erro', description: 'O motivo deve ter pelo menos 10 caracteres.', variant: 'destructive' });
+      return;
+    }
+    const osFresh = getOrdemServicoById(id);
+    if (!osFresh) return;
+    const nomeResponsavel = user?.colaborador?.nome || user?.username || 'Gestor';
+    updateOrdemServico(id, {
+      status: 'Cancelada',
+      proximaAtuacao: '-',
+      timeline: [...osFresh.timeline, {
+        data: new Date().toISOString(),
+        tipo: 'status',
+        descricao: `OS cancelada por ${nomeResponsavel}. Motivo: ${motivoCancelamento}`,
+        responsavel: nomeResponsavel
+      }]
+    });
+    setModalCancelarOS(false);
+    toast({ title: 'OS Cancelada', description: `OS ${id} foi cancelada com sucesso.` });
+    navigate('/os/assistencia');
+  };
+
+  const canCancelOS = osOriginal && !['Cancelada', 'Liquidado', 'Finalizado', 'Concluído'].includes(osOriginal.status);
+
   if (loading) {
     return (
       <PageLayout title="Carregando...">
@@ -398,6 +433,12 @@ export default function OSAssistenciaEditar() {
             Voltar
           </Button>
           <div className="flex gap-2">
+            {canCancelOS && (
+              <Button variant="destructive" onClick={() => { setMotivoCancelamento(''); setCheckCancelamento(false); setModalCancelarOS(true); }}>
+                <XCircle className="h-4 w-4 mr-2" />
+                Cancelar OS
+              </Button>
+            )}
             <Button variant="outline" onClick={() => navigate(`/os/assistencia/${id}`)}>
               Ver Detalhes
             </Button>
@@ -1007,6 +1048,55 @@ export default function OSAssistenciaEditar() {
           </Button>
         </div>
       </div>
+
+      {/* Modal Cancelar OS */}
+      <AlertDialog open={modalCancelarOS} onOpenChange={setModalCancelarOS}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Cancelar OS {id}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é irreversível. A OS será cancelada e todas as solicitações de peças ativas serão marcadas para tratamento.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Motivo do Cancelamento *</Label>
+              <Textarea
+                value={motivoCancelamento}
+                onChange={(e) => setMotivoCancelamento(e.target.value)}
+                placeholder="Descreva o motivo do cancelamento (mínimo 10 caracteres)..."
+                rows={3}
+              />
+              {motivoCancelamento.length > 0 && motivoCancelamento.length < 10 && (
+                <p className="text-xs text-destructive">Mínimo de 10 caracteres ({motivoCancelamento.length}/10)</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="check-cancelamento"
+                checked={checkCancelamento}
+                onCheckedChange={(v) => setCheckCancelamento(v === true)}
+              />
+              <label htmlFor="check-cancelamento" className="text-sm">
+                Confirmo que desejo cancelar esta Ordem de Serviço
+              </label>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={!checkCancelamento || motivoCancelamento.trim().length < 10}
+              onClick={handleCancelarOS}
+            >
+              Confirmar Cancelamento
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageLayout>
   );
 }

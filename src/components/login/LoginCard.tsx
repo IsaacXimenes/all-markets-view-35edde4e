@@ -4,6 +4,7 @@ import { LoginForm } from './LoginForm';
 import { BiometricTransition } from './BiometricTransition';
 import loginBg from '@/assets/login_screen_v2_thiago_imports.png';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 export const LoginCard = () => {
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -21,18 +22,24 @@ export const LoginCard = () => {
   return (
     <>
       <motion.div
-        className="h-screen w-full bg-cover bg-center bg-no-repeat flex items-center justify-center"
-        style={{ backgroundImage: `url(${loginBg})` }}
+        className={cn(
+          "h-screen w-full bg-no-repeat flex items-center justify-center",
+          isMobile ? "bg-[#0a0a0a]" : "bg-cover bg-center"
+        )}
+        style={isMobile ? {} : { backgroundImage: `url(${loginBg})` }}
         animate={bgFading ? { opacity: 0 } : { opacity: 1 }}
         transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1] }}
       >
         <AnimatePresence>
           {formVisible && (
             <motion.div
-              className="relative z-20 flex items-center justify-center"
+              className={cn(
+                "relative z-20 flex items-center justify-center",
+                isMobile && "px-4"
+              )}
               style={{
-                width: '420px',
-                maxWidth: '90vw',
+                width: isMobile ? '100%' : '420px',
+                maxWidth: isMobile ? '85vw' : '90vw',
                 marginLeft: isMobile ? '0' : '26%',
               }}
               initial={{ opacity: 1 }}

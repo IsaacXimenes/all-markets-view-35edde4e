@@ -99,7 +99,7 @@ function SidebarContent({
       </div>
       
       <ScrollArea className="flex-1 py-4">
-        <nav className="grid gap-0.5 px-2">
+        <nav className={cn("grid px-2", isCollapsed ? "gap-1" : "gap-0.5")}>
           {navItems.map((item, index) => {
             const isActive = isActiveModule(item.href);
             return (
@@ -108,11 +108,13 @@ function SidebarContent({
                 to={item.href}
                 onClick={onNavigate}
                 className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 transition-all duration-200 relative",
+                  "flex items-center rounded-md transition-all duration-200 relative",
                   isActive 
                     ? "bg-primary text-primary-foreground font-semibold shadow-md" 
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  isCollapsed && "justify-center px-2 py-1.5 mx-1"
+                  isCollapsed 
+                    ? "justify-center px-0 py-2.5 mx-auto w-10 h-10" 
+                    : "gap-3 px-3 py-2"
                 )}
                 title={isCollapsed ? item.title : undefined}
               >
@@ -123,29 +125,29 @@ function SidebarContent({
                   "h-5 w-5 shrink-0",
                   isActive && "animate-pulse"
                 )} />
-                <span className={cn(
-                  "text-sm transition-opacity duration-200",
-                  isCollapsed ? "opacity-0 w-0" : "opacity-100",
-                  isActive ? "font-semibold" : "font-medium"
-                )}>
-                  {item.title}
-                </span>
+                {!isCollapsed && (
+                  <span className={cn(
+                    "text-sm",
+                    isActive ? "font-semibold" : "font-medium"
+                  )}>
+                    {item.title}
+                  </span>
+                )}
               </Link>
             );
           })}
         </nav>
       </ScrollArea>
       
-      <div className="p-4 border-t border-sidebar-border">
-        <div className={cn(
-          "transition-opacity duration-200 rounded-md bg-sidebar-accent/50 p-2 text-xs text-sidebar-accent-foreground",
-          isCollapsed ? "opacity-0" : "opacity-100"
-        )}>
-          <p className="font-medium">Status da Loja</p>
-          <p>Loja aberta</p>
-          <p className="text-[10px]">Pedidos: 47 hoje</p>
+      {!isCollapsed && (
+        <div className="p-4 border-t border-sidebar-border">
+          <div className="rounded-md bg-sidebar-accent/50 p-2 text-xs text-sidebar-accent-foreground">
+            <p className="font-medium">Status da Loja</p>
+            <p>Loja aberta</p>
+            <p className="text-[10px]">Pedidos: 47 hoje</p>
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

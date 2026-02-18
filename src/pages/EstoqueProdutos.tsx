@@ -113,12 +113,9 @@ export default function EstoqueProdutos() {
     }
 
     const usuario = colaboradores.find(c => c.id === usuarioSelecionado);
-    if (!usuario) {
-      toast.error('Selecione um usuário válido');
-      return;
-    }
+    const nomeUsuario = usuario?.nome || user?.colaborador?.nome || 'Usuário';
 
-    updateValorRecomendado(produtoSelecionado.id, valor, usuario.nome);
+    updateValorRecomendado(produtoSelecionado.id, valor, nomeUsuario);
     setProdutos(getProdutos());
     setShowValorModal(false);
     toast.success(`Valor recomendado atualizado para ${formatCurrency(valor)}`);

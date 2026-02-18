@@ -88,6 +88,10 @@ export default function OSSolicitacoesPecas() {
   // Seleção para lote
   const [selecionadas, setSelecionadas] = useState<string[]>([]);
 
+  // Modal detalhamento solicitação
+  const [detalheSolicitacaoOpen, setDetalheSolicitacaoOpen] = useState(false);
+  const [detalheSolicitacao, setDetalheSolicitacao] = useState<SolicitacaoPeca | null>(null);
+
   // Filtrar solicitações
   const solicitacoesFiltradas = useMemo(() => {
     return solicitacoes.filter(s => {
@@ -423,6 +427,7 @@ export default function OSSolicitacoesPecas() {
                       <SelectItem value="Aprovada">Aprovada</SelectItem>
                       <SelectItem value="Enviada">Enviada</SelectItem>
                       <SelectItem value="Recebida">Recebida</SelectItem>
+                      <SelectItem value="Cancelada">Cancelada</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -466,6 +471,7 @@ export default function OSSolicitacoesPecas() {
                   <TableHead>Peça</TableHead>
                   <TableHead>Qtd</TableHead>
                   <TableHead>Valor</TableHead>
+                  <TableHead>Fornecedor</TableHead>
                   <TableHead>Justificativa</TableHead>
                   <TableHead>SLA</TableHead>
                   <TableHead>Status</TableHead>
@@ -506,6 +512,9 @@ export default function OSSolicitacoesPecas() {
                     <TableCell>{sol.quantidade}</TableCell>
                     <TableCell className="text-sm">
                       {sol.valorPeca ? formatCurrency(sol.valorPeca) : '-'}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {sol.fornecedorId ? getFornecedorNome(sol.fornecedorId) : '-'}
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
                       {sol.justificativa}
@@ -552,7 +561,11 @@ export default function OSSolicitacoesPecas() {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => navigate(`/os/assistencia/${sol.osId}?from=solicitacoes`)}
+                          onClick={() => {
+                            setDetalheSolicitacao(sol);
+                            setDetalheSolicitacaoOpen(true);
+                          }}
+                          title="Ver detalhes"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -562,7 +575,7 @@ export default function OSSolicitacoesPecas() {
                 ))}
                 {solicitacoesFiltradas.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                       Nenhuma solicitação encontrada
                     </TableCell>
                   </TableRow>
@@ -905,6 +918,111 @@ export default function OSSolicitacoesPecas() {
               Confirmar Cancelamento
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Detalhamento da Solicitação */}
+      <Dialog open={detalheSolicitacaoOpen} onOpenChange={setDetalheSolicitacaoOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Solicitação</DialogTitle>
+            <DialogDescription>Informações completas da solicitação de peça</DialogDescription>
+          </DialogHeader>
+          {detalheSolicitacao && (
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-muted-foreground">Peça:</span>
+                  <p className="font-medium">{detalheSolicitacao.peca}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Quantidade:</span>
+                  <p className="font-medium">{detalheSolicitacao.quantidade}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">OS:</span>
+                  <p className="font-mono font-medium">{detalheSolicitacao.osId}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Status:</span>
+                  <div className="mt-1">{getStatusBadge(detalheSolicitacao.status)}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Data Solicitação:</span>
+                  <p className="font-medium">{new Date(detalheSolicitacao.dataSolicitacao).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Loja:</span>
+                  <p className="font-medium">{getLojaNome(detalheSolicitacao.lojaSolicitante)}</p>
+                </div>
+              </div>
+              
+              <div>
+                <span className="text-muted-foreground">Justificativa:</span>
+                <p>{detalheSolicitacao.justificativa}</p>
+              </div>
+
+              {detalheSolicitacao.fornecedorId && (
+                <div className="border-t pt-3 space-y-2">
+                  <p className="font-medium text-muted-foreground">Dados da Aprovação</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <span className="text-muted-foreground">Fornecedor:</span>
+                      <p className="font-medium">{getFornecedorNome(detalheSolicitacao.fornecedorId)}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Valor:</span>
+                      <p className="font-medium">{detalheSolicitacao.valorPeca ? formatCurrency(detalheSolicitacao.valorPeca) : '-'}</p>
+                    </div>
+                    {detalheSolicitacao.formaPagamento && (
+                      <div>
+                        <span className="text-muted-foreground">Forma de Pagamento:</span>
+                        <p className="font-medium">{detalheSolicitacao.formaPagamento}</p>
+                      </div>
+                    )}
+                    {detalheSolicitacao.bancoDestinatario && (
+                      <div>
+                        <span className="text-muted-foreground">Banco:</span>
+                        <p className="font-medium">{detalheSolicitacao.bancoDestinatario}</p>
+                      </div>
+                    )}
+                    {detalheSolicitacao.chavePix && (
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">Chave Pix:</span>
+                        <p className="font-medium">{detalheSolicitacao.chavePix}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {detalheSolicitacao.observacao && (
+                <div className="border-t pt-3">
+                  <span className="text-muted-foreground">Observação do Gestor:</span>
+                  <p>{detalheSolicitacao.observacao}</p>
+                </div>
+              )}
+
+              {(detalheSolicitacao as any).timeline && (detalheSolicitacao as any).timeline.length > 0 && (
+                <div className="border-t pt-3">
+                  <p className="font-medium text-muted-foreground mb-2">Timeline</p>
+                  <div className="space-y-2">
+                    {(detalheSolicitacao as any).timeline.map((evento: any, idx: number) => (
+                      <div key={idx} className="flex gap-2 items-start">
+                        <div className="w-1.5 h-1.5 mt-2 rounded-full bg-primary flex-shrink-0" />
+                        <div>
+                          <p className="text-xs">{evento.descricao}</p>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(evento.data).toLocaleDateString('pt-BR')} {evento.responsavel && `• ${evento.responsavel}`}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </OSLayout>

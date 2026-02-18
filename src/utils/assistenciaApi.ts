@@ -341,6 +341,34 @@ let ordensServico: OrdemServico[] = [
     modeloAparelho: 'iPhone 13',
     imeiAparelho: '890123456789012',
     origemOS: 'Balcão'
+  },
+  // 9. OS de Estoque - Validar Aparelho (teste de ciclo retrabalho)
+  {
+    id: 'OS-2025-0009',
+    dataHora: '2025-01-22T10:00:00',
+    clienteId: 'CLI-001',
+    setor: 'ASSISTÊNCIA',
+    tecnicoId: 'be61a9df',
+    lojaId: 'db894e7d',
+    status: 'Serviço Concluído - Validar Aparelho' as any,
+    proximaAtuacao: 'Gestor (Estoque)',
+    pecas: [
+      { id: 'PC-009', peca: 'Troca de tela OLED', imei: '999888777666555', valor: 450, percentual: 0, valorTotal: 450, servicoTerceirizado: false, unidadeServico: 'db894e7d', pecaNoEstoque: true, pecaDeFornecedor: false }
+    ],
+    pagamentos: [],
+    descricao: 'Aparelho do estoque com tela danificada - reparo concluído pelo técnico',
+    resumoConclusao: 'Tela OLED substituída com sucesso. Aparelho testado e funcionando normalmente.',
+    timeline: [
+      { data: '2025-01-22T10:00:00', tipo: 'registro', descricao: 'OS registrada - Aparelho do estoque para reparo', responsavel: 'João Gestor' },
+      { data: '2025-01-22T11:00:00', tipo: 'status', descricao: 'Técnico assumiu o reparo', responsavel: 'Jeferson Sousa Cabral' },
+      { data: '2025-01-22T16:00:00', tipo: 'conclusao_servico', descricao: 'Serviço concluído - Aparelho enviado para validação do Estoque', responsavel: 'Jeferson Sousa Cabral' }
+    ],
+    valorTotal: 0,
+    valorCustoTecnico: 450,
+    custoTotal: 450,
+    modeloAparelho: 'iPhone 15 Pro Max',
+    imeiAparelho: '999888777666555',
+    origemOS: 'Estoque'
   }
 ];
 

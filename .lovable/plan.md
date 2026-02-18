@@ -1,80 +1,88 @@
 
 
-## Plano: Reatividade na Oficina + Status/Filtros/Colunas nas Solicitacoes + Ajustes em Nova Assistencia
+## Adaptar Layout da Tabela "Notas Pendentes - Assistencia" com Identidade Visual
 
-### 1. Botao "Confirmar Recebimento" independente do pagamento (OSAssistenciaEditar.tsx)
+### Objetivo
+Replicar o layout da tabela `TabelaNotasPendencias` (Estoque) na pagina `FinanceiroNotasAssistencia.tsx`, aplicando a paleta de cores da identidade visual do cliente e ordenando por data mais recente primeiro.
 
-**Problema:** O botao "Confirmar Recebimento" so aparece apos o financeiro confirmar pagamento. Deve ser visivel assim que existir uma solicitacao registrada.
+### Paleta de Cores Aplicada
 
-**Correcao:** Na tabela de solicitacoes de pecas dentro da edicao da OS (linhas 807-841), adicionar uma coluna "Acoes" com botao "Confirmar Recebimento" para solicitacoes com status `Pendente`, `Aprovada`, `Enviada`, `Pagamento Finalizado`, `Pagamento - Financeiro`, `Aguardando Chegada`. Ao clicar:
-- Atualizar a solicitacao para status `Recebida`
-- Fazer fresh fetch da OS e atualizar status para `Em servico` com `proximaAtuacao: 'Tecnico'`
-- Atualizar timeline
+| Elemento | Cor | Hex |
+|----------|-----|-----|
+| Fundo geral | Branco puro | `#FFFFFF` |
+| Destaques, badges atencao, botoes | Amarelo principal | `#F7BB05` |
+| Badges alerta, icones secundarios | Dourado/laranja | `#F48F03` |
+| Titulos, textos, menus | Preto | `#111111` |
+| Textos secundarios, divisores | Cinza escuro | `#212121` |
+| Linhas de tabela, bordas sutis | Cinza medio | `#7F7F7F` |
 
-### 2. Solicitacao de peca NAO deve salvar automaticamente (OSAssistenciaEditar.tsx)
+### Alteracoes no Arquivo `src/pages/FinanceiroNotasAssistencia.tsx`
 
-**Problema:** Ao clicar "Adicionar" na solicitacao de pecas (linhas 862-896), o sistema chama `addSolicitacao()` e `updateOrdemServico()` imediatamente.
+**1. Ordenacao por data decrescente (mais novas em cima)**
+- Remover a logica que prioriza "Pendente" no topo
+- Ordenar exclusivamente por `dataCriacao` decrescente
 
-**Correcao:** Manter as solicitacoes em estado local (`solicitacoesPendentesLocal`) e so persistir quando o usuario clicar "Salvar Alteracoes":
-- Ao clicar "Adicionar", salvar apenas no `useState` local
-- No `handleSave`, apos validar, iterar pelas solicitacoes locais e chamar `addSolicitacao` + atualizar status da OS
+**2. Cards de Resumo - Aplicar cores da identidade visual**
+- Card "Pendentes": trocar `text-yellow-600` por cor customizada `text-[#F7BB05]`
+- Icone Clock: trocar `text-yellow-600` por `text-[#F7BB05]`
+- Card "Total Pendente": mesma troca de amarelo
+- Card "Conferidas": manter verde (sucesso)
+- Textos principais dos cards: `text-[#111111]`
 
-### 3. Renomear status "Peca Recebida" para "Pagamento Realizado" na aba Servicos
+**3. Tabela - Replicar estrutura visual do Estoque**
+- Adicionar coluna "Data/Hora" com icone Clock e formatacao `dd/MM/yyyy HH:mm` (mesmo padrao do Estoque)
+- Adicionar coluna "Dias" com badge colorido baseado nos dias decorridos
+- Cabecalhos da tabela: fundo sutil com texto `text-[#212121]`
+- Linhas da tabela: fundo branco `#FFFFFF` com bordas sutis em `#7F7F7F` com opacidade
+- Coloracao de status nas linhas: manter apenas nos badges, nao na linha inteira (remover `getStatusRowClass`)
+- Badge "Pendente": fundo `#F7BB05/15` com texto `#F48F03`
+- Badge "Concluido": manter verde (indicador de sucesso)
+- Botao "Conferir": fundo `#F7BB05` com texto `#111111`
+- Valor total no rodape: texto `#111111` em negrito
 
-**Arquivo: `src/pages/OSAssistenciaEditar.tsx` (linhas 824-834)**
+**4. Filtros - Ajustar cores**
+- Botao "Limpar": bordas e texto em `#212121`
+- Labels: `text-[#212121]`
 
-Onde o badge exibe `Recebida` ou `Pagamento Finalizado`, exibir como "Pagamento Realizado". Tambem no select de status (linhas 461-476), renomear a opcao.
+**5. Botao Exportar CSV**
+- Borda e texto em `#212121`, hover sutil
 
-Tambem ajustar em `src/pages/OSOficina.tsx` nos badges de status para consistencia.
+### Secao Tecnica - Detalhes de Implementacao
 
-### 4. Filtro "Cancelada" na aba Solicitacoes de Pecas
+```text
+Arquivo: src/pages/FinanceiroNotasAssistencia.tsx
 
-**Arquivo: `src/pages/OSSolicitacoesPecas.tsx` (linhas 418-427)**
+1. Ordenacao (linha 69-73):
+   - Remover priorizacao por status
+   - Manter apenas: sort por dataCriacao desc
 
-Adicionar `<SelectItem value="Cancelada">Cancelada</SelectItem>` apos "Recebida" no seletor de filtros.
+2. Coluna Data/Hora:
+   - Adicionar formatacao com toLocaleString('pt-BR')
+   - Icone Clock h-3 w-3 ao lado da data
 
-### 5. Coluna "Fornecedor" na listagem de Solicitacoes de Pecas
+3. Coluna Dias:
+   - Calcular dias decorridos desde dataCriacao
+   - Badge com cores: >=7 dias = vermelho, >=5 = amarelo (#F7BB05), <5 = cinza
 
-**Arquivo: `src/pages/OSSolicitacoesPecas.tsx`**
+4. Badges de Status:
+   - Pendente: className="bg-[#F7BB05]/15 text-[#F48F03] border-[#F7BB05]/30"
+   - Concluido: manter bg-green (sucesso visual)
 
-Na tabela (linhas 460-473), adicionar `<TableHead>Fornecedor</TableHead>` apos a coluna "Valor".
+5. Botao Conferir:
+   - className="bg-[#F7BB05] text-[#111111] hover:bg-[#F48F03]"
 
-Na celula (apos linha 509), adicionar:
+6. Cards resumo:
+   - Pendentes e Total Pendente: text-[#F7BB05] e icones text-[#F7BB05]
+   
+7. Linhas da tabela:
+   - Remover getStatusRowClass (cores na linha)
+   - Fundo branco limpo, cores apenas nos badges
 ```
-<TableCell className="text-xs">
-  {sol.fornecedorId ? getFornecedorNome(sol.fornecedorId) : '-'}
-</TableCell>
-```
 
-O `fornecedorId` ja existe na interface `SolicitacaoPeca` e e preenchido na aprovacao.
-
-### 6. Botao de detalhamento na aba Solicitacoes de Pecas
-
-**Arquivo: `src/pages/OSSolicitacoesPecas.tsx` (linhas 552-558)**
-
-O botao `Eye` atualmente navega para `/os/assistencia/${sol.osId}`. Alterar para abrir um modal de detalhes da solicitacao que exiba:
-- Dados da solicitacao (peca, quantidade, justificativa, status, datas)
-- Fornecedor e valor (se aprovada)
-- Forma de pagamento, banco, chave Pix (se preenchidos)
-- Timeline/historico da solicitacao
-- Observacao do gestor
-
-Criar um novo estado `detalheSolicitacaoOpen` e `solicitacaoDetalhe` para controlar o modal.
-
-### 7. Remover campo "Status" da tela de Nova Assistencia
-
-**Arquivo: `src/pages/OSAssistenciaNova.tsx` (linhas 1062-1072)**
-
-Remover o bloco do campo Status (Select com opcoes "Servico concluido", "Em servico", "Aguardando Peca"). O status sera fixo como "Aguardando Analise" (que ja e o valor padrao na linha 130: `useState('Aguardando Analise')`).
-
-Remover tambem a referencia ao `status` no auto-save (linha 407) e no draft (linhas 370, 397).
-
----
-
-### Resumo de Arquivos Modificados
-
-1. `src/pages/OSAssistenciaEditar.tsx` - Botao Confirmar Recebimento na tabela + solicitacoes em estado local + renomear status
-2. `src/pages/OSSolicitacoesPecas.tsx` - Filtro Cancelada + coluna Fornecedor + modal de detalhamento
-3. `src/pages/OSAssistenciaNova.tsx` - Remover campo Status
-4. `src/pages/OSOficina.tsx` - Consistencia de badges de status (renomear "Peca Recebida" para "Pagamento Realizado")
+### Resultado Esperado
+- Tabela com visual limpo e branco, identico ao padrao do Estoque
+- Cores da identidade visual (amarelo/dourado) nos destaques e badges
+- Dados ordenados do mais recente para o mais antigo
+- Coluna de "Dias" para acompanhamento visual de prazo
+- Consistencia visual com o restante do sistema
 

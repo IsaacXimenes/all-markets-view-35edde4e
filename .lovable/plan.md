@@ -1,43 +1,58 @@
 
 
-## Correcao: Sincronizacao entre Finalizacao da OS e Aparelhos Pendentes no Estoque
+## Correcao do Layout - Detalhes do Produto Pendente
 
-### Problema Identificado
+### Problema
 
-Quando o tecnico finaliza a OS com origem "Estoque" na pagina `OSAssistenciaDetalhes.tsx`, o sistema atualiza o status da OS para "Servico Concluido - Validar Aparelho", mas **nao chama a funcao `atualizarStatusProdutoPendente`** para sincronizar essa mudanca com o registro do produto na aba Aparelhos Pendentes do Estoque.
+O card "Servico Concluido - Validacao Pendente" (Custo Composto) foi inserido dentro do grid de 2 colunas com a classe `lg:col-span-2`, ocupando toda a largura e empurrando o quadro "Parecer Estoque" para baixo, desorganizando o layout original.
 
-A funcao ja existe em `osApi.ts` (linha 331), mas nunca e importada nem invocada no fluxo de finalizacao.
+### Layout Original (antes da mudanca)
 
-### Correcao
-
-**Arquivo: `src/pages/OSAssistenciaDetalhes.tsx`**
-
-1. Adicionar import da funcao `atualizarStatusProdutoPendente` de `@/utils/osApi`
-2. Na funcao `handleConfirmarFinalizacao` (linha 321), apos o `updateOrdemServico`, quando `isEstoque === true`, chamar:
-
-```typescript
-atualizarStatusProdutoPendente(osFresh.imeiAparelho, 'Serviço Concluído - Validar Aparelho', {
-  osId: os.id,
-  resumo: descMsg,
-  custoPecas: valorCustoTecnico,
-  responsavel: user?.colaborador?.nome || tecnico?.nome || 'Técnico'
-});
+```text
++---------------------------+---------------------------+
+| Informacoes do Produto    | Parecer Estoque           |
++---------------------------+---------------------------+
+| Parecer Assistencia       | Timeline                  |
++---------------------------+---------------------------+
 ```
 
-Isso garante que:
-- O status do produto pendente muda para "Servico Concluido - Validar Aparelho"
-- O custo das pecas e registrado no campo `custoAssistencia` do produto
-- Uma entrada na timeline do produto e criada automaticamente com os dados do servico
-- O Gestor de Estoque vera o produto atualizado ao acessar a aba Aparelhos Pendentes
+### Layout Atual (quebrado)
+
+```text
++---------------------------+---------------------------+
+| Informacoes do Produto    |                           |
++-----------------------------------------------------------+
+| Custo Composto (col-span-2 - ocupa tudo)                  |
++-----------------------------------------------------------+
+| Parecer Estoque           | Parecer Assistencia       |
++---------------------------+---------------------------+
+| Timeline                  |                           |
++---------------------------+---------------------------+
+```
+
+### Correcao Proposta
+
+Mover o card de Custo Composto para **fora** do grid de 2 colunas, colocando-o **acima** do grid como um card de largura total independente. Assim o grid interno mantem o layout original com "Informacoes do Produto" e "Parecer Estoque" lado a lado.
+
+### Layout Corrigido
+
+```text
++-----------------------------------------------------------+
+| Custo Composto + Resumo Tecnico (largura total, fora do   |
+| grid, so aparece quando status = Validar Aparelho)        |
++-----------------------------------------------------------+
++---------------------------+---------------------------+
+| Informacoes do Produto    | Parecer Estoque           |
++---------------------------+---------------------------+
+| Parecer Assistencia       | Timeline                  |
++---------------------------+---------------------------+
+```
 
 ### Detalhes Tecnicos
 
-Alteracao em um unico arquivo:
+**Arquivo: `src/pages/EstoqueProdutoPendenteDetalhes.tsx`**
 
-**`src/pages/OSAssistenciaDetalhes.tsx`**
+- Mover o bloco condicional do card "Custo Composto" (linhas 394-444) para **antes** da abertura do grid (linha 314: `<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">`)
+- Remover a classe `col-span-1 lg:col-span-2` do card, pois ele estara fora do grid e ja ocupara a largura total naturalmente
 
-- Linha 23: Adicionar `import { atualizarStatusProdutoPendente } from '@/utils/osApi';`
-- Linha 349 (apos `setOS(updatedOS || null);`): Inserir bloco condicional `if (isEstoque && osFresh.imeiAparelho)` que chama `atualizarStatusProdutoPendente`
-
-Nenhum outro arquivo precisa ser alterado. A funcao `atualizarStatusProdutoPendente` em `osApi.ts` ja trata a atualizacao de status, custo e timeline corretamente.
-
+Nenhum outro arquivo precisa ser alterado.

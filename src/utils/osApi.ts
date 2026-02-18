@@ -62,7 +62,7 @@ export interface ProdutoPendente {
   parecerAssistencia?: ParecerAssistencia;
   timeline: TimelineEntry[];
   custoAssistencia: number;
-  statusGeral: 'Pendente Estoque' | 'Aguardando Recebimento Assistência' | 'Em Análise Assistência' | 'Aguardando Peça' | 'Liberado' | 'Retornado da Assistência' | 'Devolvido para Fornecedor' | 'Retirada de Peças';
+  statusGeral: 'Pendente Estoque' | 'Aguardando Recebimento Assistência' | 'Em Análise Assistência' | 'Aguardando Peça' | 'Liberado' | 'Retornado da Assistência' | 'Devolvido para Fornecedor' | 'Retirada de Peças' | 'Serviço Concluído - Validar Aparelho' | 'Retrabalho - Recusado pelo Estoque';
   contadorEncaminhamentos: number;
 }
 
@@ -270,6 +270,44 @@ let produtosMigrados: Produto[] = [];
 export const getProdutosPendentes = (): ProdutoPendente[] => {
   // Retorna TODOS os produtos não liberados para manter visibilidade durante todo o fluxo
   return produtosPendentes.filter(p => p.statusGeral !== 'Liberado');
+};
+
+// Atualizar status do produto pendente via IMEI (sincronização OS ↔ Estoque)
+export const atualizarStatusProdutoPendente = (
+  imei: string, 
+  novoStatus: ProdutoPendente['statusGeral'], 
+  dadosOS?: { osId: string; resumo?: string; custoPecas?: number; tecnico?: string }
+): ProdutoPendente | null => {
+  const produto = produtosPendentes.find(p => p.imei === imei);
+  if (!produto) {
+    console.warn(`[OS API] Produto pendente com IMEI ${imei} não encontrado para atualização.`);
+    return null;
+  }
+
+  produto.statusGeral = novoStatus;
+
+  // Adicionar entrada na timeline
+  if (dadosOS) {
+    produto.timeline.push({
+      id: `TL-SYNC-${Date.now()}`,
+      data: new Date().toISOString(),
+      tipo: novoStatus === 'Serviço Concluído - Validar Aparelho' ? 'parecer_assistencia' : 'parecer_estoque',
+      titulo: novoStatus === 'Serviço Concluído - Validar Aparelho'
+        ? `Serviço Concluído na Oficina – ${dadosOS.osId}`
+        : `Retrabalho Solicitado – ${dadosOS.osId}`,
+      descricao: dadosOS.resumo || `Status atualizado para: ${novoStatus}`,
+      responsavel: dadosOS.tecnico || 'Sistema',
+      valor: dadosOS.custoPecas
+    });
+
+    // Se serviço concluído, registrar custo de assistência
+    if (novoStatus === 'Serviço Concluído - Validar Aparelho' && dadosOS.custoPecas) {
+      produto.custoAssistencia = (produto.custoAssistencia || 0) + dadosOS.custoPecas;
+    }
+  }
+
+  console.log(`[OS API] Produto pendente ${produto.id} (IMEI: ${imei}) atualizado para: ${novoStatus}`);
+  return produto;
 };
 
 export const getProdutoPendenteById = (id: string): ProdutoPendente | null => {

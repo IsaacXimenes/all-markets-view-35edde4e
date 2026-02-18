@@ -1,88 +1,95 @@
 
 
-## Adaptar Layout da Tabela "Notas Pendentes - Assistencia" com Identidade Visual
+## Redesign Completo da Tela de Login - "Portal Tecnologico"
 
-### Objetivo
-Replicar o layout da tabela `TabelaNotasPendencias` (Estoque) na pagina `FinanceiroNotasAssistencia.tsx`, aplicando a paleta de cores da identidade visual do cliente e ordenando por data mais recente primeiro.
+### Visao Geral
+Redesenhar toda a experiencia de login seguindo o mockup fornecido: card flutuante com lado esquerdo branco (logo + ilustracao) e lado direito preto (formulario), sobre um fundo de circuitos tecnologicos. Incluir animacao de sucesso "portal tecnologico" com Framer Motion.
 
-### Paleta de Cores Aplicada
+### Arquivos Modificados
 
-| Elemento | Cor | Hex |
-|----------|-----|-----|
-| Fundo geral | Branco puro | `#FFFFFF` |
-| Destaques, badges atencao, botoes | Amarelo principal | `#F7BB05` |
-| Badges alerta, icones secundarios | Dourado/laranja | `#F48F03` |
-| Titulos, textos, menus | Preto | `#111111` |
-| Textos secundarios, divisores | Cinza escuro | `#212121` |
-| Linhas de tabela, bordas sutis | Cinza medio | `#7F7F7F` |
+| Arquivo | Acao |
+|---------|------|
+| `src/assets/login_screen_v2_thiago_imports.png` | Copiar imagem uploadada como background |
+| `src/components/login/LoginCard.tsx` | Redesign completo do layout |
+| `src/components/login/LoginForm.tsx` | Novo estilo dark com inputs e botao amarelo |
+| `src/components/login/BiometricTransition.tsx` | Substituir por animacao "portal tecnologico" |
+| `src/components/login/Phone3D.tsx` | Remover (substituido pela ilustracao do mockup) |
 
-### Alteracoes no Arquivo `src/pages/FinanceiroNotasAssistencia.tsx`
+---
 
-**1. Ordenacao por data decrescente (mais novas em cima)**
-- Remover a logica que prioriza "Pendente" no topo
-- Ordenar exclusivamente por `dataCriacao` decrescente
+### 1. Background e Layout (LoginCard.tsx)
 
-**2. Cards de Resumo - Aplicar cores da identidade visual**
-- Card "Pendentes": trocar `text-yellow-600` por cor customizada `text-[#F7BB05]`
-- Icone Clock: trocar `text-yellow-600` por `text-[#F7BB05]`
-- Card "Total Pendente": mesma troca de amarelo
-- Card "Conferidas": manter verde (sucesso)
-- Textos principais dos cards: `text-[#111111]`
+- Usar a imagem `login_screen_v2_thiago_imports.png` como background full-screen (`bg-cover bg-center`)
+- Card centralizado com `rounded-3xl` e `shadow-2xl`
+- Dividido em duas metades:
+  - **Esquerda**: fundo `#FFFFFF`, contendo o logo oficial da Thiago Imports (`thiago-imports-logo.png`) e uma ilustracao de dispositivos tecnologicos (SVG inline ou imagem)
+  - **Direita**: fundo `#111111`, contendo o formulario de login
+- No mobile: mostrar apenas o lado direito (formulario) com fundo `#111111`
 
-**3. Tabela - Replicar estrutura visual do Estoque**
-- Adicionar coluna "Data/Hora" com icone Clock e formatacao `dd/MM/yyyy HH:mm` (mesmo padrao do Estoque)
-- Adicionar coluna "Dias" com badge colorido baseado nos dias decorridos
-- Cabecalhos da tabela: fundo sutil com texto `text-[#212121]`
-- Linhas da tabela: fundo branco `#FFFFFF` com bordas sutis em `#7F7F7F` com opacidade
-- Coloracao de status nas linhas: manter apenas nos badges, nao na linha inteira (remover `getStatusRowClass`)
-- Badge "Pendente": fundo `#F7BB05/15` com texto `#F48F03`
-- Badge "Concluido": manter verde (indicador de sucesso)
-- Botao "Conferir": fundo `#F7BB05` com texto `#111111`
-- Valor total no rodape: texto `#111111` em negrito
+### 2. Formulario de Login (LoginForm.tsx)
 
-**4. Filtros - Ajustar cores**
-- Botao "Limpar": bordas e texto em `#212121`
-- Labels: `text-[#212121]`
+- Fundo geral do painel: `#111111`
+- Titulo "Bem-vindo" em branco, subtitulo em `#7F7F7F`
+- Inputs com:
+  - Fundo `#212121`
+  - Texto branco
+  - Placeholder em `#7F7F7F`
+  - Borda transparente que brilha em `#F7BB05` no foco (`focus:border-[#F7BB05] focus:ring-[#F7BB05]/30`)
+- Botao "Entrar":
+  - Fundo `#F7BB05`, texto `#111111` em negrito
+  - Hover com efeito glow: `hover:shadow-[0_0_20px_rgba(247,187,5,0.4)]`
+- Link "Esqueceu a senha?" em `#7F7F7F`
 
-**5. Botao Exportar CSV**
-- Borda e texto em `#212121`, hover sutil
+### 3. Animacao de Sucesso - "Portal Tecnologico" (BiometricTransition.tsx)
 
-### Secao Tecnica - Detalhes de Implementacao
+Sequencia usando Framer Motion (`AnimatePresence` + `motion.div`):
+
+1. **Pulse dourado no background** (0-300ms): o fundo de circuitos pulsa com `brightness(1.5)` e um overlay `#F7BB05` com opacidade animada
+2. **Expansao do card** (200-800ms): o card escala de `scale(1)` para `scale(1.5)` enquanto `opacity` vai para 0
+3. **Blur de transicao** (600-1200ms): `backdrop-blur` diminui gradualmente enquanto o Dashboard aparece por baixo
+4. **Redirect** ao final da animacao (~1000ms)
+
+No mobile: simplificar para fade-out suave (300ms) sem escala, mantendo performance.
+
+### 4. Responsividade
+
+- **Desktop/Tablet (>=768px)**: Card com dois paineis lado a lado
+- **Mobile (<768px)**: Apenas painel direito (formulario) em tela cheia com fundo `#111111`, sem ilustracao
+- Fonte Inter em todos os elementos
+
+---
+
+### Secao Tecnica
 
 ```text
-Arquivo: src/pages/FinanceiroNotasAssistencia.tsx
+Arquivos e mudancas:
 
-1. Ordenacao (linha 69-73):
-   - Remover priorizacao por status
-   - Manter apenas: sort por dataCriacao desc
+1. Copiar imagem:
+   - lov-copy user-uploads://login_screen_v2_thiago_imports.png -> src/assets/login_screen_v2_thiago_imports.png
 
-2. Coluna Data/Hora:
-   - Adicionar formatacao com toLocaleString('pt-BR')
-   - Icone Clock h-3 w-3 ao lado da data
+2. LoginCard.tsx:
+   - Remover import do login-background.jpg
+   - Importar login_screen_v2_thiago_imports.png como bg
+   - Remover componente Phone3D
+   - Layout: flex row com lado esquerdo (bg-white, logo, ilustracao) e lado direito (bg-[#111111], LoginForm)
+   - Adicionar estado de animacao com Framer Motion (AnimatePresence)
+   - No sucesso: animar card com scale + opacity via motion.div
+   - Animar background com brightness pulse
 
-3. Coluna Dias:
-   - Calcular dias decorridos desde dataCriacao
-   - Badge com cores: >=7 dias = vermelho, >=5 = amarelo (#F7BB05), <5 = cinza
+3. LoginForm.tsx:
+   - Fundo transparente (herdado do painel #111111)
+   - Inputs: bg-[#212121] text-white border-transparent focus:border-[#F7BB05]
+   - Botao: bg-[#F7BB05] text-[#111111] font-bold hover:shadow-glow
+   - Titulo: text-white
+   - Subtitulo: text-[#7F7F7F]
 
-4. Badges de Status:
-   - Pendente: className="bg-[#F7BB05]/15 text-[#F48F03] border-[#F7BB05]/30"
-   - Concluido: manter bg-green (sucesso visual)
+4. BiometricTransition.tsx:
+   - Usar Framer Motion para overlay animado
+   - Fase 1: overlay #F7BB05/20 com opacity 0->0.3->0 (pulse)
+   - Fase 2: backdrop-blur decrescente
+   - Timer de 1000ms antes do navigate
+   - Mobile: simples fade branco de 400ms
 
-5. Botao Conferir:
-   - className="bg-[#F7BB05] text-[#111111] hover:bg-[#F48F03]"
-
-6. Cards resumo:
-   - Pendentes e Total Pendente: text-[#F7BB05] e icones text-[#F7BB05]
-   
-7. Linhas da tabela:
-   - Remover getStatusRowClass (cores na linha)
-   - Fundo branco limpo, cores apenas nos badges
+5. Phone3D.tsx:
+   - Nao sera mais usado no login (manter arquivo por compatibilidade)
 ```
-
-### Resultado Esperado
-- Tabela com visual limpo e branco, identico ao padrao do Estoque
-- Cores da identidade visual (amarelo/dourado) nos destaques e badges
-- Dados ordenados do mais recente para o mais antigo
-- Coluna de "Dias" para acompanhamento visual de prazo
-- Consistencia visual com o restante do sistema
-

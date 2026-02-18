@@ -1,73 +1,70 @@
 
 
-## Incorporar Custo de Reparo ao Custo do Produto na Aprovacao
+## Correcoes e Melhorias: Aparelhos Pendentes + Finalizacao com Pecas
 
-### Problema Atual
+### Problemas Identificados
 
-Quando o Gestor de Estoque aprova um produto apos reparo, a funcao `migrarParaEstoque` (em `src/utils/osApi.ts`, linha 435) usa **apenas** o `valorCustoOriginal`, ignorando o custo de assistencia acumulado. Ou seja, um aparelho que custou R$ 3.100 e teve R$ 400 de reparo continua com custo de R$ 3.100 no estoque, quando deveria ser R$ 3.500.
+1. **Quadro "Servico Concluido" nao mostra campos financeiros completos**: Faltam "Valor de Entrada", "Valor Original" e "Loja Atual" (com nome, nao ID)
+2. **Status fica "Em servico" apos finalizacao com peca**: O `editStatus` nao e atualizado apos a finalizacao, e como o usuario esta em modo edicao, o badge mostra o valor antigo
+3. **Pecas utilizadas nao aparecem no quadro de Aparelhos Pendentes**: A OS vinculada tem as pecas, mas elas nao sao exibidas no card de validacao
 
-### Correcao Proposta
+---
 
-**Arquivo: `src/utils/osApi.ts`**
+### Alteracoes
 
-1. **Calcular custo composto**: Somar `custoAssistencia` ao `valorCustoOriginal` para definir o novo `valorCusto` do produto migrado
-2. **Atualizar `valorVendaSugerido`**: Basear no custo composto (nao mais no original)
-3. **Registrar na timeline**: Adicionar entrada detalhando a composicao do custo (aquisicao + reparo = total)
-4. **Incluir no `historicoCusto`**: Adicionar registro do investimento em reparo
+#### 1. Atualizar `editStatus` apos finalizacao (`src/pages/OSAssistenciaDetalhes.tsx`)
 
-### Detalhes Tecnicos
+Na funcao `handleConfirmarFinalizacao` (apos linha 365), adicionar:
 
-**`src/utils/osApi.ts` - funcao `migrarParaEstoque` (linhas 424-455)**
+```typescript
+setEditStatus(novoStatus);
+```
 
-Alteracoes:
+Isso garante que o badge de status exibido durante edicao reflita o status atualizado ("Servico Concluido - Validar Aparelho") em vez de permanecer em "Em servico".
+
+#### 2. Adicionar campos financeiros e pecas ao card de validacao (`src/pages/EstoqueProdutoPendenteDetalhes.tsx`)
+
+No card "Servico Concluido - Validacao Pendente" (linhas 492-541):
+
+**Novos campos no grid financeiro (apos "Custo Composto"):**
+- "Valor de Entrada" -> `produto.valorOrigem`
+- "Valor Original" -> `produto.valorCustoOriginal`  
+- "Valor de Custo" -> `produto.valorCustoOriginal` (custo atual sem assistencia)
+- "Custo Assistencia" -> `produto.custoAssistencia`
+- "Venda Recomendada" -> Badge "Pendente" (sera preenchido apos aprovacao)
+- "Loja Atual" -> `obterNomeLoja(produto.loja)` (nome da loja, nao ID)
+
+**Nova secao de pecas utilizadas:**
+- Listar `osVinculada.pecas` em uma mini-tabela com descricao, valor e origem
+- Exibir apenas quando existirem pecas na OS vinculada
+
+### Layout do card atualizado
 
 ```text
-ANTES:
-  valorCusto: produto.valorCustoOriginal,              // linha 435
-  valorVendaSugerido: produto.valorCustoOriginal * 1.8, // linha 436
-
-DEPOIS:
-  const custoReparo = produto.custoAssistencia || 0;
-  const custoComposto = produto.valorCustoOriginal + custoReparo;
-
-  valorCusto: custoComposto,
-  valorVendaSugerido: custoComposto * 1.8,
++----------------------------------------------------------+
+| Servico Concluido - Validacao Pendente                   |
+|----------------------------------------------------------|
+| Resumo do Tecnico: [texto]                               |
+| Custo Pecas (OS): R$ xxx | OS ID: OS-XXX                |
+|----------------------------------------------------------|
+| Pecas Utilizadas:                                        |
+| | Descricao | Valor | Origem |                          |
+| | Tela LCD  | R$200 | Estoque|                          |
+|----------------------------------------------------------|
+| Val. Entrada | Val. Original | Val. Custo                |
+| R$ 3.100     | R$ 3.100      | R$ 3.100                  |
+|                                                          |
+| Custo Assist.| Venda Recom.  | Loja Atual                |
+| R$ 350       | Pendente      | Loja Centro               |
+|                                                          |
+| Custo Composto: R$ 3.450                                 |
++----------------------------------------------------------+
 ```
 
-Adicionar ao `historicoCusto` (quando houver custo de reparo):
+### Arquivos Alterados
 
-```typescript
-historicoCusto: [
-  { data: ..., fornecedor: produto.origemEntrada, valor: produto.valorCustoOriginal },
-  // Se houve reparo, adicionar entrada separada:
-  ...(custoReparo > 0 ? [{
-    data: new Date().toISOString().split('T')[0],
-    fornecedor: 'Assistência Técnica',
-    valor: custoReparo
-  }] : [])
-],
-```
-
-Adicionar entrada na timeline (quando houver custo de reparo):
-
-```typescript
-// Timeline entry mostrando composicao do custo
-{
-  id: `TL-CUSTO-${Date.now()}`,
-  tipo: 'parecer_estoque',
-  data: new Date().toISOString(),
-  titulo: 'Custo Composto Atualizado',
-  descricao: `Aquisição: R$ ${valorCustoOriginal} + Reparo: R$ ${custoReparo} = Custo Final: R$ ${custoComposto}`,
-  responsavel
-}
-```
-
-Tambem preservar `custoAssistencia` no produto migrado para o campo existente em `estoqueApi.ts`.
-
-### Resultado Esperado
-
-- Aparelho com custo original R$ 3.100 + reparo R$ 400 = custo final R$ 3.500 no estoque
-- Timeline mostra a composicao do custo
-- Historico de custo registra ambas as entradas (aquisicao e reparo)
-- Valor de venda sugerido calculado sobre o custo composto
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/pages/OSAssistenciaDetalhes.tsx` | Adicionar `setEditStatus(novoStatus)` em `handleConfirmarFinalizacao` |
+| `src/pages/EstoqueProdutoPendenteDetalhes.tsx` | Expandir card de validacao com campos financeiros, loja e pecas |
 

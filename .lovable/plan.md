@@ -1,38 +1,64 @@
 
 
-## Ajustes: Sidebar (icones colapsados) e Login Mobile
+## Restyling da Sidebar - Visual Premium Thiago Imports
 
-### 1. Sidebar - Espacamento dos icones ao colapsar
+### Resumo
 
-**Problema**: Quando a sidebar esta colapsada (`w-16`), os icones ficam com espacamento irregular -- o `gap-0.5`, `px-2`, `py-1.5` e `mx-1` nao centralizam bem os icones no espaco disponivel.
-
-**Solucao no arquivo `src/components/layout/Sidebar.tsx`**:
-- Ajustar o padding e gap dos itens no modo colapsado para que fiquem centralizados e com espacamento uniforme.
-- Quando `isCollapsed`:
-  - Cada link tera `px-0 py-2.5 mx-auto w-10 h-10 flex items-center justify-center` para garantir centralizacao perfeita.
-  - O `gap` do nav sera aumentado para `gap-1` quando colapsado.
-  - Remover o `mx-1` atual que causa desalinhamento.
-- Ocultar o indicador lateral ativo (barra branca) quando colapsado, pois nao faz sentido visual.
-- Ocultar o rodape "Status da Loja" completamente quando colapsado (usar `hidden` em vez de `opacity-0` para nao ocupar espaco).
+Transformar a sidebar atual em um visual premium e tecnologico, com fundo preto (#111111), padrao de circuitos sutil usando a imagem existente (`login_screen_v2_thiago_imports.png`), e esquema de cores amarelo (#F7BB05) para itens ativos.
 
 ---
 
-### 2. Tela de Login - Versao Mobile
+### 1. Fundo com Padrao de Circuitos
 
-**Problema**: No mobile, o formulario usa `marginLeft: '0'` mas o background (imagem grande de desktop) nao se adapta bem, e o formulario pode ficar mal posicionado ou com tamanho inadequado.
+**Arquivo: `src/components/layout/Sidebar.tsx`**
 
-**Solucao no arquivo `src/components/login/LoginCard.tsx`**:
-- No mobile, usar `bg-contain` ou uma cor de fundo escura em vez de `bg-cover` (a imagem de desktop nao funciona bem em telas estreitas).
-- Centralizar o formulario completamente no mobile sem margin lateral.
-- Reduzir a largura maxima do formulario para `maxWidth: '85vw'` no mobile.
-- Adicionar padding seguro para evitar que o formulario encoste nas bordas.
+- No `<aside>` (desktop) e no `<SheetContent>` (mobile), aplicar:
+  - `background-color: #111111` (substituir `bg-sidebar`).
+  - Adicionar um pseudo-elemento `::before` via uma div overlay posicionada absolutamente com:
+    - A imagem `login_screen_v2_thiago_imports.png` como background.
+    - `background-size: cover`, `background-position: center`.
+    - `opacity: 0.08` (bem sutil para nao atrapalhar leitura).
+    - `pointer-events: none` para nao bloquear cliques.
 
-**Solucao no arquivo `src/components/login/LoginForm.tsx`**:
-- Reduzir tamanhos de fonte no mobile:
-  - Titulo "Bem-vindo": de `text-4xl` para `text-2xl` no mobile.
-  - Inputs: padding vertical reduzido de `py-3.5` para `py-3`.
-  - Botao "Entrar": padding de `py-4` para `py-3`.
-- Reduzir `mb-8` do header para `mb-5` no mobile.
+---
+
+### 2. Estilizacao dos Itens de Menu
+
+**Arquivo: `src/components/layout/Sidebar.tsx`**
+
+- **Texto/icone padrao**: Cor branca (`text-white` ou `text-[#E0E0E0]`).
+- **Item ativo**:
+  - Remover o `bg-primary` atual azul.
+  - Texto e icone em amarelo `text-[#F7BB05]`.
+  - Borda esquerda de 4px amarela (`border-l-4 border-[#F7BB05]`).
+  - Fundo sutil: `bg-[#F7BB05]/10`.
+  - Remover o `animate-pulse` do icone ativo (substituir por brilho estatico).
+- **Hover (nao ativo)**:
+  - `hover:bg-[#212121]` ou `hover:bg-[#F7BB05]/10`.
+  - Texto permanece branco.
+- **Indicador lateral**: Substituir a barra branca atual por `border-l-4 border-[#F7BB05]` no proprio link, removendo a div absoluta.
+
+---
+
+### 3. Cabecalho e Rodape
+
+**Arquivo: `src/components/layout/Sidebar.tsx`**
+
+- Titulo "Navegacao": cor branca `text-white`.
+- Borda inferior do cabecalho: `border-[#222222]` (sutil no fundo preto).
+- Botao de toggle (chevron): `text-white hover:text-[#F7BB05]`.
+- Rodape "Status da Loja": fundo `bg-[#1a1a1a]`, texto `text-[#E0E0E0]`.
+
+---
+
+### 4. Variaveis CSS (opcional)
+
+**Arquivo: `src/index.css`**
+
+- Atualizar as variaveis `--sidebar-*` para refletir a nova paleta:
+  - `--sidebar-background`: manter ou ajustar para `#111111`.
+  - `--sidebar-accent`: ajustar para `#212121`.
+  - As cores amarelas serao aplicadas diretamente via classes Tailwind nos itens ativos, sem criar nova variavel.
 
 ---
 
@@ -40,7 +66,6 @@
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/components/layout/Sidebar.tsx` | Centralizar icones no modo colapsado com tamanho fixo, ajustar gap, ocultar rodape quando colapsado |
-| `src/components/login/LoginCard.tsx` | Adaptar background e posicionamento do formulario para telas mobile |
-| `src/components/login/LoginForm.tsx` | Reduzir tamanhos de fonte, padding e espacamento para mobile |
+| `src/components/layout/Sidebar.tsx` | Fundo #111111, overlay de circuitos com opacidade 0.08, itens ativos amarelo #F7BB05 com border-left, hover escuro, remover animate-pulse |
+| `src/index.css` | Ajustar variaveis --sidebar-background e --sidebar-accent para a nova paleta |
 

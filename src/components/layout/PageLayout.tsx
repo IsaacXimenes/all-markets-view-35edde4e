@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { cn } from '@/lib/utils';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useIsMobile } from '@/hooks/use-mobile';
+import circuitBg from '@/assets/sidebar-circuit-bg.png';
 
 interface PageLayoutProps {
   children: React.ReactNode;
@@ -37,8 +38,22 @@ export function PageLayout({ children, title }: PageLayoutProps) {
           
           <main className="flex-1 transition-all duration-300 overflow-x-hidden">
             <div className="w-full max-w-full p-3 sm:p-4 lg:p-6 xl:p-8 2xl:p-10 animate-fade-in">
-              <div className="bg-muted/30 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 text-center border border-border">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold">{title}</h1>
+              <div 
+                className="rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 text-center border-2 border-[#F7BB05] relative overflow-hidden"
+                style={{ backgroundColor: '#111111' }}
+              >
+                <div 
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ 
+                    backgroundImage: `url(${circuitBg})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    opacity: 0.08
+                  }}
+                />
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold relative z-10" style={{ color: '#F7BB05' }}>
+                  {title}
+                </h1>
               </div>
               {children}
             </div>

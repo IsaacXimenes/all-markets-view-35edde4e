@@ -1,130 +1,79 @@
 
 
-## Implementacao dos 2 Planos: Correcoes UI/Auditoria + Historico de Devolucao
+## Padronizacao do Seletor de Pecas e Refinamentos na Consignacao
 
 ### Resumo
 
-Aplicar todas as correcoes de interface, nomenclatura e auditoria (Plano 1), junto com a alteracao para manter pecas devolvidas no historico em vez de deleta-las (Plano 2).
+Implementar um seletor de pecas estilo "Nova Venda" no modulo de Assistencia, com visualizacao colunada e transparencia de estoque entre lojas. Adicionar campos informativos de valores de referencia. Sincronizar automaticamente a Unidade de Servico com a Loja da OS. Filtrar apenas lojas tipo "Assistencia" na criacao de lotes de consignacao. Refinar a auditoria de acerto e padronizar a UI da aba de Consignacao.
 
 ---
 
-### Alteracao 1: Fix bug pecas sumindo (`src/utils/pecasApi.ts`)
+### 1. Seletor de Pecas estilo "Nova Venda" (`src/pages/OSAssistenciaNova.tsx`)
 
-**Linha 192-193**: Substituir guard `pecas.length > 0` por flag booleana:
+**Situacao atual (linhas 1179-1224):** Quando o tecnico seleciona "Peca no estoque", o sistema usa um `<Select>` simples com badges inline. Isso dificulta a visualizacao do estoque por loja.
 
-```typescript
-// ANTES
-export const initializePecasWithLojaIds = (lojaIds: string[]): void => {
-  if (pecas.length > 0) return;
+**Alteracao:** Substituir o `<Select>` por um botao "Buscar Peca no Estoque" que abre um `<Dialog>` modal com:
+- Campo de busca por descricao/modelo
+- Filtro por loja (Select com todas as lojas de assistencia)
+- Tabela colunada com colunas: Descricao | Modelo | Loja | Qtd | Valor Custo | Valor Recomendado | Acoes (botao "Selecionar")
+- Pecas de outras lojas visiveis porem desabilitadas (apenas visualizacao), com separador visual identico ao de VendasNova (linha 2824-2863)
+- Filtrar apenas pecas com `status === 'Disponivel'` e sem `statusMovimentacao`
 
-// DEPOIS
-let pecasBaseInitialized = false;
+**Novos campos informativos (somente leitura):** Apos selecionar a peca, exibir abaixo do seletor:
+- "Valor Recomendado: R$ X,XX" (campo `valorRecomendado` da peca)
+- "Valor de Custo: R$ X,XX" (campo `valorCusto` da peca)
+- Ambos em `<Input disabled>` com `className="bg-muted"`
 
-export const initializePecasWithLojaIds = (lojaIds: string[]): void => {
-  if (pecasBaseInitialized) return;
-  pecasBaseInitialized = true;
-```
+### 2. Sincronizacao Unidade de Servico com Loja da OS (`src/pages/OSAssistenciaNova.tsx`)
 
-Adicionar `pecasBaseInitialized = true;` logo antes do `pecas = pecasBase.map(...)` (apos a nova linha do guard). O restante do corpo da funcao permanece igual, mas agora as pecas base (mock) sao adicionadas ao array `pecas` junto com quaisquer pecas consignadas ja presentes via `addPeca`, usando spread: `pecas = [...pecas, ...pecasBase.map(...)]` em vez de `pecas = pecasBase.map(...)`.
+**Situacao atual (linha 1282-1288):** O campo "Unidade de Servico" em cada peca/servico e selecionavel manualmente via `AutocompleteLoja`.
 
----
+**Alteracao:** Preencher automaticamente `peca.unidadeServico` com o valor de `lojaId` (loja da OS). Implementar via `useEffect` que observa mudancas em `lojaId` e atualiza todas as pecas que ainda nao tem `unidadeServico` definido. Manter o campo editavel para casos excepcionais.
 
-### Alteracao 2: Imports e devolucao sem delete (`src/utils/consignacaoApi.ts`)
+### 3. Filtro de Lojas na Consignacao (`src/pages/OSConsignacao.tsx`)
 
-**Linha 2**: Adicionar `updatePeca` ao import:
-```typescript
-import { addPeca, getPecaById, darBaixaPeca, deletePeca, updatePeca } from './pecasApi';
-```
+**Situacao atual (linha 256):** O campo Loja no formulario de novo lote usa `<AutocompleteLoja apenasLojasTipoLoja />`, que retorna todas as lojas tipo "Loja".
 
-**Linha 202-207** (`iniciarAcertoContas`): Ao mudar itens para 'Em Acerto', tambem marcar pecas no estoque como 'Reservada':
-```typescript
-lote.itens.forEach(item => {
-  if (item.status === 'Disponivel') {
-    item.status = 'Em Acerto';
-    if (item.pecaId) {
-      updatePeca(item.pecaId, { status: 'Reservada' });
-    }
-  }
-});
-```
+**Alteracao:** Substituir `apenasLojasTipoLoja` por `filtrarPorTipo="Assistência"` para retornar apenas unidades de assistencia.
 
-**Linha 241-244** (`confirmarDevolucaoItem`): Substituir `deletePeca` por `updatePeca` para manter historico:
-```typescript
-// ANTES
-if (item.pecaId) {
-  deletePeca(item.pecaId);
-}
+### 4. Correcao do Tecnico no Quadro de Pecas Usadas (`src/pages/OSConsignacao.tsx`)
 
-// DEPOIS
-if (item.pecaId) {
-  updatePeca(item.pecaId, { status: 'Utilizada', quantidade: 0 });
-}
-```
+**Situacao atual (linha 542):** O campo `item.tecnicoConsumo` ja e exibido, mas pode estar vazio quando o consumo e feito via `darBaixaPeca` sem passar o nome do tecnico real.
 
----
+**Alteracao em `src/utils/consignacaoApi.ts` (funcao `registrarConsumoConsignacao`):** Garantir que o parametro `tecnico` nunca seja "Sistema" quando um tecnico real existe. O valor ja e passado corretamente pelo caller (`darBaixaPeca`), mas validar que o callback `onConsumoPecaConsignada` em `pecasApi.ts` recebe o tecnico real da OS.
 
-### Alteracao 3: Padronizar nomenclatura (`src/pages/OSPecas.tsx`)
+**Alteracao em `src/utils/pecasApi.ts` (funcao `darBaixaPeca`):** Verificar que o parametro `tecnico` e repassado corretamente ao callback `onConsumoPecaConsignada`. Atualmente (linha ~220), o fallback e `'Sistema'` - manter, pois o caller (OSAssistenciaNova) ja passa o tecnico real.
 
-**Linha 267**: Renomear filtro de "Consignacao" para "Consignado":
-```typescript
-<SelectItem value="Consignacao">Consignado</SelectItem>
-```
+### 5. Timeline Automatica no Acerto (`src/pages/OSConsignacao.tsx`)
 
-**Linhas 313-318**: Remover badge [CONSIGNADO] da coluna Descricao (manter apenas na coluna Origem):
-```typescript
-<TableCell className="font-medium">
-  {peca.descricao}
-</TableCell>
-```
+**Situacao atual:** Ao clicar "Gerar Lote Financeiro", a timeline registra apenas o evento generico de acerto.
+
+**Alteracao em `handleConfirmarAcerto`:** Antes de chamar `iniciarAcertoContas`, injetar na timeline do lote um resumo consolidado de todas as tratativas: consumos (com OS e tecnico), transferencias entre lojas e devolucoes. Isso sera feito iterando `loteSelecionado.timeline` e criando um registro de fechamento com descricao consolidada.
+
+### 6. Padronizacao Visual da Consignacao (`src/pages/OSConsignacao.tsx`)
+
+**Alteracoes pontuais de UI:**
+- Cards de dashboard: usar `StatsCard` ou padronizar com icones alinhados e fontes consistentes (text-xs para labels, text-2xl para valores)
+- Botoes: garantir variantes consistentes (`variant="default"` para acoes primarias, `variant="outline"` para secundarias)
+- Espacamento: verificar `gap-4` e `space-y-6` em conformidade com outras abas
+- Tabelas: usar `ResponsiveTableContainer` do design system
+- Formularios: usar `Label` do design system com `text-sm font-medium`
+
+A aba ja segue boa parte do padrao. Os ajustes serao incrementais para alinhar estilos de badges, fontes e espacamentos.
 
 ---
 
-### Alteracao 4: Quadro "Pecas Usadas" com Loja, Valor de Custo e Total (`src/pages/OSConsignacao.tsx`)
+### Detalhes Tecnicos
 
-**Linhas 496-536** (view de Acerto): Refatorar o quadro de itens consumidos:
-
-- Renomear CardTitle de "Itens Consumidos" para "Pecas Usadas"
-- Renomear header "Valor" para "Valor de Custo"
-- Adicionar coluna "Loja" entre "Valor de Custo" e "OS"
-- Garantir que `item.tecnicoConsumo` seja exibido (nao "Sistema")
-- Adicionar `TableFooter` com linha de totalizacao somando todos os valores de custo
-
-```typescript
-<CardTitle className="text-base">Pecas Usadas</CardTitle>
-// Headers: Peca | Qtd Consumida | Valor de Custo | Loja | OS | Tecnico | Data
-// Footer: Total | - | R$ X.XXX,XX | - | - | - | -
-```
-
----
-
-### Alteracao 5: Quadro "Sobras para Devolucao" com auditoria (`src/pages/OSConsignacao.tsx`)
-
-**Linhas 538-558** (view de Acerto): Substituir layout simples por Table com auditoria:
-
-- Adicionar estado local: `const [confirmacoesDevolucao, setConfirmacoesDevolucao] = useState<Record<string, { usuario: string; dataHora: string }>>({});`
-- Colunas: Peca | Loja | Qtd | Valor de Custo | Confirmacao
-- Checkbox por item: ao marcar, registra `{ usuario: user.colaborador.nome, dataHora: new Date().toLocaleString('pt-BR') }`
-- Exibir usuario e data/hora abaixo do checkbox quando confirmado
-
----
-
-### Alteracao 6: Toast de devolucao atualizado (`src/pages/OSConsignacao.tsx`)
-
-**Linha 188**: Atualizar mensagem do toast de devolucao:
-```typescript
-// ANTES
-toast({ title: 'Devolvido', description: 'Item devolvido e removido do estoque' });
-
-// DEPOIS
-toast({ title: 'Devolvido', description: 'Item devolvido. Registro mantido no historico do estoque.' });
-```
-
----
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/pages/OSAssistenciaNova.tsx` | Substituir Select de pecas por Dialog modal colunado; adicionar campos Valor Recomendado e Valor de Custo (read-only); auto-preencher Unidade de Servico com lojaId |
+| `src/pages/OSConsignacao.tsx` | Filtrar lojas por tipo "Assistencia" no novo lote; injetar timeline consolidada no acerto; ajustes visuais de padronizacao |
+| `src/utils/pecasApi.ts` | Sem alteracao funcional (validar passagem do tecnico no callback) |
+| `src/utils/consignacaoApi.ts` | Sem alteracao funcional (fluxo de tecnico ja correto) |
 
 ### Sequencia de Implementacao
 
-1. `pecasApi.ts` - Flag de inicializacao + merge de arrays
-2. `consignacaoApi.ts` - Import updatePeca, acerto marca Reservada, devolucao usa updatePeca
-3. `OSPecas.tsx` - Remover badge duplicado, renomear filtro
-4. `OSConsignacao.tsx` - Quadros refatorados com auditoria, toast atualizado
+1. `OSAssistenciaNova.tsx` - Novo modal de selecao de pecas + campos de referencia + auto-fill unidade
+2. `OSConsignacao.tsx` - Filtro de lojas assistencia + timeline acerto + ajustes visuais
 

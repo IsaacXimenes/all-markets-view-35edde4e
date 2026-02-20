@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -614,31 +614,45 @@ export default function OSConsignacao() {
                         <TableCell>
                           {confirmacoesDevolucao[item.id] ? (
                             <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <Checkbox checked={true} onCheckedChange={() => {
-                                  const updated = { ...confirmacoesDevolucao };
-                                  delete updated[item.id];
-                                  setConfirmacoesDevolucao(updated);
-                                }} />
-                                <span className="text-xs text-green-600 font-medium">Confirmado</span>
-                              </div>
+                              <Badge className="bg-green-500/15 text-green-600 border border-green-300">
+                                <CheckCircle className="h-3 w-3 mr-1" /> Confirmado
+                              </Badge>
                               <p className="text-[10px] text-muted-foreground">
                                 {confirmacoesDevolucao[item.id].usuario} • {confirmacoesDevolucao[item.id].dataHora}
                               </p>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-2">
-                              <Checkbox checked={false} onCheckedChange={() => {
-                                setConfirmacoesDevolucao(prev => ({
-                                  ...prev,
-                                  [item.id]: {
-                                    usuario: user?.colaborador?.nome || 'Sistema',
-                                    dataHora: new Date().toLocaleString('pt-BR'),
-                                  }
-                                }));
-                              }} />
-                              <span className="text-xs text-muted-foreground">Confirmar devolução</span>
-                            </div>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <PackageCheck className="h-3.5 w-3.5 mr-1" /> Confirmar Devolução
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Confirmar Devolução</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Você confirma a devolução física de <strong>{item.quantidade}x {item.descricao}</strong> ao fornecedor?
+                                    <br /><br />
+                                    <span className="text-xs text-muted-foreground">Responsável: {user?.colaborador?.nome || 'Sistema'} • {new Date().toLocaleString('pt-BR')}</span>
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => {
+                                    setConfirmacoesDevolucao(prev => ({
+                                      ...prev,
+                                      [item.id]: {
+                                        usuario: user?.colaborador?.nome || 'Sistema',
+                                        dataHora: new Date().toLocaleString('pt-BR'),
+                                      }
+                                    }));
+                                  }}>
+                                    Confirmar Devolução
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           )}
                         </TableCell>
                       </TableRow>
@@ -694,10 +708,34 @@ export default function OSConsignacao() {
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <Button variant="outline" onClick={voltar}>Cancelar</Button>
-                <Button onClick={handleConfirmarAcerto} disabled={!acertoFormaPagamento || !acertoObservacao}>
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Gerar Lote Financeiro
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button disabled={!acertoFormaPagamento || !acertoObservacao}>
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Gerar Lote Financeiro
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Confirmar Acerto de Contas</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Deseja confirmar o acerto de contas do lote <strong>{loteSelecionado.id}</strong>?
+                        <br /><br />
+                        <strong>Valor a pagar:</strong> {formatCurrency(getValorConsumido(loteSelecionado))}
+                        <br />
+                        <strong>Forma de pagamento:</strong> {acertoFormaPagamento}
+                        <br /><br />
+                        <span className="text-xs text-muted-foreground">Esta ação não pode ser desfeita.</span>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleConfirmarAcerto}>
+                        Confirmar Acerto
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </CardContent>
           </Card>

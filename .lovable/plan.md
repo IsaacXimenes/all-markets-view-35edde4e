@@ -1,63 +1,104 @@
 
 
-## Simplificacao do Quadro de Pecas, Centralizacao de Devolucao e Rastreabilidade Financeira
+## Correcao de Calculo e Transformacao da Aba de Consignacao
 
 ### Resumo
 
-Remover o campo editavel "Valor (R$)" do quadro de Pecas/Servicos na OS, reposicionar os campos informativos de referencia. Remover o botao "Confirmar Devolucao" da aba Devolucao do dossie (centralizar no Acerto). Corrigir status de estoque para usar "Devolvida" em vez de "Reservada". Exibir timeline no dossie. Adicionar coluna "OS Vinculada" no detalhamento de notas financeiras.
+Corrigir a base de calculo do valor total de pecas na OS para usar Valor de Custo (em vez de Valor Recomendado). Transformar a view "lista" da aba de Consignacao com 5 cards de indicadores consolidados, filtros profissionais (Fornecedor, Data, Status) e nova coluna "Valor Usado" na tabela.
 
 ---
 
-### 1. Remover campo "Valor (R$)" e reposicionar referencias (`src/pages/OSAssistenciaNova.tsx`)
+### Alteracao 1: Base de Calculo com Valor de Custo (`src/pages/OSAssistenciaNova.tsx`)
 
-**Linhas 1274-1282**: Remover o bloco do campo "Valor (R$)" (Label + InputComMascara com mascara="moeda").
+**Linha 2025**: Ao selecionar peca no modal, usar `valorCusto` em vez de `valorRecomendado`:
 
-**Linhas 1229-1261**: Mover os campos "Valor Recomendado" e "Valor de Custo" para ficarem na mesma linha do seletor de peca (dentro do grid principal de 4 colunas). Em vez de aparecerem abaixo do botao de busca, eles ocuparao a 4a coluna (onde estava o "Valor R$"), lado a lado em um grid de 2 colunas compacto.
+```typescript
+// ANTES
+valor: p.valorRecomendado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 
-**Layout resultante da primeira linha do grid:**
-- Coluna 1: Origem da Peca (Select)
-- Colunas 2-3: Peca/Servico (busca ou input)
-- Coluna 4: Valor Recomendado + Valor de Custo (2 campos read-only empilhados ou lado a lado)
-
-Quando a origem nao e "estoque", o campo Valor (R$) editavel tambem deve ser removido - o valor sera calculado apenas via desconto/percentual sobre o valor recomendado ou inserido manualmente no campo existente. **Nota:** Para pecas de fornecedor ou servico terceirizado, manter um campo de valor editavel, pois nao ha referencia de estoque.
-
-**Correcao**: Na verdade, o campo "Valor (R$)" e necessario para pecas que NAO vem do estoque (fornecedor, terceirizado). A remocao deve ser condicional: remover APENAS quando `pecaNoEstoque === true`, pois os valores de referencia ja informam o custo/recomendado. Para as demais origens, manter o campo editavel.
-
-### 2. Remover botao "Confirmar Devolucao" da aba Devolucao (`src/pages/OSConsignacao.tsx`)
-
-**Linhas 428-466** (TabsContent value="devolucao" no dossie): Remover o botao `<Button>Confirmar Devolucao</Button>` (linhas 445-454). Manter a listagem dos itens como somente leitura, exibindo apenas o status atual (Disponivel, Consumido, Devolvido) sem acao. A confirmacao de devolucao fisica ocorrera exclusivamente no fluxo de Acerto de Contas (view "acerto", linhas 585-650).
-
-### 3. Corrigir status "Reservada" para "Devolvida" (`src/utils/pecasApi.ts` + `src/utils/consignacaoApi.ts`)
-
-**Problema:** O tipo `Peca.status` so aceita `'Disponivel' | 'Reservada' | 'Utilizada'`. O requisito pede o status "Devolvida" que nao existe.
-
-**Alteracao em `src/utils/pecasApi.ts` (linha 28):** Adicionar 'Devolvida' ao union type de status:
-```
-status: 'Disponivel' | 'Reservada' | 'Utilizada' | 'Devolvida';
+// DEPOIS
+valor: p.valorCusto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 ```
 
-**Alteracao em `src/utils/consignacaoApi.ts`:**
-- `iniciarAcertoContas` (linha 207): Manter `updatePeca(item.pecaId, { status: 'Reservada' })` - este e um status intermediario valido durante o acerto.
-- `confirmarDevolucaoItem` (linha 246): Trocar `{ status: 'Utilizada', quantidade: 0 }` para `{ status: 'Devolvida', quantidade: 0 }`.
+Isso garante que `calcularValorTotalPeca` (linha 485-489) use o valor de custo como base para o calculo do Valor Total (incluindo desconto percentual). O campo "Valor Total" exibido na linha do grid (linha 1314) refletira o custo real.
 
-**Alteracao em `src/pages/OSPecas.tsx`:** Adicionar badge visual para o novo status "Devolvida" (cinza, similar ao badge de "Devolvido" na consignacao).
+---
 
-### 4. Exibir Timeline no Dossie (`src/pages/OSConsignacao.tsx`)
+### Alteracao 2: Dashboard com 5 Cards de Indicadores (`src/pages/OSConsignacao.tsx`)
 
-**Linhas 354-358**: A timeline ja existe como uma aba separada no dossie (TabsTrigger value="timeline"). O requisito pede que seja exibida diretamente na tela de detalhamento, nao escondida em aba.
+**Linhas 77-85** (stats useMemo): Expandir o calculo para incluir os 5 indicadores solicitados:
 
-**Alteracao:** Mover o conteudo da aba "Timeline" para fora das Tabs, exibindo-o como um Card permanente abaixo das tabs de Inventario e Devolucao. Reduzir as tabs para apenas 2: "Inventario" e "Devolucao". A timeline ficara visivel como uma secao fixa na parte inferior do dossie.
+```typescript
+const stats = useMemo(() => {
+  // 1. Soma do Valor Total (custo de todas as remessas)
+  const valorTotal = lotes.reduce((acc, l) =>
+    acc + l.itens.reduce((a, i) => a + i.valorCusto * i.quantidadeOriginal, 0), 0);
 
-### 5. Coluna "OS Vinculada" no Financeiro (`src/pages/FinanceiroNotasAssistencia.tsx`)
+  // 2. Soma do Valor Usado (custo de todas as pecas consumidas)
+  const valorUsado = lotes.reduce((acc, l) => acc + getValorConsumido(l), 0);
 
-**Linhas 464-478** (secao "Itens Somente Leitura" no Dialog de conferencia): Adicionar a informacao de OS vinculada em cada item. 
+  // 3. Total de Produtos (quantidade total recebida)
+  const totalProdutos = lotes.reduce((acc, l) =>
+    acc + l.itens.reduce((a, i) => a + i.quantidadeOriginal, 0), 0);
 
-**Problema:** A interface `NotaAssistencia.itens` nao possui campo `osId`. Para notas de consignacao, a OS vinculada esta nos itens do lote (`ItemConsignacao.osVinculada`). Para notas regulares, a OS esta em `NotaAssistencia.osId`.
+  // 4. Total de Consumidos
+  const totalConsumidos = lotes.reduce((acc, l) =>
+    acc + l.itens.filter(i => i.status === 'Consumido').reduce((a, i) => a + i.quantidadeOriginal, 0), 0);
 
-**Solucao:** 
-- Para notas de consignacao (`tipoConsignacao === true`): importar `getLoteById` e buscar os itens consumidos do lote, cruzando por `item.descricao` para exibir a OS vinculada de cada peca.
-- Para notas regulares: exibir `notaSelecionada.osId` como valor fixo para todos os itens.
-- Adicionar a interface `NotaAssistencia.itens` um campo opcional `osVinculada?: string` e preenche-lo no momento da geracao da nota em `consignacaoApi.ts` (`gerarLoteFinanceiro`).
+  // 5. Disponiveis no Estoque
+  const disponiveis = lotes.reduce((acc, l) =>
+    acc + l.itens.filter(i => i.status === 'Disponivel').reduce((a, i) => a + i.quantidade, 0), 0);
+
+  return { valorTotal, valorUsado, totalProdutos, totalConsumidos, disponiveis };
+}, [lotes]);
+```
+
+**Linhas 694-740** (Cards da view lista): Substituir os 4 cards manuais por 5 `StatsCard` com icones e cores padronizadas:
+
+| Card | Titulo | Valor | Icone |
+|------|--------|-------|-------|
+| 1 | Valor Total | formatCurrency(stats.valorTotal) | DollarSign |
+| 2 | Valor Usado | formatCurrency(stats.valorUsado) | DollarSign (destructive) |
+| 3 | Total de Produtos | stats.totalProdutos | Package |
+| 4 | Total Consumidos | stats.totalConsumidos | CheckCircle |
+| 5 | Disponiveis | stats.disponiveis | PackageCheck (green) |
+
+Grid: `grid-cols-2 md:grid-cols-5 gap-4`
+
+---
+
+### Alteracao 3: Filtros Profissionais (`src/pages/OSConsignacao.tsx`)
+
+Adicionar 3 estados de filtro e uma barra de filtros acima da tabela:
+
+```typescript
+const [filtroFornecedor, setFiltroFornecedor] = useState('');
+const [filtroStatus, setFiltroStatus] = useState('');
+const [filtroData, setFiltroData] = useState('');
+```
+
+Barra de filtros com:
+- `AutocompleteFornecedor` para filtro por fornecedor
+- `Select` com opcoes: Todos, Aberto, Em Acerto, Pago, Devolvido
+- `Input type="date"` para filtro por data de criacao
+
+`useMemo` para `lotesFiltrados` aplicando os 3 filtros sobre `lotes`.
+
+---
+
+### Alteracao 4: Nova Coluna "Valor Usado" na Tabela (`src/pages/OSConsignacao.tsx`)
+
+**Linhas 754-809** (tabela de lotes): Adicionar coluna "Valor Usado" entre "Valor Total" e "Consumidos":
+
+```typescript
+<TableHead>Valor Usado</TableHead>
+// ...
+<TableCell className="font-semibold text-destructive">
+  {formatCurrency(getValorConsumido(lote))}
+</TableCell>
+```
+
+Atualizar `colSpan` da linha vazia para 10.
 
 ---
 
@@ -65,22 +106,11 @@ status: 'Disponivel' | 'Reservada' | 'Utilizada' | 'Devolvida';
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/pages/OSAssistenciaNova.tsx` | Remover campo "Valor (R$)" quando origem e estoque; mover Valor Recomendado e Valor de Custo para a mesma linha do seletor |
-| `src/pages/OSConsignacao.tsx` | Remover botao "Confirmar Devolucao" da aba devolucao do dossie; mover timeline para fora das tabs como secao fixa |
-| `src/utils/pecasApi.ts` | Adicionar 'Devolvida' ao union type de status |
-| `src/utils/consignacaoApi.ts` | Trocar status de 'Utilizada' para 'Devolvida' em `confirmarDevolucaoItem` |
-| `src/pages/OSPecas.tsx` | Adicionar badge para status 'Devolvida' |
-| `src/utils/solicitacaoPecasApi.ts` | Adicionar campo opcional `osVinculada` na interface de itens de `NotaAssistencia` |
-| `src/utils/consignacaoApi.ts` | Preencher `osVinculada` nos itens ao gerar nota financeira em `gerarLoteFinanceiro` |
-| `src/pages/FinanceiroNotasAssistencia.tsx` | Exibir coluna "OS Vinculada" no quadro de itens do dialog de conferencia |
+| `src/pages/OSAssistenciaNova.tsx` | Linha 2025: trocar `valorRecomendado` por `valorCusto` na selecao de peca |
+| `src/pages/OSConsignacao.tsx` | Expandir stats para 5 indicadores; substituir cards por StatsCard; adicionar filtros (fornecedor, status, data); adicionar coluna "Valor Usado" na tabela |
 
 ### Sequencia de Implementacao
 
-1. `pecasApi.ts` - Adicionar status 'Devolvida'
-2. `consignacaoApi.ts` - Corrigir status na devolucao + preencher osVinculada na nota
-3. `solicitacaoPecasApi.ts` - Atualizar interface NotaAssistencia.itens
-4. `OSAssistenciaNova.tsx` - Simplificar quadro de pecas
-5. `OSConsignacao.tsx` - Remover botao devolucao do dossie + timeline fixa
-6. `OSPecas.tsx` - Badge para status Devolvida
-7. `FinanceiroNotasAssistencia.tsx` - Coluna OS Vinculada
+1. `OSAssistenciaNova.tsx` - Corrigir base de calculo
+2. `OSConsignacao.tsx` - Stats + Cards + Filtros + Coluna Valor Usado
 

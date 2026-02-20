@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   getOrdemServicoById,
@@ -31,7 +31,7 @@ import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
 import { getPecas, Peca, darBaixaPeca, initializePecasWithLojaIds } from '@/utils/pecasApi';
 import { InputComMascara } from '@/components/ui/InputComMascara';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Save, ArrowLeft, History, Package, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, History, Package, CheckCircle, XCircle, AlertTriangle, Search } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -85,7 +85,27 @@ export default function OSAssistenciaEditar() {
     }
   }, [lojas]);
 
-  const pecasEstoque = getPecas().filter(p => p.status === 'Disponível');
+  const pecasEstoque = useMemo(() => getPecas().filter(p => p.status === 'Disponível' && !p.statusMovimentacao), [lojas]);
+
+  // Modal de busca de peça no estoque
+  const [modalBuscaPecaOpen, setModalBuscaPecaOpen] = useState(false);
+  const [modalBuscaPecaIndex, setModalBuscaPecaIndex] = useState<number>(0);
+  const [buscaPecaFiltro, setBuscaPecaFiltro] = useState('');
+  const [buscaPecaLojaFiltro, setBuscaPecaLojaFiltro] = useState('todas');
+
+  const pecasFiltradasModal = useMemo(() => {
+    let resultado = pecasEstoque;
+    if (buscaPecaFiltro) {
+      const termo = buscaPecaFiltro.toLowerCase();
+      resultado = resultado.filter(p => 
+        p.descricao.toLowerCase().includes(termo) || p.modelo.toLowerCase().includes(termo)
+      );
+    }
+    if (buscaPecaLojaFiltro && buscaPecaLojaFiltro !== 'todas') {
+      resultado = resultado.filter(p => p.lojaId === buscaPecaLojaFiltro);
+    }
+    return resultado;
+  }, [pecasEstoque, buscaPecaFiltro, buscaPecaLojaFiltro]);
 
   // State
   const [loading, setLoading] = useState(true);
@@ -121,6 +141,15 @@ export default function OSAssistenciaEditar() {
   const [novaSolJustificativa, setNovaSolJustificativa] = useState('');
 
   // Modal cancelar OS
+  // Auto-fill unidadeServico quando lojaId muda
+  useEffect(() => {
+    if (lojaId) {
+      setPecas(prev => prev.map(p => 
+        !p.unidadeServico ? { ...p, unidadeServico: lojaId } : p
+      ));
+    }
+  }, [lojaId]);
+
   const [modalCancelarOS, setModalCancelarOS] = useState(false);
   const [motivoCancelamento, setMotivoCancelamento] = useState('');
   const [checkCancelamento, setCheckCancelamento] = useState(false);
@@ -313,6 +342,68 @@ export default function OSAssistenciaEditar() {
         responsavel: getTecnicoNome(tecnicoId)
       });
     }
+
+    // Timeline de auditoria para alterações de peças
+    const nomeResponsavel = user?.colaborador?.nome || user?.username || obterNomeColaborador(tecnicoId) || 'Técnico';
+    const pecasOriginais = osOriginal?.pecas || [];
+    const pecasOriginaisEstoqueIds = pecasOriginais.map(p => p.pecaEstoqueId).filter(Boolean);
+    const pecasNovasEstoqueIds = pecasFormatadas.map(p => p.pecaEstoqueId).filter(Boolean);
+    
+    // Peças adicionadas
+    const adicionadas = pecasFormatadas.filter(p => p.pecaEstoqueId && !pecasOriginaisEstoqueIds.includes(p.pecaEstoqueId));
+    adicionadas.forEach(p => {
+      timelineAtualizada.push({
+        data: new Date().toISOString(),
+        tipo: 'peca',
+        descricao: `Peça adicionada: ${p.peca} (${formatCurrency(p.valor)})`,
+        responsavel: nomeResponsavel
+      });
+    });
+    
+    // Peças removidas
+    const removidas = pecasOriginais.filter(p => p.pecaEstoqueId && !pecasNovasEstoqueIds.includes(p.pecaEstoqueId));
+    removidas.forEach(p => {
+      timelineAtualizada.push({
+        data: new Date().toISOString(),
+        tipo: 'peca',
+        descricao: `Peça removida: ${p.peca} (${formatCurrency(p.valor)})`,
+        responsavel: nomeResponsavel
+      });
+    });
+
+    // Peças com valor alterado
+    pecasFormatadas.forEach(p => {
+      if (!p.pecaEstoqueId) return;
+      const original = pecasOriginais.find(o => o.pecaEstoqueId === p.pecaEstoqueId);
+      if (original && Math.abs(original.valor - p.valor) > 0.01) {
+        timelineAtualizada.push({
+          data: new Date().toISOString(),
+          tipo: 'peca',
+          descricao: `Valor alterado: ${p.peca} de ${formatCurrency(original.valor)} para ${formatCurrency(p.valor)}`,
+          responsavel: nomeResponsavel
+        });
+      }
+    });
+
+    // Peças manuais adicionadas/removidas
+    const pecasOriginaisManuais = pecasOriginais.filter(p => !p.pecaEstoqueId && p.peca);
+    const pecasNovasManuais = pecasFormatadas.filter(p => !p.pecaEstoqueId && p.peca);
+    pecasNovasManuais.filter(p => !pecasOriginaisManuais.find(o => o.id === p.id)).forEach(p => {
+      timelineAtualizada.push({
+        data: new Date().toISOString(),
+        tipo: 'peca',
+        descricao: `Serviço adicionado: ${p.peca} (${formatCurrency(p.valor)})`,
+        responsavel: nomeResponsavel
+      });
+    });
+    pecasOriginaisManuais.filter(p => !pecasNovasManuais.find(n => n.id === p.id)).forEach(p => {
+      timelineAtualizada.push({
+        data: new Date().toISOString(),
+        tipo: 'peca',
+        descricao: `Serviço removido: ${p.peca} (${formatCurrency(p.valor)})`,
+        responsavel: nomeResponsavel
+      });
+    });
 
     // Dar baixa no estoque para peças novas (que não existiam na OS original)
     const pecasOriginaisIds = osOriginal?.pecas?.map(p => p.pecaEstoqueId).filter(Boolean) || [];
@@ -636,73 +727,49 @@ export default function OSAssistenciaEditar() {
                       <Label>Peça/Serviço</Label>
                       {peca.pecaNoEstoque ? (
                         <div className="space-y-2">
-                          <Select
-                            value={peca.pecaEstoqueId}
-                            onValueChange={(v) => {
-                              const pecaSelecionada = pecasEstoque.find(p => p.id === v);
-                              const newPecas = [...pecas];
-                              newPecas[index] = {
-                                ...newPecas[index],
-                                pecaEstoqueId: v,
-                                peca: pecaSelecionada?.descricao || newPecas[index].peca,
-                                valor: pecaSelecionada ? pecaSelecionada.valorRecomendado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : newPecas[index].valor
-                              };
-                              setPecas(newPecas);
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              setModalBuscaPecaIndex(index);
+                              setBuscaPecaFiltro('');
+                              setBuscaPecaLojaFiltro('todas');
+                              setModalBuscaPecaOpen(true);
                             }}
                           >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione a peça do estoque..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {pecasEstoque.map(p => (
-                                <SelectItem key={p.id} value={p.id}>
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-medium">{p.descricao}</span>
-                                    <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs">
-                                      {obterNomeLoja(p.lojaId)}
-                                    </Badge>
-                                    <Badge className={cn(
-                                      "text-xs",
-                                      p.quantidade > 3 
-                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" 
-                                        : p.quantidade > 0 
-                                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                                    )}>
-                                      {p.quantidade} un.
-                                    </Badge>
-                                    <Badge variant="secondary" className="text-xs">
-                                      {p.origem}
-                                    </Badge>
+                            <Search className="h-4 w-4 mr-2" />
+                            {peca.pecaEstoqueId
+                              ? pecasEstoque.find(p => p.id === peca.pecaEstoqueId)?.descricao || peca.peca || 'Peça selecionada'
+                              : 'Buscar Peça no Estoque'}
+                          </Button>
+                          {peca.pecaEstoqueId && (() => {
+                            const pecaSel = pecasEstoque.find(p => p.id === peca.pecaEstoqueId);
+                            return (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-4">
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Package className="h-4 w-4" />
+                                    <span>Estoque: {pecaSel?.quantidade || 0} un.</span>
                                   </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {peca.pecaEstoqueId && (
-                            <div className="flex items-center gap-4">
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Package className="h-4 w-4" />
-                                <span>
-                                  Estoque atual: {pecasEstoque.find(p => p.id === peca.pecaEstoqueId)?.quantidade || 0} unidades
-                                </span>
+                                  <div className="flex items-center gap-2">
+                                    <Label className="text-sm whitespace-nowrap">Qtd:</Label>
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      max={pecaSel?.quantidade || 1}
+                                      value={peca.quantidadePeca}
+                                      onChange={e => {
+                                        const qty = Math.max(1, Math.min(parseInt(e.target.value) || 1, pecaSel?.quantidade || 1));
+                                        updatePeca(index, 'quantidadePeca', qty);
+                                      }}
+                                      className="w-20 h-8"
+                                    />
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Label className="text-sm whitespace-nowrap">Qtd:</Label>
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  max={pecasEstoque.find(p => p.id === peca.pecaEstoqueId)?.quantidade || 1}
-                                  value={peca.quantidadePeca}
-                                  onChange={e => {
-                                    const qty = Math.max(1, Math.min(parseInt(e.target.value) || 1, pecasEstoque.find(p => p.id === peca.pecaEstoqueId)?.quantidade || 1));
-                                    updatePeca(index, 'quantidadePeca', qty);
-                                  }}
-                                  className="w-20 h-8"
-                                />
-                              </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </div>
                       ) : (
                         <Input
@@ -712,15 +779,32 @@ export default function OSAssistenciaEditar() {
                         />
                       )}
                     </div>
-                    <div className="space-y-2">
-                      <Label>Valor (R$)</Label>
-                      <InputComMascara
-                        mascara="moeda"
-                        value={peca.valor}
-                        onChange={(formatted, raw) => updatePeca(index, 'valor', formatted)}
-                        placeholder="0,00"
-                      />
-                    </div>
+                    {!peca.pecaNoEstoque && (
+                      <div className="space-y-2">
+                        <Label>Valor (R$)</Label>
+                        <InputComMascara
+                          mascara="moeda"
+                          value={peca.valor}
+                          onChange={(formatted, raw) => updatePeca(index, 'valor', formatted)}
+                          placeholder="0,00"
+                        />
+                      </div>
+                    )}
+                    {peca.pecaNoEstoque && peca.pecaEstoqueId && (() => {
+                      const pecaSel = pecasEstoque.find(p => p.id === peca.pecaEstoqueId);
+                      return (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">V. Recomendado</Label>
+                            <Input disabled value={formatCurrency(pecaSel?.valorRecomendado || 0)} className="bg-muted h-9 text-xs" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">V. Custo</Label>
+                            <Input disabled value={formatCurrency(pecaSel?.valorCusto || 0)} className="bg-muted h-9 text-xs" />
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1099,6 +1183,135 @@ export default function OSAssistenciaEditar() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Modal Busca Peça no Estoque */}
+      <Dialog open={modalBuscaPecaOpen} onOpenChange={setModalBuscaPecaOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Buscar Peça no Estoque
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 py-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por descrição ou modelo..."
+                value={buscaPecaFiltro}
+                onChange={e => setBuscaPecaFiltro(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={buscaPecaLojaFiltro} onValueChange={setBuscaPecaLojaFiltro}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todas as lojas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas as lojas</SelectItem>
+                {lojas.map(l => (
+                  <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="overflow-y-auto flex-1 border rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Modelo</TableHead>
+                  <TableHead>Loja</TableHead>
+                  <TableHead className="text-center">Qtd</TableHead>
+                  <TableHead>Valor Custo</TableHead>
+                  <TableHead>Valor Recomendado</TableHead>
+                  <TableHead>Ação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pecasFiltradasModal.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      Nenhuma peça encontrada
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  (() => {
+                    const lojaOS = lojaId;
+                    const daMinhaLoja = pecasFiltradasModal.filter(p => p.lojaId === lojaOS);
+                    const deOutrasLojas = pecasFiltradasModal.filter(p => p.lojaId !== lojaOS);
+                    return (
+                      <>
+                        {daMinhaLoja.map(p => (
+                          <TableRow key={p.id}>
+                            <TableCell className="font-medium">{p.descricao}</TableCell>
+                            <TableCell className="text-xs">{p.modelo}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-300 text-xs">
+                                {obterNomeLoja(p.lojaId)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge className={cn("text-xs", p.quantidade > 3 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" : p.quantidade > 0 ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200")}>
+                                {p.quantidade}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs">{formatCurrency(p.valorCusto)}</TableCell>
+                            <TableCell className="text-xs">{formatCurrency(p.valorRecomendado)}</TableCell>
+                            <TableCell>
+                              <Button size="sm" variant="default" onClick={() => {
+                                const newPecas = [...pecas];
+                                newPecas[modalBuscaPecaIndex] = {
+                                  ...newPecas[modalBuscaPecaIndex],
+                                  pecaEstoqueId: p.id,
+                                  peca: p.descricao,
+                                  valor: p.valorCusto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                                };
+                                setPecas(newPecas);
+                                setModalBuscaPecaOpen(false);
+                              }}>
+                                Selecionar
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {deOutrasLojas.length > 0 && daMinhaLoja.length > 0 && (
+                          <TableRow>
+                            <TableCell colSpan={7} className="bg-muted/50 text-center text-xs text-muted-foreground py-2 font-medium">
+                              Peças de outras lojas (somente visualização)
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        {deOutrasLojas.map(p => (
+                          <TableRow key={p.id} className="opacity-60">
+                            <TableCell className="font-medium">{p.descricao}</TableCell>
+                            <TableCell className="text-xs">{p.modelo}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-300 text-xs">
+                                {obterNomeLoja(p.lojaId)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge className={cn("text-xs", p.quantidade > 3 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" : p.quantidade > 0 ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200")}>
+                                {p.quantidade}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs">{formatCurrency(p.valorCusto)}</TableCell>
+                            <TableCell className="text-xs">{formatCurrency(p.valorRecomendado)}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="text-xs">Outra loja</Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </>
+                    );
+                  })()
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   );
 }

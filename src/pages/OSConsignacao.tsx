@@ -27,7 +27,7 @@ import {
 import { getNotasAssistencia, __pushNotaConsignacao } from '@/utils/solicitacaoPecasApi';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Plus, Eye, Trash2, Package, PackageCheck, Clock, DollarSign,
+  Plus, Eye, Trash2, Package, PackageCheck, Clock, DollarSign, Pencil,
   FileText, ArrowRightLeft, CheckCircle, AlertTriangle, ArrowLeft, Undo2, Truck,
 } from 'lucide-react';
 
@@ -822,9 +822,14 @@ export default function OSConsignacao() {
                           <Eye className="h-4 w-4" />
                         </Button>
                         {lote.status === 'Aberto' && (
-                          <Button variant="ghost" size="sm" onClick={() => handleIniciarAcerto(lote)} title="Iniciar Acerto">
-                            <DollarSign className="h-4 w-4 text-yellow-600" />
-                          </Button>
+                          <>
+                            <Button variant="ghost" size="sm" onClick={() => handleVerDossie(lote)} title="Editar Lote">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleIniciarAcerto(lote)} title="Iniciar Acerto">
+                              <DollarSign className="h-4 w-4 text-yellow-600" />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </TableCell>

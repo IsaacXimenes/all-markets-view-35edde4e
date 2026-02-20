@@ -1,66 +1,130 @@
 
 
-## Movimentacao de Pecas com Fluxo Completo (igual Estoque)
+## Implementacao dos 2 Planos: Correcoes UI/Auditoria + Historico de Devolucao
 
 ### Resumo
 
-Alinhar a aba "Movimentacao de Pecas" (OS) com o mesmo fluxo do modulo de Estoque: ao registrar uma movimentacao, a peca fica marcada como "Em movimentacao" (bloqueada para uso), e so apos confirmacao de recebimento (com responsavel auto-preenchido) a peca muda fisicamente de loja.
+Aplicar todas as correcoes de interface, nomenclatura e auditoria (Plano 1), junto com a alteracao para manter pecas devolvidas no historico em vez de deleta-las (Plano 2).
 
 ---
 
-### 1. Atualizar interface `Peca` (`src/utils/pecasApi.ts`)
+### Alteracao 1: Fix bug pecas sumindo (`src/utils/pecasApi.ts`)
 
-Adicionar campos para controle de movimentacao:
-- `statusMovimentacao?: 'Em movimentação' | null` - bloqueia a peca enquanto em transito
-- `movimentacaoPecaId?: string` - referencia a movimentacao ativa
+**Linha 192-193**: Substituir guard `pecas.length > 0` por flag booleana:
 
-### 2. Atualizar interface `MovimentacaoPeca` na pagina (`src/pages/OSMovimentacaoPecas.tsx`)
+```typescript
+// ANTES
+export const initializePecasWithLojaIds = (lojaIds: string[]): void => {
+  if (pecas.length > 0) return;
 
-Expandir a interface local `MovimentacaoPeca` com:
-- `dataRecebimento?: string`
-- `responsavelRecebimento?: string`
+// DEPOIS
+let pecasBaseInitialized = false;
 
-### 3. Logica de registro - marcar peca "Em movimentacao"
+export const initializePecasWithLojaIds = (lojaIds: string[]): void => {
+  if (pecasBaseInitialized) return;
+  pecasBaseInitialized = true;
+```
 
-Ao registrar nova movimentacao (`handleRegistrar`):
-- Buscar a peca via `getPecaById` e atualizar `statusMovimentacao = 'Em movimentação'` e `movimentacaoPecaId`
-- Decrementar quantidade na loja de origem (ou apenas bloquear, mantendo quantidade)
-- Filtrar pecas disponiveis para excluir as que estao `Em movimentação`
-
-### 4. Confirmacao de recebimento com dialog (igual Estoque)
-
-Substituir o `handleConfirmarRecebimento` simples por:
-- Um `AlertDialog` com responsavel auto-preenchido (usuario logado, disabled)
-- Ao confirmar:
-  - Atualizar `peca.lojaId` para o destino da movimentacao
-  - Limpar `peca.statusMovimentacao = null` e `peca.movimentacaoPecaId = undefined`
-  - Registrar `dataRecebimento` e `responsavelRecebimento` na movimentacao
-
-### 5. Modal de detalhes com timeline (igual Estoque)
-
-Adicionar botao "Olhinho" (Eye) em cada linha da tabela para abrir modal de timeline com:
-- Etapa 1: Envio registrado (origem, data, responsavel)
-- Etapa 2: Recebimento (destino, data recebimento, responsavel recebimento ou "Pendente")
-- Motivo da movimentacao
-
-### 6. Edicao de movimentacoes pendentes
-
-Adicionar botao "Editar" (Edit) nas movimentacoes com status Pendente:
-- Modal para alterar destino e motivo
-- Nao permitir edicao apos confirmacao
-
-### 7. Filtro de pecas disponiveis
-
-Atualizar o filtro de pecas no modal de busca para excluir pecas com `statusMovimentacao === 'Em movimentação'`, garantindo que nao sejam selecionadas para nova movimentacao ou uso em OS enquanto em transito.
+Adicionar `pecasBaseInitialized = true;` logo antes do `pecas = pecasBase.map(...)` (apos a nova linha do guard). O restante do corpo da funcao permanece igual, mas agora as pecas base (mock) sao adicionadas ao array `pecas` junto com quaisquer pecas consignadas ja presentes via `addPeca`, usando spread: `pecas = [...pecas, ...pecasBase.map(...)]` em vez de `pecas = pecasBase.map(...)`.
 
 ---
 
-### Detalhes Tecnicos
+### Alteracao 2: Imports e devolucao sem delete (`src/utils/consignacaoApi.ts`)
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/utils/pecasApi.ts` | Adicionar `statusMovimentacao` e `movimentacaoPecaId` na interface `Peca`. Atualizar filtro em `getPecas` ou criar `getPecasDisponiveis`. |
-| `src/pages/OSMovimentacaoPecas.tsx` | AlertDialog de confirmacao com responsavel auto-preenchido, modal de timeline (Eye), botao de edicao, marcacao "Em movimentacao" no registro, atualizacao de `lojaId` na confirmacao |
+**Linha 2**: Adicionar `updatePeca` ao import:
+```typescript
+import { addPeca, getPecaById, darBaixaPeca, deletePeca, updatePeca } from './pecasApi';
+```
 
-Nenhum arquivo novo sera criado. O fluxo replica fielmente o comportamento de `EstoqueMovimentacoes.tsx` adaptado para pecas (que usam quantidade ao inves de IMEI unico).
+**Linha 202-207** (`iniciarAcertoContas`): Ao mudar itens para 'Em Acerto', tambem marcar pecas no estoque como 'Reservada':
+```typescript
+lote.itens.forEach(item => {
+  if (item.status === 'Disponivel') {
+    item.status = 'Em Acerto';
+    if (item.pecaId) {
+      updatePeca(item.pecaId, { status: 'Reservada' });
+    }
+  }
+});
+```
+
+**Linha 241-244** (`confirmarDevolucaoItem`): Substituir `deletePeca` por `updatePeca` para manter historico:
+```typescript
+// ANTES
+if (item.pecaId) {
+  deletePeca(item.pecaId);
+}
+
+// DEPOIS
+if (item.pecaId) {
+  updatePeca(item.pecaId, { status: 'Utilizada', quantidade: 0 });
+}
+```
+
+---
+
+### Alteracao 3: Padronizar nomenclatura (`src/pages/OSPecas.tsx`)
+
+**Linha 267**: Renomear filtro de "Consignacao" para "Consignado":
+```typescript
+<SelectItem value="Consignacao">Consignado</SelectItem>
+```
+
+**Linhas 313-318**: Remover badge [CONSIGNADO] da coluna Descricao (manter apenas na coluna Origem):
+```typescript
+<TableCell className="font-medium">
+  {peca.descricao}
+</TableCell>
+```
+
+---
+
+### Alteracao 4: Quadro "Pecas Usadas" com Loja, Valor de Custo e Total (`src/pages/OSConsignacao.tsx`)
+
+**Linhas 496-536** (view de Acerto): Refatorar o quadro de itens consumidos:
+
+- Renomear CardTitle de "Itens Consumidos" para "Pecas Usadas"
+- Renomear header "Valor" para "Valor de Custo"
+- Adicionar coluna "Loja" entre "Valor de Custo" e "OS"
+- Garantir que `item.tecnicoConsumo` seja exibido (nao "Sistema")
+- Adicionar `TableFooter` com linha de totalizacao somando todos os valores de custo
+
+```typescript
+<CardTitle className="text-base">Pecas Usadas</CardTitle>
+// Headers: Peca | Qtd Consumida | Valor de Custo | Loja | OS | Tecnico | Data
+// Footer: Total | - | R$ X.XXX,XX | - | - | - | -
+```
+
+---
+
+### Alteracao 5: Quadro "Sobras para Devolucao" com auditoria (`src/pages/OSConsignacao.tsx`)
+
+**Linhas 538-558** (view de Acerto): Substituir layout simples por Table com auditoria:
+
+- Adicionar estado local: `const [confirmacoesDevolucao, setConfirmacoesDevolucao] = useState<Record<string, { usuario: string; dataHora: string }>>({});`
+- Colunas: Peca | Loja | Qtd | Valor de Custo | Confirmacao
+- Checkbox por item: ao marcar, registra `{ usuario: user.colaborador.nome, dataHora: new Date().toLocaleString('pt-BR') }`
+- Exibir usuario e data/hora abaixo do checkbox quando confirmado
+
+---
+
+### Alteracao 6: Toast de devolucao atualizado (`src/pages/OSConsignacao.tsx`)
+
+**Linha 188**: Atualizar mensagem do toast de devolucao:
+```typescript
+// ANTES
+toast({ title: 'Devolvido', description: 'Item devolvido e removido do estoque' });
+
+// DEPOIS
+toast({ title: 'Devolvido', description: 'Item devolvido. Registro mantido no historico do estoque.' });
+```
+
+---
+
+### Sequencia de Implementacao
+
+1. `pecasApi.ts` - Flag de inicializacao + merge de arrays
+2. `consignacaoApi.ts` - Import updatePeca, acerto marca Reservada, devolucao usa updatePeca
+3. `OSPecas.tsx` - Remover badge duplicado, renomear filtro
+4. `OSConsignacao.tsx` - Quadros refatorados com auditoria, toast atualizado
 

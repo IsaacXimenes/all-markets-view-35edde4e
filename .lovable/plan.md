@@ -1,146 +1,57 @@
 
-## Gestao de Pecas em Consignacao
+
+## Movimentacao de Pecas com Fluxo Completo (igual Estoque)
 
 ### Resumo
 
-Implementar o fluxo completo de consignacao: cadastro de lotes com rastreabilidade, injecao automatica no Estoque-Assistencia com tag [CONSIGNADO], baixa automatica por uso em OS, repasse entre unidades, acerto de contas manual com integracao financeira, guia de devolucao com auditoria, e dossie historico imutavel.
+Alinhar a aba "Movimentacao de Pecas" (OS) com o mesmo fluxo do modulo de Estoque: ao registrar uma movimentacao, a peca fica marcada como "Em movimentacao" (bloqueada para uso), e so apos confirmacao de recebimento (com responsavel auto-preenchido) a peca muda fisicamente de loja.
 
 ---
 
-### 1. Nova API de Consignacao (`src/utils/consignacaoApi.ts`) - ARQUIVO NOVO
+### 1. Atualizar interface `Peca` (`src/utils/pecasApi.ts`)
 
-**Interface `LoteConsignacao`:**
-- `id`: string (CONS-001, CONS-002...)
-- `fornecedorId`: string
-- `dataCriacao`: string
-- `responsavelCadastro`: string
-- `status`: 'Aberto' | 'Em Acerto' | 'Pago' | 'Devolvido'
-- `itens`: `ItemConsignacao[]`
-- `timeline`: `TimelineConsignacao[]`
+Adicionar campos para controle de movimentacao:
+- `statusMovimentacao?: 'Em movimentação' | null` - bloqueia a peca enquanto em transito
+- `movimentacaoPecaId?: string` - referencia a movimentacao ativa
 
-**Interface `ItemConsignacao`:**
-- `id`: string (CONS-ITEM-001)
-- `pecaId`: string (referencia ao PEC-XXXX injetado no estoque)
-- `descricao`: string
-- `modelo`: string
-- `quantidade`: number
-- `quantidadeOriginal`: number
-- `valorCusto`: number
-- `lojaAtualId`: string
-- `status`: 'Disponivel' | 'Consumido' | 'Devolvido' | 'Em Acerto'
-- `osVinculada?`: string (OS que consumiu)
-- `dataConsumo?`: string
-- `tecnicoConsumo?`: string
-- `devolvidoPor?`: string
-- `dataDevolucao?`: string
+### 2. Atualizar interface `MovimentacaoPeca` na pagina (`src/pages/OSMovimentacaoPecas.tsx`)
 
-**Interface `TimelineConsignacao`:**
-- `data`: string
-- `tipo`: 'entrada' | 'consumo' | 'transferencia' | 'acerto' | 'devolucao' | 'pagamento'
-- `descricao`: string
-- `responsavel`: string
+Expandir a interface local `MovimentacaoPeca` com:
+- `dataRecebimento?: string`
+- `responsavelRecebimento?: string`
 
-**Funcoes principais:**
-- `criarLoteConsignacao(dados)`: Cria o lote, injeta pecas no estoque (via `addPeca` com origem 'Consignacao') e registra na timeline
-- `getLotesConsignacao()`, `getLoteById(id)`
-- `registrarConsumoConsignacao(loteId, itemId, osId, tecnico)`: Baixa automatica, registra consumo no dossie
-- `transferirItemConsignacao(loteId, itemId, novaLojaId, responsavel)`: Transfere mantendo vinculo ao lote original
-- `iniciarAcertoContas(loteId, responsavel)`: Muda status para 'Em Acerto', congela retiradas, calcula valor total consumido
-- `confirmarDevolucaoItem(loteId, itemId, responsavel)`: Marca item como devolvido, remove do estoque
-- `gerarLoteFinanceiro(loteId)`: Cria NotaAssistencia consolidada com tipo consignacao para o Financeiro
-- `finalizarAcerto(loteId)`: Chamado apos confirmacao financeira, muda status para 'Pago'
+### 3. Logica de registro - marcar peca "Em movimentacao"
 
-**Integracao com `pecasApi.ts`:**
-- Adicionar nova origem 'Consignacao' na interface `Peca` (campo `origem`)
-- Adicionar campo opcional `loteConsignacaoId?: string` na interface `Peca`
-- Ao criar lote, chamar `addPeca()` com origem 'Consignacao' e `loteConsignacaoId`
-- Ao registrar consumo via OS, chamar `darBaixaPeca()` existente + registrar no dossie
+Ao registrar nova movimentacao (`handleRegistrar`):
+- Buscar a peca via `getPecaById` e atualizar `statusMovimentacao = 'Em movimentação'` e `movimentacaoPecaId`
+- Decrementar quantidade na loja de origem (ou apenas bloquear, mantendo quantidade)
+- Filtrar pecas disponiveis para excluir as que estao `Em movimentação`
 
----
+### 4. Confirmacao de recebimento com dialog (igual Estoque)
 
-### 2. Nova Pagina - Entrada de Consignacao (`src/pages/OSConsignacao.tsx`) - ARQUIVO NOVO
+Substituir o `handleConfirmarRecebimento` simples por:
+- Um `AlertDialog` com responsavel auto-preenchido (usuario logado, disabled)
+- Ao confirmar:
+  - Atualizar `peca.lojaId` para o destino da movimentacao
+  - Limpar `peca.statusMovimentacao = null` e `peca.movimentacaoPecaId = undefined`
+  - Registrar `dataRecebimento` e `responsavelRecebimento` na movimentacao
 
-**Tela principal com 3 secoes:**
+### 5. Modal de detalhes com timeline (igual Estoque)
 
-**2.1 Dashboard Cards:**
-- Total de Lotes Abertos
-- Pecas Consignadas Disponiveis
-- Valor em Consignacao
-- Lotes em Acerto
+Adicionar botao "Olhinho" (Eye) em cada linha da tabela para abrir modal de timeline com:
+- Etapa 1: Envio registrado (origem, data, responsavel)
+- Etapa 2: Recebimento (destino, data recebimento, responsavel recebimento ou "Pendente")
+- Motivo da movimentacao
 
-**2.2 Tabela de Lotes:**
-- Colunas: ID | Fornecedor | Data Criacao | Qtd Itens | Valor Total | Consumidos | Disponiveis | Status | Acoes
-- Badges de status: Aberto (azul), Em Acerto (amarelo), Pago (verde), Devolvido (cinza)
-- Acoes: Ver Dossie, Iniciar Acerto (se Aberto)
+### 6. Edicao de movimentacoes pendentes
 
-**2.3 Modal "Novo Lote de Consignacao":**
-- Fornecedor (AutocompleteFornecedor)
-- Responsavel (auto-preenchido, disabled)
-- Tabela de itens: Descricao | Modelo | Qtd | Valor Custo | Loja Destino
-- Botao "Adicionar Item" e "Remover Item"
-- Valor Total (soma automatica)
-- Botao "Cadastrar Lote"
+Adicionar botao "Editar" (Edit) nas movimentacoes com status Pendente:
+- Modal para alterar destino e motivo
+- Nao permitir edicao apos confirmacao
 
-**2.4 Modal "Dossie do Lote" (Detalhamento):**
-- Cabecalho: ID, Fornecedor, Data, Status, Valor Total, Responsavel
-- 3 abas internas:
-  - **Inventario**: Tabela com todos os itens (status individual, loja atual, OS vinculada se consumido)
-  - **Timeline**: Historico imutavel cronologico de todas as acoes
-  - **Devolucao**: Lista de itens nao consumidos com botao "Confirmar Devolucao" por item (exige usuario logado + data/hora)
+### 7. Filtro de pecas disponiveis
 
-**2.5 Modal "Iniciar Acerto de Contas":**
-- Resumo: Itens consumidos x valor
-- Lista detalhada dos itens consumidos (OS, tecnico, data)
-- Lista de itens para devolucao (sobras)
-- Botao "Gerar Lote Financeiro" -> cria nota no Financeiro
-- Campos de pagamento: Forma (Pix/Dinheiro), Conta, Nome Recebedor, Chave Pix, Observacao
-
----
-
-### 3. Integracao com Estoque-Assistencia (`src/pages/OSPecas.tsx`)
-
-**Tag [CONSIGNADO]:**
-- Na coluna "Descricao", pecas com `origem === 'Consignacao'` exibem badge `[CONSIGNADO]` em destaque (cor roxa/violeta)
-- Adicionar 'Consignacao' como opcao no filtro de Origem
-- No modal de detalhes, exibir campo "Lote Consignacao" com o ID do lote vinculado
-
-**Integracao com darBaixaPeca:**
-- Ao dar baixa em peca consignada via OS (fluxo existente), alem da baixa normal, chamar `registrarConsumoConsignacao` para registrar no dossie do lote
-
----
-
-### 4. Integracao com Selecao de Pecas na OS
-
-**Nos modais de criacao/edicao de OS** (OSAssistenciaNova, OSAssistenciaEditar, OSOficina):
-- Pecas consignadas aparecem na lista de "Peca no Estoque" normalmente (ja injetadas pelo cadastro)
-- Identificacao visual: badge [CONSIGNADO] ao lado do nome na lista de selecao
-- A baixa automatica no estoque ja dispara o registro no dossie via integracao do item 3
-
----
-
-### 5. Integracao Financeira (`src/pages/FinanceiroNotasAssistencia.tsx`)
-
-- Notas geradas por acerto de consignacao exibem badge "Consignacao" (cor violeta) na coluna Tipo
-- Modal de conferencia exibe: Lote ID, Fornecedor, lista detalhada de itens consumidos (OS, peca, valor)
-- Ao finalizar nota de consignacao, chamar `finalizarAcerto` para atualizar status do lote para 'Pago'
-
----
-
-### 6. Roteamento e Navegacao
-
-**Nova rota em `src/App.tsx`:**
-- `/os/consignacao` -> `OSConsignacao`
-
-**Nova aba no `OSLayout.tsx`:**
-- Adicionar tab "Consignacao" (icone PackageCheck) entre "Estoque - Assistencia" e "Retirada de Pecas"
-
----
-
-### 7. Atualizacao de `pecasApi.ts`
-
-- Adicionar 'Consignacao' ao tipo `origem` da interface `Peca`
-- Adicionar campo `loteConsignacaoId?: string` na interface `Peca`
-- Atualizar `darBaixaPeca` para, se a peca tiver `loteConsignacaoId`, disparar callback de registro de consumo
+Atualizar o filtro de pecas no modal de busca para excluir pecas com `statusMovimentacao === 'Em movimentação'`, garantindo que nao sejam selecionadas para nova movimentacao ou uso em OS enquanto em transito.
 
 ---
 
@@ -148,20 +59,8 @@ Implementar o fluxo completo de consignacao: cadastro de lotes com rastreabilida
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/utils/consignacaoApi.ts` | **NOVO** - Interfaces e logica completa de consignacao |
-| `src/utils/pecasApi.ts` | Adicionar origem 'Consignacao', campo `loteConsignacaoId`, hook de consumo em `darBaixaPeca` |
-| `src/pages/OSConsignacao.tsx` | **NOVO** - Tela completa com dashboard, tabela de lotes, modais de cadastro/dossie/acerto |
-| `src/pages/OSPecas.tsx` | Badge [CONSIGNADO], filtro 'Consignacao', campo lote no modal de detalhes |
-| `src/pages/FinanceiroNotasAssistencia.tsx` | Badge "Consignacao", modal expandido para notas de acerto |
-| `src/components/layout/OSLayout.tsx` | Nova tab "Consignacao" |
-| `src/App.tsx` | Nova rota `/os/consignacao` |
-| `src/utils/solicitacaoPecasApi.ts` | Tipo 'Consignacao' em NotaAssistencia para integracao financeira |
+| `src/utils/pecasApi.ts` | Adicionar `statusMovimentacao` e `movimentacaoPecaId` na interface `Peca`. Atualizar filtro em `getPecas` ou criar `getPecasDisponiveis`. |
+| `src/pages/OSMovimentacaoPecas.tsx` | AlertDialog de confirmacao com responsavel auto-preenchido, modal de timeline (Eye), botao de edicao, marcacao "Em movimentacao" no registro, atualizacao de `lojaId` na confirmacao |
 
-### Sequencia de Implementacao
+Nenhum arquivo novo sera criado. O fluxo replica fielmente o comportamento de `EstoqueMovimentacoes.tsx` adaptado para pecas (que usam quantidade ao inves de IMEI unico).
 
-1. `consignacaoApi.ts` + atualizacoes em `pecasApi.ts` (modelo de dados)
-2. `OSConsignacao.tsx` (tela principal com todos os modais)
-3. Roteamento (`App.tsx`) e navegacao (`OSLayout.tsx`)
-4. Integracao `OSPecas.tsx` (tag visual + filtro)
-5. Integracao `FinanceiroNotasAssistencia.tsx` (conferencia de acerto)
-6. Integracao `solicitacaoPecasApi.ts` (tipo consignacao na nota)

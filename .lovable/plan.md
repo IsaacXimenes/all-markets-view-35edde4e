@@ -1,137 +1,91 @@
 
 
-## Rastreabilidade Cruzada e Dashboard Unificado de Custos por Origem
+## Enriquecer Dados Mockados com Exemplos de Rastreabilidade Cruzada
 
 ### Resumo
 
-Implementar o "DNA da Peca" -- cada peca em uma OS carrega 3 selos (Origem do Servico, Origem da Peca, Valor de Custo Real) -- e consolidar os custos em 4 cards mestres exibidos de forma identica na Assistencia, Financeiro e Painel Geral, com grafico de composicao no Dashboard.
+Adicionar novas OS ao mock e enriquecer as existentes para cobrir todas as combinacoes possiveis de Origem do Servico x Origem da Peca, gerando dados significativos nos 4 cards mestres e no grafico de composicao do Dashboard.
 
 ---
 
-### 1. Mudancas no Modelo de Dados
+### Cobertura Atual vs. Desejada
+
+| OS | Origem Servico | Origem Peca | Status |
+|---|---|---|---|
+| 0001 | Garantia (Balcao) | sem pecas | Aguardando Analise |
+| 0002 | Balcao | Estoque Thiago | Em servico |
+| 0003 | Garantia | Fornecedor | Solicitacao de Peca |
+| 0004 | Garantia | Fornecedor | Aguardando Peca |
+| 0005 | Balcao | Fornecedor | Peca Recebida |
+| 0006 | Balcao | Fornecedor + Estoque Thiago | Servico concluido |
+| 0007 | Garantia | Consignado + Estoque Thiago | Conferencia do Gestor |
+| 0008 | Balcao | Retirada de Pecas | Liquidado |
+| 0009 | Estoque | Estoque Thiago | Validar Aparelho |
+
+**Combinacoes faltando:**
+- Balcao + Consignado
+- Garantia + Retirada de Pecas
+- Estoque + Consignado
+- Estoque + Retirada de Pecas
+- OS com 3+ pecas de origens diferentes na mesma OS
+- OS com origemPeca = 'Manual'
+
+---
+
+### Novas OS a Adicionar
 
 **Arquivo: `src/utils/assistenciaApi.ts`**
 
-Adicionar campos na interface `PecaServico`:
+#### OS-2025-0010 — Balcao + Consignado (Liquidado)
+- origemOS: Balcao
+- Pecas:
+  - Tela LCD iPhone 12 | origemPeca: Consignado | valorCustoReal: R$ 280
+  - Pelicula Especial | origemPeca: Manual | valorCustoReal: R$ 15
+- Status: Liquidado (fluxo completo)
+- Objetivo: popular card "Investimento Consignados" com origem Balcao
 
-- `origemServico?: 'Balcao' | 'Garantia' | 'Estoque'` -- herdado automaticamente do campo `origemOS` da OS
-- `origemPeca?: 'Consignado' | 'Estoque Thiago' | 'Retirada de Pecas' | 'Fornecedor' | 'Manual'` -- identificado no momento da selecao
-- `valorCustoReal?: number` -- valor de custo efetivo (do estoque, do lote consignado ou do desmonte)
+#### OS-2025-0011 — Garantia + Retirada de Pecas (Servico concluido)
+- origemOS: Garantia
+- Pecas:
+  - Bateria iPhone 14 Pro | origemPeca: Retirada de Pecas | valorCustoReal: R$ 95 (valor do desmonte, nao zero)
+  - Flex Power | origemPeca: Estoque Thiago | valorCustoReal: R$ 25
+- Status: Servico concluido
+- Objetivo: mostrar custo real de Retirada em contexto de Garantia
 
-**Nova funcao utilitaria: `calcularCustosPorOrigem(ordensServico[])`**
+#### OS-2025-0012 — Estoque + Consignado + Retirada (Em servico)
+- origemOS: Estoque
+- Pecas:
+  - Display AMOLED Samsung S23 | origemPeca: Consignado | valorCustoReal: R$ 520
+  - Aro lateral | origemPeca: Retirada de Pecas | valorCustoReal: R$ 45
+  - Tampa traseira | origemPeca: Estoque Thiago | valorCustoReal: R$ 80
+- Status: Em servico
+- Objetivo: OS com 3 origens diferentes na mesma OS, alimentando card Estoque + Consignados
 
-Retorna um objeto com:
-- `custoBalcao`: soma do valorCustoReal de pecas onde origemServico === 'Balcao'
-- `custoGarantia`: soma onde origemServico === 'Garantia'
-- `custoEstoque`: soma onde origemServico === 'Estoque'
-- `investimentoConsignados`: soma onde origemPeca === 'Consignado' e status de pagamento pendente
-
-Esta funcao aceita um array filtrado de OS, permitindo reutilizacao em todos os contextos.
-
----
-
-### 2. Preenchimento Automatico dos Selos
-
-**Arquivos: `src/pages/OSAssistenciaNova.tsx` e `src/pages/OSAssistenciaEditar.tsx`**
-
-#### 2.1. Origem do Servico
-- No momento de salvar a OS, cada peca recebe `origemServico` copiado do `origemOS` da OS (mapeamento: `'Venda'`/`'Balcao'` -> `'Balcao'`, `'Garantia'` -> `'Garantia'`, `'Estoque'` -> `'Estoque'`)
-
-#### 2.2. Origem da Peca
-- Ao selecionar peca no estoque via modal:
-  - Se `peca.loteConsignacaoId` existir -> `origemPeca = 'Consignado'`
-  - Se `peca.origem === 'Retirada de Peca'` -> `origemPeca = 'Retirada de Pecas'`
-  - Senao -> `origemPeca = 'Estoque Thiago'`
-- Ao selecionar peca de fornecedor -> `origemPeca = 'Fornecedor'`
-- Peca manual sem estoque -> `origemPeca = 'Manual'`
-
-#### 2.3. Valor de Custo Real
-- Estoque / Consignado: usa `peca.valorCusto` do registro em `pecasApi`
-- Retirada de Pecas: usa `peca.valorCusto` atribuido no momento do desmonte (ja existente no `pecasApi`)
-- Fornecedor: usa o valor informado na solicitacao
-- Manual: usa o valor digitado pelo usuario
+#### OS-2025-0013 — Balcao + Mix completo (Conferencia do Gestor)
+- origemOS: Balcao
+- Pecas:
+  - Placa auxiliar iPhone 15 | origemPeca: Fornecedor | valorCustoReal: R$ 320
+  - Sensor proximidade | origemPeca: Consignado | valorCustoReal: R$ 55
+  - Botao Home | origemPeca: Retirada de Pecas | valorCustoReal: R$ 30
+- Status: Conferencia do Gestor
+- Objetivo: OS rica com 3 origens de peca diferentes, todas com custo Balcao
 
 ---
 
-### 3. Componente Compartilhado: Cards de Custo por Origem
+### Resultado Esperado nos Cards
 
-**Novo arquivo: `src/components/assistencia/CustoPorOrigemCards.tsx`**
+Apos as adicoes, os 4 cards terao valores significativos:
 
-Componente reutilizavel que recebe `ordensServico: OrdemServico[]` e exibe 4 StatsCards:
+- **Custo Balcao**: OS 0002 + 0005 + 0006 + 0008 + 0010 + 0013 = valores expressivos
+- **Custo Garantia**: OS 0003 + 0004 + 0007 + 0011 = valores expressivos
+- **Custo Estoque**: OS 0009 + 0012 = valores expressivos
+- **Investimento Consignados**: OS 0007 + 0010 + 0012 + 0013 = valores expressivos
 
-| Card | Icone | Cor | Calculo |
-|---|---|---|---|
-| Custo Total - Balcao | Wrench | Azul | Soma valorCustoReal onde origemServico='Balcao' |
-| Custo Total - Garantia | Shield | Vermelho | Soma valorCustoReal onde origemServico='Garantia' |
-| Custo Total - Estoque | Package | Verde | Soma valorCustoReal onde origemServico='Estoque' |
-| Investimento Consignados | PackageCheck | Roxo | Soma valorCustoReal onde origemPeca='Consignado' |
-
-Props opcionais:
-- `titulo?: string` para contextualizar (ex: "Custos desta Nota")
-- `filtroNotas?: string[]` para filtrar por IDs de OS especificos
+O grafico de pizza no Dashboard tera fatias visiveis para todas as 5 categorias de origemPeca.
 
 ---
 
-### 4. Integracao nos Modulos
+### Arquivo Afetado
 
-#### 4.1. Nova Assistencia (`OSAssistenciaNova.tsx`)
-- Importar `CustoPorOrigemCards`
-- Exibir acima do quadro de pecas, calculando com base nas pecas ja adicionadas ao formulario (preview em tempo real)
-
-#### 4.2. Edicao de OS (`OSAssistenciaEditar.tsx`)
-- Importar `CustoPorOrigemCards`
-- Exibir acima do quadro de pecas, calculando com base nas pecas da OS sendo editada
-
-#### 4.3. Financeiro - Notas Pendentes (`FinanceiroNotasAssistencia.tsx`)
-- No dialog de conferencia (ao clicar "Conferir"), exibir os cards filtrados para as OS vinculadas aquela nota especifica
-- Buscar as OS via `getOrdemServicoById` para cada item da nota
-
-#### 4.4. Painel Geral / Dashboard (`Dashboard.tsx`)
-- Importar `CustoPorOrigemCards` com todas as OS do sistema
-- Adicionar secao "Custos de Assistencia" abaixo dos cards de garantias
-- Incluir grafico de composicao (PieChart do Recharts) mostrando distribuicao percentual por Origem da Peca (Consignado vs Estoque Thiago vs Retirada de Pecas vs Fornecedor)
-
----
-
-### 5. Badges Visuais no Quadro de Pecas
-
-**Arquivos: `OSAssistenciaNova.tsx` e `OSAssistenciaEditar.tsx`**
-
-Exibir os 3 selos como badges compactos abaixo do nome da peca selecionada:
-- Badge azul: Origem do Servico (Balcao/Garantia/Estoque)
-- Badge roxo: Origem da Peca (Consignado/Estoque Thiago/Retirada)
-- Badge verde: Valor de Custo Real formatado
-
----
-
-### 6. Grafico de Composicao no Dashboard
-
-**Arquivo: `Dashboard.tsx`**
-
-- Usar `PieChart` + `Pie` + `Cell` do Recharts (ja instalado)
-- Dados: agrupar pecas de todas as OS por `origemPeca` e somar `valorCustoReal`
-- Cores: Consignado (roxo), Estoque Thiago (azul), Retirada de Pecas (laranja), Fornecedor (verde)
-- Exibir legenda com percentuais
-
----
-
-### Sequencia de Implementacao
-
-1. Atualizar interface `PecaServico` em `assistenciaApi.ts` com os 3 novos campos
-2. Criar funcao `calcularCustosPorOrigem` em `assistenciaApi.ts`
-3. Criar componente `CustoPorOrigemCards.tsx`
-4. Atualizar `OSAssistenciaNova.tsx`: preencher selos automaticamente + exibir cards + badges
-5. Atualizar `OSAssistenciaEditar.tsx`: preencher selos automaticamente + exibir cards + badges
-6. Atualizar `FinanceiroNotasAssistencia.tsx`: exibir cards no dialog de conferencia
-7. Atualizar `Dashboard.tsx`: exibir cards + grafico de composicao
-8. Atualizar mock data das OS existentes com valores de origemServico/origemPeca/valorCustoReal
-
-### Arquivos Afetados
-
-- `src/utils/assistenciaApi.ts` (interface + funcao + mock data)
-- `src/components/assistencia/CustoPorOrigemCards.tsx` (novo)
-- `src/pages/OSAssistenciaNova.tsx` (selos + cards + badges)
-- `src/pages/OSAssistenciaEditar.tsx` (selos + cards + badges)
-- `src/pages/FinanceiroNotasAssistencia.tsx` (cards no dialog)
-- `src/components/layout/Dashboard.tsx` (cards + grafico)
+- `src/utils/assistenciaApi.ts` (adicionar 4 novas OS no array mockado)
 

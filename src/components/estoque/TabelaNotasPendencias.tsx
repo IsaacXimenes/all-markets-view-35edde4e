@@ -26,7 +26,9 @@ import {
   Clock,
   Zap,
   XCircle,
-  Wrench
+  Wrench,
+  Send,
+  CheckCircle
 } from 'lucide-react';
 
 interface TabelaNotasPendenciasProps {
@@ -37,6 +39,8 @@ interface TabelaNotasPendenciasProps {
   onConferir?: (nota: NotaEntrada) => void;
   onPagar?: (nota: NotaEntrada) => void;
   onRejeitar?: (nota: NotaEntrada) => void;
+  onEncaminharAssistencia?: (nota: NotaEntrada) => void;
+  onEnviarDiretoFinanceiro?: (nota: NotaEntrada) => void;
 }
 
 // Helper para obter nome do fornecedor a partir do ID
@@ -78,7 +82,9 @@ export function TabelaNotasPendencias({
   onCadastrarProdutos,
   onConferir,
   onPagar,
-  onRejeitar
+  onRejeitar,
+  onEncaminharAssistencia,
+  onEnviarDiretoFinanceiro
 }: TabelaNotasPendenciasProps) {
   const navigate = useNavigate();
 
@@ -290,12 +296,20 @@ export function TabelaNotasPendencias({
                   </TableCell>
                   <TableCell>
                     {(() => {
+                      if (nota.enviadoDiretoFinanceiro) {
+                        return (
+                          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 gap-1 text-[10px]">
+                            <CheckCircle className="h-3 w-3" />
+                            Enviado Direto
+                          </Badge>
+                        );
+                      }
                       const loteRevisao = getLoteRevisaoByNotaId(nota.id);
                       if (loteRevisao) {
                         return (
                           <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/30 gap-1 text-[10px]">
                             <Wrench className="h-3 w-3" />
-                            Encaminhado - Lote #{loteRevisao.id}
+                            Em Revisão - Lote #{loteRevisao.id}
                           </Badge>
                         );
                       }
@@ -392,6 +406,44 @@ export function TabelaNotasPendencias({
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>Conferir produtos</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          
+                          {/* Botão: Encaminhar para Assistência */}
+                          {onEncaminharAssistencia && !nota.enviadoDiretoFinanceiro && !getLoteRevisaoByNotaId(nota.id) && nota.qtdCadastrada > 0 && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="text-orange-600 hover:text-orange-700"
+                                    onClick={() => onEncaminharAssistencia(nota)}
+                                  >
+                                    <Wrench className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Encaminhar para Assistência</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          
+                          {/* Botão: Finalizar e Enviar ao Financeiro */}
+                          {onEnviarDiretoFinanceiro && !nota.enviadoDiretoFinanceiro && !getLoteRevisaoByNotaId(nota.id) && nota.qtdCadastrada > 0 && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="text-primary hover:text-primary"
+                                    onClick={() => onEnviarDiretoFinanceiro(nota)}
+                                  >
+                                    <Send className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Finalizar e Enviar ao Financeiro</TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
                           )}

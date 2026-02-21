@@ -41,7 +41,8 @@ import { getGarantiaById } from '@/utils/garantiasApi';
 import { getRegistrosAnaliseGarantia } from '@/utils/garantiasApi';
 import { getProdutoPendenteById } from '@/utils/osApi';
 import { getPecas, Peca, darBaixaPeca, initializePecasWithLojaIds } from '@/utils/pecasApi';
-import { Plus, Trash2, Search, AlertTriangle, Clock, User, History, ArrowLeft, Smartphone, Save, Package, Info, Camera, ImageIcon, X } from 'lucide-react';
+import { Plus, Trash2, Search, AlertTriangle, Clock, User, History, ArrowLeft, Smartphone, Save, Package, Info, Camera, ImageIcon, X, Wrench, Shield, PackageCheck } from 'lucide-react';
+import { CustoPorOrigemCards } from '@/components/assistencia/CustoPorOrigemCards';
 import { PagamentoQuadro } from '@/components/vendas/PagamentoQuadro';
 import { Pagamento as PagamentoVenda } from '@/utils/vendasApi';
 import { useToast } from '@/hooks/use-toast';
@@ -669,20 +670,49 @@ export default function OSAssistenciaNova() {
       return;
     }
 
-    const pecasFormatadas: PecaServico[] = pecas.map((p, i) => ({
-      id: `PC-${Date.now()}-${i}`,
-      peca: p.peca,
-      pecaEstoqueId: p.pecaEstoqueId || undefined,
-      valor: parseFloat(p.valor.replace(/\D/g, '')) / 100 || 0,
-      percentual: parseFloat(p.percentual) || 0,
-      valorTotal: calcularValorTotalPeca(p),
-      servicoTerceirizado: p.servicoTerceirizado,
-      descricaoTerceirizado: p.descricaoTerceirizado || undefined,
-      fornecedorId: p.fornecedorId || undefined,
-      unidadeServico: p.unidadeServico,
-      pecaNoEstoque: p.pecaNoEstoque,
-      pecaDeFornecedor: p.pecaDeFornecedor
-    }));
+    // Mapear origemServico para os selos
+    const mapOrigemServico = (origem: string | null): 'Balcao' | 'Garantia' | 'Estoque' => {
+      if (origem === 'garantia') return 'Garantia';
+      if (origem === 'estoque') return 'Estoque';
+      return 'Balcao';
+    };
+
+    const origemServicoSelo = mapOrigemServico(origemOS);
+
+    const pecasFormatadas: PecaServico[] = pecas.map((p, i) => {
+      const pecaEstoqueRef = p.pecaEstoqueId ? pecasEstoque.find(pe => pe.id === p.pecaEstoqueId) : null;
+      
+      // Determinar origemPeca
+      let origemPecaSelo: PecaServico['origemPeca'] = 'Manual';
+      if (p.pecaNoEstoque && pecaEstoqueRef) {
+        if (pecaEstoqueRef.loteConsignacaoId) origemPecaSelo = 'Consignado';
+        else if (pecaEstoqueRef.origem === 'Retirada de Peça') origemPecaSelo = 'Retirada de Pecas';
+        else origemPecaSelo = 'Estoque Thiago';
+      } else if (p.pecaDeFornecedor) {
+        origemPecaSelo = 'Fornecedor';
+      }
+
+      // Determinar valorCustoReal
+      const valorCustoReal = pecaEstoqueRef ? pecaEstoqueRef.valorCusto : (parseFloat(p.valor.replace(/\D/g, '')) / 100 || 0);
+
+      return {
+        id: `PC-${Date.now()}-${i}`,
+        peca: p.peca,
+        pecaEstoqueId: p.pecaEstoqueId || undefined,
+        valor: parseFloat(p.valor.replace(/\D/g, '')) / 100 || 0,
+        percentual: parseFloat(p.percentual) || 0,
+        valorTotal: calcularValorTotalPeca(p),
+        servicoTerceirizado: p.servicoTerceirizado,
+        descricaoTerceirizado: p.descricaoTerceirizado || undefined,
+        fornecedorId: p.fornecedorId || undefined,
+        unidadeServico: p.unidadeServico,
+        pecaNoEstoque: p.pecaNoEstoque,
+        pecaDeFornecedor: p.pecaDeFornecedor,
+        origemServico: origemServicoSelo,
+        origemPeca: origemPecaSelo,
+        valorCustoReal
+      };
+    });
 
     // Usar pagamentos do PagamentoQuadro
     const pagamentosFormatados: Pagamento[] = pagamentosQuadro.map((p, i) => ({
@@ -1167,6 +1197,27 @@ export default function OSAssistenciaNova() {
           </CardContent>
         </Card>
 
+        {/* Cards de Custo por Origem (Preview em tempo real) */}
+        <CustoPorOrigemCards
+          pecas={pecas.filter(p => p.peca || p.pecaEstoqueId).map((p, i) => {
+            const pecaEstoqueRef = p.pecaEstoqueId ? pecasEstoque.find(pe => pe.id === p.pecaEstoqueId) : null;
+            let origemPecaSelo: PecaServico['origemPeca'] = 'Manual';
+            if (p.pecaNoEstoque && pecaEstoqueRef) {
+              if (pecaEstoqueRef.loteConsignacaoId) origemPecaSelo = 'Consignado';
+              else if (pecaEstoqueRef.origem === 'Retirada de Peça') origemPecaSelo = 'Retirada de Pecas';
+              else origemPecaSelo = 'Estoque Thiago';
+            } else if (p.pecaDeFornecedor) origemPecaSelo = 'Fornecedor';
+            const origemServicoSelo: PecaServico['origemServico'] = origemOS === 'garantia' ? 'Garantia' : origemOS === 'estoque' ? 'Estoque' : 'Balcao';
+            return {
+              id: `preview-${i}`, peca: p.peca, valor: parseFloat(p.valor.replace(/\D/g, '')) / 100 || 0,
+              percentual: 0, valorTotal: 0, servicoTerceirizado: false, unidadeServico: '', pecaNoEstoque: p.pecaNoEstoque, pecaDeFornecedor: p.pecaDeFornecedor,
+              origemServico: origemServicoSelo, origemPeca: origemPecaSelo,
+              valorCustoReal: pecaEstoqueRef ? pecaEstoqueRef.valorCusto : (parseFloat(p.valor.replace(/\D/g, '')) / 100 || 0)
+            };
+          })}
+          titulo="Custos por Origem (Preview)"
+        />
+
         {/* Peças/Serviços */}
         <Card>
           <CardHeader>
@@ -1251,8 +1302,26 @@ export default function OSAssistenciaNova() {
                                 </div>
                               </div>
                             );
-                          })()}
+                    })()}
+                    {/* Badges DNA da Peça */}
+                    {peca.pecaEstoqueId && (() => {
+                      const pecaSel = pecasEstoque.find(p => p.id === peca.pecaEstoqueId);
+                      const origemServBadge = origemOS === 'garantia' ? 'Garantia' : origemOS === 'estoque' ? 'Estoque' : 'Balcão';
+                      let origemPecaBadge = '';
+                      if (pecaSel) {
+                        if (pecaSel.loteConsignacaoId) origemPecaBadge = 'Consignado';
+                        else if (pecaSel.origem === 'Retirada de Peça') origemPecaBadge = 'Retirada de Peças';
+                        else origemPecaBadge = 'Estoque Thiago';
+                      }
+                      return (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          <Badge className="bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700 text-[10px] px-1.5 py-0">{origemServBadge}</Badge>
+                          {origemPecaBadge && <Badge className="bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700 text-[10px] px-1.5 py-0">{origemPecaBadge}</Badge>}
+                          <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[10px] px-1.5 py-0">{formatCurrency(pecaSel?.valorCusto || 0)}</Badge>
                         </div>
+                      );
+                    })()}
+                  </div>
                       ) : (
                         <Input
                           value={peca.peca}

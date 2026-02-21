@@ -31,7 +31,8 @@ import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
 import { getPecas, Peca, darBaixaPeca, initializePecasWithLojaIds } from '@/utils/pecasApi';
 import { InputComMascara } from '@/components/ui/InputComMascara';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Save, ArrowLeft, History, Package, CheckCircle, XCircle, AlertTriangle, Search } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, History, Package, CheckCircle, XCircle, AlertTriangle, Search, Wrench, Shield, PackageCheck } from 'lucide-react';
+import { CustoPorOrigemCards } from '@/components/assistencia/CustoPorOrigemCards';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -284,23 +285,49 @@ export default function OSAssistenciaEditar() {
       return;
     }
 
+    // Mapear origemServico
+    const mapOrigemServico = (origem?: string): 'Balcao' | 'Garantia' | 'Estoque' => {
+      if (origem === 'Garantia') return 'Garantia';
+      if (origem === 'Estoque') return 'Estoque';
+      return 'Balcao';
+    };
+    const origemServicoSelo = mapOrigemServico(osOriginal?.origemOS);
+
     const pecasFormatadas: PecaServico[] = pecas
       .filter(p => p.peca.trim() !== '' || p.pecaEstoqueId)
-      .map(p => ({
-        id: p.id,
-        peca: p.peca,
-        pecaEstoqueId: p.pecaEstoqueId || undefined,
-        imei: p.imei || undefined,
-        valor: parseFloat(p.valor.replace(/\D/g, '')) / 100 || 0,
-        percentual: p.percentual ? parseFloat(p.percentual) : 0,
-        valorTotal: calcularValorTotalPeca(p),
-        servicoTerceirizado: p.servicoTerceirizado,
-        descricaoTerceirizado: p.descricaoTerceirizado || undefined,
-        fornecedorId: p.fornecedorId || undefined,
-        unidadeServico: p.unidadeServico || lojaId,
-        pecaNoEstoque: p.pecaNoEstoque,
-        pecaDeFornecedor: p.pecaDeFornecedor
-      }));
+      .map(p => {
+        const pecaEstoqueRef = p.pecaEstoqueId ? pecasEstoque.find(pe => pe.id === p.pecaEstoqueId) : null;
+        let origemPecaSelo: PecaServico['origemPeca'] = 'Manual';
+        if (p.pecaNoEstoque && pecaEstoqueRef) {
+          if (pecaEstoqueRef.loteConsignacaoId) origemPecaSelo = 'Consignado';
+          else if (pecaEstoqueRef.origem === 'Retirada de Peça') origemPecaSelo = 'Retirada de Pecas';
+          else origemPecaSelo = 'Estoque Thiago';
+        } else if (p.pecaDeFornecedor) origemPecaSelo = 'Fornecedor';
+
+        const valorCustoReal = pecaEstoqueRef ? pecaEstoqueRef.valorCusto : (parseFloat(p.valor.replace(/\D/g, '')) / 100 || 0);
+
+        // Preserve existing origemServico/origemPeca from original OS pecas if available
+        const pecaOriginal = osOriginal?.pecas?.find(op => op.id === p.id);
+
+        return {
+          id: p.id,
+          peca: p.peca,
+          pecaEstoqueId: p.pecaEstoqueId || undefined,
+          imei: p.imei || undefined,
+          valor: parseFloat(p.valor.replace(/\D/g, '')) / 100 || 0,
+          percentual: p.percentual ? parseFloat(p.percentual) : 0,
+          valorTotal: calcularValorTotalPeca(p),
+          servicoTerceirizado: p.servicoTerceirizado,
+          descricaoTerceirizado: p.descricaoTerceirizado || undefined,
+          fornecedorId: p.fornecedorId || undefined,
+          unidadeServico: p.unidadeServico || lojaId,
+          pecaNoEstoque: p.pecaNoEstoque,
+          pecaDeFornecedor: p.pecaDeFornecedor,
+          origemServico: pecaOriginal?.origemServico || origemServicoSelo,
+          origemPeca: pecaOriginal?.origemPeca || origemPecaSelo,
+          valorCustoReal: pecaOriginal?.valorCustoReal ?? valorCustoReal
+        };
+      });
 
     const valorTotal = calcularValorTotalPecas();
 
@@ -678,6 +705,14 @@ export default function OSAssistenciaEditar() {
           </Card>
         </div>
 
+        {/* Cards de Custo por Origem */}
+        {osOriginal && (
+          <CustoPorOrigemCards
+            pecas={osOriginal.pecas}
+            titulo="Custos por Origem"
+          />
+        )}
+
         {/* Peças/Serviços */}
         <Card>
           <CardHeader className="pb-3">
@@ -770,7 +805,27 @@ export default function OSAssistenciaEditar() {
                               </div>
                             );
                           })()}
+                    {/* Badges DNA da Peça */}
+                    {peca.pecaEstoqueId && (() => {
+                      const pecaSel = pecasEstoque.find(p => p.id === peca.pecaEstoqueId);
+                      const pecaOriginal = osOriginal?.pecas?.find(op => op.id === peca.id);
+                      const origemServBadge = pecaOriginal?.origemServico || (osOriginal?.origemOS === 'Garantia' ? 'Garantia' : osOriginal?.origemOS === 'Estoque' ? 'Estoque' : 'Balcao');
+                      let origemPecaBadge = pecaOriginal?.origemPeca;
+                      if (!origemPecaBadge && pecaSel) {
+                        if (pecaSel.loteConsignacaoId) origemPecaBadge = 'Consignado';
+                        else if (pecaSel.origem === 'Retirada de Peça') origemPecaBadge = 'Retirada de Pecas';
+                        else origemPecaBadge = 'Estoque Thiago';
+                      }
+                      const custoReal = pecaOriginal?.valorCustoReal ?? pecaSel?.valorCusto ?? 0;
+                      return (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          <Badge className="bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700 text-[10px] px-1.5 py-0">{origemServBadge}</Badge>
+                          {origemPecaBadge && <Badge className="bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700 text-[10px] px-1.5 py-0">{origemPecaBadge}</Badge>}
+                          <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[10px] px-1.5 py-0">{formatCurrency(custoReal)}</Badge>
                         </div>
+                      );
+                    })()}
+                  </div>
                       ) : (
                         <Input
                           value={peca.peca}

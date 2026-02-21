@@ -17,6 +17,8 @@ import { getPercentualComissao, LOJA_ONLINE_ID } from '@/utils/calculoComissaoVe
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useIsMobile } from '@/hooks/use-mobile';
 import circuitBg from '@/assets/sidebar-circuit-bg.png';
+import { CustoPorOrigemCards, calcularCustosPorOrigem } from '@/components/assistencia/CustoPorOrigemCards';
+import { PieChart, Pie, Cell, Legend, ResponsiveContainer, Tooltip } from 'recharts';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -58,6 +60,30 @@ export function Dashboard() {
     const percentualMedio = (0.8 * 10 + 0.2 * 6);
     return lucroEstimadoHoje * (percentualMedio / 100);
   }, [receitaHoje]);
+
+  // Dados do gráfico de composição por origem da peça
+  const composicaoPorOrigem = useMemo(() => {
+    const agrupado: Record<string, number> = {};
+    ordensServico.forEach(os => {
+      os.pecas.forEach(p => {
+        if (p.origemPeca && p.valorCustoReal) {
+          agrupado[p.origemPeca] = (agrupado[p.origemPeca] || 0) + p.valorCustoReal;
+        }
+      });
+    });
+    const cores: Record<string, string> = {
+      'Consignado': '#8b5cf6',
+      'Estoque Thiago': '#3b82f6',
+      'Retirada de Pecas': '#f97316',
+      'Fornecedor': '#22c55e',
+      'Manual': '#6b7280'
+    };
+    return Object.entries(agrupado).map(([nome, valor]) => ({
+      name: nome,
+      value: valor,
+      color: cores[nome] || '#6b7280'
+    }));
+  }, [ordensServico]);
   
   return (
     <div className="min-h-screen flex">
@@ -185,6 +211,45 @@ export function Dashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Custos de Assistência */}
+            <div className="mb-4 animate-slide-up" style={{ '--delay': '175ms' } as React.CSSProperties}>
+              <CustoPorOrigemCards ordensServico={ordensServico} titulo="Custos de Assistência" />
+            </div>
+
+            {/* Gráfico de Composição por Origem da Peça */}
+            {composicaoPorOrigem.length > 0 && (
+              <div className="mb-4 animate-slide-up" style={{ '--delay': '180ms' } as React.CSSProperties}>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Distribuição de Custos por Origem da Peça</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[250px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={composicaoPorOrigem}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {composicaoPorOrigem.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
             
             {/* Main Content Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-4 gap-4 flex-1 min-h-0">

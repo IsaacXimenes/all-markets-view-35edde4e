@@ -18,7 +18,8 @@ import {
 } from '@/utils/solicitacaoPecasApi';
 import { getLoteById } from '@/utils/consignacaoApi';
 import { getContasFinanceiras, getFornecedores } from '@/utils/cadastrosApi';
-import { getOrdemServicoById, updateOrdemServico } from '@/utils/assistenciaApi';
+import { getOrdemServicoById, updateOrdemServico, getOrdensServico } from '@/utils/assistenciaApi';
+import { CustoPorOrigemCards } from '@/components/assistencia/CustoPorOrigemCards';
 import { Eye, Check, Download, Filter, X, FileText, Clock, CheckCircle, DollarSign, Package, PackageCheck } from 'lucide-react';
 import { FileUploadComprovante } from '@/components/estoque/FileUploadComprovante';
 import { toast } from 'sonner';
@@ -401,6 +402,21 @@ export default function FinanceiroNotasAssistencia() {
             
             {notaSelecionada && (
               <div className="space-y-6">
+                {/* Cards de Custo por Origem filtrados para esta nota */}
+                {(() => {
+                  const osIds: string[] = [];
+                  if (notaSelecionada.osId) osIds.push(notaSelecionada.osId);
+                  if (notaSelecionada.solicitacaoIds) {
+                    notaSelecionada.solicitacaoIds.forEach(solId => {
+                      const sol = getSolicitacaoById(solId);
+                      if (sol?.osId && !osIds.includes(sol.osId)) osIds.push(sol.osId);
+                    });
+                  }
+                  const osVinculadas = osIds.map(id => getOrdemServicoById(id)).filter(Boolean) as any[];
+                  if (osVinculadas.length === 0) return null;
+                  return <CustoPorOrigemCards ordensServico={osVinculadas} titulo="Custos desta Nota" />;
+                })()}
+
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>

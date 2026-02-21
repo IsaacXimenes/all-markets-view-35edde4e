@@ -58,6 +58,10 @@ export interface PecaServico {
   contaOrigemPagamento?: string;
   dataPagamento?: string;
   dataRecebimento?: string;
+  // DNA da Peça - Rastreabilidade Cruzada
+  origemServico?: 'Balcao' | 'Garantia' | 'Estoque';
+  origemPeca?: 'Consignado' | 'Estoque Thiago' | 'Retirada de Pecas' | 'Fornecedor' | 'Manual';
+  valorCustoReal?: number;
 }
 
 export interface Pagamento {
@@ -141,6 +145,7 @@ let ordensServico: OrdemServico[] = [
     origemOS: 'Balcão'
   },
   // 2. Em serviço (técnico trabalhando)
+  // 2. Em serviço (técnico trabalhando)
   {
     id: 'OS-2025-0002',
     dataHora: '2025-01-18T10:00:00',
@@ -151,7 +156,7 @@ let ordensServico: OrdemServico[] = [
     status: 'Em serviço',
     proximaAtuacao: 'Técnico',
     pecas: [
-      { id: 'PC-002', peca: 'Troca de bateria', imei: '234567890123456', valor: 280, percentual: 0, valorTotal: 280, servicoTerceirizado: false, unidadeServico: 'db894e7d', pecaNoEstoque: true, pecaDeFornecedor: false }
+      { id: 'PC-002', peca: 'Troca de bateria', imei: '234567890123456', valor: 280, percentual: 0, valorTotal: 280, servicoTerceirizado: false, unidadeServico: 'db894e7d', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Balcao', origemPeca: 'Estoque Thiago', valorCustoReal: 120 }
     ],
     pagamentos: [],
     descricao: 'Substituição de bateria degradada - saúde 62%',
@@ -176,7 +181,7 @@ let ordensServico: OrdemServico[] = [
     status: 'Solicitação de Peça',
     proximaAtuacao: 'Gestor (Suprimentos)',
     pecas: [
-      { id: 'PC-003', peca: 'Display OLED iPhone 15', imei: '345678901234567', valor: 1200, percentual: 0, valorTotal: 1200, servicoTerceirizado: false, unidadeServico: '3ac7e00c', pecaNoEstoque: false, pecaDeFornecedor: true, statusAprovacao: 'Aguardando Aprovação' }
+      { id: 'PC-003', peca: 'Display OLED iPhone 15', imei: '345678901234567', valor: 1200, percentual: 0, valorTotal: 1200, servicoTerceirizado: false, unidadeServico: '3ac7e00c', pecaNoEstoque: false, pecaDeFornecedor: true, statusAprovacao: 'Aguardando Aprovação', origemServico: 'Garantia', origemPeca: 'Fornecedor', valorCustoReal: 650 }
     ],
     pagamentos: [],
     descricao: 'Troca de display OLED com burn-in - peça solicitada à matriz',
@@ -202,7 +207,7 @@ let ordensServico: OrdemServico[] = [
     status: 'Aguardando Peça',
     proximaAtuacao: 'Logística: Enviar Peça',
     pecas: [
-      { id: 'PC-004', peca: 'Conector de carga USB-C', imei: '456789012345678', valor: 180, percentual: 0, valorTotal: 180, servicoTerceirizado: false, unidadeServico: '5b9446d5', pecaNoEstoque: false, pecaDeFornecedor: true, statusAprovacao: 'Aprovado' }
+      { id: 'PC-004', peca: 'Conector de carga USB-C', imei: '456789012345678', valor: 180, percentual: 0, valorTotal: 180, servicoTerceirizado: false, unidadeServico: '5b9446d5', pecaNoEstoque: false, pecaDeFornecedor: true, statusAprovacao: 'Aprovado', origemServico: 'Garantia', origemPeca: 'Fornecedor', valorCustoReal: 60 }
     ],
     pagamentos: [],
     descricao: 'Troca de conector de carga - peça aprovada, aguardando entrega',
@@ -229,7 +234,7 @@ let ordensServico: OrdemServico[] = [
     status: 'Peça Recebida',
     proximaAtuacao: 'Técnico (Recebimento)',
     pecas: [
-      { id: 'PC-005', peca: 'Câmera traseira iPhone 14', imei: '567890123456789', valor: 350, percentual: 0, valorTotal: 350, servicoTerceirizado: false, unidadeServico: '0d06e7db', pecaNoEstoque: false, pecaDeFornecedor: true, statusAprovacao: 'Pagamento Finalizado' }
+      { id: 'PC-005', peca: 'Câmera traseira iPhone 14', imei: '567890123456789', valor: 350, percentual: 0, valorTotal: 350, servicoTerceirizado: false, unidadeServico: '0d06e7db', pecaNoEstoque: false, pecaDeFornecedor: true, statusAprovacao: 'Pagamento Finalizado', origemServico: 'Balcao', origemPeca: 'Fornecedor', valorCustoReal: 180 }
     ],
     pagamentos: [],
     descricao: 'Câmera com defeito de foco - peça recebida, aguardando confirmação do técnico',
@@ -259,8 +264,8 @@ let ordensServico: OrdemServico[] = [
     valorCustoTecnico: 450,
     valorVendaTecnico: 880,
     pecas: [
-      { id: 'PC-006', peca: 'Reparo placa lógica', imei: '678901234567890', valor: 800, percentual: 0, valorTotal: 800, servicoTerceirizado: true, descricaoTerceirizado: 'Micro solda especializada', fornecedorId: 'FORN-005', unidadeServico: '3ac7e00c', pecaNoEstoque: false, pecaDeFornecedor: true },
-      { id: 'PC-007', peca: 'Limpeza interna', valor: 80, percentual: 0, valorTotal: 80, servicoTerceirizado: false, unidadeServico: '3ac7e00c', pecaNoEstoque: true, pecaDeFornecedor: false }
+      { id: 'PC-006', peca: 'Reparo placa lógica', imei: '678901234567890', valor: 800, percentual: 0, valorTotal: 800, servicoTerceirizado: true, descricaoTerceirizado: 'Micro solda especializada', fornecedorId: 'FORN-005', unidadeServico: '3ac7e00c', pecaNoEstoque: false, pecaDeFornecedor: true, origemServico: 'Balcao', origemPeca: 'Fornecedor', valorCustoReal: 380 },
+      { id: 'PC-007', peca: 'Limpeza interna', valor: 80, percentual: 0, valorTotal: 80, servicoTerceirizado: false, unidadeServico: '3ac7e00c', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Balcao', origemPeca: 'Estoque Thiago', valorCustoReal: 20 }
     ],
     pagamentos: [],
     descricao: 'Reparo em placa lógica após queda com água',
@@ -291,8 +296,8 @@ let ordensServico: OrdemServico[] = [
     valorCustoTecnico: 80,
     valorVendaTecnico: 200,
     pecas: [
-      { id: 'PC-008', peca: 'Alto-falante', imei: '789012345678901', valor: 150, percentual: 0, valorTotal: 150, servicoTerceirizado: false, unidadeServico: 'db894e7d', pecaNoEstoque: true, pecaDeFornecedor: false },
-      { id: 'PC-009', peca: 'Microfone', valor: 50, percentual: 0, valorTotal: 50, servicoTerceirizado: false, unidadeServico: 'db894e7d', pecaNoEstoque: true, pecaDeFornecedor: false }
+      { id: 'PC-008', peca: 'Alto-falante', imei: '789012345678901', valor: 150, percentual: 0, valorTotal: 150, servicoTerceirizado: false, unidadeServico: 'db894e7d', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Garantia', origemPeca: 'Consignado', valorCustoReal: 45 },
+      { id: 'PC-009', peca: 'Microfone', valor: 50, percentual: 0, valorTotal: 50, servicoTerceirizado: false, unidadeServico: 'db894e7d', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Garantia', origemPeca: 'Estoque Thiago', valorCustoReal: 15 }
     ],
     pagamentos: [
       { id: 'PAG-007', meio: 'Pix', valor: 200 }
@@ -324,7 +329,7 @@ let ordensServico: OrdemServico[] = [
     valorCustoTecnico: 200,
     valorVendaTecnico: 450,
     pecas: [
-      { id: 'PC-010', peca: 'Troca de tela', imei: '890123456789012', valor: 450, percentual: 0, valorTotal: 450, servicoTerceirizado: false, unidadeServico: '5b9446d5', pecaNoEstoque: true, pecaDeFornecedor: false }
+      { id: 'PC-010', peca: 'Troca de tela', imei: '890123456789012', valor: 450, percentual: 0, valorTotal: 450, servicoTerceirizado: false, unidadeServico: '5b9446d5', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Balcao', origemPeca: 'Retirada de Pecas', valorCustoReal: 200 }
     ],
     pagamentos: [
       { id: 'PAG-008', meio: 'Cartão Crédito', valor: 450, parcelas: 2 }
@@ -354,7 +359,7 @@ let ordensServico: OrdemServico[] = [
     status: 'Serviço Concluído - Validar Aparelho' as any,
     proximaAtuacao: 'Gestor (Estoque)',
     pecas: [
-      { id: 'PC-009', peca: 'Troca de tela OLED', imei: '999888777666555', valor: 450, percentual: 0, valorTotal: 450, servicoTerceirizado: false, unidadeServico: 'db894e7d', pecaNoEstoque: true, pecaDeFornecedor: false }
+      { id: 'PC-009', peca: 'Troca de tela OLED', imei: '999888777666555', valor: 450, percentual: 0, valorTotal: 450, servicoTerceirizado: false, unidadeServico: 'db894e7d', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Estoque', origemPeca: 'Estoque Thiago', valorCustoReal: 450 }
     ],
     pagamentos: [],
     descricao: 'Aparelho do estoque com tela danificada - reparo concluído pelo técnico',

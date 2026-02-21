@@ -1,45 +1,36 @@
 
 
-## Correções: Layout do Modal de Conferência e Status de Desvinculação
+## Mover Cards de Custo por Origem para as Abas Principais
 
-### 1. Layout do Modal - Cards Empilhados
+### O que muda
 
-**Arquivo: `src/pages/FinanceiroNotasAssistencia.tsx`**
+Os cards de custo por origem (Balcao, Garantia, Estoque, Consignados) serao removidos dos formularios individuais de Nova OS e Edicao de OS, e adicionados nas abas principais:
 
-No modal de conferência (Dialog), os campos "ID da Nota / Data" e "Lote / Fornecedor" usam `grid grid-cols-2 gap-4` (lado a lado). A correção troca para layout vertical (`space-y-4`), colocando cada campo um abaixo do outro.
+1. **Aba "Nova Assistencia"** (`src/pages/OSAssistencia.tsx`)
+2. **Aba "Solicitacoes de Pecas"** (`src/pages/OSSolicitacoesPecas.tsx`)
 
-Linhas afetadas: ~430 e ~441 -- trocar `grid grid-cols-2 gap-4` por `space-y-4` ou `grid grid-cols-1 gap-4`.
+### Detalhes Tecnicos
 
-### 2. Status de Desvinculação: "Recusada pelo Financeiro"
-
-**Arquivo: `src/utils/solicitacaoPecasApi.ts`**
-
-Na interface `SolicitacaoPeca`, adicionar o status `'Recusada pelo Financeiro'` ao union type de `status`.
-
-Na função `desvincularNotaDeLote` (linha 759), trocar:
-```
-solicitacoes[solIdx] = { ...sol, status: 'Aprovada' };
-```
-por:
-```
-solicitacoes[solIdx] = { ...sol, status: 'Recusada pelo Financeiro' };
-```
+**Arquivo: `src/pages/OSAssistencia.tsx`**
+- Importar `CustoPorOrigemCards` e `getOrdensServico`
+- Inserir o componente logo acima da tabela de OS, alimentado por todas as OS filtradas (`ordensFiltradas`)
+- Os cards refletem dinamicamente os filtros aplicados (data, tecnico, status, loja)
 
 **Arquivo: `src/pages/OSSolicitacoesPecas.tsx`**
+- Importar `CustoPorOrigemCards` e `getOrdensServico`
+- Buscar todas as OS que possuem solicitacoes de pecas visíveis
+- Inserir o componente acima da tabela de solicitacoes, alimentado pelas OS vinculadas as solicitacoes filtradas
 
-Na função `getStatusBadge`, adicionar um novo case para exibir o badge:
-```
-case 'Recusada pelo Financeiro':
-  return <Badge className="bg-red-600 hover:bg-red-700">Recusada pelo Financeiro</Badge>;
-```
+**Arquivo: `src/pages/OSAssistenciaNova.tsx`**
+- Remover o `CustoPorOrigemCards` do formulario de criacao (linhas ~1206-1230)
 
-**Arquivo: `src/pages/FinanceiroNotasAssistencia.tsx`**
-
-Atualizar o texto do dialog de desvinculação (linha 767) para refletir o novo status: "...retornará para a assistência com status 'Recusada pelo Financeiro'."
+**Arquivo: `src/pages/OSAssistenciaEditar.tsx`**
+- Remover o `CustoPorOrigemCards` do formulario de edicao (linhas ~734-740)
 
 ### Arquivos Afetados
 
-- `src/utils/solicitacaoPecasApi.ts` (interface + função desvincularNotaDeLote)
-- `src/pages/FinanceiroNotasAssistencia.tsx` (layout modal + texto dialog)
-- `src/pages/OSSolicitacoesPecas.tsx` (badge do novo status)
+- `src/pages/OSAssistencia.tsx` (adicionar cards)
+- `src/pages/OSSolicitacoesPecas.tsx` (adicionar cards)
+- `src/pages/OSAssistenciaNova.tsx` (remover cards)
+- `src/pages/OSAssistenciaEditar.tsx` (remover cards)
 

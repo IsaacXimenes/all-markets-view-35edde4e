@@ -146,6 +146,10 @@ export interface NotaEntrada {
   // Lote de Revisão
   loteRevisaoId?: string;
   valorAbatimento?: number;
+  
+  // Envio direto ao financeiro (sem assistência)
+  enviadoDiretoFinanceiro?: boolean;
+  dataEnvioDiretoFinanceiro?: string;
 }
 
 // ============= ARMAZENAMENTO =============
@@ -1695,6 +1699,44 @@ const criarNotaEntradaComDataHora = (dados: {
   
   notasEntrada.push(novaNota);
   return novaNota;
+};
+
+// ============= ENVIO DIRETO AO FINANCEIRO =============
+
+export const enviarDiretoAoFinanceiro = (
+  notaId: string,
+  usuario: string
+): NotaEntrada | null => {
+  const nota = notasEntrada.find(n => n.id === notaId);
+  if (!nota) return null;
+  
+  // Marcar como enviada diretamente
+  nota.enviadoDiretoFinanceiro = true;
+  nota.dataEnvioDiretoFinanceiro = new Date().toISOString();
+  
+  // Mudar atuação para financeiro
+  nota.atuacaoAtual = 'Financeiro';
+  
+  // Registrar na timeline
+  registrarTimeline(
+    nota,
+    usuario,
+    'Estoque',
+    'Nota enviada diretamente ao Financeiro (sem assistência)',
+    nota.status,
+    nota.valorTotal,
+    'Lote aprovado sem necessidade de revisão técnica'
+  );
+  
+  // Notificar financeiro
+  addNotification({
+    type: 'pagamento_pendente',
+    title: 'Nova nota para pagamento (envio direto)',
+    description: `Nota ${notaId} - R$ ${nota.valorTotal.toFixed(2)} - aprovada sem revisão`,
+    targetUsers: ['financeiro']
+  });
+  
+  return nota;
 };
 
 // Inicializar ao carregar módulo

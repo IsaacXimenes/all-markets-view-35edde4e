@@ -303,7 +303,7 @@ export default function OSAssistenciaEditar() {
       .filter(p => p.peca.trim() !== '' || p.pecaEstoqueId)
       .map(p => {
         const pecaEstoqueRef = p.pecaEstoqueId ? pecasEstoque.find(pe => pe.id === p.pecaEstoqueId) : null;
-        let origemPecaSelo: PecaServico['origemPeca'] = 'Manual';
+        let origemPecaSelo: PecaServico['origemPeca'] = 'Fornecedor';
         if (p.pecaNoEstoque && pecaEstoqueRef) {
           if (pecaEstoqueRef.loteConsignacaoId) origemPecaSelo = 'Consignado';
           else if (pecaEstoqueRef.origem === 'Retirada de Peça') origemPecaSelo = 'Retirada de Pecas';

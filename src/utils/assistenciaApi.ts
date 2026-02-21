@@ -60,7 +60,7 @@ export interface PecaServico {
   dataRecebimento?: string;
   // DNA da Peça - Rastreabilidade Cruzada
   origemServico?: 'Balcao' | 'Garantia' | 'Estoque';
-  origemPeca?: 'Consignado' | 'Estoque Thiago' | 'Retirada de Pecas' | 'Fornecedor' | 'Manual';
+  origemPeca?: 'Consignado' | 'Estoque Thiago' | 'Retirada de Pecas' | 'Fornecedor';
   valorCustoReal?: number;
 }
 
@@ -406,7 +406,7 @@ let ordensServico: OrdemServico[] = [
     valorVendaTecnico: 550,
     pecas: [
       { id: 'PC-010a', peca: 'Tela LCD iPhone 12', imei: '101010101010101', valor: 500, percentual: 0, valorTotal: 500, servicoTerceirizado: false, unidadeServico: '3cfbf69f', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Balcao', origemPeca: 'Consignado', valorCustoReal: 280 },
-      { id: 'PC-010b', peca: 'Película Especial', valor: 50, percentual: 0, valorTotal: 50, servicoTerceirizado: false, unidadeServico: '3cfbf69f', pecaNoEstoque: false, pecaDeFornecedor: false, origemServico: 'Balcao', origemPeca: 'Manual', valorCustoReal: 15 }
+      { id: 'PC-010b', peca: 'Película Especial', valor: 50, percentual: 0, valorTotal: 50, servicoTerceirizado: false, unidadeServico: '3cfbf69f', pecaNoEstoque: false, pecaDeFornecedor: false, origemServico: 'Balcao', origemPeca: 'Estoque Thiago', valorCustoReal: 15 }
     ],
     pagamentos: [
       { id: 'PAG-010', meio: 'Pix', valor: 550 }

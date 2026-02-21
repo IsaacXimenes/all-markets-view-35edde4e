@@ -75,8 +75,7 @@ export function Dashboard() {
       'Consignado': '#8b5cf6',
       'Estoque Thiago': '#3b82f6',
       'Retirada de Pecas': '#f97316',
-      'Fornecedor': '#22c55e',
-      'Manual': '#6b7280'
+      'Fornecedor': '#22c55e'
     };
     return Object.entries(agrupado).map(([nome, valor]) => ({
       name: nome,

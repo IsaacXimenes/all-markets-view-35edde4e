@@ -10,7 +10,8 @@ import { ResponsiveCardGrid, ResponsiveFilterGrid } from '@/components/ui/Respon
 import { 
   getNotasParaEstoque, 
   NotaEntrada,
-  NotaEntradaStatus
+  NotaEntradaStatus,
+  enviarDiretoAoFinanceiro
 } from '@/utils/notaEntradaFluxoApi';
 import { getFornecedores } from '@/utils/cadastrosApi';
 import { formatCurrency } from '@/utils/formatUtils';
@@ -336,16 +337,12 @@ export default function EstoqueNotasPendencias() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <CardTitle>Notas Pendentes</CardTitle>
               <div className="flex gap-2">
-              <Button onClick={handleRefresh} variant="outline">
+                <Button onClick={handleRefresh} variant="outline">
                   Atualizar
                 </Button>
                 <Button onClick={() => navigate('/estoque/nota/cadastrar')}>
                   <Plus className="h-4 w-4 mr-2" />
                   Cadastrar Nova Nota
-                </Button>
-                <Button onClick={() => navigate('/estoque/encaminhar-assistencia')} variant="outline">
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  Encaminhar para Assistência
                 </Button>
                 <Button onClick={handleExport} variant="outline">
                   <Download className="h-4 w-4 mr-2" />
@@ -361,6 +358,18 @@ export default function EstoqueNotasPendencias() {
               onVerDetalhes={handleVerDetalhes}
               onCadastrarProdutos={handleCadastrarProdutos}
               onConferir={handleConferir}
+              onEncaminharAssistencia={(nota) => {
+                navigate(`/estoque/encaminhar-assistencia?nota=${nota.id}`);
+              }}
+              onEnviarDiretoFinanceiro={(nota) => {
+                const result = enviarDiretoAoFinanceiro(nota.id, 'Gestor Estoque');
+                if (result) {
+                  toast.success(`Nota ${nota.numeroNota} enviada diretamente ao Financeiro!`);
+                  setNotas(getNotasParaEstoque());
+                } else {
+                  toast.error('Erro ao enviar nota ao Financeiro');
+                }
+              }}
             />
           </CardContent>
         </Card>

@@ -1161,9 +1161,22 @@ export const confirmarRecebimentoMovimentacao = (
   // Atualizar loja do produto e limpar status de movimentação
   const produto = produtos.find(p => p.imei === mov.imei);
   if (produto) {
+    const origemAnterior = produto.loja;
     produto.loja = mov.destino;
     produto.statusMovimentacao = null; // Limpar status de movimentação
     produto.movimentacaoId = undefined; // Limpar referência
+    
+    // Registrar na timeline do produto
+    if (!produto.timeline) produto.timeline = [];
+    produto.timeline.push({
+      id: `TL-${produto.id}-MOV-${mov.id}`,
+      tipo: 'entrada',
+      data: new Date().toISOString(),
+      titulo: 'Movimentação Finalizada',
+      descricao: `Aparelho recebido na loja de destino. Origem: ${origemAnterior} → Destino: ${mov.destino}. Movimentação ${mov.id} concluída.`,
+      responsavel: responsavel,
+    });
+    
     console.log(`Produto ${produto.id} transferido para ${mov.destino} após confirmação`);
   }
   

@@ -136,6 +136,11 @@ export interface NotaEntrada {
   // Forma de pagamento preferida (informativo)
   formaPagamento?: 'Dinheiro' | 'Pix';
   
+  // Dados PIX
+  pixBanco?: string;
+  pixRecebedor?: string;
+  pixChave?: string;
+  
   // Flag de urgência
   urgente?: boolean;
   
@@ -329,6 +334,9 @@ export const criarNotaEntrada = (dados: {
   formaPagamento?: 'Dinheiro' | 'Pix';
   responsavel: string;
   observacoes?: string;
+  pixBanco?: string;
+  pixRecebedor?: string;
+  pixChave?: string;
   urgente?: boolean;
   produtos?: {
     tipoProduto: 'Aparelho' | 'Acessorio';
@@ -412,6 +420,9 @@ export const criarNotaEntrada = (dados: {
     responsavelCriacao: dados.responsavel,
     observacoes: dados.observacoes,
     formaPagamento: dados.formaPagamento,
+    pixBanco: dados.pixBanco,
+    pixRecebedor: dados.pixRecebedor,
+    pixChave: dados.pixChave,
     urgente: dados.urgente || false
   };
   

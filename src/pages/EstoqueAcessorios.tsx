@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import { ResponsiveCardGrid, ResponsiveFilterGrid, ResponsiveTableContainer } from '@/components/ui/ResponsiveContainers';
 
 import { toast } from 'sonner';
@@ -344,8 +345,15 @@ export default function EstoqueAcessorios() {
                 </TableHeader>
                 <TableBody>
                   {acessoriosFiltrados.map(acessorio => (
-                    <TableRow key={acessorio.id}>
-                      <TableCell className="font-medium sticky left-0 z-10 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{acessorio.descricao}</TableCell>
+                    <TableRow key={acessorio.id} className={cn(
+                      acessorio.quantidadeTotal === 0 && 'bg-red-500/10',
+                      acessorio.quantidadeTotal > 0 && acessorio.quantidadeTotal < 5 && 'bg-yellow-500/10'
+                    )}>
+                      <TableCell className={cn(
+                        "font-medium sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]",
+                        acessorio.quantidadeTotal === 0 ? 'bg-red-500/10' :
+                        acessorio.quantidadeTotal > 0 && acessorio.quantidadeTotal < 5 ? 'bg-yellow-500/10' : 'bg-background'
+                      )}>{acessorio.descricao}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {acessorio.lojas.map(lojaId => getLojaNome(lojaId)).join(', ')}
                       </TableCell>
@@ -362,6 +370,12 @@ export default function EstoqueAcessorios() {
                           <span className={acessorio.quantidadeTotal < 10 ? 'text-destructive font-bold' : ''}>
                             {acessorio.quantidadeTotal}
                           </span>
+                          {acessorio.quantidadeTotal === 0 && (
+                            <Badge variant="destructive" className="text-[10px] ml-1">Esgotado</Badge>
+                          )}
+                          {acessorio.quantidadeTotal > 0 && acessorio.quantidadeTotal < 5 && (
+                            <Badge variant="outline" className="text-[10px] ml-1 bg-yellow-500/15 text-yellow-700 border-yellow-300 dark:text-yellow-400">Baixo Estoque</Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">

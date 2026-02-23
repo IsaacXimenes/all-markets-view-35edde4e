@@ -91,6 +91,11 @@ export default function EstoqueNotaCadastrar() {
   const [tipoPagamento, setTipoPagamento] = useState<TipoPagamentoNota | ''>(draft?.tipoPagamento || '');
   const [observacaoPagamento, setObservacaoPagamento] = useState(draft?.observacaoPagamento || '');
   
+  // Campos PIX obrigatórios
+  const [pixBanco, setPixBanco] = useState(draft?.pixBanco || '');
+  const [pixRecebedor, setPixRecebedor] = useState(draft?.pixRecebedor || '');
+  const [pixChave, setPixChave] = useState(draft?.pixChave || '');
+  
   // Atuação Atual (somente leitura, calculado automaticamente)
   const [atuacaoAtual, setAtuacaoAtual] = useState<AtuacaoAtual | ''>('');
   
@@ -116,6 +121,9 @@ export default function EstoqueNotaCadastrar() {
       formaPagamento,
       tipoPagamento,
       observacaoPagamento,
+      pixBanco,
+      pixRecebedor,
+      pixChave,
       produtos,
       savedAt: new Date().toISOString()
     };
@@ -133,6 +141,9 @@ export default function EstoqueNotaCadastrar() {
     setFormaPagamento('');
     setTipoPagamento('');
     setObservacaoPagamento('');
+    setPixBanco('');
+    setPixRecebedor('');
+    setPixChave('');
     setProdutos([produtoLinhaVazia()]);
     setHasDraft(false);
     toast.info('Rascunho descartado.');
@@ -193,6 +204,12 @@ export default function EstoqueNotaCadastrar() {
       novosProdutos[index].custoTotal = novosProdutos[index].quantidade * novosProdutos[index].custoUnitario;
     }
 
+    // Limpar IMEI se quantidade passou de 1 para > 1
+    if (campo === 'quantidade' && valor > 1 && novosProdutos[index].imei) {
+      novosProdutos[index].imei = '';
+      setImeiDuplicados(prev => ({ ...prev, [index]: null }));
+    }
+
     // Validação assíncrona de IMEI
     if (campo === 'imei' && valor && String(valor).replace(/[^0-9]/g, '').length >= 10) {
       if (imeiTimers[index]) clearTimeout(imeiTimers[index]);
@@ -225,6 +242,13 @@ export default function EstoqueNotaCadastrar() {
     if (!responsavelLancamento) camposFaltando.push('Responsável pelo Lançamento');
     if (!tipoPagamento) camposFaltando.push('Tipo de Pagamento');
     
+    // Validar campos PIX quando forma = Pix
+    if (formaPagamento === 'Pix') {
+      if (!pixBanco) camposFaltando.push('Banco (PIX)');
+      if (!pixRecebedor) camposFaltando.push('Recebedor (PIX)');
+      if (!pixChave) camposFaltando.push('Chave PIX');
+    }
+    
     return camposFaltando;
   };
 
@@ -251,8 +275,8 @@ export default function EstoqueNotaCadastrar() {
       }
       // Se Pagamento Pós, exigir campos completos
       if (!camposSimplificados) {
-        if (p.tipoProduto === 'Aparelho' && !p.imei) {
-          toast.error('Informe o IMEI de todos os aparelhos');
+        if (p.tipoProduto === 'Aparelho' && p.quantidade === 1 && !p.imei) {
+          toast.error('Informe o IMEI de todos os aparelhos com quantidade 1');
           return false;
         }
         if (p.tipoProduto === 'Aparelho' && !p.cor) {
@@ -297,6 +321,9 @@ export default function EstoqueNotaCadastrar() {
       formaPagamento: formaPagamento || undefined,
       responsavel: responsavelLancamento,
       observacoes: observacaoPagamento || undefined,
+      pixBanco: formaPagamento === 'Pix' ? pixBanco : undefined,
+      pixRecebedor: formaPagamento === 'Pix' ? pixRecebedor : undefined,
+      pixChave: formaPagamento === 'Pix' ? pixChave : undefined,
       urgente: urgente,
       produtos: temProdutosPreenchidos ? produtos.filter(p => p.modelo && p.custoUnitario > 0).map(p => ({
         tipoProduto: p.tipoProduto,
@@ -458,7 +485,40 @@ export default function EstoqueNotaCadastrar() {
                     <RadioGroupItem value="Pix" id="pix" />
                     <Label htmlFor="pix" className="font-normal cursor-pointer">Pix</Label>
                   </div>
-                </RadioGroup>
+              </RadioGroup>
+              
+              {/* Campos PIX obrigatórios */}
+              {formaPagamento === 'Pix' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 p-3 rounded-lg border border-primary/20 bg-primary/5">
+                  <div>
+                    <Label htmlFor="pixBanco">Banco *</Label>
+                    <Input
+                      id="pixBanco"
+                      value={pixBanco}
+                      onChange={(e) => setPixBanco(e.target.value)}
+                      placeholder="Ex: Nubank, Itaú..."
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="pixRecebedor">Nome do Recebedor *</Label>
+                    <Input
+                      id="pixRecebedor"
+                      value={pixRecebedor}
+                      onChange={(e) => setPixRecebedor(e.target.value)}
+                      placeholder="Nome completo"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="pixChave">Chave PIX *</Label>
+                    <Input
+                      id="pixChave"
+                      value={pixChave}
+                      onChange={(e) => setPixChave(e.target.value)}
+                      placeholder="CPF, e-mail, telefone..."
+                    />
+                  </div>
+                </div>
+              )}
               </div>
               <div>
                 <Label className="mb-3 block">Tipo de Pagamento *</Label>
@@ -657,20 +717,35 @@ export default function EstoqueNotaCadastrar() {
                       {!camposSimplificados && (
                         <TableCell>
                           {produto.tipoProduto === 'Aparelho' ? (
-                            <div className="relative">
-                              <InputComMascara
-                                mascara="imei"
-                                value={produto.imei}
-                                onChange={(formatted, raw) => atualizarProduto(index, 'imei', String(raw))}
-                                className={`w-40 ${imeiDuplicados[index] ? 'border-destructive ring-destructive/30 ring-2' : ''}`}
-                                placeholder="00-000000-000000-0"
-                              />
-                              {imeiDuplicados[index] && (
-                                <p className="text-[10px] text-destructive mt-0.5 truncate max-w-[160px]">
-                                  Duplicado: {imeiDuplicados[index]}
+                            produto.quantidade > 1 ? (
+                              <div className="relative">
+                                <Input
+                                  disabled
+                                  value=""
+                                  placeholder="Conferência"
+                                  className="w-40 bg-muted cursor-not-allowed"
+                                  title="IMEI será preenchido na conferência (explosão)"
+                                />
+                                <p className="text-[10px] text-muted-foreground mt-0.5">
+                                  Preenchido na conferência
                                 </p>
-                              )}
-                            </div>
+                              </div>
+                            ) : (
+                              <div className="relative">
+                                <InputComMascara
+                                  mascara="imei"
+                                  value={produto.imei}
+                                  onChange={(formatted, raw) => atualizarProduto(index, 'imei', String(raw))}
+                                  className={`w-40 ${imeiDuplicados[index] ? 'border-destructive ring-destructive/30 ring-2' : ''}`}
+                                  placeholder="00-000000-000000-0"
+                                />
+                                {imeiDuplicados[index] && (
+                                  <p className="text-[10px] text-destructive mt-0.5 truncate max-w-[160px]">
+                                    Duplicado: {imeiDuplicados[index]}
+                                  </p>
+                                )}
+                              </div>
+                            )
                           ) : (
                             <Input disabled placeholder="N/A" className="w-40 bg-muted" />
                           )}
@@ -697,7 +772,7 @@ export default function EstoqueNotaCadastrar() {
                               value={produto.categoria || 'selecione'}
                               onValueChange={(value) => atualizarProduto(index, 'categoria', value === 'selecione' ? '' : value)}
                             >
-                              <SelectTrigger className="w-24">
+                              <SelectTrigger className="min-w-[120px]">
                                 <SelectValue placeholder="Cat" />
                               </SelectTrigger>
                               <SelectContent>

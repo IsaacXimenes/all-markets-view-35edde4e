@@ -557,7 +557,7 @@ export default function OSMovimentacaoPecas() {
 
       {/* Modal de Busca de Peça */}
       <Dialog open={showPecaModal} onOpenChange={setShowPecaModal}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-5xl w-full max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Buscar Peça no Estoque</DialogTitle>
           </DialogHeader>

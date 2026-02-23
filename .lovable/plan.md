@@ -1,78 +1,62 @@
 
 
-# Corrigir Encaminhamento Individual de OS e Sincronizacao com Estoque
+# Correcoes: Valores Recomendados Trade-In, Conferencia de Lancamento e Comprovantes
 
-## Problema 1: OS Agrupada em vez de Individual
+## 4 problemas identificados
 
-Atualmente, a funcao `encaminharLoteParaAssistencia` cria **uma unica OS** para todos os aparelhos do lote, agrupando-os em `itensLoteRevisao`. O correto e criar **uma OS separada para cada aparelho**, pois cada um tera tratativa, pecas e custos diferentes.
+### 1. Botao "Usar" nos Valores Recomendados nao preenche o modelo
 
-## Problema 2: Finalizacao nao comunica com Estoque
+**Problema:** O callback `onUsarValor` recebe `(valor, modelo)` mas nas 3 paginas que usam (VendasNova, VendasEditar, VendasFinalizarDigital), apenas o `valor` e utilizado - o `modelo` e ignorado. Alem disso, a condicao tambem deveria ser preenchida automaticamente.
 
-A logica de finalizacao em `OSAssistenciaDetalhes.tsx` tenta sincronizar via `itensLoteRevisao` (que e um array de multiplos itens dentro de uma unica OS). Com a mudanca para OS individuais, a sincronizacao precisa funcionar usando `imeiAparelho` e `loteRevisaoId` + `loteRevisaoItemId` da OS individual.
+**Solucao:**
+- Atualizar a interface `onUsarValor` no componente `ValoresRecomendadosTroca` para incluir a condicao: `onUsarValor?: (valor: number, modelo: string, condicao: 'Novo' | 'Semi-novo') => void`
+- Atualizar o `onClick` para passar tambem `item.condicao`
+- Nas 3 paginas (VendasNova, VendasEditar, VendasFinalizarDigital), atualizar o callback para preencher `modelo`, `valorCompraUsado` e `condicao` no `novoTradeIn`
 
-## Solucao
+**Arquivos:** `src/components/vendas/ValoresRecomendadosTroca.tsx`, `src/pages/VendasNova.tsx`, `src/pages/VendasEditar.tsx`, `src/pages/VendasFinalizarDigital.tsx`
 
-### 1. Arquivo: `src/utils/loteRevisaoApi.ts`
+### 2. Reposicionar tabela de Valores Recomendados acima do campo Modelo
 
-**Funcao `encaminharLoteParaAssistencia`** - Alterar para criar uma OS por aparelho:
+**Problema:** A tabela de valores recomendados aparece no final do modal de trade-in, abaixo de todos os campos. Deveria aparecer primeiro, acima do campo de modelo, para que o usuario selecione o valor antes de preencher os campos.
 
-- Em vez de uma unica `addOrdemServico` com todos os itens, iterar sobre `lote.itens` e criar uma OS para cada item
-- Cada OS tera:
-  - `modeloAparelho`: marca + modelo do item especifico
-  - `imeiAparelho`: IMEI do item especifico
-  - `loteRevisaoId`: ID do lote (para rastreabilidade)
-  - `loteRevisaoItemId`: ID do item no lote
-  - `origemOS`: 'Estoque'
-  - **Sem** `itensLoteRevisao` (campo nao necessario quando OS e individual)
-  - `descricao`: motivo da assistencia especifico do aparelho
-- Armazenar todos os IDs de OS gerados em `lote.osIds`
-- Vincular cada `item.osId` ao ID da sua OS individual
+**Solucao:**
+- Mover o bloco `<ValoresRecomendadosTroca>` para antes do campo "Modelo" dentro do modal de trade-in
+- Aplicar nas 3 paginas: VendasNova, VendasEditar e VendasFinalizarDigital
 
-### 2. Arquivo: `src/pages/OSAssistenciaDetalhes.tsx`
+**Arquivos:** `src/pages/VendasNova.tsx`, `src/pages/VendasEditar.tsx`, `src/pages/VendasFinalizarDigital.tsx`
 
-**Finalizacao de servico** - Corrigir sincronizacao com estoque para OS individuais:
+### 3. Conferencia de Lancamento: Ao clicar "Conferir", abrir tela de detalhamento em vez de modal
 
-- Quando a OS tem `loteRevisaoId` e `loteRevisaoItemId` (OS individual de lote):
-  - Chamar `marcarProdutoRetornoAssistencia(imeiAparelho)` para marcar o produto como retornado
-  - Chamar `atualizarItemRevisao(loteRevisaoId, loteRevisaoItemId, ...)` para atualizar custo e status do item no lote
-  - Verificar se **todos** os itens do lote estao concluidos; se sim, chamar `finalizarLoteComLogisticaReversa`
-- Chamar `atualizarStatusProdutoPendente` usando o IMEI da OS individual
+**Problema:** Ao clicar "Conferir" na conferencia de lancamento, abre um modal (`Dialog`) com o resumo. O usuario quer que abra a mesma tela de detalhamento (pagina completa) com a opcao de confirmar o lancamento.
 
-### 3. Arquivo: `src/pages/OSAssistenciaEditar.tsx`
+**Solucao:**
+- Alterar o botao "Conferir" na `VendasConferenciaLancamento` para navegar para uma rota de detalhamento, por exemplo `/vendas/${venda.id}`, passando state com `{ modoConferencia: true }`
+- Na pagina `VendaDetalhes` (que ja existe), detectar o state `modoConferencia` e exibir botoes de "Confirmar Conferencia" e "Cancelar"
+- Remover o modal de aprovacao (`modalAprovar`) da conferencia de lancamento
 
-- Manter o banner informativo do lote de revisao
-- Remover referencia a `itensLoteRevisao` (que nao existira mais em OS individuais)
-- Os campos de modelo, IMEI e descricao ja estarao preenchidos individualmente
+**Arquivos:** `src/pages/VendasConferenciaLancamento.tsx`, `src/pages/VendaDetalhes.tsx`
 
-### 4. Arquivo: `src/utils/assistenciaApi.ts`
+### 4. Comprovantes de pagamento visiveis nas 3 etapas de conferencia
 
-- Garantir que o campo `loteRevisaoItemId` esteja na interface `OrdemServico`
+**Problema:** Na tabela de Conferencia de Lancamento e Conferencia do Gestor, os comprovantes de pagamento registrados na venda nao sao exibidos com miniatura clicavel para expandir. Na Conferencia Financeira, aparece apenas um badge "Contem Anexo" sem miniatura.
 
-## Detalhes tecnicos
+**Solucao:**
+- **Conferencia de Lancamento** (`VendasConferenciaLancamento.tsx`): Adicionar coluna "Comprovante" na tabela com `ComprovantePreview` (miniatura clicavel que expande a imagem ao clicar). Usar o componente `ComprovantePreview` ja existente.
+- **Conferencia do Gestor** (`VendasConferenciaGestor.tsx`): Ja tem `ComprovantePreview` no `VendaResumoCompleto` dentro do painel lateral. Adicionar coluna na tabela principal tambem com miniatura.
+- **Conferencia Financeira** (`FinanceiroConferencia.tsx`): Substituir o badge "Contem Anexo" pelo componente `ComprovantePreview` com miniatura, mantendo a funcionalidade de clique para expandir.
 
-### Fluxo corrigido
+**Arquivos:** `src/pages/VendasConferenciaLancamento.tsx`, `src/pages/VendasConferenciaGestor.tsx`, `src/pages/FinanceiroConferencia.tsx`
 
-```text
-Nota de Entrada (3 aparelhos defeituosos)
-  |
-  v
-Lote de Revisao REV-NOTA-XXXXX
-  |
-  +-- OS-001 (iPhone 14, IMEI 350...) -> Tratativa individual
-  +-- OS-002 (Galaxy S23, IMEI 350...) -> Tratativa individual
-  +-- OS-003 (iPhone 15 Pro, IMEI 350...) -> Tratativa individual
-  |
-  v (ao finalizar cada OS)
-  Sincroniza item no lote + marca retorno no estoque
-  |
-  v (quando todas finalizadas)
-  Lote finalizado automaticamente
-```
+## Resumo dos arquivos a modificar
 
-### Arquivos a modificar
-- `src/utils/loteRevisaoApi.ts` — criar OS individual por item
-- `src/utils/assistenciaApi.ts` — campo `loteRevisaoItemId` na interface
-- `src/pages/OSAssistenciaDetalhes.tsx` — sincronizacao na finalizacao para OS individual
-- `src/pages/OSAssistenciaEditar.tsx` — remover UI de `itensLoteRevisao` agrupados
-- `src/pages/EstoqueEncaminharAssistencia.tsx` — nenhuma mudanca necessaria (ja funciona corretamente)
+| Arquivo | Alteracoes |
+|---------|-----------|
+| `src/components/vendas/ValoresRecomendadosTroca.tsx` | Passar `condicao` no callback |
+| `src/pages/VendasNova.tsx` | Preencher modelo+condicao no "Usar", mover tabela para cima |
+| `src/pages/VendasEditar.tsx` | Preencher modelo+condicao no "Usar", mover tabela para cima |
+| `src/pages/VendasFinalizarDigital.tsx` | Preencher modelo+condicao no "Usar", mover tabela para cima |
+| `src/pages/VendasConferenciaLancamento.tsx` | Navegar para detalhes em vez de modal, adicionar coluna comprovante |
+| `src/pages/VendaDetalhes.tsx` | Suportar modo conferencia com botoes de aprovacao |
+| `src/pages/VendasConferenciaGestor.tsx` | Adicionar coluna comprovante na tabela |
+| `src/pages/FinanceiroConferencia.tsx` | Substituir badge por miniatura clicavel |
 

@@ -367,27 +367,28 @@ export default function OSAssistenciaDetalhes() {
         tecnico: user?.colaborador?.nome || tecnico?.nome || 'Técnico'
       });
     }
-    // Sincronizar lote de revisão com estoque
-    if (osFresh.loteRevisaoId && osFresh.itensLoteRevisao) {
-      osFresh.itensLoteRevisao.forEach(item => {
-        if (item.statusReparo === 'Concluido' && item.imei) {
-          marcarProdutoRetornoAssistencia(item.imei);
-        }
-        if (osFresh.loteRevisaoId) {
-          atualizarItemRevisao(osFresh.loteRevisaoId, item.itemId, {
-            custoReparo: item.custoReparo,
-            statusReparo: item.statusReparo === 'Concluido' ? 'Concluido' : 'Em Andamento'
-          });
-        }
+    // Sincronizar lote de revisão com estoque (OS individual)
+    if (osFresh.loteRevisaoId && osFresh.loteRevisaoItemId) {
+      // Marcar produto como retornado da assistência
+      if (osFresh.imeiAparelho) {
+        marcarProdutoRetornoAssistencia(osFresh.imeiAparelho);
+      }
+      // Atualizar custo e status do item no lote
+      atualizarItemRevisao(osFresh.loteRevisaoId, osFresh.loteRevisaoItemId, {
+        custoReparo: valorCustoTecnico,
+        statusReparo: 'Concluido'
       });
-      // Check if all items are done
-      const allDone = osFresh.itensLoteRevisao.every(i => i.statusReparo === 'Concluido');
-      if (allDone) {
-        const resultados: ResultadoItemRevisao[] = osFresh.itensLoteRevisao.map(i => ({
-          itemId: i.itemId,
-          resultado: 'Consertado' as const
-        }));
-        finalizarLoteComLogisticaReversa(osFresh.loteRevisaoId, resultados, user?.colaborador?.nome || 'Técnico');
+      // Verificar se TODOS os itens do lote estão concluídos
+      const lote = getLoteRevisaoById(osFresh.loteRevisaoId);
+      if (lote) {
+        const allDone = lote.itens.every(i => i.statusReparo === 'Concluido');
+        if (allDone) {
+          const resultados: ResultadoItemRevisao[] = lote.itens.map(i => ({
+            itemId: i.id,
+            resultado: 'Consertado' as const
+          }));
+          finalizarLoteComLogisticaReversa(osFresh.loteRevisaoId, resultados, user?.colaborador?.nome || 'Técnico');
+        }
       }
     }
     setEditStatus(novoStatus);

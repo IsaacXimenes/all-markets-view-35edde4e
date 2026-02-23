@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { EstoqueLayout } from '@/components/layout/EstoqueLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Search, Plus, Pencil, Trash2, Download, History, ChevronDown, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
+import { InputComMascara } from '@/components/ui/InputComMascara';
+import { getProdutosCadastro } from '@/utils/cadastrosApi';
 import {
   getValoresRecomendadosTroca,
   criarValorRecomendado,
@@ -24,7 +26,7 @@ import {
   type LogValorTroca,
 } from '@/utils/valoresRecomendadosTrocaApi';
 
-const formVazio = { modelo: '', marca: 'Apple', condicao: 'Semi-novo' as 'Novo' | 'Semi-novo', valorMin: 0, valorMax: 0, valorSugerido: 0 };
+const formVazio = { modelo: '', marca: '', condicao: 'Semi-novo' as 'Novo' | 'Semi-novo', valorMin: 0, valorMax: 0, valorSugerido: 0 };
 
 export default function EstoqueValoresTroca() {
   const [busca, setBusca] = useState('');
@@ -35,6 +37,28 @@ export default function EstoqueValoresTroca() {
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [form, setForm] = useState(formVazio);
   const [excluirId, setExcluirId] = useState<string | null>(null);
+
+  // Autocomplete modelo
+  const [filtroModelo, setFiltroModelo] = useState('');
+  const [modeloAberto, setModeloAberto] = useState(false);
+
+  const produtos = useMemo(() => getProdutosCadastro(), []);
+  const modelosExistentes = useMemo(() => {
+    const atuais = getValoresRecomendadosTroca();
+    return new Set(atuais.map(v => `${v.modelo}__${v.condicao}`));
+  }, [dados]);
+
+  const produtosFiltrados = useMemo(() => {
+    if (!filtroModelo.trim()) return produtos;
+    const termo = filtroModelo.toLowerCase();
+    return produtos.filter(p => p.produto.toLowerCase().includes(termo));
+  }, [produtos, filtroModelo]);
+
+  // Marcas únicas dos produtos cadastrados
+  const marcasUnicas = useMemo(() => {
+    const set = new Set(produtos.map(p => p.marca));
+    return Array.from(set);
+  }, [produtos]);
 
   const recarregar = () => {
     setDados(busca ? buscarValoresRecomendados(busca) : getValoresRecomendadosTroca());
@@ -49,13 +73,21 @@ export default function EstoqueValoresTroca() {
   const abrirNovo = () => {
     setEditandoId(null);
     setForm(formVazio);
+    setFiltroModelo('');
     setModalAberto(true);
   };
 
   const abrirEditar = (item: ValorRecomendadoTroca) => {
     setEditandoId(item.id);
     setForm({ modelo: item.modelo, marca: item.marca, condicao: item.condicao, valorMin: item.valorMin, valorMax: item.valorMax, valorSugerido: item.valorSugerido });
+    setFiltroModelo(item.modelo);
     setModalAberto(true);
+  };
+
+  const handleSelecionarModelo = (produto: { produto: string; marca: string }) => {
+    setForm(f => ({ ...f, modelo: produto.produto, marca: produto.marca }));
+    setFiltroModelo(produto.produto);
+    setModeloAberto(false);
   };
 
   const salvar = () => {
@@ -66,6 +98,14 @@ export default function EstoqueValoresTroca() {
     if (form.valorMin <= 0 || form.valorMax <= 0 || form.valorSugerido <= 0) {
       toast.error('Valores devem ser maiores que zero');
       return;
+    }
+    // Verificar duplicidade (apenas ao criar)
+    if (!editandoId) {
+      const chave = `${form.modelo}__${form.condicao}`;
+      if (modelosExistentes.has(chave)) {
+        toast.error(`Já existe um valor cadastrado para "${form.modelo}" na condição "${form.condicao}"`);
+        return;
+      }
     }
     if (editandoId) {
       editarValorRecomendado(editandoId, form);
@@ -205,10 +245,63 @@ export default function EstoqueValoresTroca() {
             <DialogTitle>{editandoId ? 'Editar Valor de Troca' : 'Novo Valor de Troca'}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div><Label>Modelo</Label><Input value={form.modelo} onChange={e => setForm(f => ({ ...f, modelo: e.target.value }))} placeholder="Ex: iPhone 15 Pro" /></div>
-              <div><Label>Marca</Label><Input value={form.marca} onChange={e => setForm(f => ({ ...f, marca: e.target.value }))} placeholder="Ex: Apple" /></div>
+            {/* Modelo - Autocomplete */}
+            <div>
+              <Label>Modelo</Label>
+              <div className="relative">
+                <Input
+                  value={filtroModelo}
+                  onChange={e => {
+                    setFiltroModelo(e.target.value);
+                    setModeloAberto(true);
+                    // Se limpar, limpa o form
+                    if (!e.target.value) {
+                      setForm(f => ({ ...f, modelo: '', marca: '' }));
+                    }
+                  }}
+                  onFocus={() => setModeloAberto(true)}
+                  onBlur={() => setTimeout(() => setModeloAberto(false), 200)}
+                  placeholder="Buscar aparelho..."
+                  disabled={!!editandoId}
+                />
+                {modeloAberto && !editandoId && produtosFiltrados.length > 0 && (
+                  <div className="absolute z-[100] w-full mt-1 bg-popover border rounded-md shadow-lg overflow-hidden">
+                    <div className="max-h-64 overflow-y-auto">
+                      {produtosFiltrados.map(p => {
+                        const jaCadastrado = modelosExistentes.has(`${p.produto}__${form.condicao}`);
+                        return (
+                          <div
+                            key={p.id}
+                            className={`flex items-center justify-between px-3 py-2 text-sm ${jaCadastrado ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent cursor-pointer'}`}
+                            onMouseDown={() => {
+                              if (!jaCadastrado) handleSelecionarModelo(p);
+                            }}
+                          >
+                            <span>{p.produto}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">{p.marca}</span>
+                              {jaCadastrado && <Badge variant="outline" className="text-xs">Já cadastrado</Badge>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {modeloAberto && !editandoId && produtosFiltrados.length === 0 && filtroModelo && (
+                  <div className="absolute z-[100] w-full mt-1 bg-popover border rounded-md shadow-lg p-3 text-sm text-muted-foreground">
+                    Nenhum aparelho encontrado
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Marca - readonly, preenchida pelo modelo selecionado */}
+            <div>
+              <Label>Marca</Label>
+              <Input value={form.marca} readOnly disabled className="bg-muted" placeholder="Preenchido ao selecionar modelo" />
+            </div>
+
             <div>
               <Label>Condição</Label>
               <Select value={form.condicao} onValueChange={v => setForm(f => ({ ...f, condicao: v as 'Novo' | 'Semi-novo' }))}>
@@ -219,10 +312,32 @@ export default function EstoqueValoresTroca() {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="grid grid-cols-3 gap-4">
-              <div><Label>Valor Mín (R$)</Label><Input type="number" value={form.valorMin || ''} onChange={e => setForm(f => ({ ...f, valorMin: Number(e.target.value) }))} /></div>
-              <div><Label>Valor Máx (R$)</Label><Input type="number" value={form.valorMax || ''} onChange={e => setForm(f => ({ ...f, valorMax: Number(e.target.value) }))} /></div>
-              <div><Label>Valor Sugerido (R$)</Label><Input type="number" value={form.valorSugerido || ''} onChange={e => setForm(f => ({ ...f, valorSugerido: Number(e.target.value) }))} /></div>
+              <div>
+                <Label>Valor Mín</Label>
+                <InputComMascara
+                  mascara="moeda"
+                  value={form.valorMin}
+                  onChange={(_formatted, raw) => setForm(f => ({ ...f, valorMin: Number(raw) }))}
+                />
+              </div>
+              <div>
+                <Label>Valor Máx</Label>
+                <InputComMascara
+                  mascara="moeda"
+                  value={form.valorMax}
+                  onChange={(_formatted, raw) => setForm(f => ({ ...f, valorMax: Number(raw) }))}
+                />
+              </div>
+              <div>
+                <Label>Valor Sugerido</Label>
+                <InputComMascara
+                  mascara="moeda"
+                  value={form.valorSugerido}
+                  onChange={(_formatted, raw) => setForm(f => ({ ...f, valorSugerido: Number(raw) }))}
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>

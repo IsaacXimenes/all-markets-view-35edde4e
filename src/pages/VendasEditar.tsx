@@ -33,6 +33,7 @@ import { getProdutosCadastro, ProdutoCadastro } from '@/utils/cadastrosApi';
 import { getPlanosPorModelo, PlanoGarantia } from '@/utils/planosGarantiaApi';
 import { formatarMoeda } from '@/utils/formatUtils';
 import { PagamentoQuadro } from '@/components/vendas/PagamentoQuadro';
+import { ValoresRecomendadosTroca } from '@/components/vendas/ValoresRecomendadosTroca';
 import { displayIMEI } from '@/utils/imeiMask';
 
 const formatCurrency = formatarMoeda;
@@ -1694,7 +1695,17 @@ export default function VendasEditar() {
                 <span className="text-sm">IMEI não validado bloqueia o registro da venda</span>
               </div>
             )}
-          </div>
+           </div>
+
+            {/* Valores Recomendados para Troca */}
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium mb-2">📊 Valores Recomendados para Troca</p>
+              <ValoresRecomendadosTroca
+                onUsarValor={(valor) => {
+                  setNovoTradeIn({ ...novoTradeIn, valorCompraUsado: valor });
+                }}
+              />
+            </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTradeInModal(false)}>Cancelar</Button>
             <Button onClick={handleAddTradeIn}>Adicionar</Button>

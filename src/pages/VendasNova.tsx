@@ -40,6 +40,7 @@ import { getPlanosPorModelo, PlanoGarantia } from '@/utils/planosGarantiaApi';
 import { displayIMEI, formatIMEI } from '@/utils/imeiMask';
 import { formatarMoeda, moedaMask, parseMoeda } from '@/utils/formatUtils';
 import { PagamentoQuadro } from '@/components/vendas/PagamentoQuadro';
+import { ValoresRecomendadosTroca } from '@/components/vendas/ValoresRecomendadosTroca';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { getTaxasEntregaAtivas, TaxaEntrega } from '@/utils/taxasEntregaApi';
@@ -3216,7 +3217,17 @@ export default function VendasNova() {
                 <span className="text-sm">IMEI não validado bloqueia o registro da venda</span>
               </div>
             )}
-          </div>
+           </div>
+
+            {/* Valores Recomendados para Troca */}
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium mb-2">📊 Valores Recomendados para Troca</p>
+              <ValoresRecomendadosTroca
+                onUsarValor={(valor) => {
+                  setNovoTradeIn({ ...novoTradeIn, valorCompraUsado: valor });
+                }}
+              />
+            </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTradeInModal(false)}>Cancelar</Button>
             <Button onClick={handleAddTradeIn}>Adicionar</Button>

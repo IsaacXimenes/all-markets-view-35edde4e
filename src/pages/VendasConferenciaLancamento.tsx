@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { Eye, Download, Filter, X, Pencil, Check, Clock, AlertTriangle, CreditCard, Wallet, Smartphone, Banknote, AlertCircle, ArrowLeftRight } from 'lucide-react';
 import { ComprovantePreview, ComprovanteBadgeSemAnexo } from '@/components/vendas/ComprovantePreview';
+import { VendaResumoCompleto } from '@/components/vendas/VendaResumoCompleto';
 import { useFluxoVendas } from '@/hooks/useFluxoVendas';
 import { 
   aprovarLancamento, 
@@ -630,7 +631,7 @@ export default function VendasConferenciaLancamento() {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            {venda.statusFluxo !== 'Finalizado' && (
+                            {(venda.statusFluxo === 'Aguardando Conferência' || venda.statusFluxo === 'Recusada - Gestor' || venda.statusFluxo === 'Feito Sinal') && (
                               <Button 
                                 variant="ghost" 
                                 size="sm"
@@ -703,99 +704,7 @@ export default function VendasConferenciaLancamento() {
           
           {vendaSelecionada && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
-                <div>
-                  <p className="text-sm text-muted-foreground">ID Venda</p>
-                  <p className="font-medium">{vendaSelecionada.id}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Cliente</p>
-                  <p className="font-medium">{vendaSelecionada.clienteNome}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Valor Total</p>
-                  <p className="font-medium text-lg">{formatCurrency(vendaSelecionada.total)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Data</p>
-                  <p className="font-medium">
-                    {new Date(vendaSelecionada.dataHora).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-              </div>
-
-              {/* Produtos */}
-              {vendaSelecionada.itens && vendaSelecionada.itens.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Produtos:</p>
-                  <div className="space-y-1">
-                    {vendaSelecionada.itens.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg text-sm">
-                        <div>
-                          <span className="font-medium">{item.produto}</span>
-                          {item.imei && <span className="text-muted-foreground ml-2">IMEI: {item.imei}</span>}
-                        </div>
-                        <span className="font-medium">{formatCurrency(item.valorVenda)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Acessórios */}
-              {vendaSelecionada.acessorios && vendaSelecionada.acessorios.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Acessórios:</p>
-                  <div className="space-y-1">
-                    {vendaSelecionada.acessorios.map((acess, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg text-sm">
-                        <div>
-                          <span className="font-medium">{acess.descricao}</span>
-                          <span className="text-muted-foreground ml-2">Qtd: {acess.quantidade}</span>
-                          <span className="text-muted-foreground ml-2">Unit: {formatCurrency(acess.valorUnitario)}</span>
-                        </div>
-                        <span className="font-medium">{formatCurrency(acess.valorTotal)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Comprovantes de Pagamento */}
-              {vendaSelecionada.pagamentos && vendaSelecionada.pagamentos.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Comprovantes de Pagamento:</p>
-                  <div className="space-y-2">
-                    {vendaSelecionada.pagamentos.map((pag, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{pag.meioPagamento}</span>
-                          <span className="text-muted-foreground">{formatCurrency(pag.valor)}</span>
-                        </div>
-                        <div>
-                          {pag.comprovante ? (
-                            <ComprovantePreview comprovante={pag.comprovante} comprovanteNome={pag.comprovanteNome} />
-                          ) : (
-                            <ComprovanteBadgeSemAnexo />
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Exibir chave PIX para Downgrade */}
-              {(vendaSelecionada as any).tipoOperacao === 'Downgrade' && (vendaSelecionada as any).chavePix && (
-                <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg border border-orange-300">
-                  <p className="text-xs font-medium text-orange-700 dark:text-orange-300 mb-1">
-                    Chave PIX para Devolução:
-                  </p>
-                  <p className="font-mono text-lg font-bold text-orange-800 dark:text-orange-200">
-                    {(vendaSelecionada as any).chavePix}
-                  </p>
-                </div>
-              )}
+              <VendaResumoCompleto venda={vendaSelecionada} readOnly showCustos={false} />
 
               {vendaSelecionada.statusFluxo === 'Recusada - Gestor' && vendaSelecionada.recusaGestor && (
                 <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">

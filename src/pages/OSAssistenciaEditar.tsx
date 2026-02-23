@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   getOrdemServicoById,
@@ -145,6 +145,8 @@ export default function OSAssistenciaEditar() {
   const [novaSolPeca, setNovaSolPeca] = useState('');
   const [novaSolQtd, setNovaSolQtd] = useState(1);
   const [novaSolJustificativa, setNovaSolJustificativa] = useState('');
+  const [modalConfirmarSolLocal, setModalConfirmarSolLocal] = useState(false);
+  const [checkConfirmarSolLocal, setCheckConfirmarSolLocal] = useState(false);
 
   // Excluir solicitação state
   const [solExcluirId, setSolExcluirId] = useState<string | null>(null);
@@ -1187,15 +1189,8 @@ export default function OSAssistenciaEditar() {
                     toast({ title: 'Preencha peça e justificativa', variant: 'destructive' });
                     return;
                   }
-                  setSolicitacoesPendentesLocal(prev => [...prev, {
-                    peca: novaSolPeca,
-                    quantidade: novaSolQtd,
-                    justificativa: novaSolJustificativa
-                  }]);
-                  setNovaSolPeca('');
-                  setNovaSolQtd(1);
-                  setNovaSolJustificativa('');
-                  toast({ title: 'Solicitação adicionada localmente. Clique "Salvar Alterações" para persistir.' });
+                  setCheckConfirmarSolLocal(false);
+                  setModalConfirmarSolLocal(true);
                 }}>
                   <Plus className="h-4 w-4 mr-1" />
                   Adicionar
@@ -1476,6 +1471,59 @@ export default function OSAssistenciaEditar() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Modal Dupla Confirmação - Adicionar Solicitação Local */}
+      <Dialog open={modalConfirmarSolLocal} onOpenChange={setModalConfirmarSolLocal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Confirmar Solicitação de Peça
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-muted/30 rounded-md p-4 space-y-2 text-sm">
+              <p><strong>Peça:</strong> {novaSolPeca}</p>
+              <p><strong>Quantidade:</strong> {novaSolQtd}</p>
+              <p><strong>Justificativa:</strong> {novaSolJustificativa}</p>
+            </div>
+            <div className="flex items-center gap-2 border rounded-md p-3 bg-muted/30">
+              <Checkbox
+                checked={checkConfirmarSolLocal}
+                onCheckedChange={(checked) => setCheckConfirmarSolLocal(checked as boolean)}
+              />
+              <Label className="text-sm cursor-pointer">
+                Confirmo que os dados da solicitação estão corretos e desejo adicionar esta peça
+              </Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalConfirmarSolLocal(false)}>Cancelar</Button>
+            <Button 
+              onClick={() => {
+                if (!checkConfirmarSolLocal) {
+                  toast({ title: 'Confirme na caixa de seleção', variant: 'destructive' });
+                  return;
+                }
+                setSolicitacoesPendentesLocal(prev => [...prev, {
+                  peca: novaSolPeca,
+                  quantidade: novaSolQtd,
+                  justificativa: novaSolJustificativa
+                }]);
+                setNovaSolPeca('');
+                setNovaSolQtd(1);
+                setNovaSolJustificativa('');
+                setModalConfirmarSolLocal(false);
+                toast({ title: 'Solicitação adicionada localmente. Clique "Salvar Alterações" para persistir.' });
+              }}
+              disabled={!checkConfirmarSolLocal}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Confirmar e Adicionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   );
 }

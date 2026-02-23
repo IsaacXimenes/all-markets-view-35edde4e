@@ -7,6 +7,7 @@ export interface TimelineConsignacao {
   tipo: 'entrada' | 'consumo' | 'transferencia' | 'acerto' | 'devolucao' | 'pagamento';
   descricao: string;
   responsavel: string;
+  comprovanteUrl?: string;
 }
 
 export interface ItemConsignacao {
@@ -33,6 +34,8 @@ export interface PagamentoParcial {
   itensIds: string[];
   notaFinanceiraId: string;
   status: 'Pendente' | 'Pago';
+  comprovanteUrl?: string;
+  dataPagamento?: string;
 }
 
 export interface LoteConsignacao {
@@ -40,7 +43,7 @@ export interface LoteConsignacao {
   fornecedorId: string;
   dataCriacao: string;
   responsavelCadastro: string;
-  status: 'Aberto' | 'Em Acerto' | 'Pago' | 'Devolvido' | 'Concluido';
+  status: 'Aberto' | 'Em Acerto' | 'Aguardando Pagamento' | 'Pago' | 'Devolvido' | 'Concluido';
   itens: ItemConsignacao[];
   timeline: TimelineConsignacao[];
   pagamentosParciais: PagamentoParcial[];
@@ -316,10 +319,15 @@ export const gerarPagamentoParcial = (
     responsavel: lote.responsavelCadastro,
   });
 
+  // Atualizar status do lote para Aguardando Pagamento
+  if (lote.status === 'Aberto' || lote.status === 'Em Acerto') {
+    lote.status = 'Aguardando Pagamento';
+  }
+
   return pagamento;
 };
 
-export const confirmarPagamentoParcial = (loteId: string, pagamentoId: string, responsavel: string): boolean => {
+export const confirmarPagamentoParcial = (loteId: string, pagamentoId: string, responsavel: string, comprovanteUrl?: string): boolean => {
   const lote = lotes.find(l => l.id === loteId);
   if (!lote) return false;
 
@@ -327,6 +335,8 @@ export const confirmarPagamentoParcial = (loteId: string, pagamentoId: string, r
   if (!pagamento || pagamento.status === 'Pago') return false;
 
   pagamento.status = 'Pago';
+  pagamento.comprovanteUrl = comprovanteUrl;
+  pagamento.dataPagamento = new Date().toISOString();
 
   // Mudar status dos itens vinculados para 'Pago'
   lote.itens.forEach(item => {
@@ -338,9 +348,23 @@ export const confirmarPagamentoParcial = (loteId: string, pagamentoId: string, r
   lote.timeline.push({
     data: new Date().toISOString(),
     tipo: 'pagamento',
-    descricao: `Pagamento ${pagamento.notaFinanceiraId} confirmado - R$ ${pagamento.valor.toFixed(2)}`,
+    descricao: `Pagamento ${pagamento.notaFinanceiraId} confirmado pelo financeiro - R$ ${pagamento.valor.toFixed(2)}`,
     responsavel,
+    comprovanteUrl,
   });
+
+  // Verificar se todos os pagamentos foram pagos
+  const todosPagos = lote.pagamentosParciais.every(p => p.status === 'Pago');
+  const todosItensFinalizados = lote.itens.every(i => ['Pago', 'Devolvido'].includes(i.status));
+  if (todosPagos && todosItensFinalizados) {
+    lote.status = 'Concluido';
+    lote.timeline.push({
+      data: new Date().toISOString(),
+      tipo: 'acerto',
+      descricao: 'Todos os pagamentos confirmados. Lote concluído automaticamente.',
+      responsavel,
+    });
+  }
 
   return true;
 };
@@ -386,11 +410,15 @@ export const finalizarLote = (
     });
   });
 
-  lote.status = 'Concluido';
+  // Se há pagamentos pendentes, aguardar pagamento; senão, concluído
+  const temPagamentosPendentes = lote.pagamentosParciais.some(p => p.status === 'Pendente');
+  lote.status = temPagamentosPendentes ? 'Aguardando Pagamento' : 'Concluido';
   lote.timeline.push({
     data: agora,
     tipo: 'acerto',
-    descricao: 'Lote finalizado e devoluções confirmadas.',
+    descricao: temPagamentosPendentes 
+      ? 'Lote finalizado. Aguardando confirmação de pagamento pelo financeiro.' 
+      : 'Lote finalizado e devoluções confirmadas.',
     responsavel,
   });
 

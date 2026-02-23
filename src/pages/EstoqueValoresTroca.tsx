@@ -211,7 +211,7 @@ export default function EstoqueValoresTroca() {
                     {log.tipo === 'criacao' ? 'Criação' : log.tipo === 'edicao' ? 'Edição' : 'Exclusão'}
                   </Badge>
                   <div className="flex-1 min-w-0">
-                    <p className="text-muted-foreground">{log.detalhes}</p>
+                    <p className="text-muted-foreground whitespace-pre-line">{log.detalhes}</p>
                   </div>
                   <div className="text-right shrink-0 text-muted-foreground">
                     <p>{new Date(log.dataHora).toLocaleDateString('pt-BR')}</p>

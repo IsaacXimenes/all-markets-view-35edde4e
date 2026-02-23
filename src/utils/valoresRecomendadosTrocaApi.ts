@@ -184,7 +184,7 @@ export const editarValorRecomendado = (id: string, dados: Partial<Omit<ValorReco
   valoresRecomendados[idx] = { ...anterior, ...dados, ultimaAtualizacao: new Date().toISOString().split('T')[0] };
   
   if (alteracoes.length > 0) {
-    registrarLog('edicao', id, valoresRecomendados[idx].modelo, alteracoes.join('; '));
+    registrarLog('edicao', id, valoresRecomendados[idx].modelo, alteracoes.join('\n'));
   }
   return valoresRecomendados[idx];
 };

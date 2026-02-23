@@ -1,161 +1,112 @@
 
 
-# Ajustes em Nota de Entrada, Aparelhos Pendentes, Acessorios e Rastreabilidade
+# Nova Aba "Valores de Troca" no Estoque + Atualização de Cadastro de Aparelhos
 
 ## Escopo
 
-6 frentes de trabalho cobrindo melhorias em Notas de Entrada, Aparelhos Pendentes, Acessorios, Movimentacao de Pecas e Rastreabilidade de Estoque.
+Duas frentes de trabalho:
+1. Criar aba separada no modulo Estoque para gerenciar os Valores Recomendados de Troca (com edicao e logs)
+2. Atualizar a listagem de aparelhos no Cadastro, substituindo os iPhones existentes pela lista completa com capacidade de armazenamento
 
 ---
 
-## 1. Nota de Entrada: Campos PIX Obrigatorios (1.1)
+## 1. Nova Aba "Valores de Troca" no Modulo Estoque
 
-### Situacao Atual
-Em `EstoqueNotaCadastrar.tsx`, o pagamento tem apenas `formaPagamento` (Dinheiro/Pix), `tipoPagamento` e `observacaoPagamento`. Nao ha campos para Banco, Recebedor ou Chave PIX.
+### O que sera feito
+- Criar nova pagina `EstoqueValoresTroca.tsx` com tabela de valores recomendados
+- Adicionar aba "Valores de Troca" no `EstoqueLayout.tsx` (carousel de abas)
+- Registrar rota `/estoque/valores-troca` no `App.tsx`
 
-### Acao
-- Adicionar 3 novos states: `pixBanco`, `pixRecebedor`, `pixChave`
-- Quando `formaPagamento === 'Pix'`, renderizar os 3 campos abaixo do RadioGroup (Banco, Nome do Recebedor, Chave PIX)
-- Na funcao `handleSalvar`, validar que os 3 campos estao preenchidos quando forma = Pix
-- Incluir os campos PIX no draft (localStorage) e no payload de `criarNotaEntrada`
-- Salvar no draft para persistencia
+### Funcionalidades da pagina
+- Tabela com colunas: Modelo, Marca, Condicao (Novo/Semi-novo), Valor Min, Valor Max, Valor Sugerido, Ultima Atualizacao
+- Busca por modelo/marca
+- Botao "Novo Valor" para cadastrar novo registro
+- Botao de editar em cada linha (modal com formulario)
+- Botao de excluir com confirmacao
+- Exportar CSV
 
-### Arquivo
-- `src/pages/EstoqueNotaCadastrar.tsx`
+### Sistema de Logs
+- Adicionar interface `LogValorTroca` na API (`valoresRecomendadosTrocaApi.ts`) com campos: id, tipo (criacao/edicao/exclusao), modelo, usuario, dataHora, detalhes (campo alterado, valor anterior, valor novo)
+- Cada acao de criar, editar ou excluir gera um registro de log
+- Exibir historico de logs na pagina via botao "Ver Logs" ou secao expansivel
 
----
-
-## 2. Nota de Entrada: Inativacao de IMEI por Quantidade (1.2)
-
-### Situacao Atual
-No modo nao-simplificado (Pagamento Pos), o campo IMEI aparece para todos os itens, mesmo quando quantidade > 1.
-
-### Acao
-- Na celula de IMEI (linha ~660), adicionar condicao: se `produto.quantidade > 1`, desabilitar o campo e exibir tooltip "IMEI sera preenchido na conferencia (explosao)"
-- Se `produto.quantidade === 1`, manter o campo habilitado normalmente
-- Ao alterar quantidade de 1 para > 1, limpar o valor IMEI automaticamente
-
-### Arquivo
-- `src/pages/EstoqueNotaCadastrar.tsx`
+### Arquivos
+- **Novo:** `src/pages/EstoqueValoresTroca.tsx`
+- **Editar:** `src/components/layout/EstoqueLayout.tsx` (adicionar aba)
+- **Editar:** `src/App.tsx` (adicionar rota)
+- **Editar:** `src/utils/valoresRecomendadosTrocaApi.ts` (adicionar funcoes CRUD + logs)
 
 ---
 
-## 3. Aparelhos Pendentes: Classificacao por SLA (2.1)
+## 2. Atualizacao do Cadastro de Aparelhos (iPhones)
 
-### Situacao Atual
-`OSAparelhosPendentes.tsx` ordena por data decrescente (mais recentes primeiro). Nao tem indicadores de SLA.
+### O que sera feito
+- Substituir os 20 registros atuais de iPhones (PROD-CAD-001 a PROD-CAD-020) por 108 registros detalhados com modelo + capacidade de armazenamento
+- Manter os registros de iPad, MacBook, Watch, AirPods e Acessorios (PROD-CAD-021 a PROD-CAD-040)
+- Remover duplicatas, mantendo sempre Marca = "Apple" e Categoria = "iPhone"
 
-### Acao
-- Inverter a ordenacao padrao para mais antigos primeiro (mais urgentes no topo)
-- Adicionar coluna "Tempo em Pendencia" calculada como diferenca entre `new Date()` e `os.dataHora`
-- Exibir badges coloridos:
-  - Verde: ate 3 dias
-  - Amarelo: 4-7 dias
-  - Vermelho: > 7 dias (SLA excedido)
-- Adicionar filtro/select para ordenar por "Mais antigo" ou "Mais recente"
-
-### Arquivo
-- `src/pages/OSAparelhosPendentes.tsx`
-
----
-
-## 4. Nota de Entrada: Coluna Categoria Mais Larga (2.2)
-
-### Situacao Atual
-A coluna Categoria tem `className="w-24"` no SelectTrigger (linha 700), truncando o texto.
-
-### Acao
-- Alterar o `className` do SelectTrigger da categoria de `w-24` para `w-32` ou `min-w-[120px]`
-- Ja existe `min-w-[120px]` no TableHead (linha 594), mas o SelectTrigger interno limita - corrigir para acompanhar
-
-### Arquivo
-- `src/pages/EstoqueNotaCadastrar.tsx`
-
----
-
-## 5. Acessorios: Cor da Linha por Quantidade (3.1)
-
-### Situacao Atual
-`EstoqueAcessorios.tsx` ja exibe icone de alerta e texto vermelho quando `quantidadeTotal < 10`, mas nao tem cores de fundo na linha.
-
-### Acao
-- Na `TableRow` dos acessorios (linha 347), adicionar classes condicionais:
-  - `quantidadeTotal === 0`: fundo vermelho claro (`bg-red-500/10`) + Badge "Esgotado"
-  - `quantidadeTotal > 0 && quantidadeTotal < 5`: fundo amarelo claro (`bg-yellow-500/10`) + Badge "Baixo Estoque"
-  - Caso contrario: sem cor especial
-- Adicionar Badge na coluna de estoque indicando "Esgotado" ou "Baixo Estoque"
-
-### Arquivo
-- `src/pages/EstoqueAcessorios.tsx`
-
----
-
-## 6. Movimentacao de Pecas: Redimensionar Modal de Busca (3.2)
-
-### Situacao Atual
-`OSMovimentacaoPecas.tsx` possui modal de busca de pecas. O DialogContent pode estar com largura padrao causando scroll horizontal.
-
-### Acao
-- No DialogContent do modal de busca, adicionar `className="max-w-4xl w-full"` ou `max-w-5xl` para ampliar a largura
-- Garantir que a tabela de resultados use `overflow-x-auto` adequado dentro do espaco ampliado
+### Lista completa (108 registros iPhone)
+- iPhone 7 (32/128/256 GB) -- 3 registros
+- iPhone 7 Plus (32/128/256 GB) -- 3 registros
+- iPhone 8 (64/128/256 GB) -- 3 registros
+- iPhone 8 Plus (64/128/256 GB) -- 3 registros
+- iPhone X (64/256 GB) -- 2 registros
+- iPhone XS (64/256/512 GB) -- 3 registros
+- iPhone XS Max (64/256/512 GB) -- 3 registros
+- iPhone XR (64/128/256 GB) -- 3 registros
+- iPhone 11 (64/128/256 GB) -- 3 registros
+- iPhone 11 Pro (64/256/512 GB) -- 3 registros
+- iPhone 11 Pro Max (64/256/512 GB) -- 3 registros
+- iPhone 12 mini (64/128/256 GB) -- 3 registros
+- iPhone 12 (64/128/256 GB) -- 3 registros
+- iPhone 12 Pro (128/256/512 GB) -- 3 registros
+- iPhone 12 Pro Max (128/256/512 GB) -- 3 registros
+- iPhone 13 mini (128/256/512 GB) -- 3 registros
+- iPhone 13 (128/256/512 GB) -- 3 registros
+- iPhone 13 Pro (128/256/512/1TB) -- 4 registros
+- iPhone 13 Pro Max (128/256/512/1TB) -- 4 registros
+- iPhone 14 (128/256/512 GB) -- 3 registros
+- iPhone 14 Plus (128/256/512 GB) -- 3 registros
+- iPhone 14 Pro (128/256/512/1TB) -- 4 registros
+- iPhone 14 Pro Max (128/256/512/1TB) -- 4 registros
+- iPhone 15 (128/256/512 GB) -- 3 registros
+- iPhone 15 Plus (128/256/512 GB) -- 3 registros
+- iPhone 15 Pro (128/256/512/1TB) -- 4 registros
+- iPhone 15 Pro Max (128/256/512/1TB) -- 4 registros
+- iPhone 16 (128/256 GB) -- 2 registros
+- iPhone 16 Plus (128/256 GB) -- 2 registros
+- iPhone 16 Pro (128/256/512/1TB) -- 4 registros
+- iPhone 16 Pro Max (256/512/1TB) -- 3 registros
+- iPhone 17 (256/512 GB) -- 2 registros
+- iPhone 17 Air (256/512/1TB) -- 3 registros
+- iPhone 17 Pro (256/512/1TB) -- 3 registros
+- iPhone 17 Pro Max (256/512/1TB/2TB) -- 4 registros
 
 ### Arquivo
-- `src/pages/OSMovimentacaoPecas.tsx`
-
----
-
-## 7. Rastreabilidade: Saida de "Em Movimentacao" (4.1)
-
-### Situacao Atual
-`confirmarRecebimentoMovimentacao` em `estoqueApi.ts` (linhas 1150-1171) ja:
-- Atualiza `mov.status = 'Recebido'`
-- Atualiza `produto.loja = mov.destino`
-- Limpa `produto.statusMovimentacao = null`
-- Limpa `produto.movimentacaoId = undefined`
-
-O fluxo ja esta implementado corretamente. Sera validado e, se necessario, adicionado registro na timeline do produto.
-
-### Acao
-- Adicionar registro na timeline do produto com descricao da movimentacao finalizada (origem, destino, responsavel, data)
-- Garantir que o produto fique habilitado para venda apos recebimento
-
-### Arquivo
-- `src/utils/estoqueApi.ts`
-
----
-
-## 8. Anexo de Video no Detalhamento do Aparelho (4.2)
-
-### Situacao Atual
-`EstoqueProdutoDetalhes.tsx` ja tem sistema de imagens temporarias (blob URLs), mas nao suporta videos.
-
-### Acao
-- Adicionar secao "Anexos de Video" no detalhamento do produto
-- Permitir upload de arquivos MP4/MOV com limite de 50MB
-- Armazenar em estado local (mock, sem Supabase Storage), com blob URLs para preview
-- Exibir player de video inline para cada anexo
-- Registrar na timeline do produto: "Video anexado por [usuario] em [data]"
-- Condicionar visibilidade: apenas usuarios com `eh_estoquista` ou `eh_gestor`
-
-### Arquivo
-- `src/pages/EstoqueProdutoDetalhes.tsx`
+- **Editar:** `src/utils/cadastrosApi.ts` (substituir array `produtosCadastro` de PROD-CAD-001 a PROD-CAD-020 pelos 108 novos registros, mantendo PROD-CAD-021+ intactos com IDs sequenciais ajustados)
 
 ---
 
 ## Detalhes Tecnicos
 
-### Arquivos a modificar
-1. `src/pages/EstoqueNotaCadastrar.tsx` -- campos PIX, inativacao IMEI, coluna categoria
-2. `src/pages/OSAparelhosPendentes.tsx` -- SLA badges, ordenacao, coluna tempo
-3. `src/pages/EstoqueAcessorios.tsx` -- cores de linha por quantidade
-4. `src/pages/OSMovimentacaoPecas.tsx` -- redimensionar modal de busca
-5. `src/utils/estoqueApi.ts` -- timeline na confirmacao de recebimento
-6. `src/pages/EstoqueProdutoDetalhes.tsx` -- secao de anexo de video
-
 ### Ordem de implementacao
-1. Nota de Entrada: campos PIX + IMEI inativo + coluna categoria (items 1, 2, 4)
-2. Aparelhos Pendentes com SLA (item 3)
-3. Acessorios: cores de linha (item 5)
-4. Modal de busca redimensionado (item 6)
-5. Timeline na movimentacao + anexo de video (items 7, 8)
+1. Atualizar `cadastrosApi.ts` com os 108 iPhones
+2. Atualizar `valoresRecomendadosTrocaApi.ts` com CRUD completo e sistema de logs
+3. Criar pagina `EstoqueValoresTroca.tsx`
+4. Adicionar aba no `EstoqueLayout.tsx`
+5. Registrar rota no `App.tsx`
+
+### Padrao de logs
+```text
+interface LogValorTroca {
+  id: string;
+  tipo: 'criacao' | 'edicao' | 'exclusao';
+  modelo: string;
+  usuario: string;
+  dataHora: string;
+  detalhes: string;
+}
+```
+
+Cada operacao CRUD registra automaticamente um log com usuario logado (do authStore), data/hora e descricao da alteracao.
 

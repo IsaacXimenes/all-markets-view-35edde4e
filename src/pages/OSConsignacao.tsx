@@ -129,6 +129,7 @@ export default function OSConsignacao() {
     switch (status) {
       case 'Aberto': return <Badge className="bg-blue-500 hover:bg-blue-600 text-white">Aberto</Badge>;
       case 'Em Acerto': return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">Em Acerto</Badge>;
+      case 'Aguardando Pagamento': return <Badge className="bg-orange-500 hover:bg-orange-600 text-white">Aguardando Pagamento</Badge>;
       case 'Pago': return <Badge className="bg-green-500 hover:bg-green-600 text-white">Pago</Badge>;
       case 'Devolvido': return <Badge className="bg-gray-500 hover:bg-gray-600 text-white">Devolvido</Badge>;
       case 'Concluido': return <Badge className="bg-purple-700 hover:bg-purple-800 text-white">Concluído</Badge>;
@@ -232,11 +233,16 @@ export default function OSConsignacao() {
     }
   };
 
+  // Comprovante state for payment confirmation
+  const [comprovanteFile, setComprovanteFile] = useState<string | null>(null);
+  const [comprovanteExpandido, setComprovanteExpandido] = useState<string | null>(null);
+
   const handleConfirmarPagamento = (pagamentoId: string) => {
     if (!loteSelecionado) return;
-    confirmarPagamentoParcial(loteSelecionado.id, pagamentoId, user?.colaborador?.nome || 'Sistema');
+    confirmarPagamentoParcial(loteSelecionado.id, pagamentoId, user?.colaborador?.nome || 'Sistema', comprovanteFile || undefined);
     setLoteSelecionado(getLoteById(loteSelecionado.id) || null);
     refreshLotes();
+    setComprovanteFile(null);
     toast({ title: 'Pagamento confirmado', description: 'Status atualizado para Pago.' });
   };
 
@@ -875,7 +881,27 @@ export default function OSConsignacao() {
                           </div>
                           <p className="text-xs text-muted-foreground">
                             {new Date(pag.data).toLocaleString('pt-BR')} • {pag.itensIds.length} item(ns)
+                            {pag.dataPagamento && ` • Pago em ${new Date(pag.dataPagamento).toLocaleString('pt-BR')}`}
                           </p>
+                          {pag.comprovanteUrl && (
+                            <button
+                              onClick={() => setComprovanteExpandido(comprovanteExpandido === pag.comprovanteUrl ? null : pag.comprovanteUrl!)}
+                              className="mt-1 group relative cursor-pointer"
+                            >
+                              <img
+                                src={pag.comprovanteUrl}
+                                alt="Comprovante"
+                                className={`rounded-md border object-contain transition-all duration-300 ${
+                                  comprovanteExpandido === pag.comprovanteUrl ? 'max-h-64 max-w-full' : 'max-h-12 max-w-20 opacity-80 hover:opacity-100'
+                                }`}
+                              />
+                              {comprovanteExpandido !== pag.comprovanteUrl && (
+                                <span className="absolute bottom-0 right-0 bg-black/60 text-white text-[10px] px-1 rounded-tl">
+                                  Ver
+                                </span>
+                              )}
+                            </button>
+                          )}
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="font-bold text-lg">{formatCurrency(pag.valor)}</span>
@@ -893,8 +919,30 @@ export default function OSConsignacao() {
                                     Confirmar o pagamento da nota <strong>{pag.notaFinanceiraId}</strong> no valor de <strong>{formatCurrency(pag.valor)}</strong>?
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
+                                <div className="space-y-3 py-2">
+                                  <div className="space-y-2">
+                                    <Label className="text-sm font-medium">Comprovante de Pagamento</Label>
+                                    <Input
+                                      type="file"
+                                      accept="image/*,.pdf"
+                                      onChange={e => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          const reader = new FileReader();
+                                          reader.onload = () => setComprovanteFile(reader.result as string);
+                                          reader.readAsDataURL(file);
+                                        }
+                                      }}
+                                    />
+                                    {comprovanteFile && (
+                                      <div className="mt-2">
+                                        <img src={comprovanteFile} alt="Comprovante" className="max-h-32 rounded-md border object-contain" />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
                                 <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogCancel onClick={() => setComprovanteFile(null)}>Cancelar</AlertDialogCancel>
                                   <AlertDialogAction onClick={() => handleConfirmarPagamento(pag.id)}>
                                     Confirmar
                                   </AlertDialogAction>
@@ -1034,6 +1082,27 @@ export default function OSConsignacao() {
                         <span>{new Date(entry.data).toLocaleString('pt-BR')}</span>
                         <span>• {entry.responsavel}</span>
                       </div>
+                      {entry.comprovanteUrl && (
+                        <div className="mt-2">
+                          <button
+                            onClick={() => setComprovanteExpandido(comprovanteExpandido === entry.comprovanteUrl ? null : entry.comprovanteUrl!)}
+                            className="group relative cursor-pointer"
+                          >
+                            <img
+                              src={entry.comprovanteUrl}
+                              alt="Comprovante"
+                              className={`rounded-md border object-contain transition-all duration-300 ${
+                                comprovanteExpandido === entry.comprovanteUrl ? 'max-h-96 max-w-full' : 'max-h-16 max-w-24 opacity-80 hover:opacity-100'
+                              }`}
+                            />
+                            {comprovanteExpandido !== entry.comprovanteUrl && (
+                              <span className="absolute bottom-0 right-0 bg-black/60 text-white text-[10px] px-1 rounded-tl">
+                                Expandir
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1093,6 +1162,7 @@ export default function OSConsignacao() {
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="Aberto">Aberto</SelectItem>
+              <SelectItem value="Aguardando Pagamento">Aguardando Pagamento</SelectItem>
               <SelectItem value="Concluido">Concluído</SelectItem>
               <SelectItem value="Pago">Pago</SelectItem>
               <SelectItem value="Devolvido">Devolvido</SelectItem>
@@ -1167,6 +1237,17 @@ export default function OSConsignacao() {
                         {lote.status === 'Aberto' && (
                           <Button variant="ghost" size="sm" onClick={() => handleVerDetalhamentoEdit(lote)} title="Editar Lote">
                             <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {lote.itens.some(i => i.status === 'Consumido') && lote.status !== 'Concluido' && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            const loteAtual = getLoteById(lote.id) || lote;
+                            setLoteSelecionado(loteAtual);
+                            setDetalhamentoReadOnly(false);
+                            setItensSelecionadosPagamento([]);
+                            setViewMode('detalhamento');
+                          }} title="Gerar Pagamento" className="text-green-600 hover:text-green-700">
+                            <DollarSign className="h-4 w-4" />
                           </Button>
                         )}
                       </div>

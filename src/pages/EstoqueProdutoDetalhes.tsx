@@ -1,10 +1,10 @@
- import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { EstoqueLayout } from '@/components/layout/EstoqueLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Upload, Printer, Clock, Package, Wrench, CheckCircle, AlertCircle, DollarSign, AlertTriangle, Scissors } from 'lucide-react';
+import { ArrowLeft, Upload, Printer, Clock, Package, Wrench, CheckCircle, AlertCircle, DollarSign, AlertTriangle, Scissors, Video, Trash2, Film } from 'lucide-react';
 import { getProdutos, Produto, TimelineEntry } from '@/utils/estoqueApi';
 import { getHistoricoGarantiasByIMEI } from '@/utils/garantiasApi';
 import { cn } from '@/lib/utils';
@@ -12,9 +12,20 @@ import QRCode from 'qrcode';
 import { formatIMEI } from '@/utils/imeiMask';
 import { ModalRetiradaPecas } from '@/components/estoque/ModalRetiradaPecas';
 import { verificarDisponibilidadeRetirada } from '@/utils/retiradaPecasApi';
-  import { ImagemTemporaria } from '@/components/estoque/ImagensTemporarias';
-  import { CarrosselImagensProduto } from '@/components/estoque/CarrosselImagensProduto';
-  import { ListaImagensAnexadas } from '@/components/estoque/ListaImagensAnexadas';
+import { ImagemTemporaria } from '@/components/estoque/ImagensTemporarias';
+import { CarrosselImagensProduto } from '@/components/estoque/CarrosselImagensProduto';
+import { ListaImagensAnexadas } from '@/components/estoque/ListaImagensAnexadas';
+import { useAuthStore } from '@/store/authStore';
+import { toast } from 'sonner';
+
+interface VideoAnexo {
+  id: string;
+  nome: string;
+  blobUrl: string;
+  tamanho: number;
+  dataUpload: string;
+  responsavel: string;
+}
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -26,24 +37,70 @@ export default function EstoqueProdutoDetalhes() {
   const [produto, setProduto] = useState<Produto | null>(null);
   const [qrCode, setQrCode] = useState('');
   const [showModalRetirada, setShowModalRetirada] = useState(false);
-   const [imagensTemporarias, setImagensTemporarias] = useState<ImagemTemporaria[]>([]);
-   const imagensRef = useRef<ImagemTemporaria[]>([]);
+  const [imagensTemporarias, setImagensTemporarias] = useState<ImagemTemporaria[]>([]);
+  const imagensRef = useRef<ImagemTemporaria[]>([]);
+  const [videosAnexados, setVideosAnexados] = useState<VideoAnexo[]>([]);
+  const videosRef = useRef<VideoAnexo[]>([]);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuthStore();
+  const ehEstoquistaOuGestor = (user?.colaborador as any)?.eh_estoquista || (user?.colaborador as any)?.eh_gestor || (user?.colaborador?.cargo && user.colaborador.cargo.toLowerCase().includes('gestor'));
  
-   // Keep ref in sync for cleanup
-   useEffect(() => {
-     imagensRef.current = imagensTemporarias;
-   }, [imagensTemporarias]);
+  // Keep refs in sync for cleanup
+  useEffect(() => {
+    imagensRef.current = imagensTemporarias;
+  }, [imagensTemporarias]);
+  useEffect(() => {
+    videosRef.current = videosAnexados;
+  }, [videosAnexados]);
+
+  // Cleanup blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      imagensRef.current.forEach(img => URL.revokeObjectURL(img.blobUrl));
+      videosRef.current.forEach(vid => URL.revokeObjectURL(vid.blobUrl));
+    };
+  }, []);
  
-   // Cleanup blob URLs on unmount
-   useEffect(() => {
-     return () => {
-       imagensRef.current.forEach(img => URL.revokeObjectURL(img.blobUrl));
-     };
-   }, []);
- 
-   const handleRemoveImagem = useCallback((id: string) => {
-     setImagensTemporarias(prev => prev.filter(img => img.id !== id));
-   }, []);
+  const handleRemoveImagem = useCallback((id: string) => {
+    setImagensTemporarias(prev => prev.filter(img => img.id !== id));
+  }, []);
+
+  const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    for (const file of Array.from(files)) {
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error(`Arquivo "${file.name}" excede o limite de 50MB.`);
+        continue;
+      }
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (!['mp4', 'mov', 'webm'].includes(ext || '')) {
+        toast.error(`Formato "${ext}" não suportado. Use MP4, MOV ou WebM.`);
+        continue;
+      }
+      const blobUrl = URL.createObjectURL(file);
+      const novoVideo: VideoAnexo = {
+        id: `VID-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        nome: file.name,
+        blobUrl,
+        tamanho: file.size,
+        dataUpload: new Date().toISOString(),
+        responsavel: user?.colaborador?.nome || 'Usuário',
+      };
+      setVideosAnexados(prev => [...prev, novoVideo]);
+      toast.success(`Vídeo "${file.name}" anexado com sucesso!`);
+    }
+    if (videoInputRef.current) videoInputRef.current.value = '';
+  }, [user]);
+
+  const handleRemoveVideo = useCallback((id: string) => {
+    setVideosAnexados(prev => {
+      const vid = prev.find(v => v.id === id);
+      if (vid) URL.revokeObjectURL(vid.blobUrl);
+      return prev.filter(v => v.id !== id);
+    });
+  }, []);
 
   useEffect(() => {
     const produtoEncontrado = getProdutos().find(p => p.id === id);
@@ -450,11 +507,71 @@ export default function EstoqueProdutoDetalhes() {
           </CardContent>
         </Card>
 
-         {/* Lista de Imagens Anexadas */}
-         <ListaImagensAnexadas
-           imagens={imagensTemporarias}
-           onRemove={handleRemoveImagem}
-         />
+        {/* Lista de Imagens Anexadas */}
+        <ListaImagensAnexadas
+          imagens={imagensTemporarias}
+          onRemove={handleRemoveImagem}
+        />
+
+        {/* Seção Anexos de Vídeo - apenas estoque/gestor */}
+        {ehEstoquistaOuGestor && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Film className="h-5 w-5" />
+                Anexos de Vídeo
+                {videosAnexados.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">{videosAnexados.length}</Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/mp4,video/mov,video/quicktime,video/webm"
+                  multiple
+                  onChange={handleVideoUpload}
+                  className="hidden"
+                />
+                <Button variant="outline" onClick={() => videoInputRef.current?.click()}>
+                  <Video className="mr-2 h-4 w-4" />
+                  Anexar Vídeo (MP4/MOV, max 50MB)
+                </Button>
+              </div>
+              
+              {videosAnexados.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhum vídeo anexado
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {videosAnexados.map(vid => (
+                    <div key={vid.id} className="border rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">{vid.nome}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {(vid.tamanho / (1024 * 1024)).toFixed(1)} MB · {vid.responsavel} · {new Date(vid.dataUpload).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => handleRemoveVideo(vid.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                      <video
+                        src={vid.blobUrl}
+                        controls
+                        className="w-full max-h-[300px] rounded-md bg-black"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
       
       {/* Modal Retirada de Peças */}

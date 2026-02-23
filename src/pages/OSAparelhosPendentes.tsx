@@ -14,9 +14,10 @@ import { getClientes } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { useAuthStore } from '@/store/authStore';
 import { formatIMEI } from '@/utils/imeiMask';
-import { Eye, CheckCircle, XCircle, Package, RotateCcw, DollarSign } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Eye, CheckCircle, XCircle, Package, RotateCcw, DollarSign, Clock, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, differenceInDays, differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
 
 export default function OSAparelhosPendentes() {
@@ -26,6 +27,9 @@ export default function OSAparelhosPendentes() {
   const { obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   const user = useAuthStore((s) => s.user);
 
+  // Ordenação
+  const [ordenacao, setOrdenacao] = useState<'antigo' | 'recente'>('antigo');
+
   // Modais
   const [aprovarModal, setAprovarModal] = useState(false);
   const [recusarModal, setRecusarModal] = useState(false);
@@ -33,11 +37,32 @@ export default function OSAparelhosPendentes() {
   const [motivoRecusa, setMotivoRecusa] = useState('');
 
   // Filtrar OSs pendentes de validação do estoque
+  // Helper SLA
+  const getSlaDias = (dataHora: string) => differenceInDays(new Date(), new Date(dataHora));
+  const getSlaHoras = (dataHora: string) => differenceInHours(new Date(), new Date(dataHora));
+  const getSlaLabel = (dataHora: string) => {
+    const dias = getSlaDias(dataHora);
+    const horas = getSlaHoras(dataHora);
+    if (dias < 1) return `${horas}h`;
+    return `${dias}d`;
+  };
+  const getSlaBadge = (dataHora: string) => {
+    const dias = getSlaDias(dataHora);
+    if (dias > 7) return { label: 'SLA Excedido', className: 'bg-red-500/15 text-red-700 border-red-300 dark:text-red-400' };
+    if (dias >= 4) return { label: 'Atenção', className: 'bg-yellow-500/15 text-yellow-700 border-yellow-300 dark:text-yellow-400' };
+    return { label: 'No Prazo', className: 'bg-green-500/15 text-green-700 border-green-300 dark:text-green-400' };
+  };
+
   const osPendentes = useMemo(() => {
     return ordensServico
       .filter(os => os.status === 'Serviço Concluído - Validar Aparelho')
-      .sort((a, b) => new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime());
-  }, [ordensServico]);
+      .sort((a, b) => {
+        if (ordenacao === 'antigo') {
+          return new Date(a.dataHora).getTime() - new Date(b.dataHora).getTime();
+        }
+        return new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime();
+      });
+  }, [ordensServico, ordenacao]);
 
   const recarregar = () => setOrdensServico(getOrdensServico());
 
@@ -173,12 +198,26 @@ export default function OSAparelhosPendentes() {
       {/* Tabela */}
       <Card>
         <CardContent className="p-0">
+          {/* Ordenação */}
+          <div className="flex items-center gap-2 p-4 pb-2">
+            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+            <Select value={ordenacao} onValueChange={(v) => setOrdenacao(v as 'antigo' | 'recente')}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="antigo">Mais antigo primeiro</SelectItem>
+                <SelectItem value="recente">Mais recente primeiro</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nº OS</TableHead>
                   <TableHead>Data</TableHead>
+                  <TableHead>Tempo</TableHead>
                   <TableHead>Modelo</TableHead>
                   <TableHead>IMEI</TableHead>
                   <TableHead>Técnico</TableHead>
@@ -188,11 +227,25 @@ export default function OSAparelhosPendentes() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {osPendentes.map(os => (
-                  <TableRow key={os.id} className="bg-orange-500/5">
+                {osPendentes.map(os => {
+                  const slaBadge = getSlaBadge(os.dataHora);
+                  return (
+                  <TableRow key={os.id} className={cn(
+                    getSlaDias(os.dataHora) > 7 ? 'bg-red-500/5' : 
+                    getSlaDias(os.dataHora) >= 4 ? 'bg-yellow-500/5' : 'bg-orange-500/5'
+                  )}>
                     <TableCell className="font-mono text-xs font-medium">{os.id}</TableCell>
                     <TableCell className="text-xs">
                       {format(new Date(os.dataHora), 'dd/MM/yyyy HH:mm')}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-xs font-medium">{getSlaLabel(os.dataHora)}</span>
+                        <Badge variant="outline" className={cn('text-[10px] ml-1', slaBadge.className)}>
+                          {slaBadge.label}
+                        </Badge>
+                      </div>
                     </TableCell>
                     <TableCell className="font-medium">{os.modeloAparelho || '-'}</TableCell>
                     <TableCell className="font-mono text-xs">{formatIMEI(os.imeiAparelho || '')}</TableCell>
@@ -233,10 +286,11 @@ export default function OSAparelhosPendentes() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
                 {osPendentes.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       Nenhum aparelho pendente de validação
                     </TableCell>
                   </TableRow>

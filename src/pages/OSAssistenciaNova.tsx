@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   getNextOSNumber, 
@@ -541,13 +542,25 @@ export default function OSAssistenciaNova() {
   };
 
   // Solicitações de peças handlers
-  const handleAddSolicitacao = () => {
+  const [modalConfirmarSolicitacao, setModalConfirmarSolicitacao] = useState(false);
+  const [checkConfirmarSolicitacao, setCheckConfirmarSolicitacao] = useState(false);
+
+  const handleAbrirConfirmarSolicitacao = () => {
     if (!novaSolicitacao.peca || !novaSolicitacao.justificativa) {
       toast({
         title: 'Campos obrigatórios',
         description: 'Preencha a peça e a justificativa',
         variant: 'destructive'
       });
+      return;
+    }
+    setCheckConfirmarSolicitacao(false);
+    setModalConfirmarSolicitacao(true);
+  };
+
+  const handleConfirmarAddSolicitacao = () => {
+    if (!checkConfirmarSolicitacao) {
+      toast({ title: 'Confirme a solicitação na caixa de seleção', variant: 'destructive' });
       return;
     }
     setSolicitacoesPecas([...solicitacoesPecas, { ...novaSolicitacao }]);
@@ -558,6 +571,7 @@ export default function OSAssistenciaNova() {
       modeloCompativel: modeloAparelho,
       prioridade: 'Normal'
     });
+    setModalConfirmarSolicitacao(false);
     toast({
       title: 'Solicitação adicionada',
       description: `Peça "${novaSolicitacao.peca}" adicionada à lista`
@@ -1520,7 +1534,7 @@ export default function OSAssistenciaNova() {
                     />
                   </div>
                 </div>
-                <Button onClick={handleAddSolicitacao}>
+                <Button onClick={handleAbrirConfirmarSolicitacao}>
                   <Plus className="mr-2 h-4 w-4" />
                   Adicionar Solicitação
                 </Button>
@@ -2141,6 +2155,43 @@ export default function OSAssistenciaNova() {
               </TableBody>
             </Table>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Dupla Confirmação - Adicionar Solicitação */}
+      <Dialog open={modalConfirmarSolicitacao} onOpenChange={setModalConfirmarSolicitacao}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Confirmar Solicitação de Peça
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-muted/30 rounded-md p-4 space-y-2 text-sm">
+              <p><strong>Peça:</strong> {novaSolicitacao.peca}</p>
+              <p><strong>Quantidade:</strong> {novaSolicitacao.quantidade}</p>
+              <p><strong>Prioridade:</strong> {novaSolicitacao.prioridade}</p>
+              {novaSolicitacao.modeloCompativel && <p><strong>Modelo Compatível:</strong> {novaSolicitacao.modeloCompativel}</p>}
+              <p><strong>Justificativa:</strong> {novaSolicitacao.justificativa}</p>
+            </div>
+            <div className="flex items-center gap-2 border rounded-md p-3 bg-muted/30">
+              <Checkbox
+                checked={checkConfirmarSolicitacao}
+                onCheckedChange={(checked) => setCheckConfirmarSolicitacao(checked as boolean)}
+              />
+              <Label className="text-sm cursor-pointer">
+                Confirmo que os dados da solicitação estão corretos e desejo adicionar esta peça à lista
+              </Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalConfirmarSolicitacao(false)}>Cancelar</Button>
+            <Button onClick={handleConfirmarAddSolicitacao} disabled={!checkConfirmarSolicitacao}>
+              <Plus className="h-4 w-4 mr-2" />
+              Confirmar e Adicionar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </PageLayout>

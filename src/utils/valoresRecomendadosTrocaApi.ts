@@ -15,6 +15,7 @@ export interface ValorRecomendadoTroca {
 
 export interface LogValorTroca {
   id: string;
+  valorId: string;
   tipo: 'criacao' | 'edicao' | 'exclusao';
   modelo: string;
   usuario: string;
@@ -125,9 +126,10 @@ const getUsuarioLogado = (): string => {
   }
 };
 
-const registrarLog = (tipo: LogValorTroca['tipo'], modelo: string, detalhes: string) => {
+const registrarLog = (tipo: LogValorTroca['tipo'], valorId: string, modelo: string, detalhes: string) => {
   logsValorTroca.unshift({
     id: gerarLogId(),
+    valorId,
     tipo,
     modelo,
     usuario: getUsuarioLogado(),
@@ -162,7 +164,7 @@ export const criarValorRecomendado = (dados: Omit<ValorRecomendadoTroca, 'id' | 
     ultimaAtualizacao: new Date().toISOString().split('T')[0],
   };
   valoresRecomendados.push(novo);
-  registrarLog('criacao', novo.modelo, `Criado valor para ${novo.modelo} (${novo.condicao}): Min R$${novo.valorMin}, Max R$${novo.valorMax}, Sugerido R$${novo.valorSugerido}`);
+  registrarLog('criacao', novo.id, novo.modelo, `Criado valor para ${novo.modelo} (${novo.condicao}): Min R$${novo.valorMin}, Max R$${novo.valorMax}, Sugerido R$${novo.valorSugerido}`);
   return novo;
 };
 
@@ -182,7 +184,7 @@ export const editarValorRecomendado = (id: string, dados: Partial<Omit<ValorReco
   valoresRecomendados[idx] = { ...anterior, ...dados, ultimaAtualizacao: new Date().toISOString().split('T')[0] };
   
   if (alteracoes.length > 0) {
-    registrarLog('edicao', valoresRecomendados[idx].modelo, alteracoes.join('; '));
+    registrarLog('edicao', id, valoresRecomendados[idx].modelo, alteracoes.join('; '));
   }
   return valoresRecomendados[idx];
 };
@@ -192,12 +194,13 @@ export const excluirValorRecomendado = (id: string): boolean => {
   if (idx === -1) return false;
   const removido = valoresRecomendados[idx];
   valoresRecomendados.splice(idx, 1);
-  registrarLog('exclusao', removido.modelo, `Removido valor para ${removido.modelo} (${removido.condicao})`);
+  registrarLog('exclusao', id, removido.modelo, `Removido valor para ${removido.modelo} (${removido.condicao})`);
   return true;
 };
 
 // Logs
-export const getLogsValorTroca = (): LogValorTroca[] => {
+export const getLogsValorTroca = (valorId?: string): LogValorTroca[] => {
+  if (valorId) return logsValorTroca.filter(l => l.valorId === valorId);
   return [...logsValorTroca];
 };
 

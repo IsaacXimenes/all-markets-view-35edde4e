@@ -1,84 +1,88 @@
 
-# Gerar Nota de Garantia em PDF
+
+# Melhorias no Modulo de Consignacao
 
 ## Resumo
 
-Implementar a geracao automatica de um PDF "Nota de Garantia" baseado no modelo fornecido (Thiago Imports - Feira dos Importados), acessivel a partir de um botao "Gerar Nota de Garantia" na tela de detalhes da venda (`VendaDetalhes.tsx`).
+Cinco ajustes no modulo de Consignacao da Assistencia: autocomplete no campo Modelo, correcao do botao "$", reorganizacao dos botoes por aba, automacao do pagamento via Financeiro, e habilitacao permanente de "Fechar Lote" e "Registrar Devolucao" no Inventario.
 
-## Biblioteca
+---
 
-Sera utilizada a biblioteca **jsPDF** para geracao client-side do PDF, sem necessidade de backend. E leve, amplamente usada e suporta texto, tabelas e imagens.
+## 1. Autocomplete no Campo Modelo (Novo Lote e Edicao)
 
-## Estrutura do PDF (baseado no modelo)
+**Problema:** O campo "Modelo" usa um `<Select>` estatico com `produtosCadastro`. Conforme a regra global, deve ser um Autocomplete pesquisavel.
 
-O PDF segue o layout do modelo fornecido com as seguintes secoes:
+**Alteracao:** Substituir os 3 `<Select>` de Modelo (novo lote linha 443, edicao linha 588, novos itens edicao linha 625) por um componente Autocomplete que filtra `produtosCadastro` por texto digitado, usando `<Popover>` + `<Command>` (padrao cmdk ja usado no projeto).
 
-1. **Cabecalho**: Logo Thiago Imports, "NOTA DE GARANTIA", numero, data, identificacao
-2. **Emitente** (fixo): Thiago Imports, Feira dos Importados, Bloco D, Loja 433/434, Brasilia, CEP 71208-900, CNPJ 46.197.533/0001-06
-3. **Destinatario**: Nome, CPF, Endereco, Bairro, Cidade, UF, CEP, Telefone, Email (do cliente da venda)
-4. **Forma de Pagamento**: Tabela com descricao e valor de cada pagamento
-5. **Frete**: Indica se tem entrega e endereco
-6. **Dados dos Produtos**: Tabela com QTD, Descricao (produto + IMEI), Tipo (categoria), Valor
-7. **Dados Adicionais**: Observacoes da venda
-8. **Informacoes Complementares** (fixo): Texto de garantia de 1 ano
-9. **Rodape**: Data e hora da impressao
+**Arquivo:** `src/pages/OSConsignacao.tsx`
 
-## Detalhes Tecnicos
+---
 
-### 1. Instalar dependencia
+## 2. Botao "$" nao deve abrir "Editar Itens do Lote"
 
-- Adicionar `jspdf` ao projeto
+**Problema:** O botao "$" na lista (linha 1265) abre o detalhamento com `detalhamentoReadOnly: false`, o que exibe o card "Editar Itens do Lote" (linha 558). O usuario quer apenas gerar pagamento, nao editar.
 
-### 2. Criar utilitario: `src/utils/gerarNotaGarantiaPdf.ts`
+**Alteracao:** No onClick do botao "$" (linha 1265-1273), definir `setDetalhamentoReadOnly(true)` em vez de `false`. Isso oculta o card de edicao. O usuario ainda tera acesso a aba "Pecas Usadas" para selecionar itens e gerar pagamento parcial. Ajustar a condicao do card "Gerar Pagamento Parcial" na aba Pecas Usadas para permitir operacao mesmo em modo readOnly quando vindo do "$".
 
-Funcao `gerarNotaGarantiaPdf(venda: Venda)` que:
+**Solucao tecnica:** Criar um novo estado `modoPagamento` (boolean). O botao "$" seta `modoPagamento = true` e `detalhamentoReadOnly = true`. O card de "Gerar Pagamento Parcial" fica visivel quando `!loteConcluido && (!detalhamentoReadOnly || modoPagamento)`. O card de edicao segue oculto (so visivel quando `!detalhamentoReadOnly && loteAberto`).
 
-- Recebe o objeto `Venda` completo
-- Busca dados do cliente via `getClientes()` usando `venda.clienteId` para obter endereco, bairro, cidade, estado, CEP
-- Monta o PDF com jsPDF usando coordenadas manuais para reproduzir o layout do modelo
-- Dados do emitente sao fixos (Thiago Imports)
-- Abre o PDF em nova aba via `window.open(pdf.output('bloburl'))`
+**Arquivo:** `src/pages/OSConsignacao.tsx`
 
-Mapeamento dos campos:
+---
 
-| Campo na Nota | Origem no Sistema |
-|---|---|
-| No | `venda.numero` |
-| DATA | `venda.dataHora` formatado |
-| IDENTIFICACAO | `venda.id` |
-| DATA DA EMISSAO | `venda.dataHora` |
-| DATA DA SAIDA | `venda.dataHora` |
-| NOME/RAZAO SOCIAL | `venda.clienteNome` |
-| CNPJ/CPF | `venda.clienteCpf` |
-| ENDERECO | `cliente.endereco + cliente.numero` |
-| BAIRRO | `cliente.bairro` |
-| MUNICIPIO | `cliente.cidade` ou `venda.clienteCidade` |
-| UF | `cliente.estado` |
-| CEP | `cliente.cep` |
-| TELEFONE | `venda.clienteTelefone` |
-| EMAIL | `venda.clienteEmail` |
-| Forma Pagamento | `venda.pagamentos[].meioPagamento` e `valor` |
-| Frete | baseado em `venda.tipoRetirada` e `venda.taxaEntrega` |
-| Produtos QTD | `item.quantidade` |
-| Produtos DESCRICAO | `item.produto + IMEI` |
-| Produtos TIPO | `item.categoria` |
-| Produtos VALOR | `item.valorVenda` |
-| TOTAL | `venda.total` |
-| DADOS ADICIONAIS | `venda.observacoes` |
-| DATA HORA IMPRESSAO | `new Date()` formatado |
+## 3. Esconder "Finalizar Lote" e "Confirmar Devolucoes" da aba "Pecas Usadas"
 
-### 3. Alterar: `src/pages/VendaDetalhes.tsx`
+**Problema:** Os botoes "Finalizar Lote" e devoluces ficam fora das abas (linhas 984-1079), visiveis independente da aba selecionada.
 
-- Importar `gerarNotaGarantiaPdf`
-- Adicionar botao "Gerar Nota de Garantia" ao lado do botao "Imprimir Recibo" (visivel apenas fora do modo conferencia)
-- O botao chama `gerarNotaGarantiaPdf(venda)` ao clicar
+**Alteracao:** 
+- Mover o card "Finalizar Lote e Confirmar Devolucoes" (linhas 984-1079) para dentro do `<TabsContent value="inventario">`.
+- Adicionar botoes de devolucao individual por item na tabela do Inventario (coluna "Acoes") para itens com status "Disponivel".
+- Controlar a aba ativa via estado `activeTab` para condicionar a visibilidade.
 
-### 4. Layout do PDF
+**Arquivo:** `src/pages/OSConsignacao.tsx`
 
-O PDF sera gerado em formato A4 retrato com:
-- Bordas e linhas para separar secoes (como no modelo)
-- Texto em caixa alta para cabecalhos de secao
-- Tabela de produtos com colunas QTD, DESCRICAO, TIPO, VALOR
-- Tabela de pagamentos com colunas DESCRICAO, VALOR
-- Acessorios incluidos na lista de produtos com tipo "Acessorio"
-- Texto fixo de garantia no rodape
+---
+
+## 4. Automacao de Status de Pagamento via Financeiro
+
+**Problema:** Atualmente, a confirmacao de pagamento e feita manualmente na aba "Historico de Pagamentos" da Assistencia (botao "Confirmar" linha 931-973). O correto e que o pagamento seja confirmado automaticamente quando o Financeiro finaliza a nota.
+
+**Alteracoes:**
+
+### 4a. `src/utils/solicitacaoPecasApi.ts` - `finalizarNotaAssistencia`
+- Apos a linha que processa lotes de pagamento (linha 600-610), adicionar logica: se `nota.tipoConsignacao === true`, chamar `confirmarPagamentoParcial` do `consignacaoApi` usando `nota.solicitacaoId` (loteId) e o pagamento vinculado ao `nota.id` (notaFinanceiraId), passando o responsavel financeiro e o comprovante.
+
+### 4b. `src/pages/OSConsignacao.tsx` - Historico de Pagamentos
+- Remover o botao "Confirmar" (AlertDialog linhas 931-973) da aba Historico de Pagamentos. Pagamentos pendentes exibem apenas o badge "Pendente" sem acao manual. A confirmacao vem exclusivamente do Financeiro.
+
+### 4c. `src/utils/consignacaoApi.ts` - Nova funcao auxiliar
+- Criar funcao `confirmarPagamentoPorNotaId(loteId, notaFinanceiraId, responsavel, comprovanteUrl)` que busca o pagamento parcial pela `notaFinanceiraId` e chama `confirmarPagamentoParcial` internamente. Isso facilita a integracao do Financeiro sem precisar saber o `pagamentoId`.
+
+**Arquivos:** `src/utils/consignacaoApi.ts`, `src/utils/solicitacaoPecasApi.ts`, `src/pages/OSConsignacao.tsx`
+
+---
+
+## 5. Habilitar "Fechar Lote" e "Registrar Devolucao" Sempre no Inventario
+
+**Problema:** "Finalizar Lote" so aparece quando `loteAberto && temConsumidos` (linha 985). Deveria estar sempre habilitado no Inventario, independente do status dos itens.
+
+**Alteracoes:**
+
+### 5a. Botao "Finalizar Lote"
+- Remover condicao `loteAberto && temConsumidos`. Exibir sempre que `lote.status !== 'Concluido'` e estiver na aba Inventario.
+
+### 5b. Botao "Registrar Devolucao" com selecao individual
+- Na tabela do Inventario, adicionar coluna "Acoes" com botao de devolucao por item (icone Undo2) para itens com status "Disponivel".
+- Cada clique abre o AlertDialog de confirmacao em duas etapas (ja existente, linhas 1286-1314) para aquele item especifico.
+- Remover restricao de status do lote para devolucao - permitir devolver itens mesmo que o lote esteja em "Aguardando Pagamento".
+
+**Arquivo:** `src/pages/OSConsignacao.tsx`
+
+---
+
+## Sequencia de Implementacao
+
+1. `src/utils/consignacaoApi.ts` - Criar `confirmarPagamentoPorNotaId`
+2. `src/utils/solicitacaoPecasApi.ts` - Integrar automacao na `finalizarNotaAssistencia`
+3. `src/pages/OSConsignacao.tsx` - Aplicar todas as alteracoes de UI (itens 1, 2, 3, 4b, 5)
+

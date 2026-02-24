@@ -1,46 +1,74 @@
 
 
-# Ajustes no Modal de Pecas e Movimentacao de Pecas
+# Autocomplete de Modelo, Encaminhamento Individual para Assistencia, e Correcao de Rota
 
 ## Resumo
 
-Duas alteracoes: (1) no modal de selecao de pecas da Nova OS e Editar OS, substituir a coluna "Valor Recomendado" por "Origem" e remover o campo "V. Recomendado" exibido apos selecao; (2) no formulario de Nova Movimentacao de Pecas, trocar o campo Destino de lojas tipo "Loja" para lojas tipo "Assistencia".
+Tres alteracoes na tela de Cadastro de Produtos da Nota de Entrada:
+1. Substituir o Select estatico de Modelo por Autocomplete pesquisavel
+2. Adicionar botao individual por produto para encaminhar para assistencia (com modal de motivo), habilitado apenas quando o IMEI esta preenchido
+3. Corrigir o fluxo de encaminhamento: ao enviar para assistencia a partir da nota de entrada, os aparelhos devem ir para "Analise de Tratativas" (nao diretamente para Servicos/OS)
 
 ---
 
-## 1. Modal de Selecao de Peca - Trocar "Valor Recomendado" por "Origem"
+## 1. Autocomplete no Campo Modelo
 
-**Arquivos:** `src/pages/OSAssistenciaNova.tsx` e `src/pages/OSAssistenciaEditar.tsx`
+**Arquivo:** `src/pages/EstoqueNotaCadastrarProdutos.tsx`
 
-### 1a. Cabecalho da tabela do modal
+**Problema:** O campo Modelo (linhas 456-473) usa um `<Select>` estatico. Conforme a regra global, deve ser um Autocomplete pesquisavel consumindo dados de Cadastros > Aparelhos.
 
-Em ambos os arquivos, substituir o `<TableHead>Valor Recomendado</TableHead>` por `<TableHead>Origem</TableHead>`.
-
-### 1b. Linhas da tabela (pecas da minha loja e de outras lojas)
-
-Em ambos os arquivos, substituir `<TableCell>{formatCurrency(p.valorRecomendado)}</TableCell>` por `<TableCell className="text-xs">{p.origem}</TableCell>` nas linhas de pecas da minha loja e de outras lojas.
-
-### 1c. Remover campo "V. Recomendado" apos selecao
-
-Apos selecionar uma peca do estoque, o sistema exibe dois campos lado a lado: "V. Recomendado" e "V. Custo". Remover o campo "V. Recomendado" e manter apenas "V. Custo" ocupando toda a largura (mudar de `grid-cols-2` para coluna unica).
-
-Isso se aplica a ambos os arquivos:
-- `OSAssistenciaNova.tsx` (linhas 1363-1377)
-- `OSAssistenciaEditar.tsx` (linhas 899-913)
+**Alteracao:** Substituir o `<Select>` por um componente inline usando `<Popover>` + `<Command>` (padrao cmdk ja utilizado no projeto). O autocomplete filtra `produtosCadastro` (para Aparelhos) ou `acessoriosCadastro` (para Acessorios) por texto digitado. A largura do campo sera mantida em `w-44`.
 
 ---
 
-## 2. Movimentacao de Pecas - Destino como Assistencia
+## 2. Botao de Encaminhar para Assistencia por Produto
 
-**Arquivo:** `src/pages/OSMovimentacaoPecas.tsx`
+**Arquivo:** `src/pages/EstoqueNotaCadastrarProdutos.tsx`
 
-### 2a. Campo Destino no formulario de Nova Movimentacao
+**Problema:** Atualmente so existe o botao "Salvar Produtos". O usuario precisa de um botao por linha para marcar individualmente um aparelho para encaminhamento a assistencia.
 
-Na linha 527-532, o `<AutocompleteLoja>` usa `apenasLojasTipoLoja={true}` que filtra apenas lojas do tipo "Loja". Substituir por `filtrarPorTipo="Assistencia"` para listar apenas unidades de Assistencia.
+**Alteracao:**
 
-### 2b. Campo Destino no formulario de Edicao
+### 2a. Botao na coluna de acoes
+Na coluna de acoes da tabela (linha 558-568), ao lado do botao de remover, adicionar um botao com icone `Wrench` (chave inglesa). O botao so fica habilitado quando:
+- `tipoProduto === 'Aparelho'`
+- `imei` esta preenchido (campo nao vazio)
+- O produto ainda nao foi marcado para assistencia
 
-Na linha 764-767, o mesmo ajuste: substituir `apenasLojasTipoLoja={true}` por `filtrarPorTipo="Assistencia"`.
+### 2b. Modal de motivo
+Ao clicar no botao, abre um `<Dialog>` com:
+- Informacoes do aparelho (Marca, Modelo, IMEI) em modo leitura
+- Campo `<Textarea>` obrigatorio para informar o motivo do encaminhamento
+- Data/hora e responsavel preenchidos automaticamente
+- Checkbox de confirmacao
+- Botoes "Cancelar" e "Confirmar Encaminhamento"
+
+### 2c. Estado de marcacao
+Criar estado `produtosMarcadosAssistencia` (array de objetos com indice do produto + motivo). Produtos marcados exibem um `<Badge>` "Assistencia" na linha e o botao Wrench fica desabilitado. O usuario pode desmarcar clicando novamente.
+
+### 2d. Fluxo no salvar
+Ao clicar "Salvar Produtos", apos o cadastro normal (`cadastrarProdutosNota`), os produtos marcados para assistencia sao encaminhados individualmente para a "Analise de Tratativas" usando `encaminharParaAnaliseGarantia` da `garantiasApi.ts`, passando:
+- `origemId`: ID do produto na nota
+- `origem`: `'Estoque'`
+- `descricao`: `"[Marca] [Modelo] - IMEI: [imei]"`
+- `observacao`: motivo informado no modal
+
+---
+
+## 3. Correcao do Fluxo de Encaminhamento (Nota de Entrada)
+
+**Arquivo:** `src/utils/loteRevisaoApi.ts`
+
+**Problema:** A funcao `encaminharLoteParaAssistencia` (linha 129-176) cria OS diretamente com `addOrdemServico`, fazendo os aparelhos irem para a aba "Servicos" em vez de passar pela "Analise de Tratativas".
+
+**Alteracao:** Substituir a chamada `addOrdemServico` por `encaminharParaAnaliseGarantia` para cada item do lote. Assim, os aparelhos encaminhados via Nota de Entrada (tela de Conferencia) tambem passam pela "Analise de Tratativas" antes de virar OS.
+
+Detalhes:
+- Importar `encaminharParaAnaliseGarantia` de `garantiasApi.ts`
+- Para cada item do lote, chamar `encaminharParaAnaliseGarantia(item.id, 'Estoque', descricao, motivoAssistencia)`
+- Remover a criacao direta de OS (`addOrdemServico`)
+- Manter o status do lote como `'Encaminhado'`
+- Atualizar o retorno (sem `osIds`, pois as OS serao criadas depois na Analise de Tratativas)
 
 ---
 
@@ -50,10 +78,28 @@ Na linha 764-767, o mesmo ajuste: substituir `apenasLojasTipoLoja={true}` por `f
 
 | Arquivo | Alteracao |
 |---|---|
-| `src/pages/OSAssistenciaNova.tsx` | Tabela modal: coluna "Valor Recomendado" vira "Origem"; campo V. Recomendado removido apos selecao |
-| `src/pages/OSAssistenciaEditar.tsx` | Mesmas alteracoes acima |
-| `src/pages/OSMovimentacaoPecas.tsx` | Destino: `apenasLojasTipoLoja` substituido por `filtrarPorTipo="Assistencia"` em 2 locais |
+| `src/pages/EstoqueNotaCadastrarProdutos.tsx` | Autocomplete Modelo + botao encaminhar assistencia por linha + modal motivo |
+| `src/utils/loteRevisaoApi.ts` | Corrigir fluxo: usar `encaminharParaAnaliseGarantia` em vez de `addOrdemServico` |
 
-### Sem novas dependencias
+### Novas importacoes em EstoqueNotaCadastrarProdutos.tsx
+- `Wrench` de lucide-react
+- `Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter` de ui/dialog
+- `Textarea` de ui/textarea
+- `Checkbox` de ui/checkbox
+- `Popover, PopoverContent, PopoverTrigger` de ui/popover
+- `Command, CommandInput, CommandList, CommandItem, CommandEmpty` de ui/command
+- `encaminharParaAnaliseGarantia` de garantiasApi
+- `useAuthStore` de store/authStore
+- `format` de date-fns
 
-Todas as props (`filtrarPorTipo`, `origem`) ja existem nos componentes e tipos atuais.
+### Sem novas dependencias npm
+
+Todas as funcoes e componentes ja existem no projeto.
+
+---
+
+## Sequencia de Implementacao
+
+1. `src/utils/loteRevisaoApi.ts` - Corrigir fluxo de encaminhamento
+2. `src/pages/EstoqueNotaCadastrarProdutos.tsx` - Autocomplete Modelo + botao assistencia + modal
+

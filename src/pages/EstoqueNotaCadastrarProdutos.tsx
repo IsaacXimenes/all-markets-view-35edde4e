@@ -9,7 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, Plus, Trash2, AlertTriangle, Save, CheckCircle, Clock } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandInput, CommandList, CommandItem, CommandEmpty } from '@/components/ui/command';
+import { ArrowLeft, Plus, Trash2, AlertTriangle, Save, CheckCircle, Clock, Wrench, ChevronsUpDown, Check } from 'lucide-react';
 import { 
   getNotaEntradaById, 
   cadastrarProdutosNota, 
@@ -17,12 +22,16 @@ import {
   podeRealizarAcao 
 } from '@/utils/notaEntradaFluxoApi';
 import { getProdutosCadastro } from '@/utils/cadastrosApi';
+import { encaminharParaAnaliseGarantia } from '@/utils/garantiasApi';
+import { useAuthStore } from '@/store/authStore';
 import { toast } from 'sonner';
 import { InputComMascara } from '@/components/ui/InputComMascara';
 import { formatCurrency } from '@/utils/formatUtils';
 import { getCores } from '@/utils/coresApi';
 import { getAcessorios } from '@/utils/acessoriosApi';
 import { formatIMEI } from '@/utils/imeiMask';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const categoriasAparelho = ['Novo', 'Seminovo'];
 
@@ -39,11 +48,18 @@ interface ProdutoLinha {
   explodido?: boolean;
 }
 
+interface MarcacaoAssistencia {
+  index: number;
+  motivo: string;
+  timestamp: string;
+}
+
 const marcasAparelhos = ['Apple', 'Samsung', 'Xiaomi', 'Motorola', 'LG', 'Huawei', 'OnePlus', 'Realme', 'ASUS', 'Nokia', 'Oppo', 'Vivo'];
 
 export default function EstoqueNotaCadastrarProdutos() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   
   const [nota, setNota] = useState<NotaEntrada | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,6 +79,16 @@ export default function EstoqueNotaCadastrarProdutos() {
     custoUnitario: 0,
     custoTotal: 0
   }]);
+
+  // Estado para marcação de assistência
+  const [produtosMarcadosAssistencia, setProdutosMarcadosAssistencia] = useState<MarcacaoAssistencia[]>([]);
+  const [modalAssistenciaAberto, setModalAssistenciaAberto] = useState(false);
+  const [indiceProdutoAssistencia, setIndiceProdutoAssistencia] = useState<number | null>(null);
+  const [motivoAssistencia, setMotivoAssistencia] = useState('');
+  const [confirmarAssistencia, setConfirmarAssistencia] = useState(false);
+
+  // Estado para popover do autocomplete modelo
+  const [openModeloPopover, setOpenModeloPopover] = useState<number | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -104,6 +130,11 @@ export default function EstoqueNotaCadastrarProdutos() {
   const removerProduto = (index: number) => {
     if (produtos.length > 1) {
       setProdutos(produtos.filter((_, i) => i !== index));
+      // Remover marcação de assistência se existir
+      setProdutosMarcadosAssistencia(prev => prev.filter(m => m.index !== index).map(m => ({
+        ...m,
+        index: m.index > index ? m.index - 1 : m.index
+      })));
     }
   };
 
@@ -120,6 +151,8 @@ export default function EstoqueNotaCadastrarProdutos() {
       if (valor === 'Aparelho') {
         novosProdutos[index].quantidade = 1;
       }
+      // Remover marcação de assistência ao trocar tipo
+      setProdutosMarcadosAssistencia(prev => prev.filter(m => m.index !== index));
     }
     
     if (campo === 'marca') {
@@ -144,6 +177,40 @@ export default function EstoqueNotaCadastrarProdutos() {
 
   const calcularValorTotal = () => {
     return produtos.reduce((acc, prod) => acc + prod.custoTotal, 0);
+  };
+
+  // Assistência handlers
+  const isMarcadoAssistencia = (index: number) => produtosMarcadosAssistencia.some(m => m.index === index);
+
+  const abrirModalAssistencia = (index: number) => {
+    setIndiceProdutoAssistencia(index);
+    setMotivoAssistencia('');
+    setConfirmarAssistencia(false);
+    setModalAssistenciaAberto(true);
+  };
+
+  const confirmarEncaminhamento = () => {
+    if (indiceProdutoAssistencia === null) return;
+    if (!motivoAssistencia.trim()) {
+      toast.error('Informe o motivo do encaminhamento');
+      return;
+    }
+    if (!confirmarAssistencia) {
+      toast.error('Confirme o encaminhamento');
+      return;
+    }
+
+    setProdutosMarcadosAssistencia(prev => [
+      ...prev,
+      { index: indiceProdutoAssistencia, motivo: motivoAssistencia, timestamp: new Date().toISOString() }
+    ]);
+    setModalAssistenciaAberto(false);
+    toast.success('Produto marcado para assistência');
+  };
+
+  const desmarcarAssistencia = (index: number) => {
+    setProdutosMarcadosAssistencia(prev => prev.filter(m => m.index !== index));
+    toast.info('Marcação de assistência removida');
   };
 
   const validarProdutos = (): boolean => {
@@ -194,7 +261,19 @@ export default function EstoqueNotaCadastrarProdutos() {
     );
     
     if (resultado) {
-      toast.success(`${produtos.length} produto(s) cadastrado(s) com sucesso!`);
+      // Encaminhar produtos marcados para assistência
+      produtosMarcadosAssistencia.forEach(marcacao => {
+        const prod = produtos[marcacao.index];
+        if (prod) {
+          const descricao = `${prod.marca} ${prod.modelo} - IMEI: ${prod.imei}`;
+          encaminharParaAnaliseGarantia(nota.id, 'Estoque', descricao, marcacao.motivo);
+        }
+      });
+
+      const msgAssistencia = produtosMarcadosAssistencia.length > 0
+        ? ` | ${produtosMarcadosAssistencia.length} encaminhado(s) para assistência`
+        : '';
+      toast.success(`${produtos.length} produto(s) cadastrado(s) com sucesso!${msgAssistencia}`);
       navigate('/estoque/notas-pendencias');
     } else {
       toast.error('Erro ao cadastrar produtos');
@@ -413,12 +492,12 @@ export default function EstoqueNotaCadastrarProdutos() {
                     <TableHead>Qtd *</TableHead>
                     <TableHead className="min-w-[130px]">Custo Unit. *</TableHead>
                     <TableHead>Custo Total</TableHead>
-                    <TableHead></TableHead>
+                    <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {produtos.map((produto, index) => (
-                    <TableRow key={index}>
+                    <TableRow key={index} className={isMarcadoAssistencia(index) ? 'bg-orange-50 dark:bg-orange-950/20' : ''}>
                       <TableCell>
                         <Select 
                           value={produto.tipoProduto}
@@ -452,25 +531,52 @@ export default function EstoqueNotaCadastrarProdutos() {
                           <Input disabled placeholder="N/A" className="w-28 bg-muted" />
                         )}
                       </TableCell>
+                      {/* Modelo - Autocomplete */}
                       <TableCell>
-                        <Select 
-                          value={produto.modelo}
-                          onValueChange={(value) => atualizarProduto(index, 'modelo', value)}
-                        >
-                          <SelectTrigger className="w-44">
-                            <SelectValue placeholder="Selecione" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {produto.tipoProduto === 'Acessorio'
-                              ? acessoriosCadastro.map(a => (
-                                  <SelectItem key={a.id} value={a.descricao}>{a.descricao}</SelectItem>
-                                ))
-                              : getModelosAparelhos(produto.marca).map(p => (
-                                  <SelectItem key={p.id} value={p.produto}>{p.produto}</SelectItem>
-                                ))
-                            }
-                          </SelectContent>
-                        </Select>
+                        <Popover open={openModeloPopover === index} onOpenChange={(open) => setOpenModeloPopover(open ? index : null)}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" role="combobox" className="w-44 justify-between font-normal">
+                              <span className="truncate">{produto.modelo || 'Selecione...'}</span>
+                              <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-56 p-0" style={{ zIndex: 100 }}>
+                            <Command>
+                              <CommandInput placeholder="Pesquisar modelo..." />
+                              <CommandList className="max-h-48 overflow-y-auto">
+                                <CommandEmpty>Nenhum modelo encontrado.</CommandEmpty>
+                                {produto.tipoProduto === 'Acessorio'
+                                  ? acessoriosCadastro.map(a => (
+                                      <CommandItem
+                                        key={a.id}
+                                        value={a.descricao}
+                                        onSelect={() => {
+                                          atualizarProduto(index, 'modelo', a.descricao);
+                                          setOpenModeloPopover(null);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", produto.modelo === a.descricao ? "opacity-100" : "opacity-0")} />
+                                        {a.descricao}
+                                      </CommandItem>
+                                    ))
+                                  : getModelosAparelhos(produto.marca).map(p => (
+                                      <CommandItem
+                                        key={p.id}
+                                        value={p.produto}
+                                        onSelect={() => {
+                                          atualizarProduto(index, 'modelo', p.produto);
+                                          setOpenModeloPopover(null);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", produto.modelo === p.produto ? "opacity-100" : "opacity-0")} />
+                                        {p.produto}
+                                      </CommandItem>
+                                    ))
+                                }
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </TableCell>
                       {/* IMEI */}
                       <TableCell>
@@ -557,6 +663,34 @@ export default function EstoqueNotaCadastrarProdutos() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          {isMarcadoAssistencia(index) ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => desmarcarAssistencia(index)}
+                              title="Remover marcação de assistência"
+                            >
+                              <Badge className="text-[10px] px-1.5 py-0 bg-orange-500 hover:bg-orange-600 text-white cursor-pointer">
+                                Assistência ✕
+                              </Badge>
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => abrirModalAssistencia(index)}
+                              disabled={produto.tipoProduto !== 'Aparelho' || !produto.imei.trim()}
+                              title={
+                                produto.tipoProduto !== 'Aparelho'
+                                  ? 'Apenas aparelhos podem ser encaminhados'
+                                  : !produto.imei.trim()
+                                    ? 'Preencha o IMEI para habilitar'
+                                    : 'Encaminhar para assistência'
+                              }
+                            >
+                              <Wrench className="h-4 w-4 text-orange-500" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -586,6 +720,77 @@ export default function EstoqueNotaCadastrarProdutos() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal de Encaminhamento para Assistência */}
+      <Dialog open={modalAssistenciaAberto} onOpenChange={setModalAssistenciaAberto}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-orange-500" />
+              Encaminhar para Assistência
+            </DialogTitle>
+          </DialogHeader>
+
+          {indiceProdutoAssistencia !== null && produtos[indiceProdutoAssistencia] && (
+            <div className="space-y-4">
+              {/* Info do aparelho */}
+              <div className="p-3 bg-muted/50 rounded-lg space-y-1">
+                <p className="text-sm"><span className="text-muted-foreground">Marca:</span> <span className="font-medium">{produtos[indiceProdutoAssistencia].marca}</span></p>
+                <p className="text-sm"><span className="text-muted-foreground">Modelo:</span> <span className="font-medium">{produtos[indiceProdutoAssistencia].modelo}</span></p>
+                <p className="text-sm"><span className="text-muted-foreground">IMEI:</span> <span className="font-mono font-medium">{formatIMEI(produtos[indiceProdutoAssistencia].imei)}</span></p>
+              </div>
+
+              {/* Data/hora e responsável */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Data/Hora</Label>
+                  <p className="text-sm font-medium">{format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Responsável</Label>
+                  <p className="text-sm font-medium">{user?.colaborador?.nome || user?.username || 'Usuário'}</p>
+                </div>
+              </div>
+
+              {/* Motivo */}
+              <div className="space-y-2">
+                <Label>Motivo do encaminhamento *</Label>
+                <Textarea
+                  value={motivoAssistencia}
+                  onChange={(e) => setMotivoAssistencia(e.target.value)}
+                  placeholder="Descreva o motivo pelo qual este aparelho deve ser encaminhado para assistência..."
+                  rows={3}
+                />
+              </div>
+
+              {/* Checkbox de confirmação */}
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  checked={confirmarAssistencia}
+                  onCheckedChange={(checked) => setConfirmarAssistencia(checked as boolean)}
+                />
+                <Label className="text-sm leading-tight cursor-pointer" onClick={() => setConfirmarAssistencia(!confirmarAssistencia)}>
+                  Confirmo que este aparelho deve ser encaminhado para Análise de Tratativas na Assistência
+                </Label>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalAssistenciaAberto(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={confirmarEncaminhamento}
+              disabled={!motivoAssistencia.trim() || !confirmarAssistencia}
+              className="bg-orange-500 hover:bg-orange-600 text-white"
+            >
+              <Wrench className="mr-2 h-4 w-4" />
+              Confirmar Encaminhamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </EstoqueLayout>
   );
 }

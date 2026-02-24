@@ -1,8 +1,8 @@
 // ============= API para Lotes de Revisão de Notas de Entrada =============
 // Gerencia o encaminhamento em lote de aparelhos defeituosos para assistência
 
-import { addOrdemServico, OrdemServico } from './assistenciaApi';
 import { getNotaEntradaById, NotaEntrada, gerarCreditoFornecedor } from './notaEntradaFluxoApi';
+import { encaminharParaAnaliseGarantia } from './garantiasApi';
 import { marcarProdutoRetornoAssistencia, marcarProdutoDevolvido } from './estoqueApi';
 
 // ============= TIPOS E INTERFACES =============
@@ -133,44 +133,13 @@ export const encaminharLoteParaAssistencia = (
   const lote = lotesRevisao.find(l => l.id === loteId);
   if (!lote || lote.status !== 'Em Revisao') return null;
 
-  const osIdsCriados: string[] = [];
-
-  // Criar uma OS INDIVIDUAL para cada aparelho do lote
+  // Encaminhar cada item para Análise de Tratativas (não criar OS diretamente)
   lote.itens.forEach(item => {
-    const novaOS = addOrdemServico({
-      dataHora: new Date().toISOString(),
-      clienteId: '',
-      setor: 'ASSISTÊNCIA',
-      tecnicoId: '',
-      lojaId: '3cfbf69f', // Assistência - SIA (default)
-      status: 'Aguardando Análise',
-      proximaAtuacao: 'Técnico: Avaliar/Executar',
-      pecas: [],
-      pagamentos: [],
-      descricao: `Lote ${lote.id} — ${item.marca} ${item.modelo}${item.imei ? ` (IMEI: ${item.imei})` : ''}\nMotivo: ${item.motivoAssistencia}${item.observacao ? `\nObs: ${item.observacao}` : ''}`,
-      timeline: [{
-        data: new Date().toISOString(),
-        tipo: 'registro' as const,
-        descricao: `OS criada a partir do Lote de Revisão ${lote.id} — ${item.marca} ${item.modelo}. Nota ${lote.numeroNota}.`,
-        responsavel
-      }],
-      origemOS: 'Estoque',
-      modeloAparelho: `${item.marca} ${item.modelo}`,
-      imeiAparelho: item.imei || '',
-      valorTotal: 0,
-      custoTotal: 0,
-      loteRevisaoId: lote.id,
-      loteRevisaoItemId: item.id,
-      observacaoOrigem: `Lote de Revisão ${lote.id} — Nota ${lote.numeroNota}`
-    } as any);
-
-    if (novaOS) {
-      item.osId = novaOS.id;
-      osIdsCriados.push(novaOS.id);
-    }
+    const descricao = `Lote ${lote.id} — ${item.marca} ${item.modelo}${item.imei ? ` (IMEI: ${item.imei})` : ''}`;
+    const observacao = `Motivo: ${item.motivoAssistencia}${item.observacao ? `\nObs: ${item.observacao}` : ''}\nNota: ${lote.numeroNota}`;
+    encaminharParaAnaliseGarantia(item.produtoNotaId, 'Estoque', descricao, observacao);
   });
 
-  lote.osIds = osIdsCriados;
   lote.status = 'Encaminhado';
 
   return lote;

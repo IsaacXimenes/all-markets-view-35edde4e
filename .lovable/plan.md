@@ -1,129 +1,139 @@
 
+## Plano: Toggle Contas Financeiras + Evidencias OS + PIX Automatico no Financeiro
 
-## Plano: Ajustes Consignacao + Fornecedor no Estoque + Origem no Financeiro
+### 1. Toggle Habilitar/Desabilitar Contas Financeiras com Historico (2.1)
 
-### 1. Autocomplete no campo "Modelo" no Novo Lote (1.1)
+**Arquivo:** `src/utils/cadastrosApi.ts`
+- Adicionar campo `habilitada: boolean` (default `true`) a interface `ContaFinanceira`
+- Adicionar campo `historicoAlteracoes?: { dataHora: string; usuario: string; statusAnterior: string; novoStatus: string; observacao?: string }[]` a interface `ContaFinanceira`
+- Inicializar todas as contas existentes com `habilitada: true` e `historicoAlteracoes: []`
+- Criar funcao `toggleContaFinanceira(id: string, usuario: string, observacao?: string)` que alterna `habilitada`, registra no historico e retorna a conta atualizada
+- Criar funcao `getContasFinanceirasHabilitadas()` que retorna apenas contas com `habilitada === true` (para uso nos selects de outros modulos)
 
-**Arquivo:** `src/pages/OSConsignacao.tsx`
+**Arquivo:** `src/pages/CadastrosContasFinanceiras.tsx`
+- Importar componente `Switch` de `@/components/ui/switch`
+- Substituir a coluna "Status" (Ativo/Inativo) por coluna "Habilitada" com um Switch interativo
+- Ao clicar no Switch, abrir modal pedindo observacao opcional, registrar usuario logado via `useAuthStore`, chamar `toggleContaFinanceira`
+- Contas desabilitadas: linha com `opacity-50` e texto cinza claro
+- Adicionar botao "Historico" (icone History) na coluna de acoes que abre Dialog com timeline de alteracoes da conta
+- Manter coluna "Status" original (Ativo/Inativo) separada, pois sao conceitos diferentes
 
-**Situacao atual:** O campo Modelo no formulario de novo lote ja usa Popover + Command com `produtosCadastro` (linhas 449-470). Isso ja funciona como autocomplete.
-
-**Verificacao:** Ja implementado. Nenhuma mudanca necessaria.
-
----
-
-### 2. Botao "$" nao deve abrir quadro de edicao (1.2)
-
-**Arquivo:** `src/pages/OSConsignacao.tsx`
-
-**Situacao atual:** O botao "$" chama `handleVerDetalhamento(lote, true, true)` que abre o detalhamento com `detalhamentoReadOnly=true` e `modoPagamento=true`. Porem, o quadro "Editar Itens do Lote" so aparece quando `!detalhamentoReadOnly && loteAberto` (linha 578), entao ja esta correto -- o quadro de edicao NAO aparece no modo pagamento.
-
-**Mudanca necessaria:** Quando `modoPagamento=true`, a aba padrao das Tabs deve ser "pecas-usadas" em vez de "inventario", e os quadros "Finalizar Lote" e "Confirmar Devolucoes" nao devem aparecer. Alterar o `defaultValue` das Tabs para ser condicional.
-
----
-
-### 3. Quadros Finalizar Lote e Devolucoes so na aba Inventario (1.3)
-
-**Arquivo:** `src/pages/OSConsignacao.tsx`
-
-**Situacao atual:** Os quadros "Finalizar Lote" (linhas 803-898) estao dentro do `TabsContent value="inventario"`, entao ja so aparecem na aba Inventario.
-
-**Problema:** Precisa controlar via estado da aba ativa para garantir que na aba "pecas-usadas" esses quadros estejam ocultos. Como ja estao dentro de `TabsContent value="inventario"`, isso ja funciona. Nenhuma mudanca necessaria.
+**Impacto nos outros modulos (selects de conta):**
+- Em todos os arquivos que usam `getContasFinanceiras()` para popular selects (27 arquivos encontrados), trocar para `getContasFinanceirasHabilitadas()` nos campos de selecao. Os principais sao:
+  - `src/pages/CadastrosMaquinas.tsx` (linha 60)
+  - `src/pages/VendasEditarGestor.tsx` (linha 57)
+  - `src/pages/FinanceiroConferencia.tsx` (linha 126)
+  - `src/components/vendas/PagamentoQuadro.tsx`
+  - `src/pages/FinanceiroContas.tsx`
+  - Outros modulos que montam selects de conta financeira
+- Em telas de consulta/visualizacao (VendaResumoCompleto, etc.), manter `getContasFinanceiras()` para exibir o nome mesmo de contas desabilitadas
 
 ---
 
-### 4. Automacao do status de pagamento (1.4)
+### 2. Upload de Evidencias na Finalizacao de Servico da OS (2.2)
 
-**Arquivo:** `src/utils/solicitacaoPecasApi.ts`
+**Arquivo:** `src/pages/OSAssistenciaDetalhes.tsx`
+- No modal "Confirmar Finalizacao do Servico" (linhas 1799-1860), adicionar campo `BufferAnexos` (componente ja existente em `src/components/estoque/BufferAnexos.tsx`) com label "Anexar Evidencias do Servico (opcional)"
+- Limite: 5 arquivos, 10MB cada
+- Estado: `const [evidenciasServico, setEvidenciasServico] = useState<AnexoTemporario[]>([])`
+- No `handleConfirmarFinalizacao`, salvar as evidencias na OS via `updateOrdemServico` (novo campo `evidencias?: { nome: string; tipo: string; dataAnexo: string; usuario: string }[]`)
+- Registrar na timeline: "Evidencia anexada: [nome do arquivo]" para cada arquivo
 
-**Situacao atual:** A funcao `finalizarNotaAssistencia` ja chama `confirmarPagamentoPorNotaId` (linhas 637-645), que por sua vez atualiza o status do item consignado para "Pago" e registra na timeline. A automacao JA ESTA implementada.
+**Arquivo:** `src/pages/OSAssistenciaEditar.tsx`
+- No card "Concluir Servico" (linhas 1036-1048), adicionar campo similar de `BufferAnexos` antes do botao "Concluir Servico"
+- Ao salvar com status "Servico concluido", persistir evidencias na OS
 
-**Verificacao adicional:** O comprovante do financeiro nao esta sendo passado na chamada (linha 643: `undefined`). Alterar para passar o comprovante do pagamento quando disponivel. Isso requer propagar o `comprovante` da `finalizarNotaAssistencia` para a chamada `confirmarPagamentoPorNotaId`.
+**Arquivo:** `src/utils/assistenciaApi.ts`
+- Adicionar campo `evidencias?: { nome: string; tipo: string; url?: string; dataAnexo: string; usuario: string }[]` a interface `OrdemServico`
 
-**Mudanca:**
-- Na funcao `finalizarNotaAssistencia`, extrair o comprovante dos dados de pagamento (se houver) e passa-lo como 4o parametro de `confirmarPagamentoPorNotaId`.
-- Adicionar `comprovante` a interface de dados de `finalizarNotaAssistencia`.
-
----
-
-### 5. Trava de fechamento de lote (1.5)
-
-**Arquivo:** `src/pages/OSConsignacao.tsx`
-
-**Situacao atual:** O botao "Finalizar Lote" esta sempre habilitado quando o lote nao esta concluido (linha 804-898).
-
-**Mudanca:**
-- Calcular se ha itens com status `'Em Pagamento'` (pagamento pendente no financeiro).
-- Se houver itens "Em Pagamento", desabilitar o botao "Finalizar Lote" e exibir tooltip/mensagem explicando que ha pagamentos pendentes.
-- Manter habilitado se so houver itens "Disponivel" (para devolucao) ou "Pago"/"Consumido".
-- Adicionar confirmacao individual para cada item devolvido: na acao de finalizar, exibir lista de itens disponiveis com checkbox individual para confirmar devolucao de cada um.
+**Arquivo:** `src/pages/OSAssistenciaDetalhes.tsx` (visualizacao)
+- Na secao de detalhes da OS, adicionar card "Evidencias do Servico" que lista os arquivos anexados com nome, data e usuario, quando houver evidencias
 
 ---
 
-### 6. Coluna Fornecedor no Estoque > Assistencia (2.1)
+### 3. Informacoes PIX Automaticas da Nota de Entrada no Financeiro (2.3)
 
-**Arquivo:** `src/pages/OSPecas.tsx` e `src/utils/pecasApi.ts`
+**Situacao atual:** A Nota de Entrada ja persiste `pixBanco`, `pixRecebedor`, `pixChave` na interface `NotaEntrada` (notaEntradaFluxoApi.ts). Porem, a tela `FinanceiroNotasPendencias.tsx` nao exibe esses dados.
 
-**Situacao atual:** A interface `Peca` nao tem campo `fornecedorId`. Para pecas de consignacao, o fornecedor pode ser recuperado via `loteConsignacaoId` -> `getLoteById` -> `fornecedorId`. Para pecas de solicitacao/nota de compra, o fornecedor pode ser recuperado via `notaCompraId` ou pela solicitacao vinculada.
+**Arquivo:** `src/pages/FinanceiroNotasPendencias.tsx`
+- No modo detalhes (`modoDetalhes && notaSelecionada`), entre o `NotaDetalhesContent` e o quadro de Pagamento, adicionar um Card condicional "Instrucoes de Pagamento PIX" quando `notaSelecionada.formaPagamento === 'Pix'`
+- O card exibe: Banco, Recebedor, Chave PIX e Observacao -- todos pre-preenchidos e somente leitura, vindos da nota de entrada
+- Estilo: borda azul/primary, icone Smartphone ou Landmark, campos em grid 2x2
+- Adicionar timeline entry na nota quando o pagamento for registrado: "Pagamento registrado com dados PIX originados da Nota de Entrada"
 
-**Mudanca:**
-- Adicionar campo opcional `fornecedorId?: string` a interface `Peca` em `pecasApi.ts`.
-- Ao criar pecas via consignacao (`criarLoteConsignacao`), preencher o `fornecedorId` com o do lote.
-- Ao criar pecas via solicitacao de pecas, preencher o `fornecedorId` com o da solicitacao.
-- Na tabela de `OSPecas.tsx`, adicionar coluna "Fornecedor" entre "Modelo" e "Valor Custo".
-- Usar `getFornecedores()` para resolver o nome do fornecedor a partir do ID.
-- Como fallback, para pecas de consignacao sem `fornecedorId`, buscar via `getLoteById(peca.loteConsignacaoId)?.fornecedorId`.
-
----
-
-### 7. Origem do Servico no Financeiro (3.1)
-
-**Arquivo:** `src/pages/FinanceiroNotasAssistencia.tsx`
-
-**Situacao atual:** A nota de assistencia (`NotaAssistencia`) nao tem campo `origemEntrada`. Porem, as solicitacoes vinculadas (`SolicitacaoPeca`) possuem `origemEntrada` (Balcao/Garantia/Estoque).
-
-**Mudanca:**
-- Na tabela de notas pendentes, adicionar coluna "Origem" que resolva a origem do servico:
-  - Para notas normais: buscar a solicitacao vinculada (`getSolicitacaoById`) e usar `origemEntrada`.
-  - Para notas de consignacao: buscar os itens do lote e resolver via OS vinculada.
-- Exibir como Badge colorido (Balcao = azul, Garantia = laranja, Estoque = verde).
-- Tambem exibir no modal de detalhes/conferencia da nota.
+**Arquivo:** `src/components/estoque/ModalFinalizarPagamento.tsx`
+- Receber prop opcional `dadosPix?: { banco: string; recebedor: string; chave: string; observacao?: string }`
+- Se `dadosPix` estiver presente, exibir banner informativo no topo do modal: "Dados PIX pre-preenchidos da Nota de Entrada" com os valores
+- Propagar esses dados para o pagamento ao confirmar
 
 ---
 
 ### Resumo de arquivos a modificar
 
-1. **`src/pages/OSConsignacao.tsx`** -- Tabs defaultValue condicional (modo pagamento), trava "Finalizar Lote" para pagamentos pendentes, confirmacao individual de devolucoes
-2. **`src/utils/pecasApi.ts`** -- Adicionar `fornecedorId` a interface Peca
-3. **`src/utils/consignacaoApi.ts`** -- Passar `fornecedorId` ao criar pecas
-4. **`src/pages/OSPecas.tsx`** -- Coluna Fornecedor na tabela
-5. **`src/utils/solicitacaoPecasApi.ts`** -- Passar comprovante na automacao de pagamento consignado
-6. **`src/pages/FinanceiroNotasAssistencia.tsx`** -- Coluna Origem do Servico na tabela e no modal
+1. `src/utils/cadastrosApi.ts` -- interface ContaFinanceira + toggleContaFinanceira + getContasFinanceirasHabilitadas
+2. `src/pages/CadastrosContasFinanceiras.tsx` -- Switch toggle + modal observacao + historico
+3. `src/pages/CadastrosMaquinas.tsx` -- trocar getContasFinanceiras por getContasFinanceirasHabilitadas nos selects
+4. `src/pages/VendasEditarGestor.tsx` -- idem
+5. `src/pages/FinanceiroConferencia.tsx` -- idem
+6. `src/utils/assistenciaApi.ts` -- campo evidencias na interface OrdemServico
+7. `src/pages/OSAssistenciaDetalhes.tsx` -- BufferAnexos no modal de finalizacao + card de visualizacao de evidencias
+8. `src/pages/OSAssistenciaEditar.tsx` -- BufferAnexos no card de conclusao de servico
+9. `src/pages/FinanceiroNotasPendencias.tsx` -- Card de instrucoes PIX pre-preenchido
+10. `src/components/estoque/ModalFinalizarPagamento.tsx` -- banner dados PIX
 
 ### Detalhes tecnicos
 
-**Trava de fechamento (item 5):**
-```
-const temPagamentoPendente = loteSelecionado.itens.some(i => i.status === 'Em Pagamento');
-// Botao desabilitado quando temPagamentoPendente
-```
-
-**Fornecedor na Peca (item 6):**
+**Toggle (item 1):**
 ```typescript
-// pecasApi.ts - interface Peca
-fornecedorId?: string;
+// cadastrosApi.ts
+interface ContaFinanceira {
+  // ...campos existentes
+  habilitada: boolean;
+  historicoAlteracoes?: {
+    dataHora: string;
+    usuario: string;
+    statusAnterior: string;
+    novoStatus: string;
+    observacao?: string;
+  }[];
+}
 
-// consignacaoApi.ts - criarLoteConsignacao
-const pecaCriada = addPeca({
-  ...
-  fornecedorId: dados.fornecedorId, // NOVO
-});
+export const getContasFinanceirasHabilitadas = () =>
+  contasFinanceiras.filter(c => c.habilitada !== false);
+
+export const toggleContaFinanceira = (id: string, usuario: string, observacao?: string) => {
+  const conta = contasFinanceiras.find(c => c.id === id);
+  if (!conta) return null;
+  const anterior = conta.habilitada ? 'Habilitada' : 'Desabilitada';
+  conta.habilitada = !conta.habilitada;
+  if (!conta.historicoAlteracoes) conta.historicoAlteracoes = [];
+  conta.historicoAlteracoes.push({
+    dataHora: new Date().toISOString(),
+    usuario,
+    statusAnterior: anterior,
+    novoStatus: conta.habilitada ? 'Habilitada' : 'Desabilitada',
+    observacao
+  });
+  return conta;
+};
 ```
 
-**Origem no Financeiro (item 7):**
-```typescript
-// Resolver origem a partir da solicitacao
-const sol = getSolicitacaoById(nota.solicitacaoId);
-const origem = sol?.origemEntrada || 'N/A';
+**PIX no Financeiro (item 3):**
+```tsx
+// FinanceiroNotasPendencias.tsx - entre NotaDetalhesContent e quadro de Pagamento
+{notaSelecionada.formaPagamento === 'Pix' && (notaSelecionada.pixBanco || notaSelecionada.pixRecebedor || notaSelecionada.pixChave) && (
+  <Card className="border-blue-500/30 bg-blue-500/5">
+    <CardHeader>
+      <CardTitle>Instrucoes de Pagamento PIX</CardTitle>
+    </CardHeader>
+    <CardContent>
+      <div className="grid grid-cols-2 gap-4">
+        <div><Label>Banco</Label><p>{notaSelecionada.pixBanco}</p></div>
+        <div><Label>Recebedor</Label><p>{notaSelecionada.pixRecebedor}</p></div>
+        <div><Label>Chave PIX</Label><p>{notaSelecionada.pixChave}</p></div>
+        <div><Label>Observacao</Label><p>{notaSelecionada.observacoes || '-'}</p></div>
+      </div>
+    </CardContent>
+  </Card>
+)}
 ```
-

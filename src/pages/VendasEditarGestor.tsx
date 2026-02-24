@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, User, Package, CreditCard, Shield, Lock, Save, X, AlertTriangle,
-  FileText, Check, Pencil
+  FileText, Check, Pencil, Headphones, Plus, Trash2
 } from 'lucide-react';
 import { format, addMonths, addDays } from 'date-fns';
 import { 
@@ -33,6 +33,7 @@ import { useCadastroStore } from '@/store/cadastroStore';
 import { calcularComissaoVenda, getComissaoColaborador } from '@/utils/comissoesApi';
 import { displayIMEI } from '@/utils/imeiMask';
 import { formatCurrency, moedaMask, parseMoeda } from '@/utils/formatUtils';
+import { getAcessorios, Acessorio, VendaAcessorio } from '@/utils/acessoriosApi';
 
 export default function VendasEditarGestor() {
   const { id } = useParams<{ id: string }>();
@@ -43,6 +44,12 @@ export default function VendasEditarGestor() {
   const [itens, setItens] = useState<ItemVenda[]>([]);
   const [tradeIns, setTradeIns] = useState<ItemTradeIn[]>([]);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
+  
+  // Acessórios
+  const [acessoriosEstoque, setAcessoriosEstoque] = useState<Acessorio[]>(getAcessorios());
+  const [acessoriosVenda, setAcessoriosVenda] = useState<VendaAcessorio[]>([]);
+  const [showAcessorioModal, setShowAcessorioModal] = useState(false);
+  const [buscaAcessorio, setBuscaAcessorio] = useState('');
   
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [alteracoesDetectadas, setAlteracoesDetectadas] = useState<{ campo: string; valorAnterior: any; valorNovo: any }[]>([]);
@@ -58,6 +65,12 @@ export default function VendasEditarGestor() {
         setItens([...venda.itens]);
         setTradeIns([...venda.tradeIns]);
         setPagamentos([...venda.pagamentos]);
+        // Carregar acessórios
+        if (venda.acessorios && venda.acessorios.length > 0) {
+          setAcessoriosVenda(venda.acessorios);
+        } else if ((venda as any).acessoriosVenda) {
+          setAcessoriosVenda((venda as any).acessoriosVenda);
+        }
       }
     }
   }, [id]);
@@ -68,10 +81,15 @@ export default function VendasEditarGestor() {
 
   // Cálculos
   const subtotal = useMemo(() => itens.reduce((acc, item) => acc + item.valorVenda, 0), [itens]);
+  const totalAcessorios = useMemo(() => acessoriosVenda.reduce((acc, a) => acc + a.valorTotal, 0), [acessoriosVenda]);
   const totalTradeIn = useMemo(() => tradeIns.reduce((acc, t) => acc + t.valorCompraUsado, 0), [tradeIns]);
   const totalPagamentos = useMemo(() => pagamentos.reduce((acc, p) => acc + p.valor, 0), [pagamentos]);
-  const total = subtotal - totalTradeIn + (vendaOriginal?.taxaEntrega || 0);
-  const valorCustoTotal = useMemo(() => itens.reduce((acc, item) => acc + item.valorCusto, 0), [itens]);
+  const total = subtotal + totalAcessorios - totalTradeIn + (vendaOriginal?.taxaEntrega || 0);
+  const valorCustoAcessorios = useMemo(() => acessoriosVenda.reduce((acc, a) => {
+    const acessorio = acessoriosEstoque.find(ae => ae.id === a.acessorioId);
+    return acc + (acessorio?.valorCusto || 0) * a.quantidade;
+  }, 0), [acessoriosVenda, acessoriosEstoque]);
+  const valorCustoTotal = useMemo(() => itens.reduce((acc, item) => acc + item.valorCusto, 0) + valorCustoAcessorios, [itens, valorCustoAcessorios]);
   const lucro = total - valorCustoTotal;
   const margem = valorCustoTotal > 0 ? ((lucro / valorCustoTotal) * 100) : 0;
   const valorPendente = total - totalPagamentos;
@@ -93,6 +111,51 @@ export default function VendasEditarGestor() {
   const comissaoVendedor = vendaOriginal && lucro > 0 
     ? calcularComissaoVenda(vendaOriginal.vendedor, lucro) 
     : 0;
+
+  // Acessórios filtrados
+  const acessoriosFiltrados = useMemo(() => {
+    return acessoriosEstoque.filter(a => {
+      if (a.quantidade <= 0) return false;
+      if (buscaAcessorio && !a.descricao.toLowerCase().includes(buscaAcessorio.toLowerCase())) return false;
+      return true;
+    });
+  }, [acessoriosEstoque, buscaAcessorio]);
+
+  // Adicionar acessório à venda
+  const handleAddAcessorio = (acessorio: Acessorio) => {
+    const existente = acessoriosVenda.find(a => a.acessorioId === acessorio.id);
+    if (existente) {
+      if (existente.quantidade + 1 > acessorio.quantidade) {
+        toast({ title: "Estoque insuficiente", description: `Apenas ${acessorio.quantidade} unidades disponíveis.`, variant: "destructive" });
+        return;
+      }
+      const updated = acessoriosVenda.map(a => 
+        a.acessorioId === acessorio.id 
+          ? { ...a, quantidade: a.quantidade + 1, valorTotal: (a.quantidade + 1) * a.valorUnitario }
+          : a
+      );
+      setAcessoriosVenda(updated);
+    } else {
+      const valorRecomendado = acessorio.valorRecomendado || acessorio.valorCusto * 1.5;
+      const novoAcessorio: VendaAcessorio = {
+        id: `ACESSV-${Date.now()}`,
+        acessorioId: acessorio.id,
+        descricao: acessorio.descricao,
+        quantidade: 1,
+        valorRecomendado: valorRecomendado,
+        valorUnitario: valorRecomendado,
+        valorTotal: valorRecomendado
+      };
+      setAcessoriosVenda([...acessoriosVenda, novoAcessorio]);
+    }
+    setShowAcessorioModal(false);
+    setBuscaAcessorio('');
+    toast({ title: "Acessório adicionado", description: `${acessorio.descricao} adicionado à venda` });
+  };
+
+  const handleRemoveAcessorio = (acessorioId: string) => {
+    setAcessoriosVenda(acessoriosVenda.filter(a => a.id !== acessorioId));
+  };
 
   // Atualizar valor de item
   const handleUpdateItemValor = (itemId: string, novoValor: number) => {
@@ -233,6 +296,7 @@ export default function VendasEditarGestor() {
       itens,
       tradeIns,
       pagamentos,
+      acessorios: acessoriosVenda,
       subtotal,
       totalTradeIn,
       total,
@@ -392,7 +456,142 @@ export default function VendasEditarGestor() {
           </CardContent>
         </Card>
 
-        {/* Card Editável - Base de Troca */}
+        {/* Acessórios */}
+        <Card className="border-primary">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Headphones className="h-5 w-5" />
+                Acessórios
+                <Badge variant="outline" className="ml-2 text-primary border-primary">Editável</Badge>
+              </span>
+              <Button onClick={() => setShowAcessorioModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Selecionar Acessórios
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {acessoriosVenda.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhum acessório adicionado. Clique em "Selecionar Acessórios" para adicionar.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Acessório</TableHead>
+                    <TableHead className="text-center">Qtd</TableHead>
+                    <TableHead className="text-right">Custo Produto</TableHead>
+                    <TableHead className="text-right">Valor Recomendado</TableHead>
+                    <TableHead className="text-right">Valor de Venda</TableHead>
+                    <TableHead className="text-right">Valor Total</TableHead>
+                    <TableHead className="text-right">Lucro</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {acessoriosVenda.map(acessorio => {
+                    const acessorioOriginal = acessoriosEstoque.find(a => a.id === acessorio.acessorioId);
+                    const custoUnit = acessorioOriginal?.valorCusto || 0;
+                    const lucroItem = acessorio.valorTotal - (custoUnit * acessorio.quantidade);
+                    return (
+                    <TableRow key={acessorio.id}>
+                      <TableCell className="font-medium">{acessorio.descricao}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-6 w-6"
+                            onClick={() => {
+                              if (acessorio.quantidade > 1) {
+                                const updated = acessoriosVenda.map(a => 
+                                  a.id === acessorio.id 
+                                    ? { ...a, quantidade: a.quantidade - 1, valorTotal: (a.quantidade - 1) * a.valorUnitario }
+                                    : a
+                                );
+                                setAcessoriosVenda(updated);
+                              }
+                            }}
+                          >
+                            -
+                          </Button>
+                          <span className="w-8 text-center">{acessorio.quantidade}</span>
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-6 w-6"
+                            onClick={() => {
+                              const acessorioEstoqueItem = acessoriosEstoque.find(a => a.id === acessorio.acessorioId);
+                              if (acessorioEstoqueItem && acessorio.quantidade < acessorioEstoqueItem.quantidade) {
+                                const updated = acessoriosVenda.map(a => 
+                                  a.id === acessorio.id 
+                                    ? { ...a, quantidade: a.quantidade + 1, valorTotal: (a.quantidade + 1) * a.valorUnitario }
+                                    : a
+                                );
+                                setAcessoriosVenda(updated);
+                              } else {
+                                toast({ title: "Estoque insuficiente", description: "Quantidade máxima atingida.", variant: "destructive" });
+                              }
+                            }}
+                          >
+                            +
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground text-sm">
+                        {formatCurrency(custoUnit)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatCurrency(acessorio.valorRecomendado)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end">
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                            <Input 
+                              type="text"
+                              value={acessorio.valorUnitario.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, '');
+                                const numValue = Number(value) / 100;
+                                const updated = acessoriosVenda.map(a => 
+                                  a.id === acessorio.id ? { ...a, valorUnitario: numValue, valorTotal: numValue * a.quantidade } : a
+                                );
+                                setAcessoriosVenda(updated);
+                              }}
+                              className="w-28 text-right pl-8"
+                            />
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(acessorio.valorTotal)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className={`font-bold ${lucroItem >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                          {formatCurrency(lucroItem)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleRemoveAcessorio(acessorio.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
         {tradeIns.length > 0 && (
           <Card className="border-primary">
             <CardHeader>
@@ -527,11 +726,17 @@ export default function VendasEditarGestor() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-sm text-muted-foreground">Subtotal</p>
                 <p className="text-xl font-bold">{formatCurrency(subtotal)}</p>
               </div>
+              {totalAcessorios > 0 && (
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Acessórios</p>
+                  <p className="text-xl font-bold">{formatCurrency(totalAcessorios)}</p>
+                </div>
+              )}
               <div className="p-3 bg-green-100 dark:bg-green-950/30 rounded-lg">
                 <p className="text-sm text-muted-foreground">Base de Troca</p>
                 <p className="text-xl font-bold text-green-600">-{formatCurrency(totalTradeIn)}</p>
@@ -569,6 +774,78 @@ export default function VendasEditarGestor() {
           </Button>
         </div>
       </div>
+
+      {/* Modal Selecionar Acessórios */}
+      <Dialog open={showAcessorioModal} onOpenChange={setShowAcessorioModal}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle>Selecionar Acessórios</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden flex flex-col space-y-4">
+            <Input 
+              placeholder="Buscar acessório..."
+              value={buscaAcessorio}
+              onChange={(e) => setBuscaAcessorio(e.target.value)}
+              className="flex-shrink-0"
+            />
+            
+            <div className="flex-1 overflow-y-auto overflow-x-hidden">
+              <div className="overflow-x-auto min-w-0">
+                <div className="min-w-[600px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead className="text-center">Qtd Disp.</TableHead>
+                      <TableHead className="text-right">Valor Custo</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {acessoriosFiltrados.map(acessorio => (
+                      <TableRow key={acessorio.id} className={acessorio.quantidade < 10 ? 'bg-destructive/10' : ''}>
+                        <TableCell className="font-mono text-sm">{acessorio.id}</TableCell>
+                        <TableCell className="font-medium">{acessorio.descricao}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{acessorio.categoria}</Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={acessorio.quantidade < 10 ? "destructive" : "secondary"}>
+                            {acessorio.quantidade}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(acessorio.valorCusto)}</TableCell>
+                        <TableCell>
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleAddAcessorio(acessorio)}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Adicionar
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {acessoriosFiltrados.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          Nenhum acessório encontrado.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="flex-shrink-0">
+            <Button variant="outline" onClick={() => setShowAcessorioModal(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Confirmação */}
       <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>

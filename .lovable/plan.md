@@ -1,105 +1,124 @@
 
+Objetivo: corrigir o fluxo de Nota de Entrada → Assistência para que (1) o envio não “salte” para Serviços sem rastreabilidade e (2) o retorno do serviço apareça corretamente no contexto da Nota de Entrada (aba de Estoque).
 
-# Autocomplete de Modelo, Encaminhamento Individual para Assistencia, e Correcao de Rota
+1) Diagnóstico do problema atual (causas-raiz)
 
-## Resumo
+- O encaminhamento feito em “Nota de Entrada” está registrando origem incorreta em alguns pontos:
+  - Em `src/pages/EstoqueNotaCadastrar.tsx` e `src/pages/EstoqueNotaCadastrarProdutos.tsx`, o envio para análise usa `encaminharParaAnaliseGarantia(nota.id, 'Estoque', ...)`.
+  - Isso usa o ID da nota como `origemId`, mas o fluxo de Assistência espera rastreabilidade por item/aparelho (produto da nota ou item de lote), não pela nota inteira.
 
-Tres alteracoes na tela de Cadastro de Produtos da Nota de Entrada:
-1. Substituir o Select estatico de Modelo por Autocomplete pesquisavel
-2. Adicionar botao individual por produto para encaminhar para assistencia (com modal de motivo), habilitado apenas quando o IMEI esta preenchido
-3. Corrigir o fluxo de encaminhamento: ao enviar para assistencia a partir da nota de entrada, os aparelhos devem ir para "Analise de Tratativas" (nao diretamente para Servicos/OS)
+- Em `src/pages/OSAnaliseGarantia.tsx`, ao aprovar uma tratativa de origem Estoque:
+  - O código tenta resolver `origemId` como produto pendente (`getProdutoPendenteById`).
+  - Quando `origemId` vem como ID da nota/produto da nota, a resolução falha parcialmente e a OS é criada sem vínculo completo de retorno para o ciclo da nota/lote.
+  - Resultado percebido: usuário vê comportamento “indo para Serviços” sem feedback claro de retorno no quadro da nota.
 
----
+- O indicador de revisão na listagem de notas não reflete o ciclo completo:
+  - Em `src/components/estoque/TabelaNotasPendencias.tsx`, a coluna “Revisão” mostra “Em Revisão - Lote ...” de forma estática quando existe lote, sem refletir bem “Encaminhado / Em andamento / Finalizado (retorno)”.
 
-## 1. Autocomplete no Campo Modelo
+2) Estratégia de correção
 
-**Arquivo:** `src/pages/EstoqueNotaCadastrarProdutos.tsx`
+Vamos unificar o encaminhamento da Nota de Entrada para o mesmo trilho de rastreabilidade por lote/item (já existente) e reforçar os vínculos até a criação da OS, para que o retorno apareça corretamente no Estoque.
 
-**Problema:** O campo Modelo (linhas 456-473) usa um `<Select>` estatico. Conforme a regra global, deve ser um Autocomplete pesquisavel consumindo dados de Cadastros > Aparelhos.
+3) Implementação planejada (arquivos e mudanças)
 
-**Alteracao:** Substituir o `<Select>` por um componente inline usando `<Popover>` + `<Command>` (padrao cmdk ja utilizado no projeto). O autocomplete filtra `produtosCadastro` (para Aparelhos) ou `acessoriosCadastro` (para Acessorios) por texto digitado. A largura do campo sera mantida em `w-44`.
+3.1 `src/pages/EstoqueNotaCadastrar.tsx`
+- Ajustar o fluxo de “produtos marcados para assistência”:
+  - Em vez de chamar `encaminharParaAnaliseGarantia` com `novaNota.id`, criar lote de revisão com itens individuais (produto + motivo).
+  - Encaminhar via `encaminharLoteParaAssistencia`.
+  - Marcar IMEIs em revisão técnica com `marcarProdutosEmRevisaoTecnica`.
+- Garantir que o vínculo use ID de produto da nota (produto individual) e não ID da nota.
+- Atualizar mensagem de sucesso para “encaminhado para Análise de Tratativas”.
 
----
+3.2 `src/pages/EstoqueNotaCadastrarProdutos.tsx`
+- Mesma correção do item 3.1:
+  - Trocar envio direto por lote com itens individuais.
+  - Garantir rastreabilidade por aparelho com motivo.
+- Manter regra de habilitação (somente aparelho com IMEI preenchido) já existente.
 
-## 2. Botao de Encaminhar para Assistencia por Produto
+3.3 `src/utils/loteRevisaoApi.ts`
+- Preservar o comportamento já correto de encaminhar para análise (`encaminharParaAnaliseGarantia`) sem criar OS direta.
+- Enriquecer o encaminhamento com metadados de vínculo (item/lote/nota) para facilitar rastreio no passo de aprovação da análise.
+- Ajustar retorno/tipagem legada de `osIds` para não induzir interpretação de OS criada nesse momento.
 
-**Arquivo:** `src/pages/EstoqueNotaCadastrarProdutos.tsx`
+3.4 `src/utils/garantiasApi.ts`
+- Evoluir `RegistroAnaliseGarantia` para aceitar metadados opcionais de rastreabilidade de estoque (ex.: `notaEntradaId`, `produtoNotaId`, `loteRevisaoId`, `loteRevisaoItemId`, `imeiAparelho`, `modeloAparelho`).
+- Evoluir `encaminharParaAnaliseGarantia` para receber metadados opcionais (sem quebrar chamadas antigas).
 
-**Problema:** Atualmente so existe o botao "Salvar Produtos". O usuario precisa de um botao por linha para marcar individualmente um aparelho para encaminhamento a assistencia.
+3.5 `src/pages/OSAnaliseGarantia.tsx`
+- Na aprovação de tratativa de origem Estoque:
+  - Resolver dados do aparelho por prioridade:
+    1) metadados explícitos do registro de análise;
+    2) produto pendente (`getProdutoPendenteById`) quando aplicável;
+    3) fallback por produto da nota/lote quando origem vier desse fluxo.
+  - Criar OS com vínculo completo de rastreabilidade (`origemOS='Estoque'`, `loteRevisaoId`, `loteRevisaoItemId` quando existir).
+  - Ajustar status inicial da OS para seguir o fluxo operacional esperado (Aguardando Análise), evitando discrepância com o funil da Assistência.
 
-**Alteracao:**
+3.6 `src/components/estoque/TabelaNotasPendencias.tsx`
+- Melhorar coluna “Revisão” para mostrar estado real do lote:
+  - Em Revisão
+  - Encaminhado
+  - Em Andamento
+  - Finalizado (retorno concluído)
+- Exibir resumo (ex.: concluídos/total) para dar visibilidade imediata de retorno na aba de nota.
 
-### 2a. Botao na coluna de acoes
-Na coluna de acoes da tabela (linha 558-568), ao lado do botao de remover, adicionar um botao com icone `Wrench` (chave inglesa). O botao so fica habilitado quando:
-- `tipoProduto === 'Aparelho'`
-- `imei` esta preenchido (campo nao vazio)
-- O produto ainda nao foi marcado para assistencia
+3.7 `src/pages/EstoqueEncaminharAssistencia.tsx`
+- Ajustar mensagem de sucesso:
+  - Remover referência a “OS geradas” no ato do encaminhamento (pois nesse ponto deve ir para Análise de Tratativas).
+  - Mensagem deve refletir “encaminhado para análise”.
 
-### 2b. Modal de motivo
-Ao clicar no botao, abre um `<Dialog>` com:
-- Informacoes do aparelho (Marca, Modelo, IMEI) em modo leitura
-- Campo `<Textarea>` obrigatorio para informar o motivo do encaminhamento
-- Data/hora e responsavel preenchidos automaticamente
-- Checkbox de confirmacao
-- Botoes "Cancelar" e "Confirmar Encaminhamento"
+4) Sequência de execução (ordem recomendada)
 
-### 2c. Estado de marcacao
-Criar estado `produtosMarcadosAssistencia` (array de objetos com indice do produto + motivo). Produtos marcados exibem um `<Badge>` "Assistencia" na linha e o botao Wrench fica desabilitado. O usuario pode desmarcar clicando novamente.
+1. Base de dados de fluxo/rastreabilidade:
+   - `garantiasApi.ts` (metadados no registro de análise)
+   - `loteRevisaoApi.ts` (encaminhamento com metadados)
 
-### 2d. Fluxo no salvar
-Ao clicar "Salvar Produtos", apos o cadastro normal (`cadastrarProdutosNota`), os produtos marcados para assistencia sao encaminhados individualmente para a "Analise de Tratativas" usando `encaminharParaAnaliseGarantia` da `garantiasApi.ts`, passando:
-- `origemId`: ID do produto na nota
-- `origem`: `'Estoque'`
-- `descricao`: `"[Marca] [Modelo] - IMEI: [imei]"`
-- `observacao`: motivo informado no modal
+2. Aprovação e criação de OS com vínculo correto:
+   - `OSAnaliseGarantia.tsx`
 
----
+3. Correção dos dois pontos de entrada de Nota:
+   - `EstoqueNotaCadastrar.tsx`
+   - `EstoqueNotaCadastrarProdutos.tsx`
 
-## 3. Correcao do Fluxo de Encaminhamento (Nota de Entrada)
+4. Visibilidade de retorno no Estoque:
+   - `TabelaNotasPendencias.tsx`
+   - ajuste de mensagem em `EstoqueEncaminharAssistencia.tsx`
 
-**Arquivo:** `src/utils/loteRevisaoApi.ts`
+5) Riscos e cuidados
 
-**Problema:** A funcao `encaminharLoteParaAssistencia` (linha 129-176) cria OS diretamente com `addOrdemServico`, fazendo os aparelhos irem para a aba "Servicos" em vez de passar pela "Analise de Tratativas".
+- Compatibilidade: existem outros fluxos que também usam `encaminharParaAnaliseGarantia`; a assinatura será expandida de forma opcional para não quebrar chamadas já existentes.
+- Integridade de estado: manter padrão de “fresh fetch” nos pontos críticos de Assistência para não sobrescrever timeline/status.
+- Evitar regressão no fluxo de produtos pendentes antigos (origem por `ProdutoPendente`), mantendo fallback atual.
 
-**Alteracao:** Substituir a chamada `addOrdemServico` por `encaminharParaAnaliseGarantia` para cada item do lote. Assim, os aparelhos encaminhados via Nota de Entrada (tela de Conferencia) tambem passam pela "Analise de Tratativas" antes de virar OS.
+6) Critérios de aceite (validação funcional)
 
-Detalhes:
-- Importar `encaminharParaAnaliseGarantia` de `garantiasApi.ts`
-- Para cada item do lote, chamar `encaminharParaAnaliseGarantia(item.id, 'Estoque', descricao, motivoAssistencia)`
-- Remover a criacao direta de OS (`addOrdemServico`)
-- Manter o status do lote como `'Encaminhado'`
-- Atualizar o retorno (sem `osIds`, pois as OS serao criadas depois na Analise de Tratativas)
+- Ao encaminhar aparelho da Nota de Entrada:
+  - Deve aparecer primeiro em `OS > Análise de Tratativas`.
+  - Não deve aparecer como OS ativa antes da aprovação na análise.
 
----
+- Ao aprovar a análise:
+  - OS deve ser criada com origem Estoque e vínculo de rastreabilidade do item/lote.
 
-## Detalhes Tecnicos
+- Ao finalizar serviço:
+  - Status de item/lote deve ser atualizado.
+  - A aba de notas no Estoque deve mostrar progresso/retorno da revisão (incluindo finalização quando aplicável).
 
-### Arquivos alterados
+- Fluxo legado:
+  - Encaminhamentos de Garantia e de Produtos Pendentes continuam funcionando.
 
-| Arquivo | Alteracao |
-|---|---|
-| `src/pages/EstoqueNotaCadastrarProdutos.tsx` | Autocomplete Modelo + botao encaminhar assistencia por linha + modal motivo |
-| `src/utils/loteRevisaoApi.ts` | Corrigir fluxo: usar `encaminharParaAnaliseGarantia` em vez de `addOrdemServico` |
+7) Teste end-to-end recomendado (roteiro)
 
-### Novas importacoes em EstoqueNotaCadastrarProdutos.tsx
-- `Wrench` de lucide-react
-- `Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter` de ui/dialog
-- `Textarea` de ui/textarea
-- `Checkbox` de ui/checkbox
-- `Popover, PopoverContent, PopoverTrigger` de ui/popover
-- `Command, CommandInput, CommandList, CommandItem, CommandEmpty` de ui/command
-- `encaminharParaAnaliseGarantia` de garantiasApi
-- `useAuthStore` de store/authStore
-- `format` de date-fns
+- Roteiro 1 (nota/cadastro direto):
+  1. Criar nota em `/estoque/nota/cadastrar`.
+  2. Adicionar aparelho com IMEI.
+  3. Marcar para assistência com motivo.
+  4. Salvar.
+  5. Verificar entrada em `/os/analise-garantia`.
 
-### Sem novas dependencias npm
+- Roteiro 2 (aprovação e retorno):
+  1. Aprovar tratativa na Análise.
+  2. Abrir OS criada, finalizar serviço com resumo.
+  3. Voltar em `/estoque/notas-pendencias`.
+  4. Confirmar atualização de revisão/retorno na linha da nota.
 
-Todas as funcoes e componentes ja existem no projeto.
-
----
-
-## Sequencia de Implementacao
-
-1. `src/utils/loteRevisaoApi.ts` - Corrigir fluxo de encaminhamento
-2. `src/pages/EstoqueNotaCadastrarProdutos.tsx` - Autocomplete Modelo + botao assistencia + modal
-
+- Roteiro 3 (regressão):
+  - Validar um caso de origem Estoque vindo de Produto Pendente e um caso de Garantia para garantir que nada foi quebrado.

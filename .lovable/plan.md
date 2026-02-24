@@ -1,124 +1,158 @@
 
-Objetivo: corrigir o fluxo de Nota de Entrada → Assistência para que (1) o envio não “salte” para Serviços sem rastreabilidade e (2) o retorno do serviço apareça corretamente no contexto da Nota de Entrada (aba de Estoque).
+# Inteligencia de Custos e Abatimento na Nota de Entrada
 
-1) Diagnóstico do problema atual (causas-raiz)
+## Resumo
 
-- O encaminhamento feito em “Nota de Entrada” está registrando origem incorreta em alguns pontos:
-  - Em `src/pages/EstoqueNotaCadastrar.tsx` e `src/pages/EstoqueNotaCadastrarProdutos.tsx`, o envio para análise usa `encaminharParaAnaliseGarantia(nota.id, 'Estoque', ...)`.
-  - Isso usa o ID da nota como `origemId`, mas o fluxo de Assistência espera rastreabilidade por item/aparelho (produto da nota ou item de lote), não pela nota inteira.
+Implementar o ciclo completo de retorno financeiro da Assistencia para a Nota de Entrada, garantindo que os custos de reparo sejam refletidos corretamente nos tres fluxos de pagamento (Pos, Parcial e 100% Antecipado), com abatimento automatico no valor pendente ou geracao de credito ao fornecedor.
 
-- Em `src/pages/OSAnaliseGarantia.tsx`, ao aprovar uma tratativa de origem Estoque:
-  - O código tenta resolver `origemId` como produto pendente (`getProdutoPendenteById`).
-  - Quando `origemId` vem como ID da nota/produto da nota, a resolução falha parcialmente e a OS é criada sem vínculo completo de retorno para o ciclo da nota/lote.
-  - Resultado percebido: usuário vê comportamento “indo para Serviços” sem feedback claro de retorno no quadro da nota.
+---
 
-- O indicador de revisão na listagem de notas não reflete o ciclo completo:
-  - Em `src/components/estoque/TabelaNotasPendencias.tsx`, a coluna “Revisão” mostra “Em Revisão - Lote ...” de forma estática quando existe lote, sem refletir bem “Encaminhado / Em andamento / Finalizado (retorno)”.
+## Situacao Atual
 
-2) Estratégia de correção
+O sistema ja possui:
+- Encaminhamento de aparelhos da nota para Assistencia via lote de revisao
+- Atualizacao de custo de reparo (`atualizarItemRevisao`) quando o tecnico finaliza o servico
+- Finalizacao automatica do lote quando todos os itens estao concluidos (`finalizarLoteComLogisticaReversa`)
+- Sistema de creditos ao fornecedor (`gerarCreditoFornecedor`, `getCreditosByFornecedor`)
+- Campo `valorAbatimento` na interface `NotaEntrada` (existe mas nao e populado pelo retorno da assistencia)
 
-Vamos unificar o encaminhamento da Nota de Entrada para o mesmo trilho de rastreabilidade por lote/item (já existente) e reforçar os vínculos até a criação da OS, para que o retorno apareça corretamente no Estoque.
+**O que falta:**
+1. Quando o lote e finalizado, o `valorAbatimento` da nota nao e atualizado
+2. O `valorPendente` da nota nao e recalculado com base no abatimento
+3. A tela de detalhes da nota (`NotaDetalhesContent`) nao exibe informacoes de assistencia/custos de reparo
+4. Nao ha geracao automatica de credito no fluxo de finalizacao do lote para notas 100% Antecipadas (ja existe em `finalizarLoteComLogisticaReversa` mas sem registro na timeline da nota)
+5. A timeline da nota nao registra o retorno da assistencia
 
-3) Implementação planejada (arquivos e mudanças)
+---
 
-3.1 `src/pages/EstoqueNotaCadastrar.tsx`
-- Ajustar o fluxo de “produtos marcados para assistência”:
-  - Em vez de chamar `encaminharParaAnaliseGarantia` com `novaNota.id`, criar lote de revisão com itens individuais (produto + motivo).
-  - Encaminhar via `encaminharLoteParaAssistencia`.
-  - Marcar IMEIs em revisão técnica com `marcarProdutosEmRevisaoTecnica`.
-- Garantir que o vínculo use ID de produto da nota (produto individual) e não ID da nota.
-- Atualizar mensagem de sucesso para “encaminhado para Análise de Tratativas”.
+## Implementacao
 
-3.2 `src/pages/EstoqueNotaCadastrarProdutos.tsx`
-- Mesma correção do item 3.1:
-  - Trocar envio direto por lote com itens individuais.
-  - Garantir rastreabilidade por aparelho com motivo.
-- Manter regra de habilitação (somente aparelho com IMEI preenchido) já existente.
+### 1. Atualizar nota ao finalizar lote de revisao
 
-3.3 `src/utils/loteRevisaoApi.ts`
-- Preservar o comportamento já correto de encaminhar para análise (`encaminharParaAnaliseGarantia`) sem criar OS direta.
-- Enriquecer o encaminhamento com metadados de vínculo (item/lote/nota) para facilitar rastreio no passo de aprovação da análise.
-- Ajustar retorno/tipagem legada de `osIds` para não induzir interpretação de OS criada nesse momento.
+**Arquivo:** `src/utils/loteRevisaoApi.ts`
 
-3.4 `src/utils/garantiasApi.ts`
-- Evoluir `RegistroAnaliseGarantia` para aceitar metadados opcionais de rastreabilidade de estoque (ex.: `notaEntradaId`, `produtoNotaId`, `loteRevisaoId`, `loteRevisaoItemId`, `imeiAparelho`, `modeloAparelho`).
-- Evoluir `encaminharParaAnaliseGarantia` para receber metadados opcionais (sem quebrar chamadas antigas).
+Na funcao `finalizarLoteComLogisticaReversa` (ja existente, linha 183-238), apos calcular custos e processar itens:
 
-3.5 `src/pages/OSAnaliseGarantia.tsx`
-- Na aprovação de tratativa de origem Estoque:
-  - Resolver dados do aparelho por prioridade:
-    1) metadados explícitos do registro de análise;
-    2) produto pendente (`getProdutoPendenteById`) quando aplicável;
-    3) fallback por produto da nota/lote quando origem vier desse fluxo.
-  - Criar OS com vínculo completo de rastreabilidade (`origemOS='Estoque'`, `loteRevisaoId`, `loteRevisaoItemId` quando existir).
-  - Ajustar status inicial da OS para seguir o fluxo operacional esperado (Aguardando Análise), evitando discrepância com o funil da Assistência.
+- Buscar a nota de entrada vinculada (`getNotaEntradaById`)
+- Atualizar `nota.valorAbatimento` com o custo total de reparos
+- Recalcular `nota.valorPendente` considerando o abatimento:
+  - **Pos-Pagamento**: `valorPendente = valorTotal - valorPago - custoTotalReparos`
+  - **Parcial**: `valorPendente = valorTotal - valorPago - custoTotalReparos`
+  - **100% Antecipado**: manter valorPendente = 0, gerar credito (ja implementado parcialmente)
+- Registrar na timeline da nota: "Retorno da Assistencia - Lote [ID] finalizado. Custo de reparos: R$ X. Abatimento aplicado."
+- Para notas 100% Antecipadas, registrar tambem na timeline: "Credito gerado para fornecedor [nome]: R$ X"
 
-3.6 `src/components/estoque/TabelaNotasPendencias.tsx`
-- Melhorar coluna “Revisão” para mostrar estado real do lote:
-  - Em Revisão
-  - Encaminhado
-  - Em Andamento
-  - Finalizado (retorno concluído)
-- Exibir resumo (ex.: concluídos/total) para dar visibilidade imediata de retorno na aba de nota.
+Na funcao `finalizarLoteRevisao` (linha 157-172), aplicar a mesma logica de sincronizacao com a nota.
 
-3.7 `src/pages/EstoqueEncaminharAssistencia.tsx`
-- Ajustar mensagem de sucesso:
-  - Remover referência a “OS geradas” no ato do encaminhamento (pois nesse ponto deve ir para Análise de Tratativas).
-  - Mensagem deve refletir “encaminhado para análise”.
+### 2. Sincronizacao individual por item (ao finalizar cada OS)
 
-4) Sequência de execução (ordem recomendada)
+**Arquivo:** `src/pages/OSAssistenciaDetalhes.tsx`
 
-1. Base de dados de fluxo/rastreabilidade:
-   - `garantiasApi.ts` (metadados no registro de análise)
-   - `loteRevisaoApi.ts` (encaminhamento com metadados)
+A logica de atualizacao do item no lote ja existe (linhas 376-397). Adicionar:
 
-2. Aprovação e criação de OS com vínculo correto:
-   - `OSAnaliseGarantia.tsx`
+- Apos `atualizarItemRevisao`, registrar na timeline da nota de entrada:
+  - "Aparelho [modelo] (IMEI: [imei]) retornou da assistencia. Custo reparo: R$ X. Parecer: [resumo]"
+- Atualizar `nota.valorAbatimento` parcialmente (acumular custos conforme itens vao sendo concluidos)
 
-3. Correção dos dois pontos de entrada de Nota:
-   - `EstoqueNotaCadastrar.tsx`
-   - `EstoqueNotaCadastrarProdutos.tsx`
+### 3. Funcao auxiliar para sincronizar nota com lote
 
-4. Visibilidade de retorno no Estoque:
-   - `TabelaNotasPendencias.tsx`
-   - ajuste de mensagem em `EstoqueEncaminharAssistencia.tsx`
+**Arquivo:** `src/utils/loteRevisaoApi.ts`
 
-5) Riscos e cuidados
+Criar funcao `sincronizarNotaComLote(loteId: string)`:
+- Recalcula custo total dos itens concluidos
+- Atualiza `nota.valorAbatimento`
+- Recalcula `nota.valorPendente` conforme tipo de pagamento
+- Retorna a nota atualizada
 
-- Compatibilidade: existem outros fluxos que também usam `encaminharParaAnaliseGarantia`; a assinatura será expandida de forma opcional para não quebrar chamadas já existentes.
-- Integridade de estado: manter padrão de “fresh fetch” nos pontos críticos de Assistência para não sobrescrever timeline/status.
-- Evitar regressão no fluxo de produtos pendentes antigos (origem por `ProdutoPendente`), mantendo fallback atual.
+Esta funcao sera chamada tanto na finalizacao do lote quanto na finalizacao individual de cada OS.
 
-6) Critérios de aceite (validação funcional)
+### 4. Exibir informacoes de assistencia na tela de detalhes da nota
 
-- Ao encaminhar aparelho da Nota de Entrada:
-  - Deve aparecer primeiro em `OS > Análise de Tratativas`.
-  - Não deve aparecer como OS ativa antes da aprovação na análise.
+**Arquivo:** `src/components/estoque/NotaDetalhesContent.tsx`
 
-- Ao aprovar a análise:
-  - OS deve ser criada com origem Estoque e vínculo de rastreabilidade do item/lote.
+Adicionar nova secao "Assistencia Tecnica" entre "Produtos" e "Timeline":
 
-- Ao finalizar serviço:
-  - Status de item/lote deve ser atualizado.
-  - A aba de notas no Estoque deve mostrar progresso/retorno da revisão (incluindo finalização quando aplicável).
+- Importar `getLoteRevisaoByNotaId`, `calcularAbatimento` de `loteRevisaoApi`
+- Verificar se a nota tem lote de revisao vinculado
+- Se sim, exibir:
+  - **Card de resumo financeiro** (reutilizar `LoteRevisaoResumo` ja existente):
+    - Valor Original da Nota
+    - Custo Total de Reparos (com alerta se > 15%)
+    - Valor Liquido (valor a pagar ao fornecedor)
+  - **Tabela de itens encaminhados** com colunas:
+    - Marca | Modelo | IMEI | Motivo | Status Reparo | Custo Reparo | Parecer
+  - **Card de credito** (apenas para notas 100% Antecipadas):
+    - Exibir creditos gerados com `getCreditosByFornecedor`
+    - Badge visual "Credito Disponivel" ou "Credito Utilizado"
+  - **Indicador de abatimento no card financeiro principal**:
+    - Ao lado de "Valor Pendente", exibir "(com abatimento de R$ X)" quando houver abatimento
 
-- Fluxo legado:
-  - Encaminhamentos de Garantia e de Produtos Pendentes continuam funcionando.
+### 5. Atualizar funcao de pagamento para considerar abatimento
 
-7) Teste end-to-end recomendado (roteiro)
+**Arquivo:** `src/utils/notaEntradaFluxoApi.ts`
 
-- Roteiro 1 (nota/cadastro direto):
-  1. Criar nota em `/estoque/nota/cadastrar`.
-  2. Adicionar aparelho com IMEI.
-  3. Marcar para assistência com motivo.
-  4. Salvar.
-  5. Verificar entrada em `/os/analise-garantia`.
+Na funcao `registrarPagamento` (linha 629-727):
 
-- Roteiro 2 (aprovação e retorno):
-  1. Aprovar tratativa na Análise.
-  2. Abrir OS criada, finalizar serviço com resumo.
-  3. Voltar em `/estoque/notas-pendencias`.
-  4. Confirmar atualização de revisão/retorno na linha da nota.
+- Ao calcular `nota.valorPendente`, considerar o `valorAbatimento`:
+  - `nota.valorPendente = nota.valorTotal - nota.valorPago - (nota.valorAbatimento || 0)`
+- Na validacao de quitacao (tolerancia de R$ 0.01), usar o valor liquido (com abatimento)
+- Garantir que a finalizacao automatica considere o abatimento na comparacao
 
-- Roteiro 3 (regressão):
-  - Validar um caso de origem Estoque vindo de Produto Pendente e um caso de Garantia para garantir que nada foi quebrado.
+### 6. Exibir creditos na tela do Financeiro
+
+**Arquivo:** `src/pages/FinanceiroNotasAssistencia.tsx`
+
+Na area de conferencia de notas de assistencia:
+- Ja importa `getCreditosByFornecedor` e `calcularAbatimento`
+- Adicionar card de creditos disponiveis do fornecedor vinculado a nota
+- Permitir visualizacao dos creditos existentes
+
+---
+
+## Detalhes Tecnicos
+
+### Arquivos alterados
+
+| Arquivo | Alteracao |
+|---|---|
+| `src/utils/loteRevisaoApi.ts` | Nova funcao `sincronizarNotaComLote`; atualizar `finalizarLoteComLogisticaReversa` e `finalizarLoteRevisao` para sincronizar nota |
+| `src/utils/notaEntradaFluxoApi.ts` | Exportar funcao `atualizarAbatimentoNota` para atualizar valorAbatimento e valorPendente; ajustar `registrarPagamento` para considerar abatimento |
+| `src/components/estoque/NotaDetalhesContent.tsx` | Nova secao "Assistencia Tecnica" com resumo financeiro, tabela de itens e creditos |
+| `src/pages/OSAssistenciaDetalhes.tsx` | Registrar retorno na timeline da nota ao finalizar OS com lote vinculado |
+
+### Novas funcoes
+
+- `sincronizarNotaComLote(loteId)` em `loteRevisaoApi.ts`
+- `atualizarAbatimentoNota(notaId, valorAbatimento)` em `notaEntradaFluxoApi.ts`
+
+### Sem novas dependencias npm
+
+Todos os componentes e funcoes necessarias ja existem no projeto.
+
+---
+
+## Sequencia de Implementacao
+
+1. `src/utils/notaEntradaFluxoApi.ts` - funcao `atualizarAbatimentoNota` + ajuste em `registrarPagamento`
+2. `src/utils/loteRevisaoApi.ts` - funcao `sincronizarNotaComLote` + integracoes nas funcoes de finalizacao
+3. `src/pages/OSAssistenciaDetalhes.tsx` - registro na timeline da nota ao finalizar OS
+4. `src/components/estoque/NotaDetalhesContent.tsx` - secao visual de assistencia com resumo financeiro
+
+---
+
+## Logica de Abatimento por Fluxo
+
+```text
+Pos-Pagamento:
+  Valor a Pagar = Valor Nota - Custo Reparos
+  (abatimento reduz diretamente o que falta pagar)
+
+Parcial:
+  Saldo Devedor = Valor Nota - Valor Ja Pago - Custo Reparos
+  (abatimento reduz o saldo restante)
+
+100% Antecipado:
+  Valor Ja Pago = Valor Nota (tudo pago)
+  Credito Fornecedor = Custo Reparos
+  (credito gerado para uso em futuras compras)
+```

@@ -20,7 +20,7 @@ import {
 import { getLoteRevisaoByNotaId, calcularAbatimento } from '@/utils/loteRevisaoApi';
 import { getNotaEntradaById, gerarCreditoFornecedor, getCreditosByFornecedor } from '@/utils/notaEntradaFluxoApi';
 import { getLoteById } from '@/utils/consignacaoApi';
-import { getContasFinanceiras, getFornecedores } from '@/utils/cadastrosApi';
+import { getContasFinanceirasHabilitadas, getFornecedores } from '@/utils/cadastrosApi';
 import { getOrdemServicoById, updateOrdemServico, getOrdensServico } from '@/utils/assistenciaApi';
 import { CustoPorOrigemCards } from '@/components/assistencia/CustoPorOrigemCards';
 import { Eye, Check, Download, Filter, X, FileText, Clock, CheckCircle, DollarSign, Package, PackageCheck, Unlink, AlertTriangle, Coins } from 'lucide-react';
@@ -42,7 +42,7 @@ export default function FinanceiroNotasAssistencia() {
   const { obterLojasAtivas, obterFinanceiros, obterNomeLoja, obterColaboradorById } = useCadastroStore();
   const user = useAuthStore(state => state.user);
   
-  const contasFinanceiras = getContasFinanceiras().filter(c => c.status === 'Ativo');
+  const contasFinanceiras = getContasFinanceirasHabilitadas();
   const colaboradoresFinanceiros = obterFinanceiros();
   const fornecedoresList = getFornecedores();
   const lojas = obterLojasAtivas();

@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Check, Download, Filter, X, Clock, CheckCircle2, Undo2, AlertCircle, CreditCard, Banknote, Smartphone, Wallet, ChevronRight, Lock, MessageSquare, XCircle, Save, Building2, History, UserCheck, Calendar, User, CheckCircle, FileText, Timer, Wrench } from 'lucide-react';
 import { ComprovantePreview, ComprovanteBadgeSemAnexo } from '@/components/vendas/ComprovantePreview';
-import { getContasFinanceiras, getClientes } from '@/utils/cadastrosApi';
+import { getContasFinanceirasHabilitadas, getClientes } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { useFluxoVendas } from '@/hooks/useFluxoVendas';
 import { 
@@ -123,7 +123,7 @@ export default function FinanceiroConferencia() {
     status: ['Conferência Financeiro', 'Finalizado']
   });
   
-  const contasFinanceiras = getContasFinanceiras();
+  const contasFinanceiras = getContasFinanceirasHabilitadas();
   const colaboradores = obterColaboradoresAtivos();
   const lojas = obterLojasAtivas();
   

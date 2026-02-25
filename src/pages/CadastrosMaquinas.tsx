@@ -14,7 +14,7 @@ import {
   addMaquinaCartao, 
   updateMaquinaCartao, 
   deleteMaquinaCartao, 
-  getContasFinanceiras,
+  getContasFinanceirasHabilitadas,
   getLojaById,
   getContaFinanceiraById,
   MaquinaCartao 
@@ -57,7 +57,7 @@ export default function CadastrosMaquinas() {
   const [maquinas, setMaquinas] = useState(getMaquinasCartao());
   const { obterLojasAtivas, obterLojaById } = useCadastroStore();
   const lojas = obterLojasAtivas();
-  const contasFinanceiras = getContasFinanceiras().filter(c => c.status === 'Ativo');
+  const contasFinanceiras = getContasFinanceirasHabilitadas();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMaquina, setEditingMaquina] = useState<MaquinaCartao | null>(null);
   

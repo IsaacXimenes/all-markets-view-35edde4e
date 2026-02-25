@@ -103,7 +103,9 @@ export default function FinanceiroContas() {
       saldoAtual: parseFloat(form.saldoAtual) || 0,
       status: form.status,
       statusMaquina: form.statusMaquina,
-      notaFiscal: form.notaFiscal
+      notaFiscal: form.notaFiscal,
+      habilitada: true,
+      historicoAlteracoes: []
     };
 
     if (editingConta) {

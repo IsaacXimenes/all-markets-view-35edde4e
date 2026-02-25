@@ -25,7 +25,7 @@ import {
   Pagamento 
 } from '@/utils/vendasApi';
 import { 
-  getContasFinanceiras,
+  getContasFinanceirasHabilitadas,
   getMaquinasCartao,
   MaquinaCartao
 } from '@/utils/cadastrosApi';
@@ -54,7 +54,7 @@ export default function VendasEditarGestor() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [alteracoesDetectadas, setAlteracoesDetectadas] = useState<{ campo: string; valorAnterior: any; valorNovo: any }[]>([]);
   
-  const contasFinanceiras = getContasFinanceiras();
+  const contasFinanceiras = getContasFinanceirasHabilitadas();
   const maquinasCartao = getMaquinasCartao().filter(m => m.status === 'Ativo');
 
   useEffect(() => {

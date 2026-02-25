@@ -343,6 +343,47 @@ export default function FinanceiroNotasPendencias() {
 
           <NotaDetalhesContent nota={notaSelecionada} showActions={false} />
 
+          {/* Card PIX - Instruções de Pagamento */}
+          {notaSelecionada.formaPagamento === 'Pix' && (notaSelecionada.pixBanco || notaSelecionada.pixRecebedor || notaSelecionada.pixChave) && (
+            <Card className="border-blue-500/30 bg-blue-500/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Landmark className="h-5 w-5 text-blue-600" />
+                  Instruções de Pagamento PIX
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">Dados transferidos automaticamente da Nota de Entrada</p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {notaSelecionada.pixBanco && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Banco</Label>
+                      <p className="text-sm font-medium">{notaSelecionada.pixBanco}</p>
+                    </div>
+                  )}
+                  {notaSelecionada.pixRecebedor && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Recebedor</Label>
+                      <p className="text-sm font-medium">{notaSelecionada.pixRecebedor}</p>
+                    </div>
+                  )}
+                  {notaSelecionada.pixChave && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Chave PIX</Label>
+                      <p className="text-sm font-medium font-mono">{notaSelecionada.pixChave}</p>
+                    </div>
+                  )}
+                  {notaSelecionada.observacoes && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Observação</Label>
+                      <p className="text-sm font-medium">{notaSelecionada.observacoes}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Quadro de Pagamento */}
           {mostrarPagamento && (
             <div ref={pagamentoRef}>

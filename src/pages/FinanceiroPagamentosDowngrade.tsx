@@ -18,7 +18,7 @@ import {
 import { FileUploadComprovante } from '@/components/estoque/FileUploadComprovante';
 
 import { useCadastroStore } from '@/store/cadastroStore';
-import { getContasFinanceiras, ContaFinanceira } from '@/utils/cadastrosApi';
+import { getContasFinanceirasHabilitadas, ContaFinanceira } from '@/utils/cadastrosApi';
 import { useFluxoVendas } from '@/hooks/useFluxoVendas';
 import { finalizarVendaDowngrade, VendaComFluxo } from '@/utils/fluxoVendasApi';
 import { formatarMoeda } from '@/utils/formatUtils';
@@ -27,7 +27,7 @@ const formatCurrency = formatarMoeda;
 
 export default function FinanceiroPagamentosDowngrade() {
   const { obterNomeLoja, obterNomeColaborador } = useCadastroStore();
-  const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceiras());
+  const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceirasHabilitadas());
   
   // Buscar vendas com status Pagamento Downgrade E finalizadas que eram downgrade
   const { vendas, recarregar } = useFluxoVendas({ 

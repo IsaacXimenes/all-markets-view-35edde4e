@@ -1,26 +1,42 @@
 
 
-## Plano: Meta Acessorios em R$ + Ocultar Resumo na Nova Venda
+## Plano: Incluir Garantia Estendida na Nota de Garantia (PDF)
 
-### 1. Meta Acessorios passa de unidades para R$ 
+### Alteracao
 
-**Arquivos afetados**: `src/pages/CadastrosMetas.tsx`, `src/utils/metasApi.ts`, `src/components/vendas/PainelMetasLoja.tsx` (se exibir meta de acessorios)
+Adicionar uma linha de Garantia Estendida na tabela de "DADOS DOS PRODUTOS / SERVICOS" do PDF, logo apos os acessorios e antes da linha de total.
 
-Alteracoes:
+### Arquivo afetado
 
-- **Tabela** (`CadastrosMetas.tsx` linha 142): Trocar header "Meta Acessorios (un.)" para "Meta Acessorios"
-- **Tabela** (linha 154-155): Exibir `formatarMoeda(meta.metaAcessorios)` ao inves do numero puro
-- **Modal** (linhas 211-218): Trocar label "Meta Acessorios (unidades)" para "Meta Acessorios (R$)", trocar `type="number"` por input com `moedaMask`, e usar `parseMoeda` no handleSalvar
-- **Editar** (linha 71): No `abrirEditar`, setar `setMetaAcessorios(formatarMoeda(meta.metaAcessorios))` ao inves de `String(meta.metaAcessorios)`
-- **Salvar** (linha 82): Trocar `Number(metaAcessorios) || 0` por `parseMoeda(metaAcessorios)`
-- **Defaults** (`metasApi.ts` linhas 25-45): Atualizar valores default de `metaAcessorios` de unidades (80, 60, 100) para valores em reais (ex: 5000, 3500, 8000)
-- **PainelMetasLoja**: Ajustar exibicao para formatar como moeda ao inves de unidades
+`src/utils/gerarNotaGarantiaPdf.ts`
 
-### 2. Ocultar o card "Resumo" na Nova Venda
+### Implementacao
 
-**Arquivo afetado**: `src/pages/VendasNova.tsx`
+No trecho entre os acessorios (linha 387) e o total de produtos (linha 389), inserir um bloco condicional:
 
-- Envolver o bloco do Resumo (linhas 2283-2449, o Card inteiro com header "Resumo") com `{false && (...)}`  ou adicionar `hidden` / comentario condicional
-- O Painel de Rentabilidade (linha 2451) permanece visivel
-- Nao excluir o codigo, apenas ocultar da renderizacao
+```
+if (venda.garantiaExtendida && venda.garantiaExtendida.valor > 0) {
+  const descGarantia = `Plano de Garantia Estendido - ${venda.garantiaExtendida.planoNome} (${venda.garantiaExtendida.meses} meses)`;
+  drawBox(prodColQtd, y, prodColQtdW, rowH);
+  drawBox(prodColDesc, y, prodColDescW, rowH);
+  drawBox(prodColTipo, y, prodColTipoW, rowH);
+  drawBox(prodColValor, y, prodColValorW, rowH);
+  doc.text('1', prodColQtd + 2, y + 5);
+  doc.text(descGarantia.substring(0, 70), prodColDesc + 2, y + 5);
+  doc.text('Garantia', prodColTipo + 2, y + 5);
+  doc.text(formatCurrency(venda.garantiaExtendida.valor), prodColValor + 2, y + 5);
+  y += rowH;
+}
+```
+
+A linha segue exatamente o mesmo padrao visual das linhas de acessorios (mesmas colunas, fontes, bordas e alinhamentos). O total ja usa `venda.total` que inclui a garantia, portanto nao precisa de ajuste adicional.
+
+### Estrutura visual no PDF
+
+| QTD | DESCRICAO DO PRODUTO / ACESSORIO | TIPO | VALOR |
+|-----|----------------------------------|------|-------|
+| 1 | iPhone 16 Pro Max - IMEI: 123... | Aparelho | R$ 8.999,00 |
+| 1 | Capa Silicone | Acessorio | R$ 79,90 |
+| 1 | Plano de Garantia Estendido - Gold (12 meses) | Garantia | R$ 399,90 |
+| | TOTAL | | R$ 9.478,80 |
 

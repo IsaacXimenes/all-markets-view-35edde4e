@@ -14,9 +14,9 @@ export const getCabecalhoLoja = (lojaId: string): { subtitulo: string; endereco:
   const mapa: Record<string, { subtitulo: string; endereco: string }> = {
     '3ac7e00c': { subtitulo: 'FEIRA DOS IMPORTADOS', endereco: 'BLOCO D, LOJA 433/434 – BRASÍLIA' },
     'fcc78c1a': { subtitulo: 'FEIRA DOS IMPORTADOS', endereco: 'BLOCO D, LOJA 433/434 – BRASÍLIA' },
-    '5b9446d5': { subtitulo: 'SHOPPING SUL', endereco: 'BR-040 – Parque Esplanada III, Valparaíso de Goiás' },
-    '0d06e7db': { subtitulo: 'SHOPPING ÁGUAS LINDAS', endereco: 'BR-070 – Mansões Centroeste, Águas Lindas de Goiás' },
-    'db894e7d': { subtitulo: 'JK SHOPPING', endereco: 'St. M Norte QNM 34 Área especial 01 – Taguatinga' },
+    '5b9446d5': { subtitulo: 'SHOPPING SUL', endereco: 'BR-040 – PARQUE ESPLANADA III, VALPARAÍSO DE GOIÁS' },
+    '0d06e7db': { subtitulo: 'SHOPPING ÁGUAS LINDAS', endereco: 'BR-070 – MANSÕES CENTROESTE, ÁGUAS LINDAS DE GOIÁS' },
+    'db894e7d': { subtitulo: 'JK SHOPPING', endereco: 'ST. M NORTE QNM 34 ÁREA ESPECIAL 01 – TAGUATINGA' },
   };
   return mapa[lojaId] || { subtitulo: 'FEIRA DOS IMPORTADOS', endereco: 'BLOCO D, LOJA 433/434 – BRASÍLIA' };
 };

@@ -82,7 +82,7 @@ export function PainelRentabilidadeVenda(props: PainelRentabilidadeVendaProps) {
         {/* Bloco Aparelhos */}
         {itens.length > 0 && (
           <Collapsible defaultOpen>
-            <BlocoHeader icon={Package} title="Aparelhos" total={formatCurrency(aparelhos.totalLucro)} />
+            <BlocoHeader icon={Package} title="Aparelhos" total={formatCurrency(aparelhos.totalVenda)} />
             <CollapsibleContent>
               <div className="px-3 pb-3">
                 <Table>
@@ -105,7 +105,7 @@ export function PainelRentabilidadeVenda(props: PainelRentabilidadeVendaProps) {
                           {formatCurrency(item.lucro)}
                         </TableCell>
                         <TableCell className="text-xs text-right py-1.5">
-                          <Badge variant={item.margem < 0 ? 'destructive' : 'secondary'} className="text-xs">
+                          <Badge variant={item.margem < 0 ? 'destructive' : 'secondary'} className={`text-xs ${item.margem >= 30 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : item.margem >= 15 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
                             {item.margem.toFixed(1)}%
                           </Badge>
                         </TableCell>
@@ -121,7 +121,7 @@ export function PainelRentabilidadeVenda(props: PainelRentabilidadeVendaProps) {
         {/* Bloco Acessórios */}
         {acessoriosVenda.length > 0 && (
           <Collapsible>
-            <BlocoHeader icon={Headphones} title="Acessórios" total={formatCurrency(acessorios.totalLucro)} />
+            <BlocoHeader icon={Headphones} title="Acessórios" total={formatCurrency(acessorios.totalVenda)} />
             <CollapsibleContent>
               <div className="px-3 pb-3">
                 <Table>
@@ -218,7 +218,7 @@ export function PainelRentabilidadeVenda(props: PainelRentabilidadeVendaProps) {
         {/* Bloco Logística */}
         {taxaEntrega > 0 && (
           <Collapsible>
-            <BlocoHeader icon={Truck} title="Logística (Entrega)" total={formatCurrency(resumo.lucroEntrega)} />
+            <BlocoHeader icon={Truck} title="Logística (Entrega)" total={formatCurrency(taxaEntrega)} />
             <CollapsibleContent>
               <div className="px-3 pb-3 space-y-1">
                 <div className="flex justify-between text-sm">
@@ -248,10 +248,15 @@ export function PainelRentabilidadeVenda(props: PainelRentabilidadeVendaProps) {
 
         {/* Resumo Consolidado */}
         <div className="space-y-2 pt-2">
-          <h4 className="font-semibold text-sm flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-primary" />
-            Resumo Consolidado
-          </h4>
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold text-sm flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-primary" />
+              Resumo Consolidado
+            </h4>
+            <span className={`text-sm font-bold ${resumo.lucroBruto >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+              Lucro Bruto: {formatCurrency(resumo.lucroBruto)}
+            </span>
+          </div>
 
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
             <span className="text-muted-foreground">Custo Total</span>

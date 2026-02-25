@@ -2280,8 +2280,8 @@ export default function VendasNova() {
           />
         )}
 
-        {/* Resumo */}
-        <Card className={cn(
+        {/* Resumo - oculto temporariamente */}
+        {false && (<Card className={cn(
           "border-2",
           hasValidDowngrade ? 'border-orange-500' : isPrejuizo ? 'border-destructive' : 'border-primary'
         )}>
@@ -2446,7 +2446,7 @@ export default function VendasNova() {
               Gerar Nota Fiscal Simplificada
             </Button>
           </CardContent>
-        </Card>
+        </Card>)}
 
         {/* Painel de Rentabilidade */}
         <PainelRentabilidadeVenda

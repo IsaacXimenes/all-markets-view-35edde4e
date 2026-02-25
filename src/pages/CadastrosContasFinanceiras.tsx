@@ -7,19 +7,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { getContasFinanceiras, addContaFinanceira, updateContaFinanceira, deleteContaFinanceira, ContaFinanceira } from '@/utils/cadastrosApi';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { getContasFinanceiras, addContaFinanceira, updateContaFinanceira, deleteContaFinanceira, toggleContaFinanceira, ContaFinanceira } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
+import { useAuthStore } from '@/store/authStore';
 import { exportToCSV } from '@/utils/formatUtils';
 import { InputComMascara } from '@/components/ui/InputComMascara';
-import { Plus, Pencil, Trash2, Download, Check, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Check, X, History } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function CadastrosContasFinanceiras() {
   const { toast } = useToast();
   const { lojas } = useCadastroStore();
+  const user = useAuthStore((s) => s.user);
   const [contas, setContas] = useState(getContasFinanceiras());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingConta, setEditingConta] = useState<ContaFinanceira | null>(null);
+
+  // Toggle dialog
+  const [toggleDialogOpen, setToggleDialogOpen] = useState(false);
+  const [toggleContaId, setToggleContaId] = useState<string | null>(null);
+  const [toggleObservacao, setToggleObservacao] = useState('');
+
+  // Histórico dialog
+  const [historicoDialogOpen, setHistoricoDialogOpen] = useState(false);
+  const [historicoConta, setHistoricoConta] = useState<ContaFinanceira | null>(null);
+
   const [form, setForm] = useState({
     nome: '',
     tipo: '',
@@ -74,7 +88,7 @@ export default function CadastrosContasFinanceiras() {
     setForm({ 
       ...form, 
       statusMaquina: value,
-      notaFiscal: value === 'Própria' // Auto-set notaFiscal based on statusMaquina
+      notaFiscal: value === 'Própria'
     });
   };
 
@@ -87,7 +101,9 @@ export default function CadastrosContasFinanceiras() {
     const dataToSave = { 
       ...form, 
       saldoAtual: form.saldoAtual || form.saldoInicial,
-      notaFiscal: form.statusMaquina === 'Própria' // Ensure notaFiscal is true when statusMaquina is Própria
+      notaFiscal: form.statusMaquina === 'Própria',
+      habilitada: true,
+      historicoAlteracoes: [] as any[]
     };
 
     if (editingConta) {
@@ -109,6 +125,31 @@ export default function CadastrosContasFinanceiras() {
     toast({ title: 'Sucesso', description: 'Conta removida com sucesso' });
   };
 
+  const handleToggleClick = (contaId: string) => {
+    setToggleContaId(contaId);
+    setToggleObservacao('');
+    setToggleDialogOpen(true);
+  };
+
+  const handleConfirmarToggle = () => {
+    if (!toggleContaId) return;
+    const usuario = user?.colaborador?.nome || user?.username || 'Usuário';
+    toggleContaFinanceira(toggleContaId, usuario, toggleObservacao || undefined);
+    setContas(getContasFinanceiras());
+    setToggleDialogOpen(false);
+    setToggleContaId(null);
+    const conta = getContasFinanceiras().find(c => c.id === toggleContaId);
+    toast({ 
+      title: 'Sucesso', 
+      description: `Conta ${conta?.nome} ${conta?.habilitada !== false ? 'habilitada' : 'desabilitada'} com sucesso` 
+    });
+  };
+
+  const handleOpenHistorico = (conta: ContaFinanceira) => {
+    setHistoricoConta(conta);
+    setHistoricoDialogOpen(true);
+  };
+
   const handleExport = () => {
     const dataToExport = contas.map(conta => ({
       ID: conta.id,
@@ -119,6 +160,7 @@ export default function CadastrosContasFinanceiras() {
       'Valor Inicial': new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(conta.saldoInicial || 0),
       'Status Máquina': conta.statusMaquina,
       'Nota Fiscal': conta.notaFiscal ? 'Sim' : 'Não',
+      Habilitada: conta.habilitada !== false ? 'Sim' : 'Não',
       Status: conta.status
     }));
     exportToCSV(dataToExport, 'contas-financeiras.csv');
@@ -130,6 +172,8 @@ export default function CadastrosContasFinanceiras() {
     const loja = lojas.find(l => l.id === lojaId);
     return loja?.nome || lojaId;
   };
+
+  const toggleContaData = toggleContaId ? contas.find(c => c.id === toggleContaId) : null;
 
   return (
     <CadastrosLayout title="Cadastro de Contas Financeiras">
@@ -159,13 +203,14 @@ export default function CadastrosContasFinanceiras() {
                 <TableHead className="text-right">Valor Inicial</TableHead>
                 <TableHead>Status Máquina</TableHead>
                 <TableHead>Nota Fiscal</TableHead>
+                <TableHead>Habilitada</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {contas.map(conta => (
-                <TableRow key={conta.id}>
+                <TableRow key={conta.id} className={conta.habilitada === false ? 'opacity-50' : ''}>
                   <TableCell className="font-mono text-xs">{conta.id}</TableCell>
                   <TableCell className="text-sm">{getLojaName(conta.lojaVinculada)}</TableCell>
                   <TableCell className="font-medium">{conta.nome}</TableCell>
@@ -187,12 +232,21 @@ export default function CadastrosContasFinanceiras() {
                     )}
                   </TableCell>
                   <TableCell>
+                    <Switch
+                      checked={conta.habilitada !== false}
+                      onCheckedChange={() => handleToggleClick(conta.id)}
+                    />
+                  </TableCell>
+                  <TableCell>
                     <Badge variant={conta.status === 'Ativo' ? 'default' : 'secondary'}>
                       {conta.status}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleOpenHistorico(conta)} title="Histórico">
+                        <History className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(conta)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -208,6 +262,7 @@ export default function CadastrosContasFinanceiras() {
         </div>
       </div>
 
+      {/* Dialog de edição/criação */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -307,6 +362,77 @@ export default function CadastrosContasFinanceiras() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de confirmação do toggle */}
+      <Dialog open={toggleDialogOpen} onOpenChange={setToggleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {toggleContaData?.habilitada !== false ? 'Desabilitar' : 'Habilitar'} Conta
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Deseja {toggleContaData?.habilitada !== false ? 'desabilitar' : 'habilitar'} a conta <strong>{toggleContaData?.nome}</strong>?
+              {toggleContaData?.habilitada !== false && (
+                <span className="block mt-1 text-destructive">
+                  Contas desabilitadas não aparecerão nos campos de seleção de outros módulos.
+                </span>
+              )}
+            </p>
+            <div className="space-y-2">
+              <Label>Observação (opcional)</Label>
+              <Textarea
+                value={toggleObservacao}
+                onChange={e => setToggleObservacao(e.target.value)}
+                placeholder="Motivo da alteração..."
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setToggleDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleConfirmarToggle}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de histórico */}
+      <Dialog open={historicoDialogOpen} onOpenChange={setHistoricoDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Histórico - {historicoConta?.nome}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {(!historicoConta?.historicoAlteracoes || historicoConta.historicoAlteracoes.length === 0) ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Nenhuma alteração registrada.</p>
+            ) : (
+              historicoConta.historicoAlteracoes.map((h, i) => (
+                <div key={i} className="border rounded-lg p-3 space-y-1">
+                  <div className="flex justify-between items-start">
+                    <Badge variant={h.novoStatus === 'Habilitada' ? 'default' : 'secondary'}>
+                      {h.statusAnterior} → {h.novoStatus}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(h.dataHora).toLocaleString('pt-BR')}
+                    </span>
+                  </div>
+                  <p className="text-sm"><strong>Usuário:</strong> {h.usuario}</p>
+                  {h.observacao && (
+                    <p className="text-sm text-muted-foreground"><strong>Obs:</strong> {h.observacao}</p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHistoricoDialogOpen(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

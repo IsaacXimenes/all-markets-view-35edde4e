@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus, Pencil, Trash2, History, Download, X, Users, DollarSign, Wallet, Calendar } from 'lucide-react';
 import { formatCurrency, formatDateTime, exportToCSV } from '@/utils/formatUtils';
 import { useCadastroStore } from '@/store/cadastroStore';
-import { getContasFinanceiras, getContaFinanceiraById } from '@/utils/cadastrosApi';
+import { getContasFinanceirasHabilitadas, getContaFinanceiraById } from '@/utils/cadastrosApi';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { 
@@ -35,7 +35,7 @@ const RHAdiantamentos: React.FC = () => {
   const [adiantamentos, setAdiantamentos] = useState<Adiantamento[]>(getAdiantamentos());
   const lojas = obterLojasAtivas();
   const colaboradores = obterColaboradoresAtivos();
-  const contasFinanceiras = getContasFinanceiras();
+  const contasFinanceiras = getContasFinanceirasHabilitadas();
   
   // Modais
   const [isDialogOpen, setIsDialogOpen] = useState(false);

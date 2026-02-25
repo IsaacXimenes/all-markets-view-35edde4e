@@ -23,7 +23,7 @@ import { format, addMonths, addDays } from 'date-fns';
 
 import { 
   getClientes, getOrigensVenda, 
-  getContasFinanceiras, Cliente, OrigemVenda, ContaFinanceira,
+  getContasFinanceirasHabilitadas, Cliente, OrigemVenda, ContaFinanceira,
   addCliente
 } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
@@ -65,7 +65,7 @@ export default function VendasNova() {
   const motoboys = obterMotoboys();
   const [clientes, setClientes] = useState<Cliente[]>(getClientes());
   const [origensVenda] = useState<OrigemVenda[]>(getOrigensVenda());
-  const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceiras());
+  const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceirasHabilitadas());
   const [produtosEstoque] = useState<Produto[]>(getProdutos());
   const [produtosCadastro] = useState<ProdutoCadastro[]>(getProdutosCadastro());
   const [produtosPendentes] = useState<ProdutoPendente[]>(getProdutosPendentes());

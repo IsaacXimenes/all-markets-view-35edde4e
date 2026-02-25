@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { 
   getClientes, getOrigensVenda, 
-  getContasFinanceiras, Cliente, OrigemVenda, ContaFinanceira,
+  getContasFinanceirasHabilitadas, Cliente, OrigemVenda, ContaFinanceira,
   addCliente, calcularTipoPessoa
 } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
@@ -52,7 +52,7 @@ export default function VendasAcessorios() {
   const vendedoresDisponiveis = obterVendedores();
   const [clientes, setClientes] = useState<Cliente[]>(getClientes());
   const [origensVenda] = useState<OrigemVenda[]>(getOrigensVenda());
-  const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceiras());
+  const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceirasHabilitadas());
   const [acessoriosEstoque, setAcessoriosEstoque] = useState<Acessorio[]>(getAcessorios());
   
   // Info da venda

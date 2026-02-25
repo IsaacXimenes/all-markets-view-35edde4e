@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { getContasFinanceiras } from '@/utils/cadastrosApi';
+import { getContasFinanceirasHabilitadas } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { useAuthStore } from '@/store/authStore';
 import { formatCurrency } from '@/utils/formatUtils';
@@ -48,17 +48,19 @@ interface ModalFinalizarPagamentoProps {
   open: boolean;
   onClose: () => void;
   onConfirm: (dados: DadosPagamento) => void;
+  dadosPix?: { banco: string; recebedor: string; chave: string; observacao?: string };
 }
 
 export function ModalFinalizarPagamento({
   pendencia,
   open,
   onClose,
-  onConfirm
+  onConfirm,
+  dadosPix
 }: ModalFinalizarPagamentoProps) {
   const { obterFinanceiros } = useCadastroStore();
   const user = useAuthStore((state) => state.user);
-  const contasFinanceiras = getContasFinanceiras().filter(c => c.status === 'Ativo');
+  const contasFinanceiras = getContasFinanceirasHabilitadas();
   const colaboradoresFinanceiros = obterFinanceiros();
   
   // Usuário logado - usa dados do authStore
@@ -198,6 +200,22 @@ export function ModalFinalizarPagamento({
         </DialogHeader>
         
         <div className="space-y-4">
+          {/* Banner PIX pré-preenchido */}
+          {dadosPix && (
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+              <div className="flex items-center gap-2 mb-2">
+                <CreditCard className="h-4 w-4 text-blue-600" />
+                <p className="text-sm font-medium text-blue-700 dark:text-blue-400">Dados PIX da Nota de Entrada</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><span className="text-muted-foreground">Banco:</span> {dadosPix.banco}</div>
+                <div><span className="text-muted-foreground">Recebedor:</span> {dadosPix.recebedor}</div>
+                <div><span className="text-muted-foreground">Chave:</span> <span className="font-mono">{dadosPix.chave}</span></div>
+                {dadosPix.observacao && <div><span className="text-muted-foreground">Obs:</span> {dadosPix.observacao}</div>}
+              </div>
+            </div>
+          )}
+
           {/* Resumo */}
           <div className="p-3 rounded-lg bg-muted/50">
             <div className="flex justify-between items-center">

@@ -1836,6 +1836,34 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                 className={cn("mt-1", !resumoConclusao.trim() && "border-destructive")}
               />
             </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Anexar Evidências do Serviço (opcional)</label>
+              <div className="mt-1">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx"
+                  onChange={(e) => {
+                    const files = e.target.files;
+                    if (!files) return;
+                    // Store file names for timeline registration
+                    const nomes: string[] = [];
+                    for (let i = 0; i < files.length; i++) {
+                      if (files[i].size > 10 * 1024 * 1024) {
+                        toast.error(`Arquivo ${files[i].name} excede 10MB`);
+                        continue;
+                      }
+                      nomes.push(files[i].name);
+                    }
+                    // Store in a data attribute for later use
+                    (e.target as any)._evidenciaNomes = nomes;
+                  }}
+                  className="text-sm"
+                  id="evidencias-finalizacao"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Máx. 5 arquivos, 10MB cada (PDF, JPG, PNG, DOCX)</p>
+              </div>
+            </div>
             <div className="flex items-center gap-2 pt-2">
               <Checkbox
                 id="check-finalizacao"

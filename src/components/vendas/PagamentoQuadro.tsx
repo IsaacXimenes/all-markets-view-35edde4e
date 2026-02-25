@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { CreditCard, Plus, X, AlertTriangle, DollarSign, TrendingUp, Percent, Store } from 'lucide-react';
-import { getContasFinanceiras, getMaquinasCartao, ContaFinanceira, MaquinaCartao } from '@/utils/cadastrosApi';
+import { getContasFinanceirasHabilitadas, getMaquinasCartao, ContaFinanceira, MaquinaCartao } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { Pagamento } from '@/utils/vendasApi';
 import { formatarMoeda, moedaMask, parseMoeda } from '@/utils/formatUtils';
@@ -86,7 +86,7 @@ export function PagamentoQuadro({
   ocultarCards = false,
   apenasContasAssistencia = false
 }: PagamentoQuadroProps) {
-  const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceiras());
+  const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceirasHabilitadas());
   const [maquinasCartao] = useState<MaquinaCartao[]>(getMaquinasCartao().filter(m => m.status === 'Ativo'));
   
   const { obterNomeLoja } = useCadastroStore();

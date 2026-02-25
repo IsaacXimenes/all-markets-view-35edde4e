@@ -133,6 +133,8 @@ export interface OrdemServico {
   }[];
   // Cronômetro de Produtividade
   cronometro?: CronometroOS;
+  // Evidências do serviço
+  evidencias?: { nome: string; tipo: string; dataAnexo: string; usuario: string }[];
 }
 
 export interface CronometroOS {

@@ -16,7 +16,7 @@ import { ComprovantePreview } from '@/components/vendas/ComprovantePreview';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { getOrdensServico, getOrdemServicoById, updateOrdemServico, formatCurrency, OrdemServico } from '@/utils/assistenciaApi';
-import { getClientes, getContasFinanceiras } from '@/utils/cadastrosApi';
+import { getClientes, getContasFinanceirasHabilitadas } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { useAuthStore } from '@/store/authStore';
 import { Eye, Download, Filter, X, Check, XCircle, Clock, DollarSign, CreditCard, Banknote, Smartphone, Wallet, Lock, MessageSquare, Paperclip } from 'lucide-react';
@@ -45,7 +45,7 @@ export default function OSConferenciaGestor() {
   const navigate = useNavigate();
   const [ordensServico, setOrdensServico] = useState(getOrdensServico());
   const clientes = getClientes();
-  const contasFinanceiras = getContasFinanceiras();
+  const contasFinanceiras = getContasFinanceirasHabilitadas();
   const { obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   const user = useAuthStore((s) => s.user);
 

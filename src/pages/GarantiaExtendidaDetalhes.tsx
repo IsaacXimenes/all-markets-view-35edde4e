@@ -17,7 +17,7 @@ import {
 import { format, addMonths } from 'date-fns';
 import { toast } from 'sonner';
 import { getGarantiaById, getTimelineByGarantiaId, addTimelineEntry } from '@/utils/garantiasApi';
-import { getLojas, getColaboradores, getContasFinanceiras, getMaquinasCartao, getModelosPagamento } from '@/utils/cadastrosApi';
+import { getLojas, getColaboradores, getContasFinanceirasHabilitadas, getMaquinasCartao, getModelosPagamento } from '@/utils/cadastrosApi';
 import { getPlanosGarantia, PlanoGarantia } from '@/utils/planosGarantiaApi';
 import { 
   calcularTempoRestante, podeRenovar, addTratativaComercial, 
@@ -35,7 +35,7 @@ export default function GarantiaExtendidaDetalhes() {
   const tratativasComerciais = getTratativasComerciasByGarantiaId(id || '');
   const lojas = getLojas();
   const colaboradores = getColaboradores();
-  const contasFinanceiras = getContasFinanceiras();
+  const contasFinanceiras = getContasFinanceirasHabilitadas();
   const maquinas = getMaquinasCartao();
   const meiosPagamento = getModelosPagamento();
   const planosGarantia = getPlanosGarantia();

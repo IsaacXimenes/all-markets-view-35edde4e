@@ -99,6 +99,14 @@ export interface ModeloPagamento {
   modelo: string;
 }
 
+export interface HistoricoAlteracaoConta {
+  dataHora: string;
+  usuario: string;
+  statusAnterior: string;
+  novoStatus: string;
+  observacao?: string;
+}
+
 export interface ContaFinanceira {
   id: string;
   nome: string;
@@ -114,6 +122,8 @@ export interface ContaFinanceira {
   ultimoMovimento?: string;
   statusMaquina: 'Terceirizada' | 'Própria';
   notaFiscal: boolean;
+  habilitada: boolean;
+  historicoAlteracoes: HistoricoAlteracaoConta[];
 }
 
 export interface MaquinaCartao {
@@ -404,31 +414,31 @@ let modelosPagamento: ModeloPagamento[] = [
 
 let contasFinanceiras: ContaFinanceira[] = [
   // Loja - Matriz
-  { id: 'CTA-001', nome: 'Santander (Unicred)', tipo: 'Conta Bancária', lojaVinculada: '3ac7e00c', banco: 'Santander', agencia: '', conta: '', cnpj: '53.295.194/0001-66', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false },
-  { id: 'CTA-002', nome: 'Bradesco Thiago Eduardo', tipo: 'Conta Bancária', lojaVinculada: '3ac7e00c', banco: 'Bradesco', agencia: '', conta: '', cnpj: '53.295.194/0001-66', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true },
+  { id: 'CTA-001', nome: 'Santander (Unicred)', tipo: 'Conta Bancária', lojaVinculada: '3ac7e00c', banco: 'Santander', agencia: '', conta: '', cnpj: '53.295.194/0001-66', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false, habilitada: true, historicoAlteracoes: [] },
+  { id: 'CTA-002', nome: 'Bradesco Thiago Eduardo', tipo: 'Conta Bancária', lojaVinculada: '3ac7e00c', banco: 'Bradesco', agencia: '', conta: '', cnpj: '53.295.194/0001-66', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
   // Loja - Online
-  { id: 'CTA-003', nome: 'Santander (Unicred)', tipo: 'Conta Bancária', lojaVinculada: 'fcc78c1a', banco: 'Santander', agencia: '', conta: '', cnpj: '46.197.533/0001-06', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false },
-  { id: 'CTA-004', nome: 'Bradesco Thiago Imports', tipo: 'Conta Bancária', lojaVinculada: 'fcc78c1a', banco: 'Bradesco', agencia: '', conta: '', cnpj: '46.197.533/0001-06', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true },
+  { id: 'CTA-003', nome: 'Santander (Unicred)', tipo: 'Conta Bancária', lojaVinculada: 'fcc78c1a', banco: 'Santander', agencia: '', conta: '', cnpj: '46.197.533/0001-06', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false, habilitada: true, historicoAlteracoes: [] },
+  { id: 'CTA-004', nome: 'Bradesco Thiago Imports', tipo: 'Conta Bancária', lojaVinculada: 'fcc78c1a', banco: 'Bradesco', agencia: '', conta: '', cnpj: '46.197.533/0001-06', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
   // Loja - JK Shopping
-  { id: 'CTA-005', nome: 'Santander (Santander JK)', tipo: 'Conta Bancária', lojaVinculada: 'db894e7d', banco: 'Santander', agencia: '', conta: '', cnpj: '62.968.637/0001-23', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false },
-  { id: 'CTA-006', nome: 'Sicoob (Sicoob JK)', tipo: 'Conta Bancária', lojaVinculada: 'db894e7d', banco: 'Sicoob', agencia: '', conta: '', cnpj: '62.968.637/0001-23', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true },
+  { id: 'CTA-005', nome: 'Santander (Santander JK)', tipo: 'Conta Bancária', lojaVinculada: 'db894e7d', banco: 'Santander', agencia: '', conta: '', cnpj: '62.968.637/0001-23', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false, habilitada: true, historicoAlteracoes: [] },
+  { id: 'CTA-006', nome: 'Sicoob (Sicoob JK)', tipo: 'Conta Bancária', lojaVinculada: 'db894e7d', banco: 'Sicoob', agencia: '', conta: '', cnpj: '62.968.637/0001-23', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
   // Loja - Águas Lindas Shopping
-  { id: 'CTA-007', nome: 'Santander (Unicred TH Imports)', tipo: 'Conta Bancária', lojaVinculada: '0d06e7db', banco: 'Santander', agencia: '', conta: '', cnpj: '56.221.743/0001-46', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false },
-  { id: 'CTA-008', nome: 'Pagbank (Pix Carol)', tipo: 'Conta Digital', lojaVinculada: '0d06e7db', banco: 'Pagbank', agencia: '', conta: '', cnpj: '56.221.743/0001-46', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true },
+  { id: 'CTA-007', nome: 'Santander (Unicred TH Imports)', tipo: 'Conta Bancária', lojaVinculada: '0d06e7db', banco: 'Santander', agencia: '', conta: '', cnpj: '56.221.743/0001-46', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false, habilitada: true, historicoAlteracoes: [] },
+  { id: 'CTA-008', nome: 'Pagbank (Pix Carol)', tipo: 'Conta Digital', lojaVinculada: '0d06e7db', banco: 'Pagbank', agencia: '', conta: '', cnpj: '56.221.743/0001-46', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
   // Loja - Shopping Sul
-  { id: 'CTA-009', nome: 'Santander (Bradesco Shopping Sul)', tipo: 'Conta Bancária', lojaVinculada: '5b9446d5', banco: 'Santander', agencia: '', conta: '', cnpj: '55.449.390/0001-73', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false },
-  { id: 'CTA-010', nome: 'Bradesco Acessórios', tipo: 'Conta Bancária', lojaVinculada: '5b9446d5', banco: 'Bradesco', agencia: '', conta: '', cnpj: '55.449.390/0001-73', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true },
+  { id: 'CTA-009', nome: 'Santander (Bradesco Shopping Sul)', tipo: 'Conta Bancária', lojaVinculada: '5b9446d5', banco: 'Santander', agencia: '', conta: '', cnpj: '55.449.390/0001-73', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false, habilitada: true, historicoAlteracoes: [] },
+  { id: 'CTA-010', nome: 'Bradesco Acessórios', tipo: 'Conta Bancária', lojaVinculada: '5b9446d5', banco: 'Bradesco', agencia: '', conta: '', cnpj: '55.449.390/0001-73', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
   // Contas de Dinheiro por Loja
-  { id: 'CTA-015', nome: 'Dinheiro - JK Shopping', tipo: 'Dinheiro', lojaVinculada: 'db894e7d', banco: '', agencia: '', conta: '', cnpj: '62.968.637/0001-23', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true },
-  { id: 'CTA-016', nome: 'Dinheiro - Shopping Sul', tipo: 'Dinheiro', lojaVinculada: '5b9446d5', banco: '', agencia: '', conta: '', cnpj: '55.449.390/0001-73', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true },
-  { id: 'CTA-017', nome: 'Dinheiro - Águas Lindas Shopping', tipo: 'Dinheiro', lojaVinculada: '0d06e7db', banco: '', agencia: '', conta: '', cnpj: '56.221.743/0001-46', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true },
-  { id: 'CTA-018', nome: 'Dinheiro - Online', tipo: 'Dinheiro', lojaVinculada: 'fcc78c1a', banco: '', agencia: '', conta: '', cnpj: '46.197.533/0001-06', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true },
-  { id: 'CTA-019', nome: 'Dinheiro - Loja Matriz', tipo: 'Dinheiro', lojaVinculada: '3ac7e00c', banco: '', agencia: '', conta: '', cnpj: '53.295.194/0001-66', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true },
-  { id: 'CTA-020', nome: 'Cofre', tipo: 'Dinheiro - Geral', lojaVinculada: 'geral-dinheiro', banco: '', agencia: '', conta: '', cnpj: '62.968.637/0001-23', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true },
+  { id: 'CTA-015', nome: 'Dinheiro - JK Shopping', tipo: 'Dinheiro', lojaVinculada: 'db894e7d', banco: '', agencia: '', conta: '', cnpj: '62.968.637/0001-23', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
+  { id: 'CTA-016', nome: 'Dinheiro - Shopping Sul', tipo: 'Dinheiro', lojaVinculada: '5b9446d5', banco: '', agencia: '', conta: '', cnpj: '55.449.390/0001-73', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
+  { id: 'CTA-017', nome: 'Dinheiro - Águas Lindas Shopping', tipo: 'Dinheiro', lojaVinculada: '0d06e7db', banco: '', agencia: '', conta: '', cnpj: '56.221.743/0001-46', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
+  { id: 'CTA-018', nome: 'Dinheiro - Online', tipo: 'Dinheiro', lojaVinculada: 'fcc78c1a', banco: '', agencia: '', conta: '', cnpj: '46.197.533/0001-06', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
+  { id: 'CTA-019', nome: 'Dinheiro - Loja Matriz', tipo: 'Dinheiro', lojaVinculada: '3ac7e00c', banco: '', agencia: '', conta: '', cnpj: '53.295.194/0001-66', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
+  { id: 'CTA-020', nome: 'Cofre', tipo: 'Dinheiro - Geral', lojaVinculada: 'geral-dinheiro', banco: '', agencia: '', conta: '', cnpj: '62.968.637/0001-23', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
   // Assistência - Geral
-  { id: 'CTA-021', nome: 'Bradesco Assistência', tipo: 'Conta Bancária', lojaVinculada: 'geral-assistencia', banco: 'Bradesco', agencia: '', conta: '', cnpj: '54.872.234/0001-58', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true },
+  { id: 'CTA-021', nome: 'Bradesco Assistência', tipo: 'Conta Bancária', lojaVinculada: 'geral-assistencia', banco: 'Bradesco', agencia: '', conta: '', cnpj: '54.872.234/0001-58', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
   // Dinheiro - Assistência (centralizada)
-  { id: 'CTA-022', nome: 'Dinheiro - Assistência', tipo: 'Dinheiro', lojaVinculada: 'geral-assistencia', banco: '', agencia: '', conta: '', cnpj: '53.295.194/0001-66', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true },
+  { id: 'CTA-022', nome: 'Dinheiro - Assistência', tipo: 'Dinheiro', lojaVinculada: 'geral-assistencia', banco: '', agencia: '', conta: '', cnpj: '53.295.194/0001-66', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
 ];
 
 let maquinasCartao: MaquinaCartao[] = [
@@ -737,9 +747,27 @@ export const deleteModeloPagamento = (id: string) => {
 };
 
 export const getContasFinanceiras = () => [...contasFinanceiras];
+export const getContasFinanceirasHabilitadas = () => contasFinanceiras.filter(c => c.habilitada !== false && c.status === 'Ativo');
+export const toggleContaFinanceira = (id: string, usuario: string, observacao?: string) => {
+  const index = contasFinanceiras.findIndex(c => c.id === id);
+  if (index === -1) return null;
+  const conta = contasFinanceiras[index];
+  const statusAnterior = conta.habilitada !== false ? 'Habilitada' : 'Desabilitada';
+  const novoStatus = conta.habilitada !== false ? 'Desabilitada' : 'Habilitada';
+  conta.habilitada = !conta.habilitada;
+  conta.historicoAlteracoes = conta.historicoAlteracoes || [];
+  conta.historicoAlteracoes.unshift({
+    dataHora: new Date().toISOString(),
+    usuario,
+    statusAnterior,
+    novoStatus,
+    observacao
+  });
+  return conta;
+};
 export const addContaFinanceira = (conta: Omit<ContaFinanceira, 'id'>) => {
   const newId = `CTA-${String(contasFinanceiras.length + 1).padStart(3, '0')}`;
-  const newConta = { ...conta, id: newId };
+  const newConta = { ...conta, id: newId, habilitada: conta.habilitada ?? true, historicoAlteracoes: conta.historicoAlteracoes || [] };
   contasFinanceiras.push(newConta);
   return newConta;
 };

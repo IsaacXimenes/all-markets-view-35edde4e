@@ -68,7 +68,7 @@ export default function CadastrosMetas() {
     setEditando(meta);
     setLojaIdModal(meta.lojaId);
     setMetaFaturamento(formatarMoeda(meta.metaFaturamento));
-    setMetaAcessorios(String(meta.metaAcessorios));
+    setMetaAcessorios(formatarMoeda(meta.metaAcessorios));
     setMetaGarantia(formatarMoeda(meta.metaGarantia));
     setModalOpen(true);
   };
@@ -79,7 +79,7 @@ export default function CadastrosMetas() {
       mes: Number(filtroMes),
       ano: Number(filtroAno),
       metaFaturamento: parseMoeda(metaFaturamento),
-      metaAcessorios: Number(metaAcessorios) || 0,
+      metaAcessorios: parseMoeda(metaAcessorios),
       metaGarantia: parseMoeda(metaGarantia),
     };
 
@@ -139,7 +139,7 @@ export default function CadastrosMetas() {
                 <TableRow>
                   <TableHead>Loja</TableHead>
                   <TableHead className="text-right">Meta Faturamento</TableHead>
-                  <TableHead className="text-right">Meta Acessórios (un.)</TableHead>
+                  <TableHead className="text-right">Meta Acessórios</TableHead>
                   <TableHead className="text-right">Meta Garantia</TableHead>
                   <TableHead className="text-center">Ações</TableHead>
                 </TableRow>
@@ -152,7 +152,7 @@ export default function CadastrosMetas() {
                       {meta ? formatarMoeda(meta.metaFaturamento) : <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell className="text-right">
-                      {meta ? meta.metaAcessorios : <span className="text-muted-foreground">-</span>}
+                      {meta ? formatarMoeda(meta.metaAcessorios) : <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell className="text-right">
                       {meta ? formatarMoeda(meta.metaGarantia) : <span className="text-muted-foreground">-</span>}
@@ -209,12 +209,11 @@ export default function CadastrosMetas() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Meta Acessórios (unidades)</label>
+              <label className="text-sm font-medium mb-1 block">Meta Acessórios (R$)</label>
               <Input
-                type="number"
                 value={metaAcessorios}
-                onChange={e => setMetaAcessorios(e.target.value)}
-                placeholder="0"
+                onChange={e => setMetaAcessorios(moedaMask(e.target.value))}
+                placeholder="R$ 0,00"
               />
             </div>
             <div>

@@ -122,7 +122,7 @@ export function PainelMetasLoja({ lojaId }: PainelMetasLojaProps) {
           icon={Headphones}
           atual={realizacao.acessorios}
           meta={meta.metaAcessorios}
-          formatFn={(v) => `${v} un.`}
+          formatFn={formatarMoeda}
         />
         <MetaBar
           label="Garantia"

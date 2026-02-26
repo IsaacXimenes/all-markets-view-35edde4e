@@ -4,10 +4,10 @@ import { format, startOfMonth, endOfMonth, getDaysInMonth } from 'date-fns';
 // Lazy imports to break circular dependency (motoboyApi <-> vendasApi)
 let _vendasModule: any = null;
 let _financeModule: any = null;
+let _cadastrosModule: any = null;
 
 const getVendasModule = () => {
   if (!_vendasModule) {
-    // Dynamic import resolved synchronously after first load
     import('./vendasApi').then(m => { _vendasModule = m; });
   }
   return _vendasModule;
@@ -20,9 +20,17 @@ const getFinanceModule = () => {
   return _financeModule;
 };
 
+const getCadastrosModule = () => {
+  if (!_cadastrosModule) {
+    import('./cadastrosApi').then(m => { _cadastrosModule = m; });
+  }
+  return _cadastrosModule;
+};
+
 // Pre-warm lazy modules
 import('./vendasApi').then(m => { _vendasModule = m; });
 import('./financeApi').then(m => { _financeModule = m; });
+import('./cadastrosApi').then(m => { _cadastrosModule = m; });
 
 export interface DemandaMotoboy {
   id: string;
@@ -243,6 +251,17 @@ const atualizarRemuneracaoPeriodo = (demanda: DemandaMotoboy) => {
   }
 };
 
+// Ativar demandas pendentes após conferência financeira
+export const ativarDemandasPorVenda = (vendaId: string): void => {
+  demandas.forEach(d => {
+    if (d.vendaId === vendaId && d.status === 'Pendente') {
+      d.status = 'Concluída';
+      atualizarRemuneracaoPeriodo(d);
+      console.log(`[MOTOBOY] Demanda ${d.id} ativada após conferência financeira`);
+    }
+  });
+};
+
 // Adicionar nova demanda de motoboy
 export const addDemandaMotoboy = (demanda: Omit<DemandaMotoboy, 'id'>): DemandaMotoboy => {
   const novaDemanda: DemandaMotoboy = {
@@ -250,10 +269,12 @@ export const addDemandaMotoboy = (demanda: Omit<DemandaMotoboy, 'id'>): DemandaM
     id: `DEM-${Date.now()}`
   };
   demandas.push(novaDemanda);
-  console.log(`[MOTOBOY] Demanda ${novaDemanda.id} registrada para ${demanda.motoboyNome}`);
+  console.log(`[MOTOBOY] Demanda ${novaDemanda.id} registrada para ${demanda.motoboyNome} (status: ${demanda.status})`);
 
-  // Atualizar/criar remuneração automaticamente
-  atualizarRemuneracaoPeriodo(novaDemanda);
+  // Só contabiliza na remuneração se já estiver concluída
+  if (novaDemanda.status === 'Concluída') {
+    atualizarRemuneracaoPeriodo(novaDemanda);
+  }
 
   return novaDemanda;
 };
@@ -450,7 +471,7 @@ export const getDetalheEntregasRemuneracao = (
         return {
           demandaId: d.id,
           vendaId: d.vendaId,
-          vendedor: venda.vendedor || d.motoboyNome,
+          vendedor: (() => { const mod = getCadastrosModule(); return mod?.getColaboradorById?.(venda.vendedor)?.nome || venda.vendedor; })(),
           produto: venda.itens?.map((i: any) => i.produto).join(', ') || d.descricao,
           localizacao: d.lojaDestino,
           valorEntrega: d.valorDemanda,

@@ -5,6 +5,7 @@ import { migrarTradeInsParaPendentes } from './osApi';
 import { enviarNotificacaoVenda, DadosVendaNotificacao } from './whatsappNotificacaoApi';
 import { addDespesa } from './financeApi';
 import { criarDividaFiado } from './fiadoApi';
+import { ativarDemandasPorVenda } from './motoboyApi';
 
 // Novo tipo para status de venda no fluxo de conferência
 export type StatusVenda = 
@@ -444,6 +445,9 @@ export const finalizarVenda = (
   });
 
   saveFluxoData(fluxoData);
+
+  // INTEGRAÇÃO MOTOBOY: Ativar demandas pendentes após conferência financeira
+  ativarDemandasPorVenda(vendaId);
   
   // MIGRAÇÃO AUTOMÁTICA: Após pagamento financeiro, trade-ins vão para Aparelhos Pendentes - Estoque
   if (venda && venda.tradeIns && venda.tradeIns.length > 0) {
@@ -624,6 +628,9 @@ export const finalizarVendaDowngrade = (
 
   saveFluxoData(fluxoData);
 
+  // INTEGRAÇÃO MOTOBOY: Ativar demandas pendentes após conferência financeira
+  ativarDemandasPorVenda(vendaId);
+
   // Registrar saída financeira no extrato
   if (saldoDevolver > 0) {
     const hoje = new Date();
@@ -743,6 +750,9 @@ export const finalizarVendaFiado = (
   });
 
   saveFluxoData(fluxoData);
+
+  // INTEGRAÇÃO MOTOBOY: Ativar demandas pendentes após conferência financeira
+  ativarDemandasPorVenda(vendaId);
 
   // Criar dívida automaticamente
   const pagFiado = venda.pagamentos?.find((p: any) => p.isFiado);

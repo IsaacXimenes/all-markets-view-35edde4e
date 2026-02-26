@@ -965,6 +965,7 @@ export default function VendasNova() {
       tipoRetirada,
       taxaEntrega,
       motoboyId: tipoRetirada === 'Entrega' ? motoboyId : undefined,
+      localEntregaNome: tipoRetirada === 'Entrega' ? localEntregaNome : undefined,
       itens,
       acessorios: acessoriosVenda,
       tradeIns,

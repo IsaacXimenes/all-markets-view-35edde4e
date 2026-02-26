@@ -1,84 +1,52 @@
 
+# Correção: Produtos da Loja Online não aparecem na Finalização Digital
 
-# Plano: Substituir Quadro de Resumo pelo Painel de Rentabilidade em todas as abas de Vendas
+## Problema Identificado
 
-## Contexto
+Quando a "Loja de Venda" é "Loja - Online" (ID `fcc78c1a`), o sistema aplica a regra de estoque compartilhado e redireciona para "Loja - Matriz" (ID `3ac7e00c`). Porém, o filtro so mostra produtos cuja localização efetiva seja exatamente a Matriz. Produtos registrados diretamente na loja Online (com `loja: 'fcc78c1a'`) ficam invisíveis, pois `'fcc78c1a' !== '3ac7e00c'`.
 
-O componente `PainelRentabilidadeVenda` ja esta implementado e funcional na aba "Nova Venda" (`VendasNova.tsx`). Ele calcula margens, lucro real, taxas de cartao, comissoes hibridas e inclui o Coach de Vendas. O objetivo e replicar esse padrao em todas as outras telas de vendas que ainda usam o quadro de "Resumo" antigo.
+## Causa Raiz
 
-## Telas Afetadas
+Na função `getLojaEstoqueReal()`, quando a loja é Online, retorna o ID da Matriz. O filtro de produtos compara `lojaEfetivaProduto === lojaEstoqueReal`, o que exclui produtos que estão fisicamente cadastrados na Online.
 
-| Tela | Arquivo | Situacao Atual |
-|------|---------|---------------|
-| Venda Balcao | `VendasAcessorios.tsx` | Quadro "Resumo da Venda" simples (linhas 798-874) |
-| Finalizar Digital | `VendasFinalizarDigital.tsx` | Quadro "Resumo" extenso (linhas 1964-2100+) |
-| Conferencia Lancamento | `VendasConferenciaLancamento.tsx` | Nao tem resumo individual (lista de vendas) |
-| Conferencia Gestor (Painel Lateral) | `VendasConferenciaGestor.tsx` | Usa `VendaResumoCompleto` no painel lateral (linha 800) |
-| Conferencia Gestor (Detalhes) | `VendasConferenciaGestorDetalhes.tsx` | Quadro "Resumo" basico no sidebar (linhas 186-207) |
+O mesmo bug existe em `getProdutosDisponiveisPorLoja()` na `estoqueApi.ts`.
 
-## Alteracoes por Arquivo
+## Solução
 
-### 1. VendasFinalizarDigital.tsx (Finalizar Venda Digital)
+Alterar a lógica de filtragem para considerar AMBAS as lojas quando há compartilhamento de estoque. Produtos devem aparecer se estiverem na Matriz OU na Online quando a venda é de qualquer uma dessas duas lojas.
 
-- **Remover** o card "Resumo" completo (linhas ~1964-2120)
-- **Adicionar** o componente `PainelRentabilidadeVenda` no mesmo local, passando as props ja existentes (`itens`, `acessoriosVenda`, `tradeIns`, `garantiaExtendida`, `taxaEntrega`, `localEntregaId`, `lojaVenda`, `pagamentos`, `total`)
-- **Manter** os cards especiais de Downgrade e Sinal abaixo do Painel de Rentabilidade, pois sao alertas criticos
-- **Manter** os botoes de acao (Cancelar / Finalizar Venda) que estao no final da pagina
-- Importar `PainelRentabilidadeVenda`
+### Alterações
 
-### 2. VendasAcessorios.tsx (Venda Balcao)
+**1. `src/utils/estoqueApi.ts`** - Criar helper e corrigir `getProdutosDisponiveisPorLoja`
 
-- **Remover** o card "Resumo da Venda" (linhas ~798-874)
-- **Adaptar** o `PainelRentabilidadeVenda`: como Venda Balcao so vende acessorios (sem aparelhos, trade-in ou garantia extendida), passar `itens={[]}`, `tradeIns={[]}`, `garantiaExtendida={null}`, `localEntregaId={''}` e os acessorios reais
-- **Mover** os botoes de acao (Cancelar / Registrar Venda) para fora do card removido
-- Importar `PainelRentabilidadeVenda`
+- Criar função `getLojasPorPoolEstoque(lojaId)` que retorna um array com todas as lojas do mesmo pool de estoque (ex: `['fcc78c1a', '3ac7e00c']` para Online ou Matriz)
+- Corrigir `getProdutosDisponiveisPorLoja` para usar o array de lojas do pool ao invés de um único ID
 
-### 3. VendasConferenciaGestorDetalhes.tsx (Detalhes Conferencia Gestor)
+**2. `src/pages/VendasFinalizarDigital.tsx`** - Corrigir filtro de produtos (linha 584-588)
 
-- **Substituir** o card "Resumo" na coluna lateral (linhas 186-207) pelo `PainelRentabilidadeVenda`
-- Os dados vem de `venda.dadosVenda` - sera necessario mapear os campos para o formato esperado pelo componente (`ItemVenda[]`, `VendaAcessorio[]`, `ItemTradeIn[]`, `Pagamento[]`)
-- Importar `PainelRentabilidadeVenda` e as interfaces de tipos necessarias
+- Importar a nova função `getLojasPorPoolEstoque`
+- No `produtosFiltrados`, trocar a comparação de igualdade simples por verificação de inclusão no pool:
+  - De: `lojaEfetivaProduto !== lojaEstoqueReal`
+  - Para: `!lojasPool.includes(lojaEfetivaProduto)`
+- Mesma correção no `produtosOutrasLojas` (linha 610)
 
-### 4. VendasConferenciaGestor.tsx (Painel Lateral)
+**3. `src/pages/VendasNova.tsx`** - Verificar e aplicar mesma correção se necessário
 
-- **Substituir** o `VendaResumoCompleto` (linha 800) pelo `PainelRentabilidadeVenda`
-- Os dados vem de `vendaSelecionada` (tipo `VendaComFluxo`) - mapear para as props do componente
-- **Manter** a validacao de pagamentos e campo de observacao do gestor abaixo do painel
-- Importar `PainelRentabilidadeVenda`
+- Garantir consistência no filtro de produtos da tela de Nova Venda
 
-### 5. VendasConferenciaLancamento.tsx
-
-- Esta tela e uma listagem de vendas, nao tem quadro de resumo individual para substituir
-- **Nenhuma alteracao necessaria**
-
-## Detalhes Tecnicos
-
-### Mapeamento de dados para o PainelRentabilidadeVenda
-
-O componente espera estas props:
+### Exemplo da correção no filtro
 
 ```text
-itens: ItemVenda[]           -> produto, valorCusto, valorVenda, id
-acessoriosVenda: VendaAcessorio[] -> acessorioId, descricao, quantidade, valorTotal
-tradeIns: ItemTradeIn[]      -> modelo, valorCompraUsado, id
-garantiaExtendida: { planoNome, valor } | null
-taxaEntrega: number
-localEntregaId: string
-lojaVenda: string
-pagamentos: Pagamento[]      -> valor, parcelas, meioPagamento
-total: number
+// Antes (bugado):
+const lojaEstoqueReal = getLojaEstoqueReal(lojaVenda);
+if (lojaEfetivaProduto !== lojaEstoqueReal) return false;
+
+// Depois (corrigido):
+const lojasPool = getLojasPorPoolEstoque(lojaVenda);
+if (!lojasPool.includes(lojaEfetivaProduto)) return false;
 ```
 
-Para as telas de conferencia, os dados vem em formatos ligeiramente diferentes (ex: `dadosVenda.itens` com campos como `produto`, `valorVenda`). Sera feito mapeamento inline para compatibilidade.
-
-### Venda Balcao (caso especial)
-
-Como so vende acessorios, o painel mostrara apenas o bloco de "Acessorios" e o "Resumo Consolidado" - os blocos de Aparelhos, Trade-In e Garantia Extendida ficarao ocultos automaticamente pela logica interna do componente.
-
-## Sequencia de Implementacao
-
-1. VendasFinalizarDigital.tsx - substituir Resumo por PainelRentabilidadeVenda
-2. VendasAcessorios.tsx - adaptar para venda somente de acessorios
-3. VendasConferenciaGestorDetalhes.tsx - substituir Resumo no sidebar
-4. VendasConferenciaGestor.tsx - substituir VendaResumoCompleto no painel lateral
-
+A nova função `getLojasPorPoolEstoque` retornará:
+- Para Loja Online: `['fcc78c1a', '3ac7e00c']` (Online + Matriz)
+- Para Loja Matriz: `['3ac7e00c', 'fcc78c1a']` (Matriz + Online)
+- Para qualquer outra loja: `['<id_da_loja>']` (apenas ela mesma)

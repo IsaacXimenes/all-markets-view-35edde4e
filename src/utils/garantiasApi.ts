@@ -797,14 +797,15 @@ export const aprovarTratativa = (
         cor: aparelhoTroca?.cor || '-',
         tipo: 'Seminovo',
         condicao: 'Semi-novo',
-        origemEntrada: 'Base de Troca',
+        origemEntrada: 'Garantia',
         notaOuVendaId: `GAR-${garantia.id}`,
         valorCusto: 0,
         valorOrigem: 0,
         saudeBateria: 0,
         loja: garantia.lojaVenda,
         dataEntrada: agora.split('T')[0],
-      }, true);
+        motivoAssistencia: `Defeito relatado na Garantia ID #${garantia.id}`,
+      } as any, true);
 
       // 3. Gerar Nota de Venda (modelo garantia) com custo e lucro zerados
       addVenda({

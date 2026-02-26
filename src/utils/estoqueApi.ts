@@ -495,7 +495,9 @@ export const getStatusAparelho = (produto: Produto): string => {
   if (produto.quantidade === 0 && produto.statusNota === 'Concluído') return 'Vendido';
   if (produto.statusMovimentacao === 'Em movimentação') return 'Em movimentação';
   if (produto.statusEmprestimo === 'Empréstimo - Assistência') return 'Empréstimo';
-  if (produto.bloqueadoEmTrocaGarantiaId) return 'Reservado para Troca';
+  if (produto.bloqueadoEmTrocaGarantiaId) {
+    return produto.quantidade === 0 ? 'Troca - Garantia' : 'Reservado para Troca';
+  }
   if (produto.bloqueadoEmVendaId) return 'Bloqueado';
   if (produto.tagRetornoAssistencia) return 'Retorno de Assistência';
   return 'Disponível';

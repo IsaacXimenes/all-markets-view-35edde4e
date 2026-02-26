@@ -11,10 +11,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { 
-  Eye, Clock, Package, Smartphone, Wrench, AlertTriangle, CheckCircle, Download, Filter, X, ThumbsUp, ThumbsDown
+  Eye, Clock, Package, Smartphone, Wrench, AlertTriangle, CheckCircle, Download, Filter, X, ThumbsUp, ThumbsDown, FileText
 } from 'lucide-react';
 import { FileUploadComprovante } from '@/components/estoque/FileUploadComprovante';
 import { exportToCSV, formatCurrency } from '@/utils/formatUtils';
+import { gerarNotaGarantiaPdf } from '@/utils/gerarNotaGarantiaPdf';
+import { getVendas } from '@/utils/vendasApi';
 import {
   getGarantiasEmAndamento, getTratativas, updateTratativa, updateGarantia,
   addTimelineEntry, getContadoresGarantia, GarantiaItem, TratativaGarantia,
@@ -440,6 +442,28 @@ export default function GarantiasEmAndamento() {
                                 title="Registrar devolução"
                               >
                                 <Package className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {tratativa?.tipo === 'Troca Direta' && tratativa?.status === 'Em Andamento' && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => {
+                                  const vendas = getVendas();
+                                  const vendaGarantia = vendas.find(v => 
+                                    v.origemVenda === 'Troca Garantia' && 
+                                    v.observacoes?.includes(garantia.id)
+                                  );
+                                  if (vendaGarantia) {
+                                    gerarNotaGarantiaPdf(vendaGarantia);
+                                    toast.success('Nota de garantia gerada!');
+                                  } else {
+                                    toast.error('Nota de venda não encontrada para esta garantia.');
+                                  }
+                                }}
+                                title="Gerar Nota de Garantia"
+                              >
+                                <FileText className="h-4 w-4" />
                               </Button>
                             )}
                             {tratativa?.osId && (

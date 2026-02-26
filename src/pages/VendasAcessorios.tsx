@@ -33,6 +33,7 @@ import {
 } from '@/utils/acessoriosApi';
 import { useDraftVenda } from '@/hooks/useDraftVenda';
 import { PagamentoQuadro } from '@/components/vendas/PagamentoQuadro';
+import { PainelRentabilidadeVenda } from '@/components/vendas/PainelRentabilidadeVenda';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 
@@ -795,83 +796,33 @@ export default function VendasAcessorios() {
           </Alert>
         )}
 
-        {/* Resumo */}
-        <Card className={`${isPrejuizo ? 'border-destructive bg-destructive/5' : 'bg-muted/30'}`}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Resumo da Venda
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Valores */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal Acessórios</span>
-                  <span className="font-medium">{formatCurrency(subtotal)}</span>
-                </div>
-                {taxaEntrega > 0 && (
-                  <div className="flex justify-between">
-                    <span>Taxa de Entrega</span>
-                    <span className="font-medium">{formatCurrency(taxaEntrega)}</span>
-                  </div>
-                )}
-                <Separator />
-                <div className="flex justify-between text-lg font-bold">
-                  <span>TOTAL</span>
-                  <span>{formatCurrency(total)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Total Pago</span>
-                  <span className="text-green-600 font-medium">{formatCurrency(totalPagamentos)}</span>
-                </div>
-                {valorPendente > 0 && (
-                  <div className="flex justify-between text-sm text-destructive font-medium">
-                    <span>Valor Pendente</span>
-                    <span>{formatCurrency(valorPendente)}</span>
-                  </div>
-                )}
-              </div>
+        {/* Painel de Rentabilidade */}
+        <PainelRentabilidadeVenda
+          itens={[]}
+          acessoriosVenda={acessorios}
+          tradeIns={[]}
+          garantiaExtendida={null}
+          taxaEntrega={taxaEntrega}
+          localEntregaId=""
+          lojaVenda={lojaVenda}
+          pagamentos={pagamentos}
+          total={total}
+        />
 
-              {/* Lucro e Margem */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Custo Total</span>
-                  <span className="text-muted-foreground">{formatCurrency(custoTotalAcessorios)}</span>
-                </div>
-                <div className={`flex justify-between ${isPrejuizo ? 'text-destructive' : 'text-green-600'}`}>
-                  <span>Lucro Projetado</span>
-                  <span className="font-bold">{formatCurrency(lucroProjetado)}</span>
-                </div>
-                <div className={`flex justify-between ${isPrejuizo ? 'text-destructive' : 'text-green-600'}`}>
-                  <span>Margem</span>
-                  <span className="font-bold">{margemProjetada.toFixed(2)}%</span>
-                </div>
-                {isPrejuizo && (
-                  <div className="mt-2 p-2 bg-destructive/10 rounded flex items-center gap-2 text-destructive text-sm">
-                    <AlertTriangle className="h-4 w-4" />
-                    <span>Venda com prejuízo!</span>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="mt-6 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => navigate('/vendas')}>
-                Cancelar
-              </Button>
-              <Button 
-                onClick={handleRegistrarVenda}
-                disabled={!canSubmit}
-                className="gap-2"
-              >
-                <Check className="h-4 w-4" />
-                Registrar Venda
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Botões de Ação */}
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => navigate('/vendas')}>
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleRegistrarVenda}
+            disabled={!canSubmit}
+            className="gap-2"
+          >
+            <Check className="h-4 w-4" />
+            Registrar Venda
+          </Button>
+        </div>
       </div>
 
       {/* Modal Buscar Cliente - max-w-5xl igual Nova Venda */}

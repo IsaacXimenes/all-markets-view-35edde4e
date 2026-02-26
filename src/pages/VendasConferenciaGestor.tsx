@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/dialog';
 import { Eye, Download, Filter, X, Pencil, Check, XCircle, AlertTriangle, Clock, Undo2, CreditCard, Banknote, Smartphone, Wallet, ChevronRight, Lock, MessageSquare, ArrowLeftRight, Shield, Package } from 'lucide-react';
 import { ComprovantePreview, ComprovanteBadgeSemAnexo } from '@/components/vendas/ComprovantePreview';
-import { VendaResumoCompleto } from '@/components/vendas/VendaResumoCompleto';
+import { PainelRentabilidadeVenda } from '@/components/vendas/PainelRentabilidadeVenda';
 import { useFluxoVendas } from '@/hooks/useFluxoVendas';
 import { 
   aprovarGestor, 
@@ -796,8 +796,18 @@ export default function VendasConferenciaGestor() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4 pt-4">
-                {/* Resumo completo padronizado */}
-                <VendaResumoCompleto venda={vendaSelecionada} readOnly showCustos={true} />
+                {/* Painel de Rentabilidade */}
+                <PainelRentabilidadeVenda
+                  itens={vendaSelecionada.itens || []}
+                  acessoriosVenda={vendaSelecionada.acessorios || []}
+                  tradeIns={vendaSelecionada.tradeIns || []}
+                  garantiaExtendida={vendaSelecionada.garantiaExtendida || null}
+                  taxaEntrega={vendaSelecionada.taxaEntrega || 0}
+                  localEntregaId={vendaSelecionada.localRetirada || ''}
+                  lojaVenda={vendaSelecionada.lojaVenda || ''}
+                  pagamentos={vendaSelecionada.pagamentos || []}
+                  total={vendaSelecionada.total || 0}
+                />
 
                 {/* Validação de Pagamentos - Checkboxes */}
                 {validacoesPagamento.length > 0 && podeAprovarOuRecusar(vendaSelecionada.statusFluxo as StatusVenda) && (

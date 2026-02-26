@@ -2592,11 +2592,11 @@ export default function VendasFinalizarDigital() {
 
       {/* Modal Base de Troca */}
       <Dialog open={showTradeInModal} onOpenChange={setShowTradeInModal}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col w-[calc(100vw-1rem)] sm:w-auto">
           <DialogHeader>
             <DialogTitle>Adicionar Item de Troca</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 flex-1 overflow-y-auto pr-1">
             {/* Valores Recomendados para Troca - no topo */}
             <div className="border-b pb-4">
               <p className="text-sm font-medium mb-2">📊 Valores Recomendados para Troca</p>

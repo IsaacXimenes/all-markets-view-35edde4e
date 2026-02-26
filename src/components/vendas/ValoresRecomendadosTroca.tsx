@@ -29,7 +29,7 @@ export function ValoresRecomendadosTroca({ onUsarValor }: ValoresRecomendadosTro
         />
       </div>
 
-      <div className="max-h-[300px] overflow-y-auto border rounded-md">
+      <div className="max-h-[200px] sm:max-h-[300px] overflow-auto border rounded-md">
         <Table>
           <TableHeader>
             <TableRow>

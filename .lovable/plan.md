@@ -1,54 +1,89 @@
 
 
-# Plano: Correcoes no Fluxo de Troca Direta e Botao de Nota na Aba Em Andamento
+# Plano: Aprimoramentos Completos no Modulo de Garantia
 
-## Problemas Identificados
+## Analise do Estado Atual
 
-### 1. Status do aparelho nao muda apos aprovacao
-Na funcao `getStatusConsolidado` em `estoqueApi.ts` (linha 498), quando o produto tem `bloqueadoEmTrocaGarantiaId`, o status retornado e **"Reservado para Troca"** em vez de **"Troca - Garantia"**. Isso ocorre tanto antes quanto depois da aprovacao, pois o campo usado e o mesmo.
+A maioria das funcionalidades base ja esta implementada. Este plano foca nos ajustes e refinamentos pendentes.
 
-### 2. Botao de Gerar Nota ausente na aba Em Andamento
-A nota de venda e gerada automaticamente na funcao `aprovarTratativa`, mas nao ha nenhum botao na tabela de "Garantias em Andamento" para o usuario gerar/baixar o PDF da nota. O botao existe apenas em `VendaDetalhes.tsx`.
-
----
-
-## Alteracoes
-
-### Arquivo: `src/utils/estoqueApi.ts`
-
-**Corrigir status consolidado (linha 498)**
-
-Alterar o retorno de `'Reservado para Troca'` para `'Troca - Garantia'` quando `bloqueadoEmTrocaGarantiaId` esta presente e `quantidade === 0` (ou seja, ja foi aprovado e dado baixa).
-
-Logica:
-- Se `bloqueadoEmTrocaGarantiaId` e `quantidade === 0`: retornar `'Troca - Garantia'`
-- Se `bloqueadoEmTrocaGarantiaId` e `quantidade > 0`: retornar `'Reservado para Troca'` (antes da aprovacao)
-
-### Arquivo: `src/pages/GarantiasEmAndamento.tsx`
-
-**Adicionar botao "Gerar Nota" na coluna de Acoes da tabela**
-
-Para tratativas do tipo "Troca Direta" que ja foram aprovadas (status "Em Andamento"):
-- Adicionar um botao com icone `FileText` na coluna de acoes
-- Ao clicar, buscar a venda gerada automaticamente (filtrar vendas por `origemVenda === 'Troca Garantia'` e observacoes contendo o ID da garantia)
-- Chamar `gerarNotaGarantiaPdf(venda)` para gerar o PDF
-- Registrar na timeline que a nota foi baixada
-
-Imports necessarios:
-- `FileText` do lucide-react
-- `gerarNotaGarantiaPdf` de `@/utils/gerarNotaGarantiaPdf`
-- `getVendas` de `@/utils/vendasApi`
-
-Posicao: apos o botao de "Registrar devolucao" (Package) e antes do botao de "Finalizar" (CheckCircle), na coluna de Acoes (linhas 425-459).
-
-Condicao de exibicao: `tratativa?.tipo === 'Troca Direta' && tratativa?.status === 'Em Andamento'`
+| Funcionalidade | Status Atual |
+|---|---|
+| Estrutura 4 quadros | Implementado |
+| IMEI camera scan | Implementado |
+| 4 tipos de tratativa | Implementado |
+| Foto aparelho emprestimo | Implementado (1 campo) |
+| Foto devolucao | Implementado |
+| origemOS = "Garantia" | Implementado |
+| Troca Direta (nota + pendentes + status) | Implementado |
+| Garantia Extendida completa | Implementado |
+| Toggle Colaboradores | Implementado |
+| Extrato Log coluna | Implementado |
+| Fix observacao fantasma | Implementado |
 
 ---
 
-## Resumo
+## Alteracoes Necessarias
 
-| Arquivo | Alteracao |
-|---------|----------|
-| `src/utils/estoqueApi.ts` | Diferenciar status "Reservado para Troca" vs "Troca - Garantia" baseado na quantidade |
-| `src/pages/GarantiasEmAndamento.tsx` | Botao "Gerar Nota" para tratativas Troca Direta aprovadas |
+### 1. Autocomplete para campo Modelo (GarantiasNovaManual.tsx, linhas 477-489)
+
+Substituir o `<Select>` estatico por um autocomplete pesquisavel usando `Popover` + `Command` (cmdk), seguindo o padrao arquitetural do sistema. Fonte de dados: `getProdutosCadastro()`.
+
+### 2. Segundo campo de anexo: Termo de Responsabilidade (GarantiasNovaManual.tsx)
+
+Adicionar um segundo `FileUploadComprovante` para "Assistencia + Emprestimo", abaixo do campo de fotos do aparelho:
+- Novo estado: `fotoTermo` e `fotoTermoNome`
+- Label: "Termo de Responsabilidade *"
+- Tipos aceitos: image/jpeg, image/png, image/webp, application/pdf
+- Validacao obrigatoria no `handleSalvar`: ambos os campos devem estar preenchidos
+
+### 3. Filtro de aparelhos: apenas status "Disponivel" (GarantiasNovaManual.tsx, linhas 139-149)
+
+O filtro atual aceita qualquer Seminovo com `quantidade > 0`. Deve usar `getStatusAparelho(p) === 'Disponivel'` para garantir que apenas aparelhos realmente disponiveis sejam listados (excluindo bloqueados, em movimentacao, emprestados, etc.). Tambem deve aceitar aparelhos Novos e Seminovos (remover restricao `p.tipo === 'Seminovo'`).
+
+### 4. Dupla confirmacao para Troca Direta (GarantiasNovaManual.tsx)
+
+Quando `tipoTratativa === 'Troca Direta'`:
+- Ao clicar "Salvar Registro", abrir um modal de confirmacao com resumo (aparelho saindo, aparelho entrando, cliente)
+- Usuario deve confirmar marcando um checkbox "Confirmo a troca direta"
+- Apos primeira confirmacao, habilitar botao "Confirmar Troca"
+- Apos segunda confirmacao (clique no botao), exibir botao "Gerar Nota" ao lado do "Salvar Registro" no header
+
+### 5. Botao "Gerar Nota" ao lado de "Salvar Registro" (GarantiasNovaManual.tsx)
+
+Apos a dupla confirmacao da Troca Direta:
+- Estado `trocaConfirmada` = true
+- No header, exibir botao "Gerar Nota de Garantia" em destaque (variant default, icone FileText) ao lado do "Salvar Registro"
+- Ao clicar, buscar a venda gerada automaticamente e chamar `gerarNotaGarantiaPdf`
+
+### 6. Motivo automatizado para aparelho defeituoso (garantiasApi.ts, linha 793-807)
+
+Na funcao `aprovarTratativa`, ao registrar o aparelho defeituoso em Aparelhos Pendentes via `addProdutoPendente`, adicionar campo de motivo/observacao automatizado:
+- `motivoAssistencia: "Defeito relatado na Garantia ID #[ID_GARANTIA]"`
+- Origem identificada como "Garantia" (nao apenas "Base de Troca")
+
+### 7. Alerta visual "Servico Concluido" (GarantiasEmAndamento.tsx)
+
+Na tabela de garantias em andamento, quando uma OS vinculada tiver status finalizado/concluido:
+- Exibir badge destacado "Servico Concluido - Chamar Cliente" em amarelo/verde
+- Adicionar indicador visual na linha da tabela (fundo verde claro)
+- Logica: verificar se a OS vinculada (`tratativa.osId`) tem status "Serviço concluído" ou similar
+
+---
+
+## Arquivos Modificados
+
+| Arquivo | Alteracoes |
+|---------|-----------|
+| `src/pages/GarantiasNovaManual.tsx` | Autocomplete Modelo, Termo de Responsabilidade, filtro aparelhos, dupla confirmacao, botao Gerar Nota |
+| `src/utils/garantiasApi.ts` | Motivo automatizado no addProdutoPendente, origem "Garantia" |
+| `src/pages/GarantiasEmAndamento.tsx` | Alerta visual "Servico Concluido" |
+
+## Sequencia de Implementacao
+
+1. Autocomplete Modelo
+2. Segundo campo de anexo (Termo)
+3. Filtro aparelhos com getStatusAparelho
+4. Dupla confirmacao + botao Gerar Nota para Troca Direta
+5. Motivo automatizado no aparelho pendente
+6. Alerta visual Servico Concluido
 

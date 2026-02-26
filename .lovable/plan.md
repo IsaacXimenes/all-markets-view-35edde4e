@@ -1,73 +1,69 @@
 
-
-## Plano: Integracao Vendas-RH para Remuneracao de Motoboys
+## Plano: Modal Full Screen de Pagamento de Remuneracao Motoboy
 
 ### Objetivo
-Quando uma venda com `tipoRetirada === 'Entrega'` e `motoboyId` preenchido for finalizada, registrar automaticamente uma demanda no modulo de motoboys. Alem disso, atualizar o sistema de competencias para formato bi-mensal e melhorar a rastreabilidade com `vendaId`.
+Substituir o botao "Pagar" simples por um fluxo completo de pagamento em tela cheia, com auditoria de entregas, selecao de conta bancaria, upload de comprovante obrigatorio e lancamento automatico no extrato financeiro.
 
 ---
 
 ### 1. Atualizar `src/utils/motoboyApi.ts`
 
-**1.1 Adicionar `vendaId` a `DemandaMotoboy`:**
-- Novo campo opcional: `vendaId?: string`
-- Adicionar nos mocks existentes valores correspondentes (ex: `vendaId: 'VEN-2026-0003'` para entregas que correspondem a vendas)
+**1.1 Expandir interface `RemuneracaoMotoboy`:**
+- Adicionar campos opcionais: `contaId?: string`, `contaNome?: string`, `comprovante?: string`, `comprovanteNome?: string`, `pagoPor?: string`, `observacoesPagamento?: string`.
 
-**1.2 Criar funcao `addDemandaMotoboy`:**
-```
-export const addDemandaMotoboy = (demanda: Omit<DemandaMotoboy, 'id'>): DemandaMotoboy
-```
-- Gerar ID unico: `DEM-${Date.now()}`
-- Inserir no array `demandas`
-- Retornar a demanda criada
-
-**1.3 Competencias bi-mensais em `gerarCompetencias`:**
-- Formato novo: `MMM-AAAA - 1` (01-15) e `MMM-AAAA - 2` (16-fim do mes)
-- Exemplo: `FEV-2026 - 1`, `FEV-2026 - 2`
-
-**1.4 Atualizar mocks de remuneracoes:**
-- Competencias existentes `JAN-2026` passam a ser `JAN-2026 - 1` e `JAN-2026 - 2`
-
-**1.5 Atualizar `DetalheEntregaRemuneracao`:**
-- Usar `vendaId` real da demanda em vez do mock `d.id.replace('DEM', 'VND')`
-- Buscar dados da venda via `getVendaById` quando disponivel
-
-**1.6 Atualizar `getDetalheEntregasRemuneracao`:**
-- Importar `getVendas` de `vendasApi.ts`
-- Preencher vendedor, produto e valorVenda com dados reais da venda quando `vendaId` existir
+**1.2 Atualizar `registrarPagamentoRemuneracao`:**
+- Nova assinatura: `registrarPagamentoRemuneracao(id, dados: { contaId, contaNome, comprovante, comprovanteNome, pagoPor, observacoes })`.
+- Persistir todos os campos no registro da remuneracao.
+- Chamar `addDespesa` de `financeApi.ts` para gerar lancamento automatico no extrato:
+  - `tipo: 'Variavel'`
+  - `categoria: 'Frete/Logistica'`
+  - `descricao: 'Pagamento Remuneracao Motoboy - [Nome] - Periodo [Inicio] a [Fim]'`
+  - `valor: valorTotal`
+  - `conta: contaNome`
+  - `status: 'Pago'`
+  - `dataPagamento: hoje`
+  - `pagoPor: usuarioNome`
+  - `comprovante: comprovanteNome`
+- Retornar `true` em caso de sucesso.
 
 ---
 
-### 2. Atualizar `src/utils/vendasApi.ts` - Funcao `addVenda`
+### 2. Atualizar `src/pages/RHMotoboyRemuneracao.tsx`
 
-**Apos o bloco de integracao de pagamentos (linha ~926), adicionar:**
-- Verificar se `venda.tipoRetirada === 'Entrega'` e `venda.motoboyId` esta preenchido
-- Importar `addDemandaMotoboy` de `motoboyApi.ts`
-- Chamar `addDemandaMotoboy` com:
-  - `motoboyId`: da venda
-  - `motoboyNome`: buscar do cadastro ou usar campo da venda
-  - `data`: extrair apenas a data de `venda.dataHora`
-  - `tipo`: `'Entrega'`
-  - `descricao`: `Entrega Venda #${newId} - Cliente ${venda.clienteNome}`
-  - `lojaOrigem`: `venda.lojaVenda`
-  - `lojaDestino`: `venda.clienteCidade || 'Endereco Cliente'`
-  - `status`: `'Concluida'`
-  - `valorDemanda`: `venda.taxaEntrega`
-  - `vendaId`: `newId`
-- Log no console: `[VENDAS] Demanda de entrega registrada para motoboy`
+**2.1 Novo estado para modal de pagamento:**
+- `modalPagamentoOpen` (boolean)
+- `remuneracaoPagamento` (RemuneracaoMotoboy | null)
+- `detalhesPagamento` (DetalheEntregaRemuneracao[])
+- `contaSelecionada` (string) - ID da conta
+- `comprovante` / `comprovanteNome` / `comprovantePreview` (strings para FileUploadComprovante)
+- `observacoesPagamento` (string)
 
----
+**2.2 Botao "Pagar" abre modal full screen:**
+- Substituir chamada direta a `handlePagar(rem.id)` por `handleAbrirPagamento(rem)`.
+- Ao abrir: carregar detalhes de entrega via `getDetalheEntregasRemuneracao` e popular o modal.
 
-### 3. Atualizar `src/pages/RHMotoboyRemuneracao.tsx`
+**2.3 Layout do modal (Dialog max-w-6xl):**
 
-**3.1 Filtro de competencias:**
-- O dropdown ja consome `gerarCompetencias()`, entao ao mudar o formato da API, a tela reflete automaticamente
+Cabecalho:
+- Nome do Motoboy, Competencia e Periodo (dd/MM a dd/MM)
 
-**3.2 Drill-down com `vendaId`:**
-- Na tabela de detalhes, a coluna "ID da Venda" ja existe e exibira o `vendaId` real vindo da demanda
+Secao 1 - Tabela de Auditoria:
+- Colunas: ID da Venda, Data, Cliente/Descricao, Localizacao, Valor da Entrega
+- Rodape com totalizador de quantidade e valor
 
-**3.3 Filtro de competencias com novo formato:**
-- Garantir que o filtro `filters.competencia` faz match correto com os novos valores bi-mensais
+Secao 2 - Resumo de Valores:
+- Card destacado com "Total de Entregas" (quantidade), "Valor Liquido a Pagar" (formatCurrency)
+
+Secao 3 - Quadro de Baixa Financeira:
+- Select "Conta de Saida" (obrigatorio): usando `getContasFinanceirasHabilitadas()` de `cadastrosApi.ts`
+- FileUploadComprovante "Comprovante de Pagamento" (obrigatorio)
+- Textarea "Observacoes" (opcional)
+- Botao "Confirmar Pagamento": desabilitado ate que conta E comprovante estejam preenchidos
+
+**2.4 Ao confirmar pagamento:**
+- Chamar `registrarPagamentoRemuneracao` com todos os dados
+- Fechar modal, atualizar lista, exibir toast de sucesso
+- O lancamento no extrato financeiro e feito automaticamente pela API
 
 ---
 
@@ -75,7 +71,12 @@ export const addDemandaMotoboy = (demanda: Omit<DemandaMotoboy, 'id'>): DemandaM
 
 | Arquivo | Alteracoes |
 |---------|-----------|
-| `src/utils/motoboyApi.ts` | `vendaId` na interface, `addDemandaMotoboy`, competencias bi-mensais, drill-down real |
-| `src/utils/vendasApi.ts` | Chamada automatica a `addDemandaMotoboy` no `addVenda` |
-| `src/pages/RHMotoboyRemuneracao.tsx` | Ajustes menores para exibir competencias bi-mensais corretamente |
+| `src/utils/motoboyApi.ts` | Expandir interface, atualizar `registrarPagamentoRemuneracao` com integracao financeira |
+| `src/pages/RHMotoboyRemuneracao.tsx` | Modal full screen de pagamento com auditoria, conta, comprovante e observacoes |
 
+### Detalhes Tecnicos
+
+- O select de contas usa `getContasFinanceirasHabilitadas()` (somente contas ativas), seguindo o padrao arquitetural do projeto.
+- O componente `FileUploadComprovante` ja existente e reutilizado (drag-and-drop, camera, PDF/imagem).
+- A despesa gerada no extrato usa `lojaId` da loja Matriz como padrao (despesa administrativa central).
+- O botao "Confirmar Pagamento" valida: `contaSelecionada !== '' && comprovante !== ''`.

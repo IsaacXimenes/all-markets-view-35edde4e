@@ -10,6 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, CheckCircle2, Clock, Send, User, Package, CreditCard, TrendingUp, FileText, DollarSign } from 'lucide-react';
+import { PainelRentabilidadeVenda } from '@/components/vendas/PainelRentabilidadeVenda';
+import { ItemVenda, ItemTradeIn, Pagamento } from '@/utils/vendasApi';
+import { VendaAcessorio } from '@/utils/acessoriosApi';
 import { ComprovantePreview, ComprovanteBadgeSemAnexo } from '@/components/vendas/ComprovantePreview';
 import { toast } from '@/hooks/use-toast';
 import { getVendaConferenciaById, validarVendaGestor, getGestores, formatCurrency, VendaConferencia, StatusConferencia } from '@/utils/conferenciaGestorApi';
@@ -183,28 +186,50 @@ export default function VendasConferenciaGestorDetalhes() {
         {/* Coluna Lateral */}
         <div className="space-y-6 lg:sticky lg:top-4">
           {/* Resumo Financeiro */}
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Resumo</CardTitle></CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between"><span>Subtotal:</span><strong>{formatCurrency(venda.dadosVenda.subtotal)}</strong></div>
-              {venda.dadosVenda.totalTradeIn > 0 && <div className="flex justify-between"><span>Troca de Nota:</span><strong className="text-orange-600">-{formatCurrency(venda.dadosVenda.totalTradeIn)}</strong></div>}
-              <Separator />
-              <div className="flex justify-between text-base"><span>Total:</span><strong className="text-primary">{formatCurrency(venda.dadosVenda.total)}</strong></div>
-              <div className="flex justify-between"><span>Lucro:</span><strong className={venda.dadosVenda.lucro >= 0 ? 'text-green-600' : 'text-red-600'}>{formatCurrency(venda.dadosVenda.lucro)}</strong></div>
-              <div className="flex justify-between"><span>Margem:</span><strong>{venda.dadosVenda.margem.toFixed(2)}%</strong></div>
-              {venda.status === 'Concluído' && venda.contaDestino && (
-                <>
-                  <Separator />
-                  <div className="flex justify-between items-center">
-                    <span>Conta Destino:</span>
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                      {venda.contaDestino}
-                    </Badge>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+          <PainelRentabilidadeVenda
+            itens={(venda.dadosVenda.itens || []).map((item: any, i: number) => ({
+              id: `item-${i}`,
+              produtoId: '',
+              produto: item.produto || '',
+              imei: item.imei || '',
+              categoria: '',
+              quantidade: 1,
+              valorRecomendado: item.valorVenda || 0,
+              valorVenda: item.valorVenda || 0,
+              valorCusto: item.valorCusto || 0,
+              loja: venda.lojaId
+            } as ItemVenda))}
+            acessoriosVenda={(venda.dadosVenda.acessorios || []).map((acc: any, i: number) => ({
+              id: `acc-${i}`,
+              acessorioId: `acc-id-${i}`,
+              descricao: acc.nome || '',
+              quantidade: acc.quantidade || 1,
+              valorRecomendado: acc.valorUnitario || 0,
+              valorUnitario: acc.valorUnitario || 0,
+              valorTotal: (acc.valorUnitario || 0) * (acc.quantidade || 1)
+            } as VendaAcessorio))}
+            tradeIns={(venda.dadosVenda.tradeIns || []).map((ti: any, i: number) => ({
+              id: `ti-${i}`,
+              modelo: ti.modelo || '',
+              descricao: '',
+              imei: ti.imei || '',
+              valorCompraUsado: ti.valorAbatimento || ti.valorCompraUsado || 0,
+              imeiValidado: true,
+              condicao: 'Semi-novo' as const
+            } as ItemTradeIn))}
+            garantiaExtendida={null}
+            taxaEntrega={venda.dadosVenda.taxaEntrega || 0}
+            localEntregaId=""
+            lojaVenda={venda.lojaId}
+            pagamentos={(venda.dadosVenda.pagamentos || []).map((pag: any, i: number) => ({
+              id: `pag-${i}`,
+              meioPagamento: pag.meioPagamento || '',
+              valor: pag.valor || 0,
+              contaDestino: '',
+              parcelas: pag.parcelas || 1
+            } as Pagamento))}
+            total={venda.dadosVenda.total}
+          />
 
           {/* Timeline */}
           <Card>

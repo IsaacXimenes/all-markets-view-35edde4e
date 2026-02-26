@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { format, addMonths, addDays } from 'date-fns';
 import { BarcodeScanner } from '@/components/ui/barcode-scanner';
+import { PainelRentabilidadeVenda } from '@/components/vendas/PainelRentabilidadeVenda';
 
 import { 
   getVendaDigitalById, 
@@ -1961,166 +1962,71 @@ export default function VendasFinalizarDigital() {
           />
         )}
 
-        {/* Resumo */}
-        <Card className={`border-2 ${
-          hasValidDowngrade ? 'border-orange-500' : isPrejuizo ? 'border-destructive' : 'border-primary'
-        }`}>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Resumo
-                {hasValidDowngrade && (
-                  <Badge className="bg-orange-500 text-white ml-2">
-                    <ArrowLeftRight className="h-3 w-3 mr-1" />
-                    DOWN
-                  </Badge>
-                )}
-              </span>
-              {isPrejuizo && !hasValidDowngrade && (
-                <Badge variant="destructive" className="text-lg px-4 py-1">
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  PREJUÍZO
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
-              <div className="p-2 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">Aparelhos</p>
-                <p className="text-xl font-bold">{formatCurrency(subtotal)}</p>
-              </div>
-              {totalAcessorios > 0 && (
-                <div className="p-2 bg-blue-100 dark:bg-blue-950/30 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Acessórios</p>
-                  <p className="text-xl font-bold text-blue-600">{formatCurrency(totalAcessorios)}</p>
-                </div>
-              )}
-              {valorGarantiaExtendida > 0 && (
-                <div className="p-2 bg-blue-100 dark:bg-blue-950/30 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Garantia Ext.</p>
-                  <p className="text-xl font-bold text-blue-600">{formatCurrency(valorGarantiaExtendida)}</p>
-                </div>
-              )}
-              <div className="p-2 bg-green-100 dark:bg-green-950/30 rounded-lg">
-                <p className="text-sm text-muted-foreground">Trade-in</p>
-                <p className="text-xl font-bold text-green-600">-{formatCurrency(totalTradeIn)}</p>
-              </div>
-              <div className="p-2 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">Entrega</p>
-                <p className="text-xl font-bold">{formatCurrency(taxaEntrega)}</p>
-              </div>
-              <div className="p-2 bg-primary/10 rounded-lg col-span-2 md:col-span-1">
-                <p className="text-sm text-muted-foreground">Total da Venda</p>
-                <p className="text-2xl font-bold text-primary">{formatCurrency(total)}</p>
-              </div>
-            </div>
-            
-            <Separator className="my-4" />
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">Custo Total</p>
-                <p className="text-lg font-medium">{formatCurrency(valorCustoTotal)}</p>
-              </div>
-              <div className={`p-3 rounded-lg ${
-                hasValidDowngrade ? 'bg-destructive/20' : isPrejuizo ? 'bg-destructive/20' : 'bg-green-100 dark:bg-green-950/30'
-              }`}>
-                <p className="text-sm text-muted-foreground">
-                  {hasValidDowngrade ? 'Devolver' : (isPrejuizo ? 'Prejuízo' : 'Lucro')} Projetado
-                </p>
-                <p className={`text-lg font-bold ${
-                  hasValidDowngrade || isPrejuizo ? 'text-destructive' : 'text-green-600'
-                }`}>
-                  {hasValidDowngrade ? formatCurrency(saldoDevolver) : formatCurrency(lucroProjetado)}
-                </p>
-              </div>
-              <div className={`p-3 rounded-lg ${hasValidDowngrade || isPrejuizo ? 'bg-destructive/20' : 'bg-muted'}`}>
-                <p className="text-sm text-muted-foreground">Margem</p>
-                <p className={`text-lg font-medium ${(hasValidDowngrade || isPrejuizo) ? 'text-destructive' : ''}`}>
-                  {hasValidDowngrade ? '-' : `${margemProjetada.toFixed(1)}%`}
-                </p>
-              </div>
-              <div className="p-3 bg-blue-100 dark:bg-blue-950/30 rounded-lg">
-                <p className="text-sm text-muted-foreground">Total Pagamentos</p>
-                <p className="text-lg font-medium text-blue-600">{formatCurrency(totalPagamentos)}</p>
-              </div>
-            </div>
-            
-            {/* Comissão do Vendedor */}
-            {venda.responsavelVendaId && lucroProjetado > 0 && (
-              <div className="mt-4 p-3 bg-orange-100 dark:bg-orange-950/30 rounded-lg flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-muted-foreground">Comissão do Vendedor</p>
-                  <p className="text-xs text-muted-foreground">
-                    ({getComissaoColaborador(venda.responsavelVendaId).comissao}% sobre o lucro)
-                  </p>
-                </div>
-                <p className="text-lg font-bold text-orange-600">
-                  {formatCurrency(calcularComissaoVenda(venda.responsavelVendaId, lucroProjetado))}
-                </p>
-              </div>
-            )}
-            
-            {/* Prejuízo em Acessórios */}
-            {prejuizoAcessorios > 0 && (
-              <div className="mt-4 p-3 bg-destructive/20 rounded-lg">
-                <p className="text-sm text-muted-foreground">Prejuízo em Acessórios</p>
-                <p className="text-lg font-bold text-destructive">-{formatCurrency(prejuizoAcessorios)}</p>
-              </div>
-            )}
+        {/* Painel de Rentabilidade */}
+        <PainelRentabilidadeVenda
+          itens={itens}
+          acessoriosVenda={acessoriosVenda}
+          tradeIns={tradeIns}
+          garantiaExtendida={garantiaExtendida}
+          taxaEntrega={taxaEntrega}
+          localEntregaId={localEntregaId}
+          lojaVenda={lojaVenda}
+          pagamentos={pagamentos}
+          total={total}
+        />
 
-            {/* Card de informação quando há Sinal */}
-            {temPagamentoSinal && (
-              <div className="mt-4 p-4 bg-red-100 dark:bg-red-900/30 rounded-lg border border-red-200 dark:border-red-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="h-5 w-5 text-red-600" />
-                  <span className="font-medium text-red-700 dark:text-red-300">Venda com Sinal</span>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Valor do Sinal</p>
-                    <p className="font-bold text-red-600">{formatCurrency(valorSinal)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Valor Pendente</p>
-                    <p className="font-bold text-red-600">{formatCurrency(valorPendenteSinal)}</p>
-                  </div>
-                </div>
-                <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-2">
-                  Os produtos serão bloqueados até o pagamento do valor restante.
-                </p>
+        {/* Card de informação quando há Sinal */}
+        {temPagamentoSinal && (
+          <Card className="border-red-200 dark:border-red-800">
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+                <span className="font-medium text-red-700 dark:text-red-300">Venda com Sinal</span>
               </div>
-            )}
-            
-            {/* PIX a Devolver - Downgrade */}
-            {hasValidDowngrade && (
-              <div className="mt-4 p-4 bg-destructive/10 rounded-lg border-2 border-destructive">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-destructive" />
-                    <span className="font-bold text-destructive">PIX a Devolver</span>
-                  </div>
-                  <span className="text-2xl font-bold text-destructive">{formatCurrency(saldoDevolver)}</span>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Valor do Sinal</p>
+                  <p className="font-bold text-red-600">{formatCurrency(valorSinal)}</p>
                 </div>
-                <p className="text-xs text-destructive/80 mt-2">
-                  Valor será pago ao cliente via PIX após aprovação do Gestor e execução pelo Financeiro.
-                </p>
+                <div>
+                  <p className="text-muted-foreground">Valor Pendente</p>
+                  <p className="font-bold text-red-600">{formatCurrency(valorPendenteSinal)}</p>
+                </div>
               </div>
-            )}
-            
-            <Button 
-              className="w-full mt-4" 
-              variant="outline"
-              onClick={handleGerarNota}
-              disabled={itens.length === 0}
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Gerar Nota Fiscal Simplificada
-            </Button>
-          </CardContent>
-        </Card>
+              <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-2">
+                Os produtos serão bloqueados até o pagamento do valor restante.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* PIX a Devolver - Downgrade */}
+        {hasValidDowngrade && (
+          <Card className="border-2 border-destructive">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                  <span className="font-bold text-destructive">PIX a Devolver</span>
+                </div>
+                <span className="text-2xl font-bold text-destructive">{formatCurrency(saldoDevolver)}</span>
+              </div>
+              <p className="text-xs text-destructive/80 mt-2">
+                Valor será pago ao cliente via PIX após aprovação do Gestor e execução pelo Financeiro.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        <Button 
+          className="w-full" 
+          variant="outline"
+          onClick={handleGerarNota}
+          disabled={itens.length === 0}
+        >
+          <FileText className="h-4 w-4 mr-2" />
+          Gerar Nota Fiscal Simplificada
+        </Button>
 
         {/* Botões Finais */}
         <div className="flex flex-col gap-4">

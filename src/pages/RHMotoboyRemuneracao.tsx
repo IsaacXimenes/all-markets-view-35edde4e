@@ -2,13 +2,13 @@ import { useState, useMemo } from 'react';
 import { RHLayout } from '@/components/layout/RHLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Download, Bike, DollarSign, Package, Clock, CheckCircle, X, TrendingUp } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Download, Bike, DollarSign, Package, Clock, CheckCircle, X, TrendingUp, Banknote, AlertCircle } from 'lucide-react';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { 
   getRemuneracoes, 
@@ -20,16 +20,20 @@ import {
   RemuneracaoMotoboy,
   DetalheEntregaRemuneracao
 } from '@/utils/motoboyApi';
+import { getContasFinanceirasHabilitadas } from '@/utils/cadastrosApi';
+import { FileUploadComprovante } from '@/components/estoque/FileUploadComprovante';
 import { toast } from 'sonner';
 import { exportToCSV } from '@/utils/formatUtils';
+import { useAuthStore } from '@/store/authStore';
 
 export default function RHMotoboyRemuneracao() {
   const { obterColaboradoresAtivos } = useCadastroStore();
+  const { user } = useAuthStore();
   const [remuneracoes, setRemuneracoes] = useState(getRemuneracoes());
   const stats = getEstatisticasMotoboys();
   const competencias = useMemo(() => gerarCompetencias(), []);
+  const contasHabilitadas = useMemo(() => getContasFinanceirasHabilitadas(), []);
 
-  // Filtrar apenas motoboys
   const motoboys = useMemo(() => {
     return obterColaboradoresAtivos().filter(c => 
       c.cargo?.toLowerCase().includes('motoboy') || 
@@ -49,6 +53,52 @@ export default function RHMotoboyRemuneracao() {
     setModalDrilldownOpen(true);
   };
 
+  // Payment modal state
+  const [modalPagamentoOpen, setModalPagamentoOpen] = useState(false);
+  const [remuneracaoPagamento, setRemuneracaoPagamento] = useState<RemuneracaoMotoboy | null>(null);
+  const [detalhesPagamento, setDetalhesPagamento] = useState<DetalheEntregaRemuneracao[]>([]);
+  const [contaSelecionada, setContaSelecionada] = useState('');
+  const [comprovante, setComprovante] = useState('');
+  const [comprovanteNome, setComprovanteNome] = useState('');
+  const [observacoesPagamento, setObservacoesPagamento] = useState('');
+
+  const handleAbrirPagamento = (rem: RemuneracaoMotoboy) => {
+    const detalhes = getDetalheEntregasRemuneracao(rem.motoboyId, rem.periodoInicio, rem.periodoFim);
+    setDetalhesPagamento(detalhes);
+    setRemuneracaoPagamento(rem);
+    setContaSelecionada('');
+    setComprovante('');
+    setComprovanteNome('');
+    setObservacoesPagamento('');
+    setModalPagamentoOpen(true);
+  };
+
+  const handleConfirmarPagamento = () => {
+    if (!remuneracaoPagamento || !contaSelecionada || !comprovante) return;
+    
+    const conta = contasHabilitadas.find(c => c.id === contaSelecionada);
+    if (!conta) return;
+
+    const sucesso = registrarPagamentoRemuneracao(remuneracaoPagamento.id, {
+      contaId: contaSelecionada,
+      contaNome: conta.nome,
+      comprovante,
+      comprovanteNome,
+      pagoPor: user?.colaborador?.nome || user?.username || 'Usuário',
+      observacoes: observacoesPagamento || undefined
+    });
+
+    if (sucesso) {
+      setRemuneracoes(getRemuneracoes());
+      setModalPagamentoOpen(false);
+      toast.success('Pagamento registrado e lançado no extrato financeiro!');
+    } else {
+      toast.error('Erro ao registrar pagamento');
+    }
+  };
+
+  const pagamentoValido = contaSelecionada !== '' && comprovante !== '';
+
   const [filters, setFilters] = useState({
     motoboyId: 'todos',
     competencia: 'todos',
@@ -57,58 +107,29 @@ export default function RHMotoboyRemuneracao() {
 
   const remuneracoesFiltradas = useMemo(() => {
     let resultado = getRemuneracoes();
-    
-    if (filters.motoboyId !== 'todos') {
-      resultado = resultado.filter(r => r.motoboyId === filters.motoboyId);
-    }
-    if (filters.competencia !== 'todos') {
-      resultado = resultado.filter(r => r.competencia === filters.competencia);
-    }
-    if (filters.status !== 'todos') {
-      resultado = resultado.filter(r => r.status === filters.status);
-    }
-    
+    if (filters.motoboyId !== 'todos') resultado = resultado.filter(r => r.motoboyId === filters.motoboyId);
+    if (filters.competencia !== 'todos') resultado = resultado.filter(r => r.competencia === filters.competencia);
+    if (filters.status !== 'todos') resultado = resultado.filter(r => r.status === filters.status);
     return resultado;
   }, [filters, remuneracoes]);
 
-  const handlePagar = (id: string) => {
-    if (registrarPagamentoRemuneracao(id)) {
-      setRemuneracoes(getRemuneracoes());
-      toast.success('Pagamento registrado com sucesso!');
-    } else {
-      toast.error('Erro ao registrar pagamento');
-    }
-  };
-
-  const handleLimpar = () => {
-    setFilters({
-      motoboyId: 'todos',
-      competencia: 'todos',
-      status: 'todos'
-    });
-  };
+  const handleLimpar = () => setFilters({ motoboyId: 'todos', competencia: 'todos', status: 'todos' });
 
   const handleExport = () => {
     const dataToExport = remuneracoesFiltradas.map(r => ({
-      ID: r.id,
-      Motoboy: r.motoboyNome,
-      Competência: r.competencia,
+      ID: r.id, Motoboy: r.motoboyNome, Competência: r.competencia,
       'Período Início': new Date(r.periodoInicio).toLocaleDateString('pt-BR'),
       'Período Fim': new Date(r.periodoFim).toLocaleDateString('pt-BR'),
-      'Qtd Demandas': r.qtdDemandas,
-      'Valor Total': formatCurrency(r.valorTotal),
+      'Qtd Demandas': r.qtdDemandas, 'Valor Total': formatCurrency(r.valorTotal),
       Status: r.status,
       'Data Pagamento': r.dataPagamento ? new Date(r.dataPagamento).toLocaleDateString('pt-BR') : '-'
     }));
-    
     exportToCSV(dataToExport, `remuneracao-motoboys-${new Date().toISOString().split('T')[0]}.csv`);
     toast.success('Dados exportados com sucesso!');
   };
 
   const getStatusBadge = (status: string) => {
-    if (status === 'Pago') {
-      return <Badge className="bg-green-500/10 text-green-600 border-green-200">Pago</Badge>;
-    }
+    if (status === 'Pago') return <Badge className="bg-green-500/10 text-green-600 border-green-200">Pago</Badge>;
     return <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-200">Pendente</Badge>;
   };
 
@@ -119,9 +140,7 @@ export default function RHMotoboyRemuneracao() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Bike className="h-5 w-5 text-primary" />
-              </div>
+              <div className="p-2 rounded-lg bg-primary/10"><Bike className="h-5 w-5 text-primary" /></div>
               <div>
                 <p className="text-sm text-muted-foreground">Demandas no Mês</p>
                 <p className="text-2xl font-bold">{stats.totalDemandasMes}</p>
@@ -129,13 +148,10 @@ export default function RHMotoboyRemuneracao() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-yellow-500/10">
-                <Clock className="h-5 w-5 text-yellow-500" />
-              </div>
+              <div className="p-2 rounded-lg bg-yellow-500/10"><Clock className="h-5 w-5 text-yellow-500" /></div>
               <div>
                 <p className="text-sm text-muted-foreground">Pendentes</p>
                 <p className="text-2xl font-bold text-yellow-600">{stats.demandasPendentes}</p>
@@ -143,13 +159,10 @@ export default function RHMotoboyRemuneracao() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <DollarSign className="h-5 w-5 text-green-500" />
-              </div>
+              <div className="p-2 rounded-lg bg-green-500/10"><DollarSign className="h-5 w-5 text-green-500" /></div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Mês</p>
                 <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.valorTotalMes)}</p>
@@ -157,13 +170,10 @@ export default function RHMotoboyRemuneracao() {
             </div>
           </CardContent>
         </Card>
-
         <Card className={stats.valorPendentePagamento > 0 ? 'bg-orange-500/10' : ''}>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-500/10">
-                <Package className="h-5 w-5 text-orange-500" />
-              </div>
+              <div className="p-2 rounded-lg bg-orange-500/10"><Package className="h-5 w-5 text-orange-500" /></div>
               <div>
                 <p className="text-sm text-muted-foreground">A Pagar</p>
                 <p className="text-2xl font-bold text-orange-600">{formatCurrency(stats.valorPendentePagamento)}</p>
@@ -175,47 +185,33 @@ export default function RHMotoboyRemuneracao() {
 
       {/* Filtros */}
       <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Filtros</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <Label>Motoboy</Label>
               <Select value={filters.motoboyId} onValueChange={(v) => setFilters({...filters, motoboyId: v})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
-                  {motoboys.map(m => (
-                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
-                  ))}
+                  {motoboys.map(m => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             <div>
               <Label>Competência</Label>
               <Select value={filters.competencia} onValueChange={(v) => setFilters({...filters, competencia: v})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
                 <SelectContent className="max-h-60">
                   <SelectItem value="todos">Todas</SelectItem>
-                  {competencias.map(c => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
+                  {competencias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             <div>
               <Label>Status</Label>
               <Select value={filters.status} onValueChange={(v) => setFilters({...filters, status: v})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
                   <SelectItem value="Pendente">Pendente</SelectItem>
@@ -223,16 +219,9 @@ export default function RHMotoboyRemuneracao() {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="flex items-end gap-2">
-              <Button variant="outline" onClick={handleLimpar}>
-                <X className="h-4 w-4 mr-2" />
-                Limpar
-              </Button>
-              <Button variant="outline" onClick={handleExport}>
-                <Download className="h-4 w-4 mr-2" />
-                CSV
-              </Button>
+              <Button variant="outline" onClick={handleLimpar}><X className="h-4 w-4 mr-2" />Limpar</Button>
+              <Button variant="outline" onClick={handleExport}><Download className="h-4 w-4 mr-2" />CSV</Button>
             </div>
           </div>
         </CardContent>
@@ -240,9 +229,7 @@ export default function RHMotoboyRemuneracao() {
 
       {/* Tabela de Remunerações */}
       <Card>
-        <CardHeader>
-          <CardTitle>Remunerações</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Remunerações</CardTitle></CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
@@ -261,16 +248,11 @@ export default function RHMotoboyRemuneracao() {
               <TableBody>
                 {remuneracoesFiltradas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      Nenhuma remuneração encontrada
-                    </TableCell>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhuma remuneração encontrada</TableCell>
                   </TableRow>
                 ) : (
                   remuneracoesFiltradas.map(rem => (
-                    <TableRow 
-                      key={rem.id}
-                      className={rem.status === 'Pendente' ? 'bg-yellow-500/5' : ''}
-                    >
+                    <TableRow key={rem.id} className={rem.status === 'Pendente' ? 'bg-yellow-500/5' : ''}>
                       <TableCell className="font-mono text-xs">{rem.id}</TableCell>
                       <TableCell className="font-medium">{rem.motoboyNome}</TableCell>
                       <TableCell>{rem.competencia}</TableCell>
@@ -279,25 +261,15 @@ export default function RHMotoboyRemuneracao() {
                       </TableCell>
                       <TableCell className="text-center font-semibold">{rem.qtdDemandas}</TableCell>
                       <TableCell className="text-right font-semibold">
-                        <button
-                          type="button"
-                          onClick={() => handleAbrirDrilldown(rem)}
-                          className="text-primary underline cursor-pointer hover:text-primary/80 transition-colors"
-                        >
+                        <button type="button" onClick={() => handleAbrirDrilldown(rem)} className="text-primary underline cursor-pointer hover:text-primary/80 transition-colors">
                           {formatCurrency(rem.valorTotal)}
                         </button>
                       </TableCell>
                       <TableCell>{getStatusBadge(rem.status)}</TableCell>
                       <TableCell>
                         {rem.status === 'Pendente' ? (
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => handlePagar(rem.id)}
-                            className="gap-1"
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                            Pagar
+                          <Button size="sm" variant="outline" onClick={() => handleAbrirPagamento(rem)} className="gap-1">
+                            <Banknote className="h-4 w-4" />Pagar
                           </Button>
                         ) : (
                           <span className="text-xs text-muted-foreground">
@@ -313,6 +285,7 @@ export default function RHMotoboyRemuneracao() {
           </div>
         </CardContent>
       </Card>
+
       {/* Modal Drill-down Remuneração */}
       <Dialog open={modalDrilldownOpen} onOpenChange={setModalDrilldownOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -341,11 +314,7 @@ export default function RHMotoboyRemuneracao() {
               </TableHeader>
               <TableBody>
                 {detalhesEntrega.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      Nenhuma entrega encontrada no período
-                    </TableCell>
-                  </TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma entrega encontrada no período</TableCell></TableRow>
                 ) : (
                   detalhesEntrega.map(d => (
                     <TableRow key={d.demandaId}>
@@ -365,9 +334,154 @@ export default function RHMotoboyRemuneracao() {
             <div className="border-t pt-4 mt-4">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Total Entregas:</span>
-                <span className="text-xl font-bold">
-                  {formatCurrency(detalhesEntrega.reduce((acc, d) => acc + d.valorEntrega, 0))}
-                </span>
+                <span className="text-xl font-bold">{formatCurrency(detalhesEntrega.reduce((acc, d) => acc + d.valorEntrega, 0))}</span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Full Screen de Pagamento */}
+      <Dialog open={modalPagamentoOpen} onOpenChange={setModalPagamentoOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5" />
+              Pagamento de Remuneração
+            </DialogTitle>
+          </DialogHeader>
+
+          {remuneracaoPagamento && (
+            <div className="space-y-6">
+              {/* Cabeçalho */}
+              <div className="flex flex-wrap gap-4 items-center p-4 rounded-lg bg-muted/50 border">
+                <div>
+                  <p className="text-xs text-muted-foreground">Motoboy</p>
+                  <p className="font-semibold">{remuneracaoPagamento.motoboyNome}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Competência</p>
+                  <p className="font-semibold">{remuneracaoPagamento.competencia}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Período</p>
+                  <p className="font-semibold">
+                    {new Date(remuneracaoPagamento.periodoInicio).toLocaleDateString('pt-BR')} a {new Date(remuneracaoPagamento.periodoFim).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Tabela de Auditoria */}
+              <div>
+                <h3 className="text-sm font-semibold mb-2">Detalhamento de Entregas</h3>
+                <div className="overflow-x-auto border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID da Venda</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Localização</TableHead>
+                        <TableHead className="text-right">Valor da Entrega</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {detalhesPagamento.length === 0 ? (
+                        <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">Nenhuma entrega no período</TableCell></TableRow>
+                      ) : (
+                        detalhesPagamento.map(d => (
+                          <TableRow key={d.demandaId}>
+                            <TableCell className="font-mono text-xs">{d.vendaId}</TableCell>
+                            <TableCell className="text-sm max-w-[250px] truncate" title={d.produto}>{d.produto}</TableCell>
+                            <TableCell className="text-sm">{d.localizacao}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(d.valorEntrega)}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              {/* Resumo de Valores */}
+              <Card className="bg-primary/5 border-primary/20">
+                <CardContent className="p-4">
+                  <div className="flex flex-wrap justify-between items-center gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total de Entregas</p>
+                      <p className="text-lg font-bold">{detalhesPagamento.length} entregas</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Valor Líquido a Pagar</p>
+                      <p className="text-2xl font-bold text-primary">{formatCurrency(remuneracaoPagamento.valorTotal)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quadro de Baixa Financeira */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Baixa Financeira
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Conta de Saída *</Label>
+                    <Select value={contaSelecionada} onValueChange={setContaSelecionada}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a conta bancária" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {contasHabilitadas.map(c => (
+                          <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <FileUploadComprovante
+                    label="Comprovante de Pagamento"
+                    required
+                    value={comprovante}
+                    fileName={comprovanteNome}
+                    onFileChange={(data) => {
+                      setComprovante(data.comprovante);
+                      setComprovanteNome(data.comprovanteNome);
+                    }}
+                  />
+
+                  <div>
+                    <Label>Observações</Label>
+                    <Textarea
+                      placeholder="Notas adicionais sobre o pagamento (opcional)"
+                      value={observacoesPagamento}
+                      onChange={(e) => setObservacoesPagamento(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Aviso e Botão */}
+              {!pagamentoValido && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <AlertCircle className="h-4 w-4" />
+                  Selecione a conta de saída e anexe o comprovante para confirmar.
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => setModalPagamentoOpen(false)}>Cancelar</Button>
+                <Button
+                  onClick={handleConfirmarPagamento}
+                  disabled={!pagamentoValido}
+                  className="gap-2"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Confirmar Pagamento
+                </Button>
               </div>
             </div>
           )}

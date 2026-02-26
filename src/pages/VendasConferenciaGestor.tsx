@@ -284,7 +284,7 @@ export default function VendasConferenciaGestor() {
       );
     }
 
-    // Salvar observação do gestor
+    // Salvar observação do gestor (ou limpar se vazio)
     if (observacaoGestor.trim()) {
       const obsGestor: ObservacaoGestor = {
         texto: observacaoGestor.trim(),
@@ -296,6 +296,9 @@ export default function VendasConferenciaGestor() {
         `observacao_gestor_${vendaSelecionada.id}`,
         JSON.stringify(obsGestor)
       );
+    } else {
+      // Limpar observação residual do localStorage se vazio
+      localStorage.removeItem(`observacao_gestor_${vendaSelecionada.id}`);
     }
 
     // Se for Downgrade, enviar para Pagamento Downgrade

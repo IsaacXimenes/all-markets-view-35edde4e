@@ -11,12 +11,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { 
-  Eye, Clock, Package, Smartphone, Wrench, AlertTriangle, CheckCircle, Download, Filter, X, ThumbsUp, ThumbsDown, FileText
+  Eye, Clock, Package, Smartphone, Wrench, AlertTriangle, CheckCircle, Download, Filter, X, ThumbsUp, ThumbsDown, FileText, Bell
 } from 'lucide-react';
 import { FileUploadComprovante } from '@/components/estoque/FileUploadComprovante';
 import { exportToCSV, formatCurrency } from '@/utils/formatUtils';
 import { gerarNotaGarantiaPdf } from '@/utils/gerarNotaGarantiaPdf';
 import { getVendas } from '@/utils/vendasApi';
+import { getOrdensServico } from '@/utils/assistenciaApi';
 import {
   getGarantiasEmAndamento, getTratativas, updateTratativa, updateGarantia,
   addTimelineEntry, getContadoresGarantia, GarantiaItem, TratativaGarantia,
@@ -60,6 +61,9 @@ export default function GarantiasEmAndamento() {
   const [motivoRecusa, setMotivoRecusa] = useState('');
   
   // Montar dados da tabela
+  // Obter todas as OS para verificar status "Serviço concluído"
+  const ordensServico = useMemo(() => getOrdensServico(), []);
+
   const dadosTabela = useMemo(() => {
     return garantiasEmAndamento.map(garantia => {
       const tratativasGarantia = todasTratativas.filter(t => t.garantiaId === garantia.id && 
@@ -69,13 +73,23 @@ export default function GarantiasEmAndamento() {
         ? differenceInDays(new Date(), new Date(ultimaTratativa.dataHora))
         : 0;
       
+      // Verificar se a OS vinculada tem status "Serviço concluído"
+      let servicoConcluido = false;
+      if (ultimaTratativa?.osId) {
+        const os = ordensServico.find(o => o.id === ultimaTratativa.osId);
+        if (os && (os.status === 'Serviço concluído' || os.status === 'Finalizado')) {
+          servicoConcluido = true;
+        }
+      }
+
       return {
         garantia,
         tratativa: ultimaTratativa,
-        diasAberto
+        diasAberto,
+        servicoConcluido
       };
     });
-  }, [garantiasEmAndamento, todasTratativas]);
+  }, [garantiasEmAndamento, todasTratativas, ordensServico]);
 
   // Dados filtrados
   const dadosFiltrados = useMemo(() => {
@@ -372,8 +386,8 @@ export default function GarantiasEmAndamento() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                      dadosFiltrados.map(({ garantia, tratativa, diasAberto }) => (
-                        <TableRow key={garantia.id} className={diasAberto > 7 ? 'bg-red-500/10' : ''}>
+                      dadosFiltrados.map(({ garantia, tratativa, diasAberto, servicoConcluido }) => (
+                        <TableRow key={garantia.id} className={servicoConcluido ? 'bg-green-500/10' : diasAberto > 7 ? 'bg-red-500/10' : ''}>
                           <TableCell className="font-medium">{garantia.id}</TableCell>
                           <TableCell>
                             {tratativa ? format(new Date(tratativa.dataHora), 'dd/MM/yyyy') : '-'}
@@ -384,9 +398,17 @@ export default function GarantiasEmAndamento() {
                           <TableCell>{garantia.modelo}</TableCell>
                           <TableCell className="font-mono text-xs">{garantia.imei}</TableCell>
                           <TableCell>
-                          <Badge variant="outline" className={tratativa?.status === 'Aguardando Aprovação' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-300' : ''}>
-                            {tratativa?.tipo || '-'}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="outline" className={tratativa?.status === 'Aguardando Aprovação' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-300' : ''}>
+                              {tratativa?.tipo || '-'}
+                            </Badge>
+                            {servicoConcluido && (
+                              <Badge className="bg-green-500 text-white hover:bg-green-600 text-[10px] gap-1">
+                                <Bell className="h-3 w-3" />
+                                Serviço Concluído - Chamar Cliente
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {tratativa?.status === 'Aguardando Aprovação' ? (

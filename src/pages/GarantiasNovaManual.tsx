@@ -11,9 +11,12 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandInput, CommandList, CommandEmpty, CommandItem, CommandGroup } from '@/components/ui/command';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   ArrowLeft, Shield, User, Phone, Mail, Save, Search, Plus, 
-  FileText, Package, Clock, Award, Smartphone, Wrench, ArrowRightLeft, Camera
+  FileText, Package, Clock, Award, Smartphone, Wrench, ArrowRightLeft, Camera, ChevronsUpDown, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getProdutosCadastro, getClientes, addCliente, Cliente, calcularTipoPessoa } from '@/utils/cadastrosApi';
@@ -21,11 +24,14 @@ import { useCadastroStore } from '@/store/cadastroStore';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { addGarantia, addTimelineEntry, processarTratativaGarantia } from '@/utils/garantiasApi';
 import { getPlanosPorModelo, PlanoGarantia, formatCurrency } from '@/utils/planosGarantiaApi';
-import { getProdutos, Produto } from '@/utils/estoqueApi';
+import { getProdutos, Produto, getStatusAparelho } from '@/utils/estoqueApi';
+import { getVendas } from '@/utils/vendasApi';
+import { gerarNotaGarantiaPdf } from '@/utils/gerarNotaGarantiaPdf';
 import { format, addMonths } from 'date-fns';
 import { formatIMEI, unformatIMEI, displayIMEI } from '@/utils/imeiMask';
 import { BarcodeScanner } from '@/components/ui/barcode-scanner';
 import { FileUploadComprovante } from '@/components/estoque/FileUploadComprovante';
+import { cn } from '@/lib/utils';
 
 export default function GarantiasNovaManual() {
   const navigate = useNavigate();
@@ -133,15 +139,26 @@ export default function GarantiasNovaManual() {
   const [fotoEmprestimo, setFotoEmprestimo] = useState('');
   const [fotoEmprestimoNome, setFotoEmprestimoNome] = useState('');
 
+  // Foto do Termo de Responsabilidade (obrigatório para Assistência + Empréstimo)
+  const [fotoTermo, setFotoTermo] = useState('');
+  const [fotoTermoNome, setFotoTermoNome] = useState('');
+
+  // Autocomplete Modelo
+  const [modeloOpen, setModeloOpen] = useState(false);
+
+  // Dupla confirmação Troca Direta
+  const [showConfirmacaoTroca, setShowConfirmacaoTroca] = useState(false);
+  const [checkboxConfirmacao, setCheckboxConfirmacao] = useState(false);
+  const [trocaConfirmada, setTrocaConfirmada] = useState(false);
+
   // Flag para indicar se precisa de aparelho
   const precisaAparelho = tipoTratativa === 'Assistência + Empréstimo' || tipoTratativa === 'Troca Direta';
 
-  // Lista de aparelhos disponíveis - FILTRAR APENAS SEMINOVOS para empréstimo
+  // Lista de aparelhos disponíveis - FILTRAR POR STATUS "Disponível"
   const aparelhosDisponiveis = useMemo(() => {
-    const produtos = getProdutos();
-    return produtos.filter(p => 
-      p.quantidade > 0 && 
-      p.tipo === 'Seminovo' && // Apenas Seminovos
+    const produtosEstoque = getProdutos();
+    return produtosEstoque.filter(p => 
+      getStatusAparelho(p) === 'Disponível' &&
       (buscaAparelho === '' || 
         p.imei?.toLowerCase().includes(buscaAparelho.toLowerCase()) ||
         p.modelo.toLowerCase().includes(buscaAparelho.toLowerCase()))
@@ -295,6 +312,18 @@ export default function GarantiasNovaManual() {
       return;
     }
 
+    // Validação de termo de responsabilidade obrigatório para empréstimo
+    if (tipoTratativa === 'Assistência + Empréstimo' && !fotoTermo) {
+      toast.error('É obrigatório anexar o Termo de Responsabilidade');
+      return;
+    }
+
+    // Dupla confirmação para Troca Direta
+    if (tipoTratativa === 'Troca Direta' && !trocaConfirmada) {
+      setShowConfirmacaoTroca(true);
+      return;
+    }
+
     // Em modo manual, usar a data fim manual; senão, calcular
     const dataFimCalc = formData.modoManual && formData.dataFimGarantia 
       ? formData.dataFimGarantia 
@@ -369,10 +398,30 @@ export default function GarantiasNovaManual() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar
         </Button>
-        <Button onClick={handleSalvar}>
-          <Save className="h-4 w-4 mr-2" />
-          Salvar Registro
-        </Button>
+        <div className="flex gap-2">
+          {trocaConfirmada && (
+            <Button onClick={() => {
+              const vendas = getVendas();
+              const vendaGarantia = vendas.find(v => 
+                v.origemVenda === 'Troca Garantia' && 
+                v.observacoes?.includes(formData.imei)
+              );
+              if (vendaGarantia) {
+                gerarNotaGarantiaPdf(vendaGarantia);
+                toast.success('Nota de garantia gerada!');
+              } else {
+                toast.error('Nota de venda não encontrada.');
+              }
+            }}>
+              <FileText className="h-4 w-4 mr-2" />
+              Gerar Nota de Garantia
+            </Button>
+          )}
+          <Button onClick={handleSalvar}>
+            <Save className="h-4 w-4 mr-2" />
+            Salvar Registro
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -474,19 +523,42 @@ export default function GarantiasNovaManual() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Modelo *</p>
-                  <Select 
-                    value={formData.modelo} 
-                    onValueChange={(v) => setFormData(prev => ({ ...prev, modelo: v }))}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {produtos.map(p => (
-                        <SelectItem key={p.id} value={p.produto}>{p.produto}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={modeloOpen} onOpenChange={setModeloOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={modeloOpen}
+                        className="h-9 w-full justify-between font-normal"
+                      >
+                        {formData.modelo || "Selecione o modelo..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0 z-[100]" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar modelo..." />
+                        <CommandList>
+                          <CommandEmpty>Nenhum modelo encontrado.</CommandEmpty>
+                          <CommandGroup>
+                            {produtos.map(p => (
+                              <CommandItem
+                                key={p.id}
+                                value={p.produto}
+                                onSelect={(value) => {
+                                  setFormData(prev => ({ ...prev, modelo: value }));
+                                  setModeloOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", formData.modelo === p.produto ? "opacity-100" : "opacity-0")} />
+                                {p.produto}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Condição *</p>
@@ -680,23 +752,42 @@ export default function GarantiasNovaManual() {
 
               {/* Upload de fotos obrigatório para empréstimo */}
               {tipoTratativa === 'Assistência + Empréstimo' && aparelhoSelecionado && (
-                <div className="space-y-2">
-                  <FileUploadComprovante
-                    label="Fotos do Estado do Aparelho Emprestado *"
-                    required
-                    value={fotoEmprestimo}
-                    fileName={fotoEmprestimoNome}
-                    onFileChange={(data) => {
-                      setFotoEmprestimo(data.comprovante);
-                      setFotoEmprestimoNome(data.comprovanteNome);
-                    }}
-                    acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
-                    maxSizeMB={10}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Registre o estado do aparelho no ato da entrega ao cliente.
-                  </p>
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <FileUploadComprovante
+                      label="Fotos do Estado do Aparelho Emprestado *"
+                      required
+                      value={fotoEmprestimo}
+                      fileName={fotoEmprestimoNome}
+                      onFileChange={(data) => {
+                        setFotoEmprestimo(data.comprovante);
+                        setFotoEmprestimoNome(data.comprovanteNome);
+                      }}
+                      acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
+                      maxSizeMB={10}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Registre o estado do aparelho no ato da entrega ao cliente.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <FileUploadComprovante
+                      label="Termo de Responsabilidade *"
+                      required
+                      value={fotoTermo}
+                      fileName={fotoTermoNome}
+                      onFileChange={(data) => {
+                        setFotoTermo(data.comprovante);
+                        setFotoTermoNome(data.comprovanteNome);
+                      }}
+                      acceptedTypes={['image/jpeg', 'image/png', 'image/webp', 'application/pdf']}
+                      maxSizeMB={10}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Anexe o termo de responsabilidade assinado pelo cliente.
+                    </p>
+                  </div>
+                </>
               )}
 
               <Separator />
@@ -1097,6 +1188,64 @@ export default function GarantiasNovaManual() {
         }}
         onClose={() => setShowScanner(false)}
       />
+
+      {/* Modal Dupla Confirmação Troca Direta */}
+      <Dialog open={showConfirmacaoTroca} onOpenChange={setShowConfirmacaoTroca}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Troca Direta</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-muted rounded-lg space-y-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Cliente</p>
+                <p className="font-medium">{formData.clienteNome}</p>
+              </div>
+              <Separator />
+              <div>
+                <p className="text-xs text-muted-foreground">Aparelho do Cliente (Defeituoso)</p>
+                <p className="font-medium">{formData.modelo} - IMEI: {formData.imei}</p>
+              </div>
+              <Separator />
+              <div>
+                <p className="text-xs text-muted-foreground">Aparelho de Troca (Saindo do Estoque)</p>
+                <p className="font-medium">{aparelhoSelecionado?.modelo} - IMEI: {displayIMEI(aparelhoSelecionado?.imei || '')}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="confirmar-troca"
+                checked={checkboxConfirmacao}
+                onCheckedChange={(checked) => setCheckboxConfirmacao(!!checked)}
+              />
+              <label htmlFor="confirmar-troca" className="text-sm font-medium leading-none cursor-pointer">
+                Confirmo a troca direta do aparelho
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowConfirmacaoTroca(false);
+              setCheckboxConfirmacao(false);
+            }}>
+              Cancelar
+            </Button>
+            <Button 
+              disabled={!checkboxConfirmacao}
+              onClick={() => {
+                setTrocaConfirmada(true);
+                setShowConfirmacaoTroca(false);
+                setCheckboxConfirmacao(false);
+                // Agora salvar de fato
+                handleSalvar();
+              }}
+            >
+              Confirmar Troca
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </GarantiasLayout>
   );
 }

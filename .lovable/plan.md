@@ -1,69 +1,87 @@
 
-## Plano: Modal Full Screen de Pagamento de Remuneracao Motoboy
 
-### Objetivo
-Substituir o botao "Pagar" simples por um fluxo completo de pagamento em tela cheia, com auditoria de entregas, selecao de conta bancaria, upload de comprovante obrigatorio e lancamento automatico no extrato financeiro.
+## Plano: Corrigir Nome do Motoboy, Vendedor, Local de Entrega e Condicionar Pagamento a Conferencia Financeira
 
----
+### Problemas Identificados
 
-### 1. Atualizar `src/utils/motoboyApi.ts`
-
-**1.1 Expandir interface `RemuneracaoMotoboy`:**
-- Adicionar campos opcionais: `contaId?: string`, `contaNome?: string`, `comprovante?: string`, `comprovanteNome?: string`, `pagoPor?: string`, `observacoesPagamento?: string`.
-
-**1.2 Atualizar `registrarPagamentoRemuneracao`:**
-- Nova assinatura: `registrarPagamentoRemuneracao(id, dados: { contaId, contaNome, comprovante, comprovanteNome, pagoPor, observacoes })`.
-- Persistir todos os campos no registro da remuneracao.
-- Chamar `addDespesa` de `financeApi.ts` para gerar lancamento automatico no extrato:
-  - `tipo: 'Variavel'`
-  - `categoria: 'Frete/Logistica'`
-  - `descricao: 'Pagamento Remuneracao Motoboy - [Nome] - Periodo [Inicio] a [Fim]'`
-  - `valor: valorTotal`
-  - `conta: contaNome`
-  - `status: 'Pago'`
-  - `dataPagamento: hoje`
-  - `pagoPor: usuarioNome`
-  - `comprovante: comprovanteNome`
-- Retornar `true` em caso de sucesso.
+1. **Nome do motoboy aparece como "Motoboy"**: Em `vendasApi.ts` linha 932, `(venda as any).motoboyNome || 'Motoboy'` -- o campo `motoboyNome` nao existe na interface `Venda`, entao cai no fallback `'Motoboy'`.
+2. **Vendedor aparece como ID**: Em `motoboyApi.ts` linha 453, `venda.vendedor` e um ID (ex: `6dcbc817`), nao o nome.
+3. **Localizacao mostra cidade do cliente**: Em `vendasApi.ts` linha 940, usa `venda.clienteCidade` em vez do campo `localEntregaNome` (que e o "Local de Entrega" selecionado no formulario).
+4. **Pagamento deve ser condicionado a conferencia financeira**: A demanda deve ser registrada com status `'Pendente'` e so mudar para `'Concluida'` (habilitando pagamento) apos o financeiro finalizar a venda.
 
 ---
 
-### 2. Atualizar `src/pages/RHMotoboyRemuneracao.tsx`
+### 1. Atualizar `src/utils/vendasApi.ts` - Integracao Motoboy
 
-**2.1 Novo estado para modal de pagamento:**
-- `modalPagamentoOpen` (boolean)
-- `remuneracaoPagamento` (RemuneracaoMotoboy | null)
-- `detalhesPagamento` (DetalheEntregaRemuneracao[])
-- `contaSelecionada` (string) - ID da conta
-- `comprovante` / `comprovanteNome` / `comprovantePreview` (strings para FileUploadComprovante)
-- `observacoesPagamento` (string)
+**Linha 929-948 -- Bloco de integracao motoboy:**
 
-**2.2 Botao "Pagar" abre modal full screen:**
-- Substituir chamada direta a `handlePagar(rem.id)` por `handleAbrirPagamento(rem)`.
-- Ao abrir: carregar detalhes de entrega via `getDetalheEntregasRemuneracao` e popular o modal.
+- Buscar nome do motoboy via `getColaboradorById` de `cadastrosApi.ts`
+- Buscar nome do local de entrega: o campo `localRetirada` na venda e o ID da loja/local selecionado. O `localEntregaNome` nao e persistido na venda. Solucao: buscar via `getTaxasEntregaAtivas()` pelo local ou usar o campo `localRetirada` que ja contem o nome/referencia do local
+- Mudar status da demanda de `'Concluida'` para `'Pendente'` (sera ativado apos conferencia)
 
-**2.3 Layout do modal (Dialog max-w-6xl):**
+```typescript
+// Buscar nome real do motoboy
+const colaboradorMotoboy = getColaboradorById(venda.motoboyId);
+const motoboyNome = colaboradorMotoboy?.nome || 'Motoboy';
 
-Cabecalho:
-- Nome do Motoboy, Competencia e Periodo (dd/MM a dd/MM)
+// Buscar local de entrega real (localRetirada contém o nome do local selecionado)
+const localEntrega = venda.localRetirada || venda.clienteCidade || 'Endereco Cliente';
 
-Secao 1 - Tabela de Auditoria:
-- Colunas: ID da Venda, Data, Cliente/Descricao, Localizacao, Valor da Entrega
-- Rodape com totalizador de quantidade e valor
+addDemandaMotoboy({
+  ...
+  motoboyNome,
+  lojaDestino: localEntrega,
+  status: 'Pendente', // Muda para 'Concluida' apos conferencia financeira
+  ...
+});
+```
 
-Secao 2 - Resumo de Valores:
-- Card destacado com "Total de Entregas" (quantidade), "Valor Liquido a Pagar" (formatCurrency)
+---
 
-Secao 3 - Quadro de Baixa Financeira:
-- Select "Conta de Saida" (obrigatorio): usando `getContasFinanceirasHabilitadas()` de `cadastrosApi.ts`
-- FileUploadComprovante "Comprovante de Pagamento" (obrigatorio)
-- Textarea "Observacoes" (opcional)
-- Botao "Confirmar Pagamento": desabilitado ate que conta E comprovante estejam preenchidos
+### 2. Atualizar `src/utils/motoboyApi.ts` - Funcao para Ativar Demandas
 
-**2.4 Ao confirmar pagamento:**
-- Chamar `registrarPagamentoRemuneracao` com todos os dados
-- Fechar modal, atualizar lista, exibir toast de sucesso
-- O lancamento no extrato financeiro e feito automaticamente pela API
+**2.1 Nova funcao `ativarDemandasPorVenda`:**
+- Recebe `vendaId: string`
+- Busca todas as demandas com esse `vendaId` e status `'Pendente'`
+- Altera status para `'Concluida'`
+- Chama `atualizarRemuneracaoPeriodo` para cada demanda ativada (para contabilizar na remuneracao)
+
+```typescript
+export const ativarDemandasPorVenda = (vendaId: string): void => {
+  demandas.forEach(d => {
+    if (d.vendaId === vendaId && d.status === 'Pendente') {
+      d.status = 'Concluida';
+      atualizarRemuneracaoPeriodo(d);
+    }
+  });
+};
+```
+
+**2.2 Ajustar `addDemandaMotoboy`:**
+- Quando status for `'Pendente'`, NAO chamar `atualizarRemuneracaoPeriodo` (so contabiliza apos conferencia)
+
+**2.3 Corrigir `getDetalheEntregasRemuneracao`:**
+- Na linha 453, resolver o nome do vendedor usando `getColaboradorById` em vez de retornar o ID cru
+- Usar `d.lojaDestino` como localizacao (que agora tera o local de entrega real)
+
+---
+
+### 3. Atualizar `src/utils/fluxoVendasApi.ts` - Hook na Finalizacao
+
+**Na funcao `finalizarVenda` (linha ~446, apos salvar o fluxo):**
+- Importar `ativarDemandasPorVenda` de `motoboyApi.ts`
+- Chamar `ativarDemandasPorVenda(vendaId)` apos a finalizacao financeira
+- Fazer o mesmo em `finalizarVendaDowngrade` e `finalizarVendaFiado`
+
+---
+
+### 4. Verificar campo `localRetirada` na venda
+
+O campo `localRetirada` na interface `Venda` armazena o valor selecionado no autocomplete "Local de Entrega". Preciso confirmar se ele salva o nome ou o ID. Se salva o nome, usamos diretamente. Se salva ID, resolvemos via lookup.
+
+Pela analise do codigo em VendasNova.tsx, o `localRetirada` e setado com o ID da loja (para "Retirada em Outra Loja") ou o nome da loja de venda. Para entregas, o local de entrega real e `localEntregaNome` que NAO e persistido no objeto da venda.
+
+**Solucao**: Adicionar `localEntregaNome` ao objeto da venda quando `tipoRetirada === 'Entrega'`, e usar esse campo na integracao com motoboy.
 
 ---
 
@@ -71,12 +89,14 @@ Secao 3 - Quadro de Baixa Financeira:
 
 | Arquivo | Alteracoes |
 |---------|-----------|
-| `src/utils/motoboyApi.ts` | Expandir interface, atualizar `registrarPagamentoRemuneracao` com integracao financeira |
-| `src/pages/RHMotoboyRemuneracao.tsx` | Modal full screen de pagamento com auditoria, conta, comprovante e observacoes |
+| `src/pages/VendasNova.tsx` | Adicionar `localEntregaNome` ao vendaData quando tipoRetirada === 'Entrega' |
+| `src/utils/vendasApi.ts` | Resolver nome do motoboy via `getColaboradorById`, usar `localEntregaNome`, status `'Pendente'` |
+| `src/utils/motoboyApi.ts` | Nova funcao `ativarDemandasPorVenda`, ajustar `addDemandaMotoboy` para nao contabilizar pendentes, resolver nome vendedor no drill-down |
+| `src/utils/fluxoVendasApi.ts` | Chamar `ativarDemandasPorVenda` em `finalizarVenda`, `finalizarVendaDowngrade` e `finalizarVendaFiado` |
 
 ### Detalhes Tecnicos
 
-- O select de contas usa `getContasFinanceirasHabilitadas()` (somente contas ativas), seguindo o padrao arquitetural do projeto.
-- O componente `FileUploadComprovante` ja existente e reutilizado (drag-and-drop, camera, PDF/imagem).
-- A despesa gerada no extrato usa `lojaId` da loja Matriz como padrao (despesa administrativa central).
-- O botao "Confirmar Pagamento" valida: `contaSelecionada !== '' && comprovante !== ''`.
+- `getColaboradorById` de `cadastrosApi.ts` e usado para resolver IDs de colaboradores para nomes
+- O fluxo completo fica: Venda lancada -> demanda criada como `Pendente` -> financeiro finaliza -> demanda vira `Concluida` -> contabiliza na remuneracao -> habilita pagamento
+- A `atualizarRemuneracaoPeriodo` so e chamada quando a demanda tem status `'Concluida'`, garantindo que valores pendentes nao sao contabilizados prematuramente
+

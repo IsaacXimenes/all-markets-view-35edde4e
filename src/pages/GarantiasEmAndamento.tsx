@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { 
   Eye, Clock, Package, Smartphone, Wrench, AlertTriangle, CheckCircle, Download, Filter, X, ThumbsUp, ThumbsDown
 } from 'lucide-react';
+import { FileUploadComprovante } from '@/components/estoque/FileUploadComprovante';
 import { exportToCSV, formatCurrency } from '@/utils/formatUtils';
 import {
   getGarantiasEmAndamento, getTratativas, updateTratativa, updateGarantia,
@@ -48,6 +49,8 @@ export default function GarantiasEmAndamento() {
   const [showDevolucaoModal, setShowDevolucaoModal] = useState(false);
   const [tratativaSelecionada, setTratativaSelecionada] = useState<TratativaGarantia | null>(null);
   const [garantiaParaDevolucao, setGarantiaParaDevolucao] = useState<GarantiaItem | null>(null);
+  const [fotoDevolucao, setFotoDevolucao] = useState('');
+  const [fotoDevolucaoNome, setFotoDevolucaoNome] = useState('');
   
   // Modal recusa
   const [showRecusaModal, setShowRecusaModal] = useState(false);
@@ -123,6 +126,12 @@ export default function GarantiasEmAndamento() {
   const handleDevolucao = () => {
     if (!tratativaSelecionada || !garantiaParaDevolucao) return;
     
+    // Validação de foto obrigatória
+    if (!fotoDevolucao) {
+      toast.error('É obrigatório anexar fotos do estado do aparelho na devolução');
+      return;
+    }
+    
     // Atualizar tratativa
     updateTratativa(tratativaSelecionada.id, { status: 'Concluído' });
     
@@ -135,7 +144,7 @@ export default function GarantiasEmAndamento() {
       dataHora: new Date().toISOString(),
       tipo: 'devolucao',
       titulo: 'Aparelho devolvido',
-      descricao: `Aparelho emprestado ${tratativaSelecionada.aparelhoEmprestadoModelo} (IMEI: ${tratativaSelecionada.aparelhoEmprestadoImei}) devolvido`,
+      descricao: `Aparelho emprestado ${tratativaSelecionada.aparelhoEmprestadoModelo} (IMEI: ${tratativaSelecionada.aparelhoEmprestadoImei}) devolvido. Fotos do estado registradas.`,
       usuarioId: 'COL-001',
       usuarioNome: 'Usuário Sistema'
     });
@@ -154,6 +163,8 @@ export default function GarantiasEmAndamento() {
     setShowDevolucaoModal(false);
     setTratativaSelecionada(null);
     setGarantiaParaDevolucao(null);
+    setFotoDevolucao('');
+    setFotoDevolucaoNome('');
   };
   
   const handleAprovarTratativa = (tratativa: TratativaGarantia) => {
@@ -477,6 +488,23 @@ export default function GarantiasEmAndamento() {
               
               <p className="text-sm text-muted-foreground">
                 Ao confirmar, o aparelho será devolvido ao estoque e a tratativa será finalizada.
+              </p>
+
+              {/* Upload de fotos obrigatório na devolução */}
+              <FileUploadComprovante
+                label="Fotos do Estado do Aparelho na Devolução *"
+                required
+                value={fotoDevolucao}
+                fileName={fotoDevolucaoNome}
+                onFileChange={(data) => {
+                  setFotoDevolucao(data.comprovante);
+                  setFotoDevolucaoNome(data.comprovanteNome);
+                }}
+                acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
+                maxSizeMB={10}
+              />
+              <p className="text-xs text-muted-foreground">
+                Registre o estado do aparelho no ato da devolução pelo cliente.
               </p>
             </div>
           )}

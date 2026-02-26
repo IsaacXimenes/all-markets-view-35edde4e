@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   ArrowLeft, Shield, User, Phone, Mail, Save, Search, Plus, 
-  FileText, Package, Clock, Award, Smartphone, Wrench, ArrowRightLeft
+  FileText, Package, Clock, Award, Smartphone, Wrench, ArrowRightLeft, Camera
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getProdutosCadastro, getClientes, addCliente, Cliente, calcularTipoPessoa } from '@/utils/cadastrosApi';
@@ -24,6 +24,8 @@ import { getPlanosPorModelo, PlanoGarantia, formatCurrency } from '@/utils/plano
 import { getProdutos, Produto } from '@/utils/estoqueApi';
 import { format, addMonths } from 'date-fns';
 import { formatIMEI, unformatIMEI, displayIMEI } from '@/utils/imeiMask';
+import { BarcodeScanner } from '@/components/ui/barcode-scanner';
+import { FileUploadComprovante } from '@/components/estoque/FileUploadComprovante';
 
 export default function GarantiasNovaManual() {
   const navigate = useNavigate();
@@ -123,6 +125,13 @@ export default function GarantiasNovaManual() {
   const [showModalAparelho, setShowModalAparelho] = useState(false);
   const [aparelhoSelecionado, setAparelhoSelecionado] = useState<Produto | null>(null);
   const [buscaAparelho, setBuscaAparelho] = useState('');
+
+  // Scanner IMEI
+  const [showScanner, setShowScanner] = useState(false);
+
+  // Fotos do empréstimo (obrigatório para Assistência + Empréstimo)
+  const [fotoEmprestimo, setFotoEmprestimo] = useState('');
+  const [fotoEmprestimoNome, setFotoEmprestimoNome] = useState('');
 
   // Flag para indicar se precisa de aparelho
   const precisaAparelho = tipoTratativa === 'Assistência + Empréstimo' || tipoTratativa === 'Troca Direta';
@@ -277,6 +286,12 @@ export default function GarantiasNovaManual() {
 
     if (precisaAparelho && tipoTratativa && !aparelhoSelecionado) {
       toast.error('Selecione um aparelho para esta tratativa');
+      return;
+    }
+
+    // Validação de foto obrigatória para empréstimo
+    if (tipoTratativa === 'Assistência + Empréstimo' && !fotoEmprestimo) {
+      toast.error('É obrigatório anexar fotos do estado do aparelho emprestado');
       return;
     }
 
@@ -490,15 +505,27 @@ export default function GarantiasNovaManual() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">IMEI *</p>
-                  <Input
-                    placeholder="00-000000-000000-0"
-                    value={formData.imei}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      imei: formatIMEI(e.target.value) 
-                    }))}
-                    className="h-9 font-mono text-sm"
-                  />
+                  <div className="flex gap-1">
+                    <Input
+                      placeholder="00-000000-000000-0"
+                      value={formData.imei}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        imei: formatIMEI(e.target.value) 
+                      }))}
+                      className="h-9 font-mono text-sm flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 flex-shrink-0"
+                      onClick={() => setShowScanner(true)}
+                      title="Escanear IMEI via câmera"
+                    >
+                      <Camera className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Status Expiração</p>
@@ -566,49 +593,6 @@ export default function GarantiasNovaManual() {
             </CardContent>
           </Card>
 
-          {/* Plano de Garantia */}
-          {formData.modelo && formData.condicao && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  Plano de Garantia *
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {planosDisponiveis.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {planosDisponiveis.map((plano) => (
-                      <div
-                        key={plano.id}
-                        onClick={() => handleSelectPlano(plano.id)}
-                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all hover:border-primary/50 ${
-                          formData.planoGarantiaId === plano.id
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border'
-                        }`}
-                      >
-                        <div className="font-semibold text-sm">{plano.nome}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {plano.meses > 0 ? `${plano.meses} meses` : 'Sem garantia adicional'}
-                        </div>
-                        <div className="text-lg font-bold text-primary mt-2">
-                          {plano.valor > 0 ? formatCurrency(plano.valor) : 'Gratuito'}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {plano.tipo}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-4 bg-muted/50 rounded-lg text-center text-muted-foreground">
-                    Nenhum plano de garantia disponível para este modelo e condição.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
 
           {/* Timeline - Empty for new warranty */}
           <Card>
@@ -691,6 +675,27 @@ export default function GarantiasNovaManual() {
                       Selecionar Aparelho
                     </Button>
                   )}
+                </div>
+              )}
+
+              {/* Upload de fotos obrigatório para empréstimo */}
+              {tipoTratativa === 'Assistência + Empréstimo' && aparelhoSelecionado && (
+                <div className="space-y-2">
+                  <FileUploadComprovante
+                    label="Fotos do Estado do Aparelho Emprestado *"
+                    required
+                    value={fotoEmprestimo}
+                    fileName={fotoEmprestimoNome}
+                    onFileChange={(data) => {
+                      setFotoEmprestimo(data.comprovante);
+                      setFotoEmprestimoNome(data.comprovanteNome);
+                    }}
+                    acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
+                    maxSizeMB={10}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Registre o estado do aparelho no ato da entrega ao cliente.
+                  </p>
                 </div>
               )}
 
@@ -1082,6 +1087,16 @@ export default function GarantiasNovaManual() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Scanner de código de barras para IMEI */}
+      <BarcodeScanner
+        open={showScanner}
+        onScan={(code) => {
+          setFormData(prev => ({ ...prev, imei: formatIMEI(code) }));
+          toast.success('IMEI escaneado com sucesso!');
+        }}
+        onClose={() => setShowScanner(false)}
+      />
     </GarantiasLayout>
   );
 }

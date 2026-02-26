@@ -1412,7 +1412,7 @@ const getContaNome = (contaId: string) => contasFinanceiras.find(c => c.id === c
                     <Lock className="h-4 w-4 text-muted-foreground" />
                     <Label className="font-semibold text-sm">Observação do Gestor</Label>
                   </div>
-                  {observacaoGestorCarregada ? (
+                  {observacaoGestorCarregada && observacaoGestorCarregada.texto.trim() ? (
                     <div>
                       <p className="text-sm text-muted-foreground">{observacaoGestorCarregada.texto}</p>
                       <p className="text-xs text-muted-foreground mt-1">

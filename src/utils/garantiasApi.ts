@@ -1,8 +1,10 @@
 // Garantias API - Módulo completo de gerenciamento de garantias
 import { format, addMonths, differenceInDays } from 'date-fns';
 import { addOrdemServico } from './assistenciaApi';
-import { updateProduto, addMovimentacao, Produto } from './estoqueApi';
+import { updateProduto, addMovimentacao, Produto, getProdutoById } from './estoqueApi';
 import { registrarEmprestimoGarantia, addTimelineEntry as addTimelineUnificada } from './timelineApi';
+import { addProdutoPendente } from './osApi';
+import { addVenda } from './vendasApi';
 
 // ==================== HELPERS localStorage ====================
 
@@ -775,16 +777,94 @@ export const aprovarTratativa = (
     }
 
     if (tratativa.tipo === 'Troca Direta' && tratativa.aparelhoTrocaId) {
-      updateProduto(tratativa.aparelhoTrocaId, { bloqueadoEmTrocaGarantiaId: garantia.id });
+      // 1. Marcar aparelho novo como "Troca - Garantia" e dar baixa
+      const aparelhoTroca = getProdutoById(tratativa.aparelhoTrocaId);
+      updateProduto(tratativa.aparelhoTrocaId, { 
+        bloqueadoEmTrocaGarantiaId: garantia.id,
+        quantidade: 0 
+      });
       addMovimentacao({
         data: agora, produto: tratativa.aparelhoTrocaModelo || '', imei: tratativa.aparelhoTrocaImei || '',
-        quantidade: 1, origem: garantia.lojaVenda, destino: 'Reserva - Troca Garantia',
+        quantidade: 1, origem: garantia.lojaVenda, destino: 'Troca - Garantia',
         responsavel: gestorNome, motivo: `Troca aprovada garantia ${garantia.id}`
       });
+
+      // 2. Registrar aparelho defeituoso do cliente em Aparelhos Pendentes
+      addProdutoPendente({
+        imei: garantia.imei,
+        marca: 'Apple',
+        modelo: garantia.modelo,
+        cor: aparelhoTroca?.cor || '-',
+        tipo: 'Seminovo',
+        condicao: 'Semi-novo',
+        origemEntrada: 'Base de Troca',
+        notaOuVendaId: `GAR-${garantia.id}`,
+        valorCusto: 0,
+        valorOrigem: 0,
+        saudeBateria: 0,
+        loja: garantia.lojaVenda,
+        dataEntrada: agora.split('T')[0],
+      }, true);
+
+      // 3. Gerar Nota de Venda (modelo garantia) com custo e lucro zerados
+      addVenda({
+        dataHora: agora,
+        lojaVenda: garantia.lojaVenda,
+        vendedor: gestorId,
+        clienteId: garantia.clienteId,
+        clienteNome: garantia.clienteNome,
+        clienteCpf: '',
+        clienteTelefone: garantia.clienteTelefone || '',
+        clienteEmail: garantia.clienteEmail || '',
+        clienteCidade: '',
+        origemVenda: 'Troca Garantia',
+        localRetirada: garantia.lojaVenda,
+        tipoRetirada: 'Retirada Balcão',
+        taxaEntrega: 0,
+        itens: [{
+          id: `ITEM-GAR-${garantia.id}`,
+          produtoId: tratativa.aparelhoTrocaId,
+          produto: tratativa.aparelhoTrocaModelo || '',
+          imei: tratativa.aparelhoTrocaImei || '',
+          quantidade: 1,
+          valorRecomendado: 0,
+          valorCusto: 0,
+          valorVenda: 0,
+          categoria: 'Apple',
+          loja: garantia.lojaVenda,
+        }],
+        tradeIns: [{
+          id: `TI-GAR-${garantia.id}`,
+          modelo: garantia.modelo,
+          descricao: 'Entrada de Garantia',
+          imei: garantia.imei,
+          valorCompraUsado: 0,
+          imeiValidado: true,
+          condicao: 'Semi-novo',
+        }],
+        acessorios: [],
+        pagamentos: [],
+        subtotal: 0,
+        totalTradeIn: 0,
+        total: 0,
+        lucro: 0,
+        margem: 0,
+        observacoes: `Troca Direta - Garantia ${garantia.id}. Aparelho defeituoso IMEI: ${garantia.imei}. Aparelho novo: ${tratativa.aparelhoTrocaModelo} IMEI: ${tratativa.aparelhoTrocaImei}.`,
+        status: 'Concluída',
+      });
+
+      // 4. Timeline - aparelho em análise
       encaminharParaAnaliseGarantia(
         garantia.id, 'Garantia',
         `${garantia.clienteNome} - ${garantia.modelo} (IMEI: ${garantia.imei}) - Troca Direta`
       );
+
+      addTimelineEntry({
+        garantiaId: garantia.id, dataHora: agora, tipo: 'troca',
+        titulo: 'Nota de Venda Garantia Gerada',
+        descricao: `Nota de venda com custo zerado gerada. Aparelho defeituoso (IMEI: ${garantia.imei}) encaminhado para Aparelhos Pendentes.`,
+        usuarioId: gestorId, usuarioNome: gestorNome
+      });
     }
 
     // Atualizar status

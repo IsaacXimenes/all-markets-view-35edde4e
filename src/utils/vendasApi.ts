@@ -5,6 +5,7 @@ import { getProdutos, updateProduto, addMovimentacao } from './estoqueApi';
 import { subtrairEstoqueAcessorio, VendaAcessorio } from './acessoriosApi';
 import { criarPagamentosDeVenda } from './financeApi';
 import { addDemandaMotoboy } from './motoboyApi';
+import { getColaboradorById } from './cadastrosApi';
 export interface ItemVenda {
   id: string;
   produtoId: string; // PROD-XXXX - ID único e persistente do produto
@@ -929,7 +930,9 @@ export const addVenda = (venda: Omit<Venda, 'id' | 'numero'>): Venda => {
   // ========== INTEGRAÇÃO: Registrar Demanda de Motoboy ==========
   if (venda.tipoRetirada === 'Entrega' && venda.motoboyId) {
     try {
-      const motoboyNome = (venda as any).motoboyNome || 'Motoboy';
+      const colaboradorMotoboy = getColaboradorById(venda.motoboyId);
+      const motoboyNome = colaboradorMotoboy?.nome || 'Motoboy';
+      const localEntrega = (venda as any).localEntregaNome || venda.clienteCidade || 'Endereço Cliente';
       addDemandaMotoboy({
         motoboyId: venda.motoboyId,
         motoboyNome,
@@ -937,8 +940,8 @@ export const addVenda = (venda: Omit<Venda, 'id' | 'numero'>): Venda => {
         tipo: 'Entrega',
         descricao: `Entrega Venda #${newId} - Cliente ${venda.clienteNome}`,
         lojaOrigem: venda.lojaVenda,
-        lojaDestino: venda.clienteCidade || 'Endereço Cliente',
-        status: 'Concluída',
+        lojaDestino: localEntrega,
+        status: 'Pendente',
         valorDemanda: venda.taxaEntrega || 0,
         vendaId: newId
       });

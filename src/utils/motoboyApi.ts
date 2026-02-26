@@ -26,6 +26,12 @@ export interface RemuneracaoMotoboy {
   valorTotal: number;
   status: 'Pendente' | 'Pago';
   dataPagamento?: string;
+  contaId?: string;
+  contaNome?: string;
+  comprovante?: string;
+  comprovanteNome?: string;
+  pagoPor?: string;
+  observacoesPagamento?: string;
 }
 
 // Mock data de demandas
@@ -234,15 +240,68 @@ export const calcularRemuneracaoPeriodo = (
   };
 };
 
-export const registrarPagamentoRemuneracao = (id: string): boolean => {
+export interface DadosPagamentoRemuneracao {
+  contaId: string;
+  contaNome: string;
+  comprovante: string;
+  comprovanteNome: string;
+  pagoPor: string;
+  observacoes?: string;
+}
+
+export const registrarPagamentoRemuneracao = (id: string, dados?: DadosPagamentoRemuneracao): boolean => {
   const index = remuneracoes.findIndex(r => r.id === id);
   if (index === -1) return false;
   
+  const rem = remuneracoes[index];
+  const hoje = new Date().toISOString().split('T')[0];
+  
   remuneracoes[index] = {
-    ...remuneracoes[index],
+    ...rem,
     status: 'Pago',
-    dataPagamento: new Date().toISOString().split('T')[0]
+    dataPagamento: hoje,
+    ...(dados ? {
+      contaId: dados.contaId,
+      contaNome: dados.contaNome,
+      comprovante: dados.comprovante,
+      comprovanteNome: dados.comprovanteNome,
+      pagoPor: dados.pagoPor,
+      observacoesPagamento: dados.observacoes
+    } : {})
   };
+
+  // Integração financeira - lançar despesa no extrato
+  if (dados) {
+    try {
+      const { addDespesa } = require('./financeApi');
+      const meses = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+      const mesAtual = new Date().getMonth();
+      const anoAtual = new Date().getFullYear();
+      const competenciaFinanceira = `${meses[mesAtual]}-${anoAtual}`;
+
+      addDespesa({
+        tipo: 'Variável' as const,
+        data: hoje,
+        descricao: `Pagamento Remuneração Motoboy - ${rem.motoboyNome} - Período ${new Date(rem.periodoInicio).toLocaleDateString('pt-BR')} a ${new Date(rem.periodoFim).toLocaleDateString('pt-BR')}`,
+        valor: rem.valorTotal,
+        competencia: competenciaFinanceira,
+        conta: dados.contaNome,
+        observacoes: dados.observacoes || '',
+        lojaId: '3ac7e00c', // Matriz
+        status: 'Pago' as const,
+        categoria: 'Frete/Logística',
+        dataVencimento: hoje,
+        dataPagamento: hoje,
+        recorrente: false,
+        periodicidade: null,
+        pagoPor: dados.pagoPor,
+        comprovante: dados.comprovanteNome
+      });
+      console.log(`[MOTOBOY] Despesa financeira lançada para remuneração ${id}`);
+    } catch (e) {
+      console.error('[MOTOBOY] Erro ao lançar despesa financeira:', e);
+    }
+  }
   
   return true;
 };

@@ -1,61 +1,100 @@
 
 
-## Plano: Corrigir nome do motoboy e adicionar taxa de entrega na tabela de produtos
+## Plano de Ajustes - Vendas, Financeiro e Cadastros
 
-### Alteracoes no arquivo `src/utils/gerarNotaGarantiaPdf.ts`
+### 1. Vendas: Modal de Troca - Validacao de IMEI com Anexo Obrigatorio
 
-### 1. Importar `getColaboradorById`
+**Arquivo:** `src/pages/VendasNova.tsx`
 
-Adicionar `getColaboradorById` ao import existente de `cadastrosApi` (linha 3).
+**1.1 Anexo obrigatorio ao validar IMEI:**
+- Ao marcar o checkbox "IMEI Validado" (linha ~3228), abrir condicionalmente um campo de upload para a tela de consulta policial.
+- Adicionar estado `anexoConsultaIMEI` (base64 + nome) no modal de trade-in.
+- Exibir icone de cadeado (Lock do lucide-react) ao lado do label "IMEI Validado".
+- Texto descritivo: "Campo proprio para anexar a tela de consulta da Policia - TELA de Consulta do IMEI".
+- O campo de upload segue o padrao `FileUploadComprovante` ja usado no projeto.
+- Bloquear o botao "Adicionar" se `imeiValidado === true` e nao houver anexo.
 
-### 2. Corrigir nome do motoboy na secao FRETE / ENTREGA
+**1.2 Alerta de prazo para "Aparelho com o cliente":**
+- Na secao existente de "Com o Cliente" (linha ~3081), adicionar um alerta visual (banner amarelo/laranja):
+  - Texto: "OBS.: A partir de 24 horas ira comecar a contar o vale, ate retorno do aparelho."
+- Posicionar logo abaixo do alerta existente sobre Termo de Responsabilidade.
 
-Na linha 333, substituir `venda.motoboyId || '-'` por uma busca do nome do colaborador:
+### 2. Vendas: Regra de Comissao
 
-```typescript
-const motoboyNome = venda.motoboyId
-  ? (getColaboradorById(venda.motoboyId)?.nome || venda.motoboyId)
-  : '-';
-```
+**Arquivo:** `src/utils/calculoComissaoVenda.ts` (ja esta correto - 6% Online, 10% demais)
 
-A secao FRETE / ENTREGA permanece como esta (com TAXA DE ENTREGA e MOTOBOY / OBSERVACOES), apenas corrigindo o valor exibido para o nome real.
+**Arquivo:** `src/utils/comissoesApi.ts`
+- A funcao `calcularComissaoVenda` nesta API usa percentual individual do colaborador (randomizado 5-15%). Precisa ser ajustada para respeitar a regra fixa: 10% para lojas fisicas, 6% para Online.
+- Alterar `calcularComissaoVenda` para receber `lojaVendaId` e usar a logica de `calculoComissaoVenda.ts` (verificando se eh loja online via `LOJA_ONLINE_ID`).
+- Remover a geracao aleatoria de percentuais na inicializacao.
 
-### 3. Adicionar taxa de entrega na tabela de produtos
+### 3. Nota de Garantia (PDF)
 
-Apos o bloco de Base de Troca (linha 428) e antes do Total (linha 430), inserir:
+**Arquivo:** `src/utils/gerarNotaGarantiaPdf.ts`
 
-```typescript
-// Taxa de Entrega (como item)
-if (venda.taxaEntrega && venda.taxaEntrega > 0) {
-  drawBox(prodColQtd, y, prodColQtdW, rowH);
-  drawBox(prodColDesc, y, prodColDescW, rowH);
-  drawBox(prodColTipo, y, prodColTipoW, rowH);
-  drawBox(prodColValor, y, prodColValorW, rowH);
-  doc.text('1', prodColQtd + 2, y + 5);
-  doc.text('Taxa de Entrega', prodColDesc + 2, y + 5);
-  doc.text('Entrega', prodColTipo + 2, y + 5);
-  doc.text(formatCurrency(venda.taxaEntrega), prodColValor + 2, y + 5);
-  y += rowH;
-}
-```
+**3.1 Motoboy padronizado:**
+- Na funcao `getNomeMotoboy`, substituir a resolucao do nome individual por um texto fixo: `"Motoboy Thiago Imports"`.
+- Basta alterar o retorno da funcao para sempre retornar esse texto quando houver motoboyId.
 
-### Resultado visual
+**3.2 Tipo "Apple" substituido por "Aparelho":**
+- Na linha ~396, o campo `item.categoria` ja tem fallback `'Aparelho'`. Basta forcar o valor para `'Aparelho'` ignorando `item.categoria` quando este for `'Apple'`.
+- Logica: `(item.categoria === 'Apple' ? 'Aparelho' : item.categoria) || 'Aparelho'`.
 
-**Secao FRETE / ENTREGA** (mantida, com nome corrigido):
+### 4. Historico de Vendas: Auditoria de Margem (Trade-In)
 
-| SIM | NAO | TIPO DE RETIRADA | ENDERECO / LOCAL |
-|-----|-----|------------------|------------------|
-| X   |     | Entrega          | Rua tal...       |
-| TAXA DE ENTREGA: R$ 15,00 | MOTOBOY / OBSERVACOES: Joao Vitor |
+**Arquivo:** `src/pages/Vendas.tsx`
 
-**Tabela DADOS DOS PRODUTOS / SERVICOS** (taxa tambem aparece aqui):
+- Adicionar coluna "Status Compra" na tabela de vendas (apos "Base de Troca"), visivel apenas quando a venda tem trade-in.
+- Para cada venda com trade-in:
+  - Buscar o valor recomendado via `getValorRecomendado(trade.modelo)` da API `valoresRecomendadosTrocaApi`.
+  - Comparar `trade.valorCompraUsado` vs `valorSugerido`.
+  - Se Valor Pago > Recomendado: icone de exclamacao vermelho (AlertTriangle) + tooltip com a diferenca.
+  - Se Valor Pago <= Recomendado: icone check verde (Check).
+- Importar `getValorRecomendado` de `valoresRecomendadosTrocaApi`.
 
-| QTD | DESCRICAO | TIPO | VALOR |
-|-----|-----------|------|-------|
-| 1 | iPhone 16 Pro Max - IMEI: 123... | Aparelho | R$ 8.999,00 |
-| 1 | Capa Silicone | Acessorio | R$ 79,90 |
-| 1 | Plano de Garantia Estendido - Gold (12 meses) | Garantia | R$ 399,90 |
-| 1 | Aparelho de Troca - iPhone X... | Base de Troca | - R$ 400,00 |
-| 1 | Taxa de Entrega | Entrega | R$ 15,00 |
-| | TOTAL | | R$ 9.093,80 |
+### 5. Financeiro: Conferencia do Gestor
+
+**Arquivo:** `src/pages/VendasConferenciaGestorDetalhes.tsx`
+
+**5.1 Renomear "Trade-In" para "Troca de Nota":**
+- Linha 141: titulo do card "Trade-In" para "Troca de Nota".
+- Linha 190: label "Trade-In:" no resumo financeiro para "Troca de Nota:".
+
+**5.2 Observacao fantasma:**
+- Linha 230: adicionar verificacao de conteudo real antes de exibir:
+  - `{evento.observacao && evento.observacao.trim() && (...)}`.
+
+### 6. Financeiro: Extrato por Conta - Coluna de Log (Data/Hora)
+
+**Arquivo:** `src/pages/FinanceiroExtratoContas.tsx`
+
+- Na tabela de movimentacoes do modal de detalhes (linha ~736):
+  - Adicionar coluna "Log (Data/Hora)" que exibe o timestamp completo (data + hora + minuto + segundo) da movimentacao.
+  - O campo `mov.data` ja contem o ISO string. Formatar: `new Date(mov.data).toLocaleString('pt-BR')`.
+  - A coluna "Data" existente mostra apenas a data (dd/MM/yyyy), a nova coluna "Log" mostra o horario exato.
+
+### 7. Cadastros: Colaboradores - Toggle de Status (Habilitar/Desabilitar)
+
+**Arquivo:** `src/pages/CadastrosColaboradores.tsx`
+
+- Na coluna "Status" da tabela (linha ~494), substituir o Badge estatico por um componente Switch interativo.
+- Ao alternar o toggle:
+  - Chamar `atualizarColaborador(col.id, { ativo: !col.ativo })`.
+  - Exibir toast de confirmacao.
+  - Colaboradores desabilitados ficam com opacidade reduzida na tabela (mesma logica das Contas Bancarias).
+- Colaboradores inativos permanecem visiveis na listagem mas sao automaticamente ocultos dos campos de selecao de vendedor/motoboy em todos os modulos (ja implementado via `obterVendedores()` e `obterMotoboys()` que filtram por `ativo`).
+
+---
+
+### Resumo dos arquivos a modificar
+
+| Arquivo | Alteracoes |
+|---------|-----------|
+| `src/pages/VendasNova.tsx` | Anexo IMEI + alerta 24h |
+| `src/utils/comissoesApi.ts` | Regra fixa 10%/6% |
+| `src/utils/gerarNotaGarantiaPdf.ts` | "Motoboy Thiago Imports" + tipo "Aparelho" |
+| `src/pages/Vendas.tsx` | Coluna auditoria margem trade-in |
+| `src/pages/VendasConferenciaGestorDetalhes.tsx` | "Troca de Nota" + observacao fantasma |
+| `src/pages/FinanceiroExtratoContas.tsx` | Coluna log data/hora |
+| `src/pages/CadastrosColaboradores.tsx` | Toggle status colaborador |
 

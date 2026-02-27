@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { OSLayout } from '@/components/layout/OSLayout';
 import { Button } from '@/components/ui/button';
@@ -617,7 +618,7 @@ export default function OSAssistencia() {
                       size="sm"
                       title="Gerar Recibo"
                       onClick={() => {
-                        alert(`Recibo da OS ${os.id} gerado com sucesso!`);
+                        toast.success(`Recibo da OS ${os.id} gerado com sucesso!`);
                       }}
                     >
                       <FileText className="h-4 w-4" />

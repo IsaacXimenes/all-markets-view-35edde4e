@@ -210,7 +210,6 @@ export default function FinanceiroConferenciaNotas() {
         }
       });
       
-      window.location.reload();
       return;
     }
 
@@ -315,8 +314,7 @@ export default function FinanceiroConferenciaNotas() {
         }
       });
       
-      // Forçar refresh da página para atualizar lista
-      window.location.reload();
+      
     }
   };
 

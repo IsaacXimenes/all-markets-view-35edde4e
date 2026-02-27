@@ -191,7 +191,6 @@ export default function GarantiasEmAndamento() {
     const resultado = aprovarTratativa(tratativa.id, 'COL-001', 'Gestor Sistema');
     if (resultado.sucesso) {
       toast.success('Tratativa aprovada! Ações de estoque executadas.');
-      window.location.reload();
     } else {
       toast.error(resultado.erro || 'Erro ao aprovar');
     }
@@ -205,7 +204,6 @@ export default function GarantiasEmAndamento() {
       setShowRecusaModal(false);
       setTratativaParaRecusa(null);
       setMotivoRecusa('');
-      window.location.reload();
     } else {
       toast.error(resultado.erro || 'Erro ao recusar');
     }

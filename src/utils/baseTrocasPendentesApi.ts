@@ -235,7 +235,7 @@ export function migrarParaProdutosPendentes(tradeInPendenteId: string): ProdutoP
     
     // Limpar IMEI removendo hífens
     const imeiLimpo = tradeIn.tradeIn.imei?.replace(/-/g, '') || '';
-    console.log(`[BaseTrocasAPI] Migrando Trade-In ${tradeInPendenteId} - IMEI: ${imeiLimpo} (original: ${tradeIn.tradeIn.imei})`);
+    
     
     // Migrar para Produtos Pendentes via osApi COM forcarCriacao=true
     // Isso ignora a verificação de duplicatas para Trade-Ins
@@ -256,7 +256,7 @@ export function migrarParaProdutosPendentes(tradeInPendenteId: string): ProdutoP
       fornecedor: `Cliente: ${tradeIn.clienteNome}`
     }, true); // forcarCriacao=true para garantir migração
 
-    console.log(`[BaseTrocasAPI] ✅ Trade-In ${tradeInPendenteId} migrado para Produtos Pendentes: ${produtoPendente.id}`);
+    
     
     return produtoPendente;
   } catch (error) {

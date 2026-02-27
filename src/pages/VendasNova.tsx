@@ -610,12 +610,12 @@ export default function VendasNova() {
     
     // Iniciar timer se for o primeiro item
     if (isFirstItem) {
-      console.log('Iniciando timer - primeiro item adicionado');
+      
       setTimerStart(Date.now());
       setTimer(TIMER_DURATION);
     }
     
-    console.log('Timer state:', { isFirstItem, timerStart, timer });
+    
     
     toast({ title: "Produto adicionado", description: `${produto.modelo} adicionado à venda` });
   };
@@ -1015,7 +1015,7 @@ export default function VendasNova() {
           termoResponsabilidade: tradeIn.termoResponsabilidade,
           fotosAparelho: tradeIn.fotosAparelho
         });
-        console.log(`[VendasNova] Trade-In "${tradeIn.modelo}" enviado para Base de Trocas`);
+        
       }
     });
 

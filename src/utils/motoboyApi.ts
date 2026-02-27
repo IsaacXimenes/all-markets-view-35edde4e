@@ -233,7 +233,7 @@ const atualizarRemuneracaoPeriodo = (demanda: DemandaMotoboy) => {
   if (existente) {
     existente.qtdDemandas += 1;
     existente.valorTotal += demanda.valorDemanda;
-    console.log(`[MOTOBOY] Remuneração ${existente.id} atualizada: +1 demanda, total ${existente.valorTotal}`);
+    
   } else {
     const novaRem: RemuneracaoMotoboy = {
       id: `REM-${Date.now()}`,
@@ -247,7 +247,7 @@ const atualizarRemuneracaoPeriodo = (demanda: DemandaMotoboy) => {
       status: 'Pendente'
     };
     remuneracoes.push(novaRem);
-    console.log(`[MOTOBOY] Nova remuneração ${novaRem.id} criada para ${demanda.motoboyNome} - ${competencia}`);
+    
   }
 };
 
@@ -257,7 +257,7 @@ export const ativarDemandasPorVenda = (vendaId: string): void => {
     if (d.vendaId === vendaId && d.status === 'Pendente') {
       d.status = 'Concluída';
       atualizarRemuneracaoPeriodo(d);
-      console.log(`[MOTOBOY] Demanda ${d.id} ativada após conferência financeira`);
+      
     }
   });
 };
@@ -269,7 +269,7 @@ export const addDemandaMotoboy = (demanda: Omit<DemandaMotoboy, 'id'>): DemandaM
     id: `DEM-${Date.now()}`
   };
   demandas.push(novaDemanda);
-  console.log(`[MOTOBOY] Demanda ${novaDemanda.id} registrada para ${demanda.motoboyNome} (status: ${demanda.status})`);
+  
 
   // Só contabiliza na remuneração se já estiver concluída
   if (novaDemanda.status === 'Concluída') {
@@ -404,7 +404,7 @@ export const registrarPagamentoRemuneracao = (id: string, dados?: DadosPagamento
         pagoPor: dados.pagoPor,
         comprovante: dados.comprovanteNome
       });
-      console.log(`[MOTOBOY] Despesa financeira lançada para remuneração ${id}`);
+      
     } catch (e) {
       console.error('[MOTOBOY] Erro ao lançar despesa financeira:', e);
     }

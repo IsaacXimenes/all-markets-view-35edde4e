@@ -1,33 +1,33 @@
 
-# Auditoria Geral do Sistema - Pendencias e "Lixo"
+# Remover Coluna de Aprovação e Executar Ações Automaticamente
 
-## Status: Fase 1 e 2 Concluídas ✅
+## O que muda
 
----
-
-## ✅ 1. Arquivo Orfão (Morto) — CONCLUÍDO
-`src/pages/OSAparelhosPendentes.tsx` deletado.
-
-## ✅ 2. `alert()` nativo — CONCLUÍDO
-Substituído por `toast.success()` em `OSAssistencia.tsx`.
-
-## ✅ 3. Console.logs de Debug — CONCLUÍDO
-Removidos de: `FinanceiroTetoBancario.tsx`, `VendasNova.tsx`, `financeApi.ts`, `motoboyApi.ts`, `baseTrocasPendentesApi.ts`, `estoqueApi.ts`, `fluxoVendasApi.ts`.
-
-## ✅ 4. `window.location.reload()` — CONCLUÍDO
-- `GarantiasEmAndamento.tsx` — removidos 2 reloads
-- `GarantiaDetalhes.tsx` — substituídos por `navigate(0)`
-- `FinanceiroConferenciaNotas.tsx` — removidos 2 reloads
-- `EstoqueNotasUrgenciaPendentes.tsx` — removido 1 reload
-
-## ✅ 5. `catch {}` vazios — CONCLUÍDO
-Adicionado `console.error` com contexto em:
-- `notaEntradaFluxoApi.ts` — 5 blocos
-- `OSOficina.tsx` — 1 bloco
-
-## 🔶 6. Uso excessivo de `as any` — PENDENTE (Fase 3)
-Trabalho maior de refatoração de tipos. Pode ser feito incrementalmente.
+O fluxo de aprovação do gestor será eliminado. Quando uma tratativa de "Troca Direta" ou "Assistência + Empréstimo" for registrada, as ações de estoque serão executadas **imediatamente**, sem etapa intermediária de aprovação.
 
 ---
 
-**Nenhum bug critico ou falha de segurança encontrado.**
+## Alterações
+
+### 1. `src/utils/garantiasApi.ts` -- Executar ações de estoque direto na criação
+
+Na função `processarTratativaGarantia()` (linha 967):
+- Remover a variável `precisaAprovacao` -- todas as tratativas terão status `'Em Andamento'` desde o início
+- Mover a lógica de estoque que hoje está dentro de `aprovarTratativa()` para dentro de `processarTratativaGarantia()`:
+  - **Assistência + Empréstimo**: marcar aparelho emprestado, criar movimentação
+  - **Troca Direta**: dar baixa no aparelho novo, registrar aparelho defeituoso em Pendentes, gerar Nota de Venda zerada, encaminhar para análise
+- As funções `aprovarTratativa` e `recusarTratativa` deixam de ser necessárias (podem ser mantidas como código morto ou removidas)
+
+### 2. `src/pages/GarantiasEmAndamento.tsx` -- Remover coluna e funcionalidades de aprovação
+
+- Remover import de `ThumbsUp`, `ThumbsDown`, `aprovarTratativa`, `recusarTratativa`
+- Remover estados: `showRecusaModal`, `tratativaParaRecusa`, `motivoRecusa`
+- Remover funções: `handleAprovarTratativa`, `handleRecusarTratativa`
+- Remover `<TableHead>Aprovação</TableHead>` (linha 378) e toda a `<TableCell>` correspondente (linhas 415-445)
+- Remover o modal de recusa (linhas 621-650)
+- Ajustar `colSpan` de 11 para 10 na linha vazia
+- Remover filtro por `'Aguardando Aprovação'` no `useMemo` dos dados da tabela (linha 70)
+
+### 3. Status do produto na Troca Direta
+
+O aparelho que sai do estoque receberá destino `'Troca Direta - Garantia'` na movimentação (em vez de `'Vendido'`), conforme solicitado anteriormente.

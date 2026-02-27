@@ -1,46 +1,46 @@
 
-# Correcoes no Modulo de Vendas e Estoque
+# Corrigir Movimentacao de Pecas na Assistencia
 
-## 4 Problemas Identificados
+## Problemas Identificados
 
-### 1. Remover "Valor Recomendado" quando tipo = "Entrega"
-No quadro "Retirada / Logistica", quando o tipo de retirada e "Entrega", aparece um campo "Valor Recom." (read-only). Este campo deve ser removido.
+### 1. Data registrando D-1 (bug de fuso horario)
+Na linha 176 de `OSMovimentacaoPecas.tsx`, a data usa `new Date().toISOString()` que converte para UTC, causando o registro com o dia anterior. O mesmo problema ocorre na linha 200 (data de recebimento).
 
-**Arquivos afetados:**
-- `src/pages/VendasNova.tsx` (linhas 2175-2181) -- remover div "Valor Recom." e a logica de comparacao com `valorRecomendadoEntrega` (linhas 2195, 2199-2204)
-- `src/pages/VendasEditar.tsx` (linhas 1465-1470) -- mesma remocao
-- `src/pages/VendasFinalizarDigital.tsx` (linhas 1835-1840) -- mesma remocao
-
-O estado `valorRecomendadoEntrega` pode ser removido ou simplesmente ignorado. O grid passara de 5 colunas para 4 (`grid-cols-1 md:grid-cols-4`).
-
-### 2. "Retirada em Outra Loja" deve mostrar apenas lojas tipo "Loja"
-Quando selecionado "Retirada em Outra Loja", o campo de loja retorna todas as unidades ativas (incluindo Estoque, Assistencia, etc.). Deve retornar somente unidades do tipo "Loja".
-
-**Correcao:** Trocar `lojas.filter(l => l.ativa)` por `lojasTipoLoja` (que ja esta disponivel via `obterLojasTipoLoja()`) nos 3 arquivos:
-- `src/pages/VendasNova.tsx` (linha 2239) -- ja tem `lojasTipoLoja` disponivel
-- `src/pages/VendasEditar.tsx` (linha 1529) -- verificar se `lojasTipoLoja` esta disponivel, senao importar
-- `src/pages/VendasFinalizarDigital.tsx` (linha 1896) -- idem
-
-### 3. Filtro de loja no EstoqueProdutos - revisar
-O componente `AutocompleteLoja` no filtro de loja da aba "Aparelhos" (EstoqueProdutos.tsx, linha 243) nao usa `apenasLojasTipoLoja` -- retorna todas as unidades (Estoque, Assistencia, etc.). Como e filtro de estoque de aparelhos, faz sentido manter todas as unidades para poder filtrar aparelhos em qualquer local. Porem, se o usuario quer somente lojas, basta adicionar a prop `apenasLojasTipoLoja` ao componente. Sera adicionada essa prop para filtrar somente lojas tipo "Loja".
-
-### 4. Data de registro da movimentacao fica com dia anterior
-Na aba de Movimentacao de Aparelhos, ao registrar um lancamento, a data usa `new Date().toISOString().split('T')[0]`. O metodo `toISOString()` converte para UTC, entao no fuso horario de Brasilia (UTC-3), qualquer hora apos 21:00 local (00:00 UTC) mostra a data correta, mas entre 00:00 e 02:59 local mostra o dia anterior. O problema e mais amplo: `toISOString()` sempre converte para UTC.
-
-**Correcao:** Substituir por formatacao local:
-```
-const hoje = new Date();
-const dataLocal = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
-```
-
-Arquivo: `src/pages/EstoqueMovimentacoes.tsx` (linha 269)
+### 2. Filtros de loja sem restricao por tipo
+Os componentes `AutocompleteLoja` nos filtros (origem/destino) e no formulario de nova movimentacao nao estao restritos a unidades do tipo "Assistencia". Devem usar `filtrarPorTipo="Assistência"` para manter a consistencia com o modulo.
 
 ---
 
-## Resumo dos Arquivos Modificados
+## Alteracoes
 
-1. **`src/pages/VendasNova.tsx`** -- Remover "Valor Recom.", ajustar grid para 4 colunas, usar `lojasTipoLoja` em "Retirada em Outra Loja"
-2. **`src/pages/VendasEditar.tsx`** -- Mesmas correcoes
-3. **`src/pages/VendasFinalizarDigital.tsx`** -- Mesmas correcoes
-4. **`src/pages/EstoqueProdutos.tsx`** -- Adicionar `apenasLojasTipoLoja` no filtro de loja
-5. **`src/pages/EstoqueMovimentacoes.tsx`** -- Corrigir data para usar formatacao local em vez de UTC
+### Arquivo: `src/pages/OSMovimentacaoPecas.tsx`
+
+**1. Corrigir data de registro (linha 176)**
+Substituir:
+```
+data: formData.data ? new Date(formData.data).toISOString() : new Date().toISOString(),
+```
+Por data local:
+```
+data: formData.data || (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })(),
+```
+
+**2. Corrigir data de recebimento (linha 200)**
+Substituir:
+```
+movimentacoesPecas[idx].dataRecebimento = new Date().toISOString();
+```
+Por:
+```
+const h = new Date();
+movimentacoesPecas[idx].dataRecebimento = `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
+```
+
+**3. Restringir AutocompleteLoja a unidades tipo Assistencia**
+Nos filtros de origem e destino (linhas 288-299) e no formulario de nova movimentacao, adicionar `filtrarPorTipo="Assistência"` a todos os componentes `AutocompleteLoja`.
+
+---
+
+## Resumo
+- 1 arquivo modificado: `src/pages/OSMovimentacaoPecas.tsx`
+- Correcoes: datas locais em 2 pontos + restricao de tipo de loja em filtros e formulario

@@ -335,6 +335,11 @@ export default function OSPecas() {
                 <TableCell className="font-mono text-xs">{peca.id}</TableCell>
                 <TableCell className="font-medium">
                   {peca.descricao}
+                  {peca.statusMovimentacao === 'Em movimentação' && (
+                    <Badge variant="outline" className="ml-2 text-[10px] border-yellow-500 text-yellow-600 bg-yellow-50 dark:bg-yellow-950/30">
+                      Em movimentação
+                    </Badge>
+                  )}
                 </TableCell>
                 <TableCell className="text-xs">{getLojaNome(peca.lojaId)}</TableCell>
                 <TableCell className="text-xs">{peca.modelo}</TableCell>

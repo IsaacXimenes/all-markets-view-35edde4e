@@ -173,7 +173,7 @@ export default function OSMovimentacaoPecas() {
       destino: formData.destino,
       responsavel: user?.colaborador?.nome || 'Não identificado',
       motivo: formData.motivo,
-      data: formData.data ? new Date(formData.data).toISOString() : new Date().toISOString(),
+      data: formData.data || (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })(),
       status: 'Pendente'
     };
 
@@ -197,7 +197,8 @@ export default function OSMovimentacaoPecas() {
     const idx = movimentacoesPecas.findIndex(m => m.id === movParaConfirmar.id);
     if (idx !== -1) {
       movimentacoesPecas[idx].status = 'Recebido';
-      movimentacoesPecas[idx].dataRecebimento = new Date().toISOString();
+      const h = new Date();
+      movimentacoesPecas[idx].dataRecebimento = `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
       movimentacoesPecas[idx].responsavelRecebimento = user?.colaborador?.nome || 'Não identificado';
 
       // Atualizar lojaId da peça para o destino e limpar bloqueio
@@ -289,6 +290,7 @@ export default function OSMovimentacaoPecas() {
                 value={filtroOrigem === 'todas' ? '' : filtroOrigem}
                 onChange={(v) => setFiltroOrigem(v || 'todas')}
                 placeholder="Todas as origens"
+                filtrarPorTipo="Assistência"
               />
             </div>
             <div>
@@ -297,6 +299,7 @@ export default function OSMovimentacaoPecas() {
                 value={filtroDestino === 'todas' ? '' : filtroDestino}
                 onChange={(v) => setFiltroDestino(v || 'todas')}
                 placeholder="Todos os destinos"
+                filtrarPorTipo="Assistência"
               />
             </div>
             <div>

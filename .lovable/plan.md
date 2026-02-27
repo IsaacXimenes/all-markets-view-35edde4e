@@ -1,81 +1,46 @@
 
-# Correcoes no Fluxo de Tratativa de Garantia
+# Correcoes no Modulo de Vendas e Estoque
 
-## Problemas Identificados
+## 4 Problemas Identificados
 
-1. **Aparelhos de qualquer loja aparecem na selecao** -- O modal de selecao de aparelho em `GarantiaDetalhes.tsx` (linha 68-76) filtra apenas por `quantidade > 0` e busca textual, sem filtrar pela loja da venda original (`garantia.lojaVenda`).
+### 1. Remover "Valor Recomendado" quando tipo = "Entrega"
+No quadro "Retirada / Logistica", quando o tipo de retirada e "Entrega", aparece um campo "Valor Recom." (read-only). Este campo deve ser removido.
 
-2. **Aparelhos com status diferente de "Disponivel" aparecem** -- O filtro nao verifica o status derivado do aparelho (via `getStatusAparelho`). Aparelhos "Em movimentacao", "Emprestimo", "Bloqueado", etc. nao devem aparecer.
+**Arquivos afetados:**
+- `src/pages/VendasNova.tsx` (linhas 2175-2181) -- remover div "Valor Recom." e a logica de comparacao com `valorRecomendadoEntrega` (linhas 2195, 2199-2204)
+- `src/pages/VendasEditar.tsx` (linhas 1465-1470) -- mesma remocao
+- `src/pages/VendasFinalizarDigital.tsx` (linhas 1835-1840) -- mesma remocao
 
-3. **Anexos nao expandem ao clicar na miniatura** -- O componente `FileUploadComprovante` mostra uma miniatura de 12x12px mas nao abre um dialog de visualizacao ampliada. O padrao correto ja existe no `ComprovantePreview` que usa um `Dialog` para expandir a imagem.
+O estado `valorRecomendadoEntrega` pode ser removido ou simplesmente ignorado. O grid passara de 5 colunas para 4 (`grid-cols-1 md:grid-cols-4`).
 
-4. **IMEI nao aparece nas Tratativas Registradas** -- No card "Tratativas Registradas" (linhas 555-570), tanto para emprestimo quanto para troca, so mostra `aparelhoEmprestadoModelo` / `aparelhoTrocaModelo`, sem o IMEI.
+### 2. "Retirada em Outra Loja" deve mostrar apenas lojas tipo "Loja"
+Quando selecionado "Retirada em Outra Loja", o campo de loja retorna todas as unidades ativas (incluindo Estoque, Assistencia, etc.). Deve retornar somente unidades do tipo "Loja".
 
-5. **Devolucao nao limpa campos de emprestimo no estoque** -- Nos dois fluxos de devolucao (GarantiaDetalhes.tsx linhas 694-711 e GarantiasEmAndamento.tsx linhas 141-183), o `updateProduto` nao limpa `statusEmprestimo`, `emprestimoGarantiaId`, `emprestimoClienteId`, `emprestimoClienteNome`, `emprestimoOsId`, `emprestimoDataHora`. Por isso o aparelho continua como "Emprestimo" no estoque.
+**Correcao:** Trocar `lojas.filter(l => l.ativa)` por `lojasTipoLoja` (que ja esta disponivel via `obterLojasTipoLoja()`) nos 3 arquivos:
+- `src/pages/VendasNova.tsx` (linha 2239) -- ja tem `lojasTipoLoja` disponivel
+- `src/pages/VendasEditar.tsx` (linha 1529) -- verificar se `lojasTipoLoja` esta disponivel, senao importar
+- `src/pages/VendasFinalizarDigital.tsx` (linha 1896) -- idem
 
-6. **Historico de emprestimo nao registrado na timeline do produto** -- Nem o emprestimo nem a devolucao registram entradas na timeline interna do produto (`produto.timeline`). Apenas a timeline da garantia recebe entradas.
+### 3. Filtro de loja no EstoqueProdutos - revisar
+O componente `AutocompleteLoja` no filtro de loja da aba "Aparelhos" (EstoqueProdutos.tsx, linha 243) nao usa `apenasLojasTipoLoja` -- retorna todas as unidades (Estoque, Assistencia, etc.). Como e filtro de estoque de aparelhos, faz sentido manter todas as unidades para poder filtrar aparelhos em qualquer local. Porem, se o usuario quer somente lojas, basta adicionar a prop `apenasLojasTipoLoja` ao componente. Sera adicionada essa prop para filtrar somente lojas tipo "Loja".
 
-7. **Alerta desatualizado sobre aprovacao do gestor** -- Em `GarantiaDetalhes.tsx` (linhas 505-512), ainda existe um `Alert` dizendo "Esta tratativa requer aprovacao do gestor", mas o fluxo de aprovacao foi removido.
+### 4. Data de registro da movimentacao fica com dia anterior
+Na aba de Movimentacao de Aparelhos, ao registrar um lancamento, a data usa `new Date().toISOString().split('T')[0]`. O metodo `toISOString()` converte para UTC, entao no fuso horario de Brasilia (UTC-3), qualquer hora apos 21:00 local (00:00 UTC) mostra a data correta, mas entre 00:00 e 02:59 local mostra o dia anterior. O problema e mais amplo: `toISOString()` sempre converte para UTC.
 
----
-
-## Alteracoes Planejadas
-
-### 1. `src/pages/GarantiaDetalhes.tsx` -- Filtro de aparelhos por loja e status
-
-**Linhas 68-76** -- Alterar o `useMemo` de `aparelhosDisponiveis`:
-- Filtrar por `p.loja === garantia.lojaVenda` (apenas aparelhos da loja da venda original)
-- Filtrar por `getStatusAparelho(p) === 'Disponivel'` (apenas aparelhos disponiveis)
-- Importar `getStatusAparelho` de `estoqueApi`
-
-### 2. `src/pages/GarantiaDetalhes.tsx` -- IMEI nas Tratativas Registradas
-
-**Linhas 555-570** -- Adicionar IMEI nos cards de emprestimo e troca:
-- Emprestimo: exibir `t.aparelhoEmprestadoModelo` + `t.aparelhoEmprestadoImei`
-- Troca: exibir `t.aparelhoTrocaModelo` + `t.aparelhoTrocaImei`
-
-### 3. `src/pages/GarantiaDetalhes.tsx` -- Anexos com visualizacao expandida
-
-**Linhas 136-172 do FileUploadComprovante** -- Como o componente `FileUploadComprovante` e usado para upload/preview de estado, a solucao e adicionar funcionalidade de clique para expandir a miniatura usando um `Dialog` (mesmo padrao de `ComprovantePreview`).
-
-Alternativa mais simples: Envolver a miniatura da `FileUploadComprovante` (quando ja tem valor) em um botao que abre um `Dialog` com a imagem ampliada. Isso sera feito no proprio `FileUploadComprovante.tsx` para beneficiar todos os usos.
-
-### 4. `src/pages/GarantiaDetalhes.tsx` -- Remover alerta de aprovacao
-
-**Linhas 505-512** -- Remover o `Alert` que diz "Esta tratativa requer aprovacao do gestor antes da execucao das acoes de estoque."
-
-### 5. `src/pages/GarantiaDetalhes.tsx` -- Corrigir devolucao (limpar campos de emprestimo + timeline do produto)
-
-**Linhas 694-711** -- No `updateProduto` da devolucao, adicionar:
+**Correcao:** Substituir por formatacao local:
 ```
-statusEmprestimo: null,
-emprestimoGarantiaId: undefined,
-emprestimoClienteId: undefined,
-emprestimoClienteNome: undefined,
-emprestimoOsId: undefined,
-emprestimoDataHora: undefined,
+const hoje = new Date();
+const dataLocal = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
 ```
 
-Adicionar entrada na timeline do produto (emprestimo e devolucao):
-```
-produto.timeline.push({ tipo: 'saida_matriz', titulo: 'Devolucao Emprestimo Garantia', descricao: '...' })
-```
-
-### 6. `src/pages/GarantiasEmAndamento.tsx` -- Mesma correcao de devolucao
-
-**Linhas 141-183** -- No `handleDevolucao`, o `updateTratativa` e chamado mas o produto nao e atualizado no estoque. Adicionar:
-- `updateProduto` com limpeza dos campos de emprestimo (mesmo que item 5)
-- Registrar na timeline do produto
-- Importar `updateProduto`, `addMovimentacao`, `getProdutoById` de estoqueApi
-
-### 7. `src/components/estoque/FileUploadComprovante.tsx` -- Miniatura clicavel com dialog
-
-Adicionar estado `showPreviewDialog` e um `Dialog` que mostra a imagem em tamanho completo quando o usuario clica na miniatura (12x12). Isso segue o padrao do `ComprovantePreview`.
+Arquivo: `src/pages/EstoqueMovimentacoes.tsx` (linha 269)
 
 ---
 
 ## Resumo dos Arquivos Modificados
 
-1. **`src/pages/GarantiaDetalhes.tsx`** -- Filtro loja+status, IMEI nas tratativas, remover alerta aprovacao, corrigir devolucao
-2. **`src/pages/GarantiasEmAndamento.tsx`** -- Corrigir devolucao (limpar campos emprestimo, timeline produto)
-3. **`src/components/estoque/FileUploadComprovante.tsx`** -- Miniatura clicavel com dialog de visualizacao ampliada
+1. **`src/pages/VendasNova.tsx`** -- Remover "Valor Recom.", ajustar grid para 4 colunas, usar `lojasTipoLoja` em "Retirada em Outra Loja"
+2. **`src/pages/VendasEditar.tsx`** -- Mesmas correcoes
+3. **`src/pages/VendasFinalizarDigital.tsx`** -- Mesmas correcoes
+4. **`src/pages/EstoqueProdutos.tsx`** -- Adicionar `apenasLojasTipoLoja` no filtro de loja
+5. **`src/pages/EstoqueMovimentacoes.tsx`** -- Corrigir data para usar formatacao local em vez de UTC

@@ -59,7 +59,7 @@ interface GarantiaItemVenda {
 export default function VendasEditar() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { obterLojasAtivas, obterVendedores, obterMotoboys, obterLojaById, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
+  const { obterLojasAtivas, obterLojasTipoLoja, obterVendedores, obterMotoboys, obterLojaById, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   
   // Dados de cadastros - usando Zustand store
   const lojas = obterLojasAtivas();
@@ -1387,7 +1387,7 @@ export default function VendasEditar() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`grid gap-4 ${tipoRetirada === 'Entrega' ? 'grid-cols-1 md:grid-cols-5' : 'grid-cols-1 md:grid-cols-2'}`}>
+            <div className={`grid gap-4 ${tipoRetirada === 'Entrega' ? 'grid-cols-1 md:grid-cols-4' : 'grid-cols-1 md:grid-cols-2'}`}>
               <div>
                 <label className="text-sm font-medium">Tipo de Retirada</label>
                 <Select 
@@ -1462,14 +1462,6 @@ export default function VendasEditar() {
                     )}
                   </div>
 
-                  {/* Valor Recomendado (read-only) */}
-                  <div>
-                    <label className="text-sm font-medium">Valor Recom.</label>
-                    <div className="h-10 flex items-center px-3 bg-muted rounded-md text-sm font-medium text-muted-foreground">
-                      {valorRecomendadoEntrega > 0 ? formatCurrency(valorRecomendadoEntrega) : '-'}
-                    </div>
-                  </div>
-
                   {/* Valor da Entrega (editável) */}
                   <div>
                     <label className="text-sm font-medium">Valor Entrega *</label>
@@ -1482,16 +1474,10 @@ export default function VendasEditar() {
                           const value = e.target.value.replace(/\D/g, '');
                           setTaxaEntrega(Number(value) / 100);
                         }}
-                        className={`pl-10 ${taxaEntrega < valorRecomendadoEntrega && valorRecomendadoEntrega > 0 ? 'border-destructive text-destructive' : ''}`}
+                        className="pl-10"
                         placeholder="0,00"
                       />
                     </div>
-                    {taxaEntrega < valorRecomendadoEntrega && valorRecomendadoEntrega > 0 && (
-                      <div className="flex items-center gap-1 mt-1 text-xs text-destructive">
-                        <AlertTriangle className="h-3 w-3" />
-                        <span>-{formatCurrency(valorRecomendadoEntrega - taxaEntrega)}</span>
-                      </div>
-                    )}
                   </div>
 
                   {/* Motoboy (obrigatório) */}
@@ -1526,7 +1512,7 @@ export default function VendasEditar() {
                       <SelectValue placeholder="Selecione a loja" />
                     </SelectTrigger>
                     <SelectContent>
-                      {lojas.filter(l => l.ativa).map(loja => (
+                      {obterLojasTipoLoja().map(loja => (
                         <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
                       ))}
                     </SelectContent>

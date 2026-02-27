@@ -244,6 +244,7 @@ export default function EstoqueProdutos() {
                   value={lojaFilter === 'todas' ? '' : lojaFilter}
                   onChange={(v) => setLojaFilter(v || 'todas')}
                   placeholder="Todas as lojas"
+                  apenasLojasTipoLoja
                 />
               </div>
 

@@ -266,7 +266,7 @@ export default function EstoqueMovimentacoes() {
     }
 
     const novaMovimentacao = addMovimentacao({
-      data: formData.data || new Date().toISOString().split('T')[0],
+      data: formData.data || (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })(),
       produto: `${produtoSelecionado.marca} ${produtoSelecionado.modelo}`,
       imei: produtoSelecionado.imei,
       quantidade: 1,

@@ -135,8 +135,8 @@ export default function GarantiaDetalhes() {
     setDescricaoTratativa('');
     setAparelhoSelecionado(null);
     
-    // Recarregar página
-    window.location.reload();
+    // Forçar re-render navegando para a mesma página
+    navigate(0);
   };
   
   const handleSelecionarAparelho = (produto: Produto) => {
@@ -727,8 +727,8 @@ export default function GarantiaDetalhes() {
               toast.success('Devolução registrada! Aparelho encaminhado para conferência.');
               setShowDevolucaoModal(false);
               
-              // Recarregar página para atualizar dados
-              window.location.reload();
+              // Forçar re-render
+              navigate(0);
             }}>
               Confirmar Devolução
             </Button>

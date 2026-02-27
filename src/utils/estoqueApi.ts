@@ -1001,7 +1001,7 @@ try {
         if (update.statusNota !== undefined) produto.statusNota = update.statusNota;
       }
     });
-    console.log('[ESTOQUE] Campos persistidos restaurados do localStorage');
+    
   }
 } catch (e) {
   console.warn('[ESTOQUE] Erro ao restaurar campos do localStorage:', e);

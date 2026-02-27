@@ -1814,7 +1814,7 @@ export const verificarImeiUnicoSistema = (
     if (encontrado) {
       return { duplicado: true, localExistente: `Estoque (${encontrado.modelo} - ${encontrado.loja})` };
     }
-  } catch {}
+  } catch (e) { console.error('[NotaEntrada] Erro ao verificar IMEI no estoque:', e); }
   
   // 2. Verificar em produtos pendentes (osApi)
   try {
@@ -1826,7 +1826,7 @@ export const verificarImeiUnicoSistema = (
     if (encontrado) {
       return { duplicado: true, localExistente: `Produtos Pendentes (${encontrado.modelo})` };
     }
-  } catch {}
+  } catch (e) { console.error('[NotaEntrada] Erro ao verificar IMEI em pendentes:', e); }
   
   // 3. Verificar em outras notas de entrada
   for (const nota of notasEntrada) {
@@ -1874,7 +1874,7 @@ export const enviarDiretoAoFinanceiro = (
     if (imeis.length > 0) {
       marcarProdutosComoDisponiveis(imeis);
     }
-  } catch {}
+  } catch (e) { console.error('[NotaEntrada] Erro ao marcar produtos como disponíveis:', e); }
   
   // Registrar na timeline
   registrarTimeline(
@@ -1961,7 +1961,7 @@ export const processarTriagemIndividualizada = (
       if (imeisVerdes.length > 0) {
         marcarProdutosComoDisponiveis(imeisVerdes);
       }
-    } catch {}
+    } catch (e) { console.error('[NotaEntrada] Erro ao marcar produtos verdes como disponíveis:', e); }
   }
 
   // ---- Processar itens AMARELOS ----
@@ -2010,7 +2010,7 @@ export const processarTriagemIndividualizada = (
           }
         }
       }
-    } catch {}
+    } catch (e) { console.error('[NotaEntrada] Erro ao processar itens amarelos:', e); }
   }
 
   // ---- Atualizar status da nota ----

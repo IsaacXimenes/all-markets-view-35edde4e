@@ -310,7 +310,7 @@ export default function OSOficina() {
         description: `${solPeca} x${solQuantidade} solicitada pelo técnico`,
         targetUsers: []
       });
-    } catch {}
+    } catch (e) { console.error('[OSOficina] Erro ao enviar notificação:', e); }
 
     toast.success(`Solicitação ${novaSol.id} enviada para aprovação do gestor!`);
     

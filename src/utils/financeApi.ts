@@ -591,7 +591,7 @@ export const criarPagamentosDeVenda = (venda: VendaParaPagamento): Pagamento[] =
     createdPagamentos.push(novoPagamento);
   });
   
-  console.log(`[FINANCE] Criados ${createdPagamentos.length} pagamentos para venda ${venda.id}`);
+  
   return createdPagamentos;
 };
 

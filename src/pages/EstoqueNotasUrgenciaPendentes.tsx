@@ -278,7 +278,7 @@ export default function EstoqueNotasUrgenciaPendentes() {
       }
     });
 
-    window.location.reload();
+    
   };
 
   return (

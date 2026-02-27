@@ -215,20 +215,20 @@ export const aprovarLancamento = (
           bloqueadoParaEdicao: vendaAny.bloqueadoParaEdicao || false
         };
         fluxoData[vendaId] = dadosFluxo;
-        console.log(`[Fluxo Vendas] Registro de fluxo criado automaticamente para venda ${vendaId}`);
+        
       } else {
-        console.log(`[Fluxo Vendas] Venda ${vendaId} com statusAtual inválido: ${statusAtual}`);
+        
         return null;
       }
     } else {
-      console.log(`[Fluxo Vendas] Venda ${vendaId} não encontrada`);
+      
       return null;
     }
   }
   
   // Validar status permitido
   if (dadosFluxo.statusFluxo !== 'Aguardando Conferência' && dadosFluxo.statusFluxo !== 'Recusada - Gestor') {
-    console.log(`[Fluxo Vendas] Status inválido para aprovar: ${dadosFluxo.statusFluxo}`);
+    
     return null;
   }
 
@@ -452,7 +452,7 @@ export const finalizarVenda = (
   // MIGRAÇÃO AUTOMÁTICA: Após pagamento financeiro, trade-ins vão para Aparelhos Pendentes - Estoque
   if (venda && venda.tradeIns && venda.tradeIns.length > 0) {
     migrarTradeInsParaPendentes(venda.tradeIns, vendaId, venda.lojaVenda, usuarioNome);
-    console.log(`[Fluxo Vendas] ${venda.tradeIns.length} trade-in(s) migrado(s) para Aparelhos Pendentes - Estoque`);
+    
   }
 
   // NOTIFICAÇÃO WHATSAPP: Disparar após finalização bem-sucedida
@@ -591,7 +591,7 @@ export const finalizarVendaDowngrade = (
   const dadosFluxo = fluxoData[vendaId];
   
   if (!dadosFluxo || dadosFluxo.statusFluxo !== 'Pagamento Downgrade') {
-    console.log(`[Fluxo Vendas] Venda ${vendaId} não está em Pagamento Downgrade`);
+    
     return null;
   }
 
@@ -655,13 +655,13 @@ export const finalizarVendaDowngrade = (
       periodicidade: null,
       pagoPor: usuarioNome
     });
-    console.log(`[Fluxo Vendas - Downgrade] Despesa de R$ ${saldoDevolver} registrada na conta ${contaOrigem}`);
+    
   }
   
   // MIGRAÇÃO AUTOMÁTICA: Após pagamento PIX, trade-ins vão para Aparelhos Pendentes - Estoque
   if (venda && venda.tradeIns && venda.tradeIns.length > 0) {
     migrarTradeInsParaPendentes(venda.tradeIns, vendaId, venda.lojaVenda, usuarioNome);
-    console.log(`[Fluxo Vendas - Downgrade] ${venda.tradeIns.length} trade-in(s) migrado(s) para Aparelhos Pendentes - Estoque`);
+    
   }
   
   return getVendaComFluxo(vendaId);
@@ -716,7 +716,7 @@ export const finalizarVendaFiado = (
   const dadosFluxo = fluxoData[vendaId];
   
   if (!dadosFluxo || dadosFluxo.statusFluxo !== 'Conferência Fiado') {
-    console.log(`[Fluxo Vendas] Venda ${vendaId} não está em Conferência Fiado`);
+    
     return null;
   }
 
@@ -767,13 +767,13 @@ export const finalizarVendaFiado = (
       (pagFiado as any).qtdVezes || 1,
       (pagFiado as any).tipoRecorrencia || 'Mensal'
     );
-    console.log(`[Fluxo Vendas - Fiado] Dívida criada para venda ${vendaId}`);
+    
   }
 
   // Migrar trade-ins
   if (venda.tradeIns && venda.tradeIns.length > 0) {
     migrarTradeInsParaPendentes(venda.tradeIns, vendaId, venda.lojaVenda, usuarioNome);
-    console.log(`[Fluxo Vendas - Fiado] ${venda.tradeIns.length} trade-in(s) migrado(s)`);
+    
   }
 
   return getVendaComFluxo(vendaId);

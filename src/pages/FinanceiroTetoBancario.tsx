@@ -267,12 +267,12 @@ export default function FinanceiroTetoBancario() {
     // 2. Processar vendas reais finalizadas do localStorage
     try {
       const vendasFinalizadas = getVendasPorStatus('Finalizado');
-      console.log('[TetoBancario] Vendas finalizadas encontradas:', vendasFinalizadas.length);
+      
       
       vendasFinalizadas.forEach(venda => {
         // Buscar data de finalização
         const dataFinalizacaoRaw = localStorage.getItem(`data_finalizacao_${venda.id}`);
-        console.log(`[TetoBancario] Venda ${venda.id} - data_finalizacao:`, dataFinalizacaoRaw);
+        
         
         if (!dataFinalizacaoRaw) return;
         
@@ -280,7 +280,7 @@ export default function FinanceiroTetoBancario() {
         const mesVenda = dataFinalizacao.getMonth();
         const anoVenda = dataFinalizacao.getFullYear();
         
-        console.log(`[TetoBancario] Venda ${venda.id} - Mês: ${mesVenda}, Ano: ${anoVenda} | Filtro: ${mesSelecionado}/${anoSelecionado}`);
+        
         
         // Filtrar pelo período selecionado
         if (mesVenda !== mesSelecionado || anoVenda !== anoSelecionado) {
@@ -291,14 +291,13 @@ export default function FinanceiroTetoBancario() {
         const validacaoRaw = localStorage.getItem(`validacao_pagamentos_financeiro_${venda.id}`);
         const historicoRaw = localStorage.getItem(`historico_conferencias_${venda.id}`);
         
-        console.log(`[TetoBancario] Venda ${venda.id} - validacao:`, validacaoRaw ? 'OK' : 'NULL', '| historico:', historicoRaw ? 'OK' : 'NULL');
+        
         
         if (validacaoRaw) {
           const validacoes = JSON.parse(validacaoRaw);
           const historico = historicoRaw ? JSON.parse(historicoRaw) : [];
           
-          console.log(`[TetoBancario] Venda ${venda.id} - Validações:`, validacoes);
-          console.log(`[TetoBancario] Venda ${venda.id} - Histórico:`, historico);
+          
           
           // Para cada validação confirmada pelo financeiro
           validacoes.forEach((validacao: any) => {
@@ -310,7 +309,7 @@ export default function FinanceiroTetoBancario() {
             const contaId = validacao.contaDestinoId || pagamentoVenda?.contaDestino;
             const valor = confHistorico?.valor || pagamentoVenda?.valor || 0;
 
-            console.log(`[TetoBancario] Venda ${venda.id} - Método: ${validacao.metodoPagamento}, Conta: ${contaId}, Valor: ${valor}`);
+            
 
             if (contaId && valor > 0) {
               saldos[contaId] = (saldos[contaId] || 0) + valor;
@@ -333,8 +332,7 @@ export default function FinanceiroTetoBancario() {
       console.error('[TetoBancario] Erro ao processar vendas reais:', e);
     }
     
-    console.log('[TetoBancario] Saldos finais:', saldos);
-    console.log('[TetoBancario] Qtd vendas finais:', qtd);
+    
     
     return { saldosPorConta: saldos, qtdVendasPorConta: qtd };
   }, [mesSelecionado, anoSelecionado, refreshKey]);

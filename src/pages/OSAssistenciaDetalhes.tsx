@@ -333,7 +333,7 @@ export default function OSAssistenciaDetalhes() {
     setModalConfirmarFinalizacao(true);
   };
 
-  const handleConfirmarFinalizacao = () => {
+  const handleConfirmarFinalizacao = async () => {
     if (!os) return;
     if (!resumoConclusao.trim()) {
       toast.error('Preencha o Resumo da Conclusão antes de finalizar.');
@@ -384,7 +384,7 @@ export default function OSAssistenciaDetalhes() {
         marcarProdutoRetornoAssistencia(osFresh.imeiAparelho);
       }
       // Atualizar custo e status do item no lote
-      atualizarItemRevisao(osFresh.loteRevisaoId, osFresh.loteRevisaoItemId, {
+      await atualizarItemRevisao(osFresh.loteRevisaoId, osFresh.loteRevisaoItemId, {
         custoReparo: valorCustoTecnico,
         statusReparo: 'Concluido'
       });
@@ -407,7 +407,7 @@ export default function OSAssistenciaDetalhes() {
             itemId: i.id,
             resultado: 'Consertado' as const
           }));
-          finalizarLoteComLogisticaReversa(osFresh.loteRevisaoId, resultados, responsavelNome);
+          await finalizarLoteComLogisticaReversa(osFresh.loteRevisaoId, resultados, responsavelNome);
         }
       }
     }
@@ -1387,7 +1387,7 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                                   updateOrdemServico(os.id, { itensLoteRevisao: updated } as any);
                                   // Sync with loteRevisaoApi
                                   if (os.loteRevisaoId) {
-                                    atualizarItemRevisao(os.loteRevisaoId, item.itemId, { custoReparo: custo, statusReparo: 'Em Andamento' });
+                                    atualizarItemRevisao(os.loteRevisaoId, item.itemId, { custoReparo: custo, statusReparo: 'Em Andamento' }).catch(console.error);
                                   }
                                   const refreshed = getOrdemServicoById(os.id);
                                   if (refreshed) setOS(refreshed);
@@ -1415,7 +1415,7 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
                                 } as any);
                                 // Sync with loteRevisaoApi
                                 if (os.loteRevisaoId) {
-                                  atualizarItemRevisao(os.loteRevisaoId, item.itemId, { custoReparo: item.custoReparo, statusReparo: 'Concluido' });
+                                  atualizarItemRevisao(os.loteRevisaoId, item.itemId, { custoReparo: item.custoReparo, statusReparo: 'Concluido' }).catch(console.error);
                                 }
                                 // Mark product return to stock
                                 if (item.imei) {

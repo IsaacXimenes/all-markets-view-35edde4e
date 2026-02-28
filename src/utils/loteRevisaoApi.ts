@@ -1,6 +1,8 @@
 // ============= API para Lotes de Revisão de Notas de Entrada =============
 // Gerencia o encaminhamento em lote de aparelhos defeituosos para assistência
+// Migrado para Supabase: tabela lotes_revisao
 
+import { supabase } from '@/integrations/supabase/client';
 import { getNotaEntradaById, NotaEntrada, gerarCreditoFornecedor, registrarTimeline, atualizarAbatimentoNota } from './notaEntradaFluxoApi';
 import { encaminharParaAnaliseGarantia, MetadadosEstoque } from './garantiasApi';
 import { marcarProdutoRetornoAssistencia, marcarProdutoDevolvido } from './estoqueApi';
@@ -47,31 +49,84 @@ export interface AbatimentoInfo {
   custoReparos: number;
   valorLiquido: number;
   percentualReparo: number;
-  alertaCritico: boolean; // > 15%
+  alertaCritico: boolean;
 }
 
-// ============= ARMAZENAMENTO =============
+// ============= CACHE LAYER =============
 
-let lotesRevisao: LoteRevisao[] = [];
-let proximoSequencialLote = 1;
+let lotesRevisaoCache: LoteRevisao[] = [];
+let cacheLoaded = false;
 
-const gerarIdLote = (numeroNota: string): string => {
-  const seq = String(proximoSequencialLote).padStart(5, '0');
-  proximoSequencialLote++;
-  return `REV-NOTA-${seq}`;
+const mapRow = (r: any): LoteRevisao => ({
+  id: r.id,
+  notaEntradaId: r.nota_entrada_id || '',
+  numeroNota: r.numero_nota || '',
+  fornecedor: r.fornecedor || '',
+  valorOriginalNota: Number(r.valor_original_nota) || 0,
+  status: r.status || 'Em Revisao',
+  itens: (r.itens as ItemRevisao[]) || [],
+  dataCriacao: r.data_criacao || '',
+  responsavelCriacao: r.responsavel_criacao || '',
+  dataFinalizacao: r.data_finalizacao || undefined,
+  custoTotalReparos: Number(r.custo_total_reparos) || 0,
+  valorLiquidoSugerido: Number(r.valor_liquido_sugerido) || 0,
+  osIds: (r.os_ids as string[]) || [],
+});
+
+const toDbRow = (lote: LoteRevisao): any => ({
+  id: lote.id,
+  nota_entrada_id: lote.notaEntradaId,
+  numero_nota: lote.numeroNota,
+  fornecedor: lote.fornecedor,
+  valor_original_nota: lote.valorOriginalNota,
+  status: lote.status,
+  itens: lote.itens as any,
+  data_criacao: lote.dataCriacao,
+  responsavel_criacao: lote.responsavelCriacao,
+  data_finalizacao: lote.dataFinalizacao || null,
+  custo_total_reparos: lote.custoTotalReparos,
+  valor_liquido_sugerido: lote.valorLiquidoSugerido,
+  os_ids: lote.osIds as any,
+});
+
+const syncToDb = async (lote: LoteRevisao) => {
+  const row = toDbRow(lote);
+  const { error } = await supabase.from('lotes_revisao').upsert(row, { onConflict: 'id' });
+  if (error) console.error('[LOTES_REVISAO] sync error', error);
+};
+
+export const initLotesRevisaoCache = async () => {
+  const { data, error } = await supabase.from('lotes_revisao').select('*').order('data_criacao', { ascending: false });
+  if (error) { console.error('[LOTES_REVISAO] init error', error); return; }
+  lotesRevisaoCache = (data || []).map(mapRow);
+  cacheLoaded = true;
 };
 
 // ============= FUNÇÕES CRUD =============
 
-export const criarLoteRevisao = (
+let proximoSequencialLote = 1;
+
+const gerarIdLote = (): string => {
+  // Find max seq from cache
+  const existing = lotesRevisaoCache
+    .map(l => {
+      const match = l.id.match(/REV-NOTA-(\d+)/);
+      return match ? parseInt(match[1]) : 0;
+    });
+  const maxSeq = existing.length > 0 ? Math.max(...existing) : 0;
+  proximoSequencialLote = maxSeq + 1;
+  return `REV-NOTA-${String(proximoSequencialLote).padStart(5, '0')}`;
+};
+
+export const criarLoteRevisao = async (
   notaEntradaId: string,
   itens: Omit<ItemRevisao, 'id' | 'osId' | 'custoReparo' | 'statusReparo'>[],
   responsavel: string
-): LoteRevisao | null => {
+): Promise<LoteRevisao | null> => {
   const nota = getNotaEntradaById(notaEntradaId);
   if (!nota) return null;
 
-  const id = gerarIdLote(nota.numeroNota);
+  const id = gerarIdLote();
 
   const itensProcessados: ItemRevisao[] = itens.map((item, idx) => ({
     ...item,
@@ -95,7 +150,8 @@ export const criarLoteRevisao = (
     osIds: []
   };
 
-  lotesRevisao.push(lote);
+  await syncToDb(lote);
+  lotesRevisaoCache.push(lote);
 
   // Vincular lote à nota de entrada automaticamente
   if (nota) {
@@ -105,20 +161,20 @@ export const criarLoteRevisao = (
   return lote;
 };
 
-export const getLotesRevisao = (): LoteRevisao[] => [...lotesRevisao];
+export const getLotesRevisao = (): LoteRevisao[] => [...lotesRevisaoCache];
 
-export const getLoteRevisaoById = (id: string): LoteRevisao | undefined => 
-  lotesRevisao.find(l => l.id === id);
+export const getLoteRevisaoById = (id: string): LoteRevisao | undefined =>
+  lotesRevisaoCache.find(l => l.id === id);
 
 export const getLoteRevisaoByNotaId = (notaId: string): LoteRevisao | undefined =>
-  lotesRevisao.find(l => l.notaEntradaId === notaId);
+  lotesRevisaoCache.find(l => l.notaEntradaId === notaId);
 
-export const atualizarItemRevisao = (
+export const atualizarItemRevisao = async (
   loteId: string,
   itemId: string,
   updates: Partial<ItemRevisao>
-): LoteRevisao | null => {
-  const lote = lotesRevisao.find(l => l.id === loteId);
+): Promise<LoteRevisao | null> => {
+  const lote = lotesRevisaoCache.find(l => l.id === loteId);
   if (!lote) return null;
 
   const itemIndex = lote.itens.findIndex(i => i.id === itemId);
@@ -130,6 +186,7 @@ export const atualizarItemRevisao = (
   lote.custoTotalReparos = lote.itens.reduce((acc, i) => acc + i.custoReparo, 0);
   lote.valorLiquidoSugerido = lote.valorOriginalNota - lote.custoTotalReparos;
 
+  await syncToDb(lote);
   return lote;
 };
 
@@ -137,10 +194,10 @@ export const encaminharLoteParaAssistencia = async (
   loteId: string,
   responsavel: string
 ): Promise<LoteRevisao | null> => {
-  const lote = lotesRevisao.find(l => l.id === loteId);
+  const lote = lotesRevisaoCache.find(l => l.id === loteId);
   if (!lote || lote.status !== 'Em Revisao') return null;
 
-  // Encaminhar cada item para Análise de Tratativas (não criar OS diretamente)
+  // Encaminhar cada item para Análise de Tratativas
   for (const item of lote.itens) {
     const descricao = `Lote ${lote.id} — ${item.marca} ${item.modelo}${item.imei ? ` (IMEI: ${item.imei})` : ''}`;
     const observacao = `Motivo: ${item.motivoAssistencia}${item.observacao ? `\nObs: ${item.observacao}` : ''}\nNota: ${lote.numeroNota}`;
@@ -157,6 +214,7 @@ export const encaminharLoteParaAssistencia = async (
   }
 
   lote.status = 'Encaminhado';
+  await syncToDb(lote);
 
   return lote;
 };
@@ -167,21 +225,18 @@ export const sincronizarNotaComLote = (
   loteId: string,
   responsavel: string
 ): NotaEntrada | null => {
-  const lote = lotesRevisao.find(l => l.id === loteId);
+  const lote = lotesRevisaoCache.find(l => l.id === loteId);
   if (!lote) return null;
 
   const nota = getNotaEntradaById(lote.notaEntradaId);
   if (!nota) return null;
 
-  // Calcular custo total dos itens concluídos
   const custoTotalConcluidos = lote.itens
     .filter(i => i.statusReparo === 'Concluido')
     .reduce((acc, i) => acc + i.custoReparo, 0);
 
-  // Atualizar abatimento na nota
   atualizarAbatimentoNota(nota.id, custoTotalConcluidos);
 
-  // Registrar na timeline da nota
   const isFinalizado = lote.status === 'Finalizado';
   const acao = isFinalizado
     ? `Retorno da Assistência - Lote ${lote.id} finalizado. Custo de reparos: R$ ${custoTotalConcluidos.toFixed(2)}. Abatimento aplicado.`
@@ -197,9 +252,7 @@ export const sincronizarNotaComLote = (
     `Valor original: R$ ${nota.valorTotal.toFixed(2)} | Valor líquido: R$ ${(nota.valorTotal - custoTotalConcluidos).toFixed(2)}`
   );
 
-  // Para notas 100% Antecipadas finalizadas, registrar crédito na timeline
   if (isFinalizado && nota.tipoPagamento === 'Pagamento 100% Antecipado' && custoTotalConcluidos > 0) {
-    // Gerar crédito ao fornecedor pelo custo de reparos
     gerarCreditoFornecedor(
       nota.fornecedor,
       custoTotalConcluidos,
@@ -221,23 +274,21 @@ export const sincronizarNotaComLote = (
   return nota;
 };
 
-export const finalizarLoteRevisao = (
+export const finalizarLoteRevisao = async (
   loteId: string,
   responsavel: string
-): LoteRevisao | null => {
-  const lote = lotesRevisao.find(l => l.id === loteId);
+): Promise<LoteRevisao | null> => {
+  const lote = lotesRevisaoCache.find(l => l.id === loteId);
   if (!lote) return null;
 
   lote.status = 'Finalizado';
   lote.dataFinalizacao = new Date().toISOString();
-
-  // Recalcular custos com base nas OS vinculadas
   lote.custoTotalReparos = lote.itens.reduce((acc, i) => acc + i.custoReparo, 0);
   lote.valorLiquidoSugerido = lote.valorOriginalNota - lote.custoTotalReparos;
 
-  // Sincronizar nota de entrada com abatimento
   sincronizarNotaComLote(loteId, responsavel);
 
+  await syncToDb(lote);
   return lote;
 };
 
@@ -250,12 +301,12 @@ export interface ResultadoItemRevisao {
   resultado: ResultadoReparo;
 }
 
-export const finalizarLoteComLogisticaReversa = (
+export const finalizarLoteComLogisticaReversa = async (
   loteId: string,
   resultados: ResultadoItemRevisao[],
   responsavel: string
-): LoteRevisao | null => {
-  const lote = lotesRevisao.find(l => l.id === loteId);
+): Promise<LoteRevisao | null> => {
+  const lote = lotesRevisaoCache.find(l => l.id === loteId);
   if (!lote) return null;
 
   lote.status = 'Finalizado';
@@ -263,7 +314,6 @@ export const finalizarLoteComLogisticaReversa = (
   lote.custoTotalReparos = lote.itens.reduce((acc, i) => acc + i.custoReparo, 0);
   lote.valorLiquidoSugerido = lote.valorOriginalNota - lote.custoTotalReparos;
 
-  // Processar cada item conforme resultado
   let valorAbatimentoDevolucao = 0;
   resultados.forEach(res => {
     const item = lote.itens.find(i => i.id === res.itemId);
@@ -271,22 +321,18 @@ export const finalizarLoteComLogisticaReversa = (
 
     if (res.resultado === 'Consertado') {
       item.statusReparo = 'Concluido';
-      // Marcar produto com tagRetornoAssistencia no estoqueApi
       if (item.imei) {
         marcarProdutoRetornoAssistencia(item.imei);
       }
     } else if (res.resultado === 'Devolucao ao Fornecedor') {
       item.statusReparo = 'Concluido';
-      // Valor integral do aparelho abatido na nota
       const custoAparelho = lote.valorOriginalNota / lote.itens.length;
       valorAbatimentoDevolucao += custoAparelho;
-      
-      // Marcar produto como devolvido no estoque
+
       if (item.imei) {
         marcarProdutoDevolvido(item.imei);
       }
-      
-      // Gerar crédito para notas antecipadas
+
       const notaEntrada = getNotaEntradaById(lote.notaEntradaId);
       if (notaEntrada && notaEntrada.tipoPagamento === 'Pagamento 100% Antecipado') {
         gerarCreditoFornecedor(
@@ -299,31 +345,29 @@ export const finalizarLoteComLogisticaReversa = (
     }
   });
 
-  // Aplicar abatimento de devoluções
   if (valorAbatimentoDevolucao > 0) {
     lote.valorLiquidoSugerido -= valorAbatimentoDevolucao;
   }
 
-  // Sincronizar nota de entrada com abatimento total (reparos + devoluções)
   sincronizarNotaComLote(loteId, responsavel);
 
+  await syncToDb(lote);
   return lote;
 };
 
-// Obter itens consertados (para retorno ao estoque com tag)
 export const getItensConsertados = (loteId: string): ItemRevisao[] => {
-  const lote = lotesRevisao.find(l => l.id === loteId);
+  const lote = lotesRevisaoCache.find(l => l.id === loteId);
   if (!lote || lote.status !== 'Finalizado') return [];
   return lote.itens.filter(i => i.statusReparo === 'Concluido');
 };
 
 export const calcularAbatimento = (loteId: string): AbatimentoInfo | null => {
-  const lote = lotesRevisao.find(l => l.id === loteId);
+  const lote = lotesRevisaoCache.find(l => l.id === loteId);
   if (!lote) return null;
 
   const custoReparos = lote.itens.reduce((acc, i) => acc + i.custoReparo, 0);
-  const percentualReparo = lote.valorOriginalNota > 0 
-    ? (custoReparos / lote.valorOriginalNota) * 100 
+  const percentualReparo = lote.valorOriginalNota > 0
+    ? (custoReparos / lote.valorOriginalNota) * 100
     : 0;
 
   return {
@@ -344,13 +388,12 @@ export const registrarEventoTecnicoNaNota = (
   responsavel: string,
   dados?: { resumo?: string; custo?: number }
 ): void => {
-  const lote = lotesRevisao.find(l => l.id === loteId);
+  const lote = lotesRevisaoCache.find(l => l.id === loteId);
   if (!lote) return;
 
   const nota = getNotaEntradaById(lote.notaEntradaId);
   if (!nota) return;
 
-  // Marcador para evitar duplicidade
   const marcador = `OS:${osId}|EVENTO:${tipoEvento}`;
   const jáRegistrado = nota.timeline?.some(t => t.detalhes?.includes(marcador));
   if (jáRegistrado) return;
@@ -375,11 +418,11 @@ export const registrarEventoTecnicoNaNota = (
 
 // ============= RECONCILIAÇÃO RETROATIVA =============
 
-export const reconciliarLoteComOS = (
+export const reconciliarLoteComOS = async (
   loteId: string,
   responsavel: string
-): boolean => {
-  const lote = lotesRevisao.find(l => l.id === loteId);
+): Promise<boolean> => {
+  const lote = lotesRevisaoCache.find(l => l.id === loteId);
   if (!lote) return false;
 
   let reconciliou = false;
@@ -401,7 +444,6 @@ export const reconciliarLoteComOS = (
       item.custoReparo = os.valorCustoTecnico || 0;
       reconciliou = true;
 
-      // Registrar evento de reconciliação na timeline da nota
       registrarEventoTecnicoNaNota(loteId, os.id, 'finalizacao', responsavel, {
         resumo: os.resumoConclusao || 'Reconciliação automática',
         custo: os.valorCustoTecnico || 0
@@ -410,90 +452,19 @@ export const reconciliarLoteComOS = (
   });
 
   if (reconciliou) {
-    // Recalcular custos do lote
     lote.custoTotalReparos = lote.itens.reduce((acc, i) => acc + i.custoReparo, 0);
     lote.valorLiquidoSugerido = lote.valorOriginalNota - lote.custoTotalReparos;
 
-    // Sincronizar nota
     sincronizarNotaComLote(loteId, responsavel);
 
-    // Verificar se lote pode ser finalizado
     const allDone = lote.itens.every(i => i.statusReparo === 'Concluido');
     if (allDone && lote.status !== 'Finalizado') {
       lote.status = 'Finalizado';
       lote.dataFinalizacao = new Date().toISOString();
     }
+
+    await syncToDb(lote);
   }
 
   return reconciliou;
 };
-
-// ============= MOCK DATA =============
-
-const initMockData = () => {
-  // Lote de revisão mock vinculado à primeira nota mock (NE-2026-00001)
-  const mockLote: LoteRevisao = {
-    id: 'REV-NOTA-00001',
-    notaEntradaId: 'NE-2026-00001',
-    numeroNota: 'NE-2026-00001',
-    fornecedor: 'Apple Distribuidor BR',
-    valorOriginalNota: 32000,
-    status: 'Encaminhado',
-    itens: [
-      {
-        id: 'REV-NOTA-00001-ITEM-001',
-        produtoNotaId: 'PROD-NE-2026-00001-001',
-        marca: 'Apple',
-        modelo: 'iPhone 14',
-        imei: '350000111222333',
-        motivoAssistencia: 'Display com manchas e touch falhando na parte inferior',
-        responsavelRegistro: 'Carlos Estoque',
-        dataRegistro: '2026-01-16T10:00:00',
-        osId: 'OS-2025-0012',
-        custoReparo: 520,
-        statusReparo: 'Em Andamento'
-      },
-      {
-        id: 'REV-NOTA-00001-ITEM-002',
-        produtoNotaId: 'PROD-NE-2026-00001-002',
-        marca: 'Samsung',
-        modelo: 'Galaxy S23',
-        imei: '350000444555666',
-        motivoAssistencia: 'Bateria inflada - risco de segurança',
-        observacao: 'Aparelho veio lacrado mas com bateria visivelmente inflada',
-        responsavelRegistro: 'Carlos Estoque',
-        dataRegistro: '2026-01-16T10:15:00',
-        custoReparo: 95,
-        statusReparo: 'Concluido'
-      },
-      {
-        id: 'REV-NOTA-00001-ITEM-003',
-        produtoNotaId: 'PROD-NE-2026-00001-003',
-        marca: 'Apple',
-        modelo: 'iPhone 15 Pro',
-        imei: '350000777888999',
-        motivoAssistencia: 'Câmera traseira com defeito de foco automático',
-        responsavelRegistro: 'Carlos Estoque',
-        dataRegistro: '2026-01-16T10:30:00',
-        custoReparo: 0,
-        statusReparo: 'Pendente'
-      }
-    ],
-    dataCriacao: '2026-01-16T10:00:00',
-    responsavelCriacao: 'Carlos Estoque',
-    custoTotalReparos: 615,
-    valorLiquidoSugerido: 31385,
-    osIds: ['OS-2025-0012']
-  };
-
-  lotesRevisao.push(mockLote);
-  proximoSequencialLote = 2;
-
-  // Vincular lote à nota mock
-  const nota = getNotaEntradaById('NE-2026-00001');
-  if (nota) {
-    nota.loteRevisaoId = 'REV-NOTA-00001';
-  }
-};
-
-initMockData();

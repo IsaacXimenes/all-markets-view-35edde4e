@@ -151,7 +151,7 @@ export default function EstoqueEncaminharAssistencia() {
     }
 
     // Criar lote de revisão
-    const lote = criarLoteRevisao(
+    const lote = await criarLoteRevisao(
       notaSelecionadaId,
       itensDefeituosos.map(item => ({
         produtoNotaId: item.produtoNotaId,

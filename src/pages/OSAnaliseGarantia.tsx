@@ -147,7 +147,7 @@ export default function OSAnaliseGarantia() {
     }
 
     const tecnico = tecnicos.find(t => t.id === tecnicoSelecionado);
-    const registroAprovado = aprovarAnaliseGarantia(registroSelecionado.id, {
+    const registroAprovado = await aprovarAnaliseGarantia(registroSelecionado.id, {
       tecnicoId: tecnicoSelecionado,
       tecnicoNome: tecnico?.nome || '',
       dataAprovacao: dataHoraAprovacao,
@@ -244,14 +244,14 @@ export default function OSAnaliseGarantia() {
   };
 
   // Stats
-  const handleConfirmarRecusa = () => {
+  const handleConfirmarRecusa = async () => {
     if (!registroParaRecusar) return;
     if (!motivoRecusa.trim()) {
       toast.error('Informe o motivo da recusa.');
       return;
     }
 
-    const registroRecusado = recusarAnaliseGarantia(registroParaRecusar.id, motivoRecusa);
+    const registroRecusado = await recusarAnaliseGarantia(registroParaRecusar.id, motivoRecusa);
     if (registroRecusado) {
       // Reverter origem com pareceres atualizados
       if (registroRecusado.origem === 'Estoque' && registroRecusado.origemId) {

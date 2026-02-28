@@ -182,7 +182,7 @@ export default function GarantiaContatosAtivosNovo() {
     toast.success('Cliente cadastrado com sucesso!');
   };
 
-  const handleSalvar = () => {
+  const handleSalvar = async () => {
     if (!form.clienteNome || !form.aparelhoModelo || !form.aparelhoImei || !form.aparelhoCondicao || !form.motoboyId || !form.dataEntregaPrevista) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
@@ -224,7 +224,7 @@ export default function GarantiaContatosAtivosNovo() {
       status: 'Pendente'
     };
 
-    addContatoAtivo(novoContato);
+    await addContatoAtivo(novoContato);
     toast.success('Contato registrado com sucesso!');
     navigate('/garantias/contatos-ativos');
   };

@@ -590,7 +590,7 @@ export const salvarParecerEstoque = async (
     
     // Adicionar à Análise de Tratativas
     try {
-      encaminharParaAnaliseGarantia(
+      await encaminharParaAnaliseGarantia(
         produto.id,
         'Estoque',
         `${produto.marca} ${produto.modelo} - ${produto.cor} (IMEI: ${produto.imei})`,

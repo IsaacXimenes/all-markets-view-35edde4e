@@ -23,8 +23,11 @@ export default function GarantiaContatosAtivos() {
   const [contatos, setContatos] = useState<ContatoAtivoGarantia[]>([]);
   
   useEffect(() => {
-    verificarEGerarContatosAutomaticos();
-    setContatos(getContatosAtivos());
+    const init = async () => {
+      await verificarEGerarContatosAutomaticos();
+      setContatos(getContatosAtivos());
+    };
+    init();
   }, []);
   const [showDetalhesModal, setShowDetalhesModal] = useState(false);
   const [contatoSelecionado, setContatoSelecionado] = useState<ContatoAtivoGarantia | null>(null);

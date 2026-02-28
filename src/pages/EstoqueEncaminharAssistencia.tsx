@@ -144,7 +144,7 @@ export default function EstoqueEncaminharAssistencia() {
     setModalConfirmacaoFinal(true);
   };
 
-  const handleConfirmarEncaminhamento = () => {
+  const handleConfirmarEncaminhamento = async () => {
     if (!checkConfirmacaoFinal) {
       toast.error('Confirme o encaminhamento na caixa de seleção');
       return;
@@ -171,7 +171,7 @@ export default function EstoqueEncaminharAssistencia() {
     }
 
     // Encaminhar para assistência (gera OS automaticamente)
-    const loteEncaminhado = encaminharLoteParaAssistencia(lote.id, responsavel);
+    const loteEncaminhado = await encaminharLoteParaAssistencia(lote.id, responsavel);
 
     if (!loteEncaminhado) {
       toast.error('Erro ao encaminhar lote para assistência');

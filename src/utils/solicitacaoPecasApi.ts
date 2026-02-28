@@ -344,15 +344,21 @@ export const addSolicitacao = async (data: Omit<SolicitacaoPeca, 'id' | 'dataSol
     status: 'Pendente',
     origemEntrada
   };
-  solicitacoes.push(novaSolicitacao);
   const { error } = await supabase.from('solicitacoes_pecas').insert(solicitacaoToDb(novaSolicitacao) as any);
-  if (error) console.error('[SolicitacoesPecas] Erro insert:', error);
+  if (error) {
+    console.error('[SolicitacoesPecas] Erro insert:', error);
+    throw error;
+  }
+  solicitacoes.push(novaSolicitacao);
   return novaSolicitacao;
 };
 
 const updateSolicitacaoDb = async (sol: SolicitacaoPeca) => {
   const { error } = await supabase.from('solicitacoes_pecas').update(solicitacaoToDb(sol) as any).eq('id', sol.id);
-  if (error) console.error('[SolicitacoesPecas] Erro update:', error);
+  if (error) {
+    console.error('[SolicitacoesPecas] Erro update:', error);
+    throw error;
+  }
 };
 
 export const aprovarSolicitacao = async (id: string, dados: {

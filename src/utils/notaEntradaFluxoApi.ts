@@ -243,7 +243,10 @@ const toDbRowNota = (n: NotaEntrada): any => ({
 const syncNotaToDb = async (nota: NotaEntrada) => {
   const row = toDbRowNota(nota);
   const { error } = await supabase.from('notas_entrada').upsert(row, { onConflict: 'id' });
-  if (error) console.error('[NOTAS_ENTRADA] sync error', error);
+  if (error) {
+    console.error('[NOTAS_ENTRADA] sync error', error);
+    throw error;
+  }
 };
 
 export const initNotasEntradaCache = async () => {

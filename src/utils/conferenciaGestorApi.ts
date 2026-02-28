@@ -181,11 +181,18 @@ export const validarVendaGestor = async (
     ]
   };
 
-  conferenciaCache[index] = updated;
   const { error } = await supabase.from('conferencias_gestor').update(conferenciaToDb(updated) as any).eq('id', id);
-  if (error) console.error('[ConferenciasGestor] Erro update:', error);
+  if (error) {
+    console.error('[ConferenciasGestor] Erro update:', error);
+    throw error;
+  }
+  conferenciaCache[index] = updated;
 
-  addNotification({ type: 'venda_conferencia', title: `Venda ${updated.vendaId} conferida pelo Gestor`, description: `${gestorNome} validou a venda - Enviada ao Financeiro`, targetUsers: ['COL-006'] });
+  // Notificar financeiro dinamicamente
+  const colaboradores = getColaboradores();
+  const cargos = getCargos();
+  const financeiroIds = colaboradores.filter(col => { const cargo = cargos.find(c => c.id === col.cargo); return cargo?.permissoes.includes('Financeiro'); }).map(c => c.id);
+  addNotification({ type: 'venda_conferencia', title: `Venda ${updated.vendaId} conferida pelo Gestor`, description: `${gestorNome} validou a venda - Enviada ao Financeiro`, targetUsers: financeiroIds.length > 0 ? financeiroIds : ['financeiro'] });
   return updated;
 };
 
@@ -205,9 +212,12 @@ export const finalizarVendaFinanceiro = async (
     ]
   };
 
-  conferenciaCache[index] = updated;
   const { error } = await supabase.from('conferencias_gestor').update(conferenciaToDb(updated) as any).eq('id', id);
-  if (error) console.error('[ConferenciasGestor] Erro update:', error);
+  if (error) {
+    console.error('[ConferenciasGestor] Erro update finalizar:', error);
+    throw error;
+  }
+  conferenciaCache[index] = updated;
   return updated;
 };
 
@@ -226,9 +236,12 @@ export const adicionarVendaParaConferencia = async (
     dadosVenda
   };
 
-  conferenciaCache.unshift(nova);
   const { error } = await supabase.from('conferencias_gestor').insert(conferenciaToDb(nova) as any);
-  if (error) console.error('[ConferenciasGestor] Erro insert:', error);
+  if (error) {
+    console.error('[ConferenciasGestor] Erro insert:', error);
+    throw error;
+  }
+  conferenciaCache.unshift(nova);
   notificarGestores(nova);
   return nova;
 };
@@ -238,7 +251,7 @@ const notificarGestores = (venda: VendaConferencia) => {
   const cargos = getCargos();
   const gestores = colaboradores.filter(col => { const cargo = cargos.find(c => c.id === col.cargo); return cargo?.permissoes.includes('Gestor'); });
   const gestorIds = gestores.map(g => g.id);
-  addNotification({ type: 'venda_conferencia', title: `Nova venda ${venda.vendaId} pendente de conferência`, description: `${venda.clienteNome} - ${formatCurrency(venda.valorTotal)} - Aguardando validação`, targetUsers: gestorIds.length > 0 ? gestorIds : ['COL-001', 'COL-002'] });
+  addNotification({ type: 'venda_conferencia', title: `Nova venda ${venda.vendaId} pendente de conferência`, description: `${venda.clienteNome} - ${formatCurrency(venda.valorTotal)} - Aguardando validação`, targetUsers: gestorIds.length > 0 ? gestorIds : ['gestor'] });
 };
 
 export const temPermissaoGestor = (colaboradorId?: string): boolean => {

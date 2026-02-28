@@ -90,6 +90,8 @@ const carregarColaboradoresDigital = async () => {
 };
 carregarColaboradoresDigital();
 
+// NOTA: Use getColaboradoresDigital() e getColaboradoresFinalizador() para dados atualizados
+// Estas referências são mantidas para compatibilidade mas podem estar vazias antes do async completar
 export const colaboradoresDigital = _colaboradoresDigital;
 export const colaboradoresFinalizador = _colaboradoresFinalizador;
 
@@ -149,7 +151,7 @@ export const criarPreCadastro = async (
     type: 'venda_digital',
     title: 'Novo pré-cadastro digital',
     description: `${mapped.id} - ${clienteNome} - R$ ${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-    targetUsers: colaboradoresFinalizador.map(c => c.id),
+    targetUsers: _colaboradoresFinalizador.map(c => c.id),
   });
 
   return mapped;
@@ -269,9 +271,9 @@ export const exportVendasDigitaisToCSV = (data: VendaDigital[], filename: string
 };
 
 export const temPermissaoDigital = (colaboradorId: string): boolean => {
-  return colaboradoresDigital.some(c => c.id === colaboradorId);
+  return _colaboradoresDigital.some(c => c.id === colaboradorId);
 };
 
 export const temPermissaoFinalizador = (colaboradorId: string): boolean => {
-  return colaboradoresFinalizador.some(c => c.id === colaboradorId);
+  return _colaboradoresFinalizador.some(c => c.id === colaboradorId);
 };

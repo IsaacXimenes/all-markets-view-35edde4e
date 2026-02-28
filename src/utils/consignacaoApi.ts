@@ -84,12 +84,12 @@ export interface CriarLoteInput {
   }[];
 }
 
-export const criarLoteConsignacao = (dados: CriarLoteInput): LoteConsignacao => {
+export const criarLoteConsignacao = async (dados: CriarLoteInput): Promise<LoteConsignacao> => {
   const loteId = `CONS-${String(nextLoteId++).padStart(3, '0')}`;
 
-  const itensConsignacao: ItemConsignacao[] = dados.itens.map(item => {
+  const itensConsignacao: ItemConsignacao[] = await Promise.all(dados.itens.map(async (item) => {
     // Injetar peça no estoque com origem Consignacao
-    const pecaCriada = addPeca({
+    const pecaCriada = await addPeca({
       descricao: item.descricao,
       lojaId: item.lojaDestinoId,
       modelo: item.modelo,
@@ -115,7 +115,7 @@ export const criarLoteConsignacao = (dados: CriarLoteInput): LoteConsignacao => 
       lojaAtualId: item.lojaDestinoId,
       status: 'Disponivel' as const,
     };
-  });
+  }));
 
   const lote: LoteConsignacao = {
     id: loteId,
@@ -580,7 +580,7 @@ export interface EditarLoteInput {
   itensRemovidos?: string[];
 }
 
-export const editarLoteConsignacao = (loteId: string, dados: EditarLoteInput, responsavel: string): LoteConsignacao | null => {
+export const editarLoteConsignacao = async (loteId: string, dados: EditarLoteInput, responsavel: string): Promise<LoteConsignacao | null> => {
   const lote = lotes.find(l => l.id === loteId);
   if (!lote || lote.status !== 'Aberto') return null;
 
@@ -646,8 +646,8 @@ export const editarLoteConsignacao = (loteId: string, dados: EditarLoteInput, re
 
   // Adicionar novos itens
   if (dados.novosItens && dados.novosItens.length > 0) {
-    dados.novosItens.forEach(novoItem => {
-      const pecaCriada = addPeca({
+    for (const novoItem of dados.novosItens) {
+      const pecaCriada = await addPeca({
         descricao: novoItem.descricao,
         lojaId: novoItem.lojaDestinoId,
         modelo: novoItem.modelo,
@@ -674,7 +674,7 @@ export const editarLoteConsignacao = (loteId: string, dados: EditarLoteInput, re
         status: 'Disponivel',
       });
       alteracoes.push(`Novo item: ${novoItem.descricao} (${novoItem.quantidade} un.)`);
-    });
+    }
   }
 
   if (alteracoes.length > 0) {

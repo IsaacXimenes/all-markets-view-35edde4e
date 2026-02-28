@@ -1,4 +1,5 @@
-// API para gestão de Peças no Estoque
+// API para gestão de Peças no Estoque - Supabase
+import { supabase } from '@/integrations/supabase/client';
 
 export interface MovimentacaoPeca {
   id: string;
@@ -10,14 +11,11 @@ export interface MovimentacaoPeca {
   descricao: string;
 }
 
-let movimentacoesPecas: MovimentacaoPeca[] = [];
-let nextMovId = 1;
-
 export interface Peca {
   id: string;
   descricao: string;
   lojaId: string;
-  modelo: string; // Modelo do celular compatível
+  modelo: string;
   valorCusto: number;
   valorRecomendado: number;
   quantidade: number;
@@ -31,282 +29,153 @@ export interface Peca {
   fornecedorId?: string;
 }
 
-// Mock de peças
-// Os IDs de loja serão inicializados dinamicamente para corresponder aos UUIDs do CadastroStore
-// A função initializePecasWithLojaIds deve ser chamada após o CadastroStore ser inicializado
-let pecas: Peca[] = [];
-let pecasBaseInitialized = false;
+// ==================== MAPEAMENTO SUPABASE ====================
 
-// Dados base das peças (sem lojaId definido)
-const pecasBase: Omit<Peca, 'lojaId'>[] = [
-  {
-    id: 'PEC-0001',
-    descricao: 'Tela LCD iPhone 14 Pro Max',
-    modelo: 'iPhone 14 Pro Max',
-    valorCusto: 450.00,
-    valorRecomendado: 650.00,
-    quantidade: 3,
-    dataEntrada: '2024-12-20T10:00:00',
-    origem: 'Nota de Compra',
-    notaCompraId: 'NC-001',
-    status: 'Disponível'
-  },
-  {
-    id: 'PEC-0002',
-    descricao: 'Bateria iPhone 13',
-    modelo: 'iPhone 13',
-    valorCusto: 120.00,
-    valorRecomendado: 200.00,
-    quantidade: 5,
-    dataEntrada: '2024-12-18T14:30:00',
-    origem: 'Nota de Compra',
-    notaCompraId: 'NC-001',
-    status: 'Disponível'
-  },
-  {
-    id: 'PEC-0003',
-    descricao: 'Câmera Traseira iPhone 15',
-    modelo: 'iPhone 15',
-    valorCusto: 280.00,
-    valorRecomendado: 400.00,
-    quantidade: 2,
-    dataEntrada: '2024-12-15T09:00:00',
-    origem: 'Produto Thiago',
-    status: 'Disponível'
-  },
-  {
-    id: 'PEC-0004',
-    descricao: 'Conector de Carga iPhone 12',
-    modelo: 'iPhone 12',
-    valorCusto: 80.00,
-    valorRecomendado: 150.00,
-    quantidade: 8,
-    dataEntrada: '2024-12-10T11:00:00',
-    origem: 'Nota de Compra',
-    notaCompraId: 'NC-002',
-    status: 'Disponível'
-  },
-  {
-    id: 'PEC-0005',
-    descricao: 'Alto-falante iPhone 14',
-    modelo: 'iPhone 14',
-    valorCusto: 55.00,
-    valorRecomendado: 100.00,
-    quantidade: 4,
-    dataEntrada: '2024-12-05T16:00:00',
-    origem: 'Solicitação',
-    status: 'Disponível'
-  },
-  {
-    id: 'PEC-0006',
-    descricao: 'Tela OLED iPhone 13 Pro',
-    modelo: 'iPhone 13 Pro',
-    valorCusto: 380.00,
-    valorRecomendado: 550.00,
-    quantidade: 1,
-    dataEntrada: '2024-12-22T08:30:00',
-    origem: 'Retirada de Peça',
-    status: 'Disponível'
-  },
-  {
-    id: 'PEC-0007',
-    descricao: 'Bateria iPhone 11',
-    modelo: 'iPhone 11',
-    valorCusto: 95.00,
-    valorRecomendado: 170.00,
-    quantidade: 0,
-    dataEntrada: '2024-11-28T13:00:00',
-    origem: 'Nota de Compra',
-    notaCompraId: 'NC-003',
-    status: 'Utilizada'
-  },
-  {
-    id: 'PEC-0008',
-    descricao: 'Flex Power iPhone 15 Pro Max',
-    modelo: 'iPhone 15 Pro Max',
-    valorCusto: 160.00,
-    valorRecomendado: 280.00,
-    quantidade: 3,
-    dataEntrada: '2024-12-25T10:00:00',
-    origem: 'Solicitação',
-    status: 'Disponível'
-  },
-  {
-    id: 'PEC-0009',
-    descricao: 'Módulo Câmera Frontal iPhone 14',
-    modelo: 'iPhone 14',
-    valorCusto: 210.00,
-    valorRecomendado: 350.00,
-    quantidade: 2,
-    dataEntrada: '2024-12-19T15:00:00',
-    origem: 'Retirada de Peça',
-    status: 'Disponível'
-  },
-  {
-    id: 'PEC-0010',
-    descricao: 'Adesivo Bateria iPhone 12 Pro',
-    modelo: 'iPhone 12 Pro',
-    valorCusto: 15.00,
-    valorRecomendado: 30.00,
-    quantidade: 12,
-    dataEntrada: '2024-12-01T09:00:00',
-    origem: 'Nota de Compra',
-    notaCompraId: 'NC-002',
-    status: 'Disponível'
-  },
-  {
-    id: 'PEC-0011',
-    descricao: 'Tela LCD iPhone 11',
-    modelo: 'iPhone 11',
-    valorCusto: 220.00,
-    valorRecomendado: 380.00,
-    quantidade: 0,
-    dataEntrada: '2024-11-15T11:00:00',
-    origem: 'Solicitação',
-    status: 'Utilizada'
-  },
-  {
-    id: 'PEC-0012',
-    descricao: 'Conector de Carga USB-C iPhone 15',
-    modelo: 'iPhone 15',
-    valorCusto: 90.00,
-    valorRecomendado: 160.00,
-    quantidade: 1,
-    dataEntrada: '2024-12-28T14:00:00',
-    origem: 'Produto Thiago',
-    status: 'Disponível'
-  },
-  {
-    id: 'PEC-0013',
-    descricao: 'Alto-falante Auricular iPhone 13',
-    modelo: 'iPhone 13',
-    valorCusto: 65.00,
-    valorRecomendado: 120.00,
-    quantidade: 6,
-    dataEntrada: '2024-12-12T16:30:00',
-    origem: 'Nota de Compra',
-    notaCompraId: 'NC-004',
-    status: 'Disponível'
+const mapPecaFromDB = (row: any): Peca => ({
+  id: row.id,
+  descricao: row.descricao,
+  lojaId: row.loja_id || '',
+  modelo: row.modelo || '',
+  valorCusto: Number(row.valor_custo) || 0,
+  valorRecomendado: Number(row.valor_recomendado) || 0,
+  quantidade: row.quantidade || 0,
+  dataEntrada: row.data_entrada || row.created_at || '',
+  origem: row.origem || 'Manual',
+  notaCompraId: row.nota_compra_id || undefined,
+  loteConsignacaoId: row.lote_consignacao_id || undefined,
+  status: row.status || 'Disponível',
+  statusMovimentacao: row.status_movimentacao || null,
+  movimentacaoPecaId: row.movimentacao_peca_id || undefined,
+  fornecedorId: row.fornecedor_id || undefined,
+});
+
+const mapPecaToDB = (peca: Partial<Peca>) => ({
+  ...(peca.descricao !== undefined && { descricao: peca.descricao }),
+  ...(peca.lojaId !== undefined && { loja_id: peca.lojaId || null }),
+  ...(peca.modelo !== undefined && { modelo: peca.modelo }),
+  ...(peca.valorCusto !== undefined && { valor_custo: peca.valorCusto }),
+  ...(peca.valorRecomendado !== undefined && { valor_recomendado: peca.valorRecomendado }),
+  ...(peca.quantidade !== undefined && { quantidade: peca.quantidade }),
+  ...(peca.dataEntrada !== undefined && { data_entrada: peca.dataEntrada?.split('T')[0] || null }),
+  ...(peca.origem !== undefined && { origem: peca.origem }),
+  ...(peca.notaCompraId !== undefined && { nota_compra_id: peca.notaCompraId || null }),
+  ...(peca.loteConsignacaoId !== undefined && { lote_consignacao_id: peca.loteConsignacaoId || null }),
+  ...(peca.status !== undefined && { status: peca.status }),
+  ...(peca.statusMovimentacao !== undefined && { status_movimentacao: peca.statusMovimentacao }),
+  ...(peca.movimentacaoPecaId !== undefined && { movimentacao_peca_id: peca.movimentacaoPecaId || null }),
+  ...(peca.fornecedorId !== undefined && { fornecedor_id: peca.fornecedorId || null }),
+});
+
+const mapMovFromDB = (row: any): MovimentacaoPeca => ({
+  id: row.id,
+  pecaId: row.peca_id || '',
+  tipo: row.tipo || 'Entrada',
+  quantidade: row.quantidade || 1,
+  data: row.data || row.created_at || '',
+  osId: row.os_id || undefined,
+  descricao: row.descricao || '',
+});
+
+// ==================== CACHE ====================
+let _pecasCache: Peca[] = [];
+let _movCache: MovimentacaoPeca[] = [];
+let _cacheLoaded = false;
+
+export const initPecasCache = async (): Promise<void> => {
+  try {
+    const { data: pecasData } = await supabase.from('pecas').select('*');
+    _pecasCache = (pecasData || []).map(mapPecaFromDB);
+
+    const { data: movData } = await supabase.from('movimentacoes_pecas').select('*');
+    _movCache = (movData || []).map(mapMovFromDB);
+    _cacheLoaded = true;
+  } catch (e) {
+    console.error('[PECAS] Erro ao carregar cache:', e);
   }
-];
-
-// Função para inicializar peças com IDs de loja válidos do CadastroStore
-export const initializePecasWithLojaIds = (lojaIds: string[]): void => {
-  if (pecasBaseInitialized) return;
-  pecasBaseInitialized = true;
-  
-  const pecasBase_mapped = pecasBase.map((peca, index) => ({
-    ...peca,
-    lojaId: lojaIds[index % lojaIds.length] || lojaIds[0] || ''
-  }));
-
-  // Merge: manter peças consignadas já adicionadas + peças base
-  pecas = [...pecas, ...pecasBase_mapped];
-
-  // Criar movimentações de entrada iniciais para peças base
-  movimentacoesPecas = [...movimentacoesPecas, ...pecasBase_mapped.map((peca) => ({
-    id: `MOV-${String(nextMovId++).padStart(4, '0')}`,
-    pecaId: peca.id,
-    tipo: 'Entrada' as const,
-    quantidade: peca.quantidade,
-    data: peca.dataEntrada,
-    descricao: `Entrada inicial - ${peca.origem}${peca.notaCompraId ? ` (${peca.notaCompraId})` : ''}`
-  }))];
 };
 
-let nextPecaId = 14;
-
-export const getPecas = (): Peca[] => {
-  return [...pecas];
+// Compatibilidade: inicialização legada (no-op)
+export const initializePecasWithLojaIds = (_lojaIds: string[]): void => {
+  // No-op - dados vêm do Supabase
 };
 
-export const getPecaById = (id: string): Peca | undefined => {
-  return pecas.find(p => p.id === id);
-};
+// ==================== CRUD ====================
 
-// Buscar peça por descrição (para integração com assistenciaApi)
+export const getPecas = (): Peca[] => [..._pecasCache];
+
+export const getPecaById = (id: string): Peca | undefined => _pecasCache.find(p => p.id === id);
+
 export const getPecaByDescricao = (descricao: string): Peca | undefined => {
-  const descricaoLower = descricao.toLowerCase();
-  return pecas.find(p => p.descricao.toLowerCase().includes(descricaoLower));
+  const lower = descricao.toLowerCase();
+  return _pecasCache.find(p => p.descricao.toLowerCase().includes(lower));
 };
 
-export const addPeca = (peca: Omit<Peca, 'id'>): Peca => {
-  const newPeca: Peca = {
-    ...peca,
-    id: `PEC-${String(nextPecaId++).padStart(4, '0')}`
-  };
-  pecas.push(newPeca);
+export const addPeca = async (peca: Omit<Peca, 'id'>): Promise<Peca> => {
+  const dbData = mapPecaToDB(peca);
+  const { data, error } = await supabase.from('pecas').insert(dbData).select().single();
+  if (error) throw error;
+  const newPeca = mapPecaFromDB(data);
 
   // Registrar movimentação de entrada
-  movimentacoesPecas.push({
-    id: `MOV-${String(nextMovId++).padStart(4, '0')}`,
-    pecaId: newPeca.id,
+  await supabase.from('movimentacoes_pecas').insert({
+    peca_id: newPeca.id,
     tipo: 'Entrada',
     quantidade: newPeca.quantidade,
-    data: newPeca.dataEntrada,
-    descricao: `Entrada - ${newPeca.origem}`
+    data: newPeca.dataEntrada || new Date().toISOString(),
+    descricao: `Entrada - ${newPeca.origem}`,
   });
 
+  _pecasCache.push(newPeca);
   return newPeca;
 };
 
-export const updatePeca = (id: string, updates: Partial<Peca>): Peca | null => {
-  const index = pecas.findIndex(p => p.id === id);
-  if (index === -1) return null;
-  pecas[index] = { ...pecas[index], ...updates };
-  return pecas[index];
+export const updatePeca = async (id: string, updates: Partial<Peca>): Promise<Peca | null> => {
+  const dbData = mapPecaToDB(updates);
+  const { data, error } = await supabase.from('pecas').update(dbData).eq('id', id).select().single();
+  if (error || !data) return null;
+  const updated = mapPecaFromDB(data);
+  const idx = _pecasCache.findIndex(p => p.id === id);
+  if (idx !== -1) _pecasCache[idx] = updated;
+  return updated;
 };
 
-export const deletePeca = (id: string): boolean => {
-  const index = pecas.findIndex(p => p.id === id);
-  if (index === -1) return false;
-  pecas.splice(index, 1);
+export const deletePeca = async (id: string): Promise<boolean> => {
+  const { error } = await supabase.from('pecas').delete().eq('id', id);
+  if (error) return false;
+  _pecasCache = _pecasCache.filter(p => p.id !== id);
   return true;
 };
 
-// Callback para registrar consumo de consignação (set externamente para evitar import circular)
+// Callback para registrar consumo de consignação
 let onConsumoPecaConsignada: ((pecaId: string, osId: string, tecnico: string, quantidade: number) => void) | null = null;
 
 export const setOnConsumoPecaConsignada = (cb: (pecaId: string, osId: string, tecnico: string, quantidade: number) => void) => {
   onConsumoPecaConsignada = cb;
 };
 
-// Dar baixa em peça do estoque (decrementar quantidade ou marcar como utilizada)
-export const darBaixaPeca = (id: string, quantidade: number = 1, osId?: string, tecnico?: string): { sucesso: boolean; mensagem: string } => {
-  const peca = pecas.find(p => p.id === id);
-  
-  if (!peca) {
-    return { sucesso: false, mensagem: `Peça ${id} não encontrada no estoque` };
-  }
-  
-  if (peca.status !== 'Disponível') {
-    return { sucesso: false, mensagem: `Peça ${peca.descricao} não está disponível (status: ${peca.status})` };
-  }
-  
-  if (peca.quantidade < quantidade) {
-    return { sucesso: false, mensagem: `Quantidade insuficiente de ${peca.descricao}. Disponível: ${peca.quantidade}, Solicitado: ${quantidade}` };
-  }
-  
-  // Decrementar quantidade
-  peca.quantidade -= quantidade;
-  
-  // Se zerou, marcar como utilizada
-  if (peca.quantidade === 0) {
-    peca.status = 'Utilizada';
-  }
+// Dar baixa em peça do estoque
+export const darBaixaPeca = async (id: string, quantidade: number = 1, osId?: string, tecnico?: string): Promise<{ sucesso: boolean; mensagem: string }> => {
+  const peca = _pecasCache.find(p => p.id === id);
+  if (!peca) return { sucesso: false, mensagem: `Peça ${id} não encontrada no estoque` };
+  if (peca.status !== 'Disponível') return { sucesso: false, mensagem: `Peça ${peca.descricao} não está disponível (status: ${peca.status})` };
+  if (peca.quantidade < quantidade) return { sucesso: false, mensagem: `Quantidade insuficiente de ${peca.descricao}. Disponível: ${peca.quantidade}, Solicitado: ${quantidade}` };
 
-  // Registrar movimentação de saída
-  movimentacoesPecas.push({
-    id: `MOV-${String(nextMovId++).padStart(4, '0')}`,
-    pecaId: id,
+  const novaQtd = peca.quantidade - quantidade;
+  const novoStatus = novaQtd === 0 ? 'Utilizada' : peca.status;
+
+  await supabase.from('pecas').update({ quantidade: novaQtd, status: novoStatus }).eq('id', id);
+  peca.quantidade = novaQtd;
+  peca.status = novoStatus as Peca['status'];
+
+  await supabase.from('movimentacoes_pecas').insert({
+    peca_id: id,
     tipo: 'Saída',
     quantidade,
     data: new Date().toISOString(),
-    osId,
-    descricao: `Baixa para OS${osId ? ` ${osId}` : ''} - ${peca.descricao}`
+    os_id: osId || null,
+    descricao: `Baixa para OS${osId ? ` ${osId}` : ''} - ${peca.descricao}`,
   });
-  
-  // Se peça consignada, registrar consumo no dossiê
+
   if (peca.loteConsignacaoId && onConsumoPecaConsignada && osId) {
     onConsumoPecaConsignada(id, osId, tecnico || 'Sistema', quantidade);
   }
@@ -316,37 +185,36 @@ export const darBaixaPeca = (id: string, quantidade: number = 1, osId?: string, 
 
 // Buscar movimentações por peça
 export const getMovimentacoesByPecaId = (pecaId: string): MovimentacaoPeca[] => {
-  return movimentacoesPecas
+  return _movCache
     .filter(m => m.pecaId === pecaId)
     .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
 };
 
 // Adicionar movimentação manual
-export const addMovimentacaoPeca = (mov: Omit<MovimentacaoPeca, 'id'>): MovimentacaoPeca => {
-  const newMov: MovimentacaoPeca = {
-    ...mov,
-    id: `MOV-${String(nextMovId++).padStart(4, '0')}`
-  };
-  movimentacoesPecas.push(newMov);
+export const addMovimentacaoPeca = async (mov: Omit<MovimentacaoPeca, 'id'>): Promise<MovimentacaoPeca> => {
+  const { data, error } = await supabase.from('movimentacoes_pecas').insert({
+    peca_id: mov.pecaId,
+    tipo: mov.tipo,
+    quantidade: mov.quantidade,
+    data: mov.data,
+    os_id: mov.osId || null,
+    descricao: mov.descricao,
+  }).select().single();
+  if (error) throw error;
+  const newMov = mapMovFromDB(data);
+  _movCache.push(newMov);
   return newMov;
 };
-
 
 export const exportPecasToCSV = (data: Peca[], filename: string): void => {
   const headers = ['ID', 'Descrição', 'Loja', 'Modelo', 'Valor Custo', 'Valor Recomendado', 'Quantidade', 'Data Entrada', 'Origem', 'Status'];
   const rows = data.map(p => [
-    p.id,
-    p.descricao,
-    p.lojaId,
-    p.modelo,
-    p.valorCusto.toFixed(2),
-    p.valorRecomendado.toFixed(2),
+    p.id, p.descricao, p.lojaId, p.modelo,
+    p.valorCusto.toFixed(2), p.valorRecomendado.toFixed(2),
     p.quantidade.toString(),
     new Date(p.dataEntrada).toLocaleDateString('pt-BR'),
-    p.origem,
-    p.status
+    p.origem, p.status,
   ]);
-
   const csvContent = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');

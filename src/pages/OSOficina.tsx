@@ -335,7 +335,7 @@ export default function OSOficina() {
     setPecaNaoUtilizadaModal(true);
   };
 
-  const handleMarcarNaoUtilizada = () => {
+  const handleMarcarNaoUtilizada = async () => {
     if (!solicitacaoSelecionada || !osParaGerenciarPeca) return;
     if (!justificativaNaoUso.trim()) {
       toast.error('Informe a justificativa para a não utilização.');
@@ -361,7 +361,7 @@ export default function OSOficina() {
       if (!osFresh) return;
 
       // Criar entrada no estoque
-      const novaPeca = addPeca({
+      const novaPeca = await addPeca({
         descricao: solicitacaoSelecionada.peca,
         lojaId: osParaGerenciarPeca.lojaId,
         modelo: solicitacaoSelecionada.modeloImei || 'N/A',
@@ -374,7 +374,7 @@ export default function OSOficina() {
       });
 
       // Registrar movimentação
-      addMovimentacaoPeca({
+      await addMovimentacaoPeca({
         pecaId: novaPeca.id,
         tipo: 'Entrada',
         quantidade: solicitacaoSelecionada.quantidade,

@@ -167,13 +167,13 @@ export default function OSPecas() {
     return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
-  const handleAdicionarPeca = () => {
+  const handleAdicionarPeca = async () => {
     if (!novaPeca.descricao || !novaPeca.lojaId || !novaPeca.modelo || !novaPeca.valorCusto) {
       toast({ title: 'Erro', description: 'Preencha todos os campos obrigatórios', variant: 'destructive' });
       return;
     }
 
-    const nova = addPeca({
+    const nova = await addPeca({
       descricao: novaPeca.descricao,
       lojaId: novaPeca.lojaId,
       modelo: novaPeca.modelo,

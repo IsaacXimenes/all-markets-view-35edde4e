@@ -289,7 +289,7 @@ export default function OSAssistenciaEditar() {
     return pecas.reduce((acc, peca) => acc + calcularValorTotalPeca(peca), 0);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!lojaId || !tecnicoId || !setor || !clienteId || !status) {
       toast({
         title: 'Campos obrigatórios',
@@ -453,7 +453,7 @@ export default function OSAssistenciaEditar() {
       const pecaForm = pecas[i];
       if (pf.pecaNoEstoque && pf.pecaEstoqueId && !pecasOriginaisIds.includes(pf.pecaEstoqueId)) {
         const qtd = pecaForm?.quantidadePeca || 1;
-        const resultado = darBaixaPeca(pf.pecaEstoqueId, qtd, id);
+        const resultado = await darBaixaPeca(pf.pecaEstoqueId, qtd, id);
         if (!resultado.sucesso) {
           toast({ title: 'Erro no estoque', description: resultado.mensagem, variant: 'destructive' });
           return;

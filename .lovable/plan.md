@@ -1,86 +1,106 @@
 
 
-# Proximo Passo: Lote 5C - Modulos Restantes com Mock/localStorage
+# Plano: Remover Todos os Dados Mockados - Migrar para Supabase
 
-## Status Atual da Migracao
+## Resumo
 
-**Concluidos (Lotes 1-5B):**
-- Cadastros (Lojas, Colaboradores, Clientes, Fornecedores, Contas, Maquinas)
-- Estoque e Pecas (Produtos, Notas, Movimentacoes)
-- Vendas e Financeiro (Vendas, Itens, Pagamentos, Despesas)
-- Assistencia e Garantias (OS, Garantias - parcial)
-- RH (Vales, Adiantamentos, Feedback, Salarios, Comissoes, Motoboy)
-- Acessorios e Metas
-
-**Pendentes - 15 arquivos em 3 categorias:**
+Existem **17 arquivos** no sistema que ainda usam dados mockados (arrays em memoria) ou `localStorage` em vez do Supabase. O objetivo e migrar todos eles para o banco de dados, eliminando 100% dos mocks.
 
 ---
 
-## Categoria A: Arquivos com Mock Data (precisam de novas tabelas)
+## Arquivos Pendentes de Migracao
 
-| Arquivo | Dados Mock | Tabela Necessaria |
-|---|---|---|
-| `fiadoApi.ts` | ~5 dividas, pagamentos, anotacoes | `dividas_fiado`, `pagamentos_fiado`, `anotacoes_fiado` |
-| `vendasDigitalApi.ts` | ~5 pre-cadastros digitais | `vendas_digitais` |
-| `conferenciaGestorApi.ts` | ~10 vendas conferencia | `vendas_conferencia` |
-| `garantiaExtendidaApi.ts` | ~5 tratativas comerciais | `tratativas_comerciais` |
-| `consignacaoApi.ts` | lotes consignacao (vazio) | `lotes_consignacao`, `itens_consignacao` |
-| `coresApi.ts` | ~15 cores Apple | `cores_aparelho` |
-| `planosGarantiaApi.ts` | ~10 planos garantia | `planos_garantia` |
-| `valoresRecomendadosTrocaApi.ts` | ~70 valores recomendados | `valores_recomendados_troca` |
-| `loteRevisaoApi.ts` | lotes revisao (vazio) | `lotes_revisao` |
-| `retiradaPecasApi.ts` | retiradas (vazio) | `retiradas_pecas` |
-| `pendenciasFinanceiraApi.ts` | pendencias (vazio) | `pendencias_financeiras` |
-| `notaEntradaFluxoApi.ts` | notas entrada (vazio) + creditos | `notas_entrada`, `creditos_fornecedor` |
+### Grupo 1 - Arrays em memoria (mock puro)
+| # | Arquivo | Linhas | Tabelas Supabase |
+|---|---------|--------|------------------|
+| 1 | `planosGarantiaApi.ts` | ~150 | `planos_garantia` (existe) |
+| 2 | `valoresRecomendadosTrocaApi.ts` | ~100 | `valores_recomendados_troca` + `logs_valor_troca` (existem) |
+| 3 | `garantiaExtendidaApi.ts` | ~200 | `tratativas_comerciais` (existe) |
+| 4 | `garantiasApi.ts` (residual) | ~80 | `contatos_ativos_garantia` + `registros_analise_garantia` (existem) |
+| 5 | `vendasDigitalApi.ts` | ~200 | `vendas_digitais` (existe) |
+| 6 | `conferenciaGestorApi.ts` | ~400 | `conferencias_gestor` (existe) |
+| 7 | `solicitacaoPecasApi.ts` | ~300 | `solicitacoes_pecas` + `notas_assistencia` + `lotes_pagamento` (existem) |
+| 8 | `osApi.ts` (produtosPendentes) | ~200 | `produtos_pendentes_os` (existe) |
+| 9 | `baseTrocasPendentesApi.ts` | ~100 | `base_trocas_pendentes` (existe) |
+| 10 | `retiradaPecasApi.ts` | ~70 | `retiradas_pecas` (existe) |
+| 11 | `loteRevisaoApi.ts` | ~500 | `lotes_revisao` (existe) |
+| 12 | `notaEntradaFluxoApi.ts` | ~2000 | `notas_entrada` + `creditos_fornecedor` (existem) |
+| 13 | `consignacaoApi.ts` | ~300 | `lotes_consignacao` + `itens_consignacao` (existem) |
+| 14 | `pendenciasFinanceiraApi.ts` | ~420 | Derivada de notas (sem tabela propria) |
+| 15 | `notificationsApi.ts` | ~50 | In-memory (pode permanecer client-side) |
 
-## Categoria B: Arquivos com localStorage (precisam de novas tabelas)
+### Grupo 2 - localStorage
+| # | Arquivo | Tabelas Supabase |
+|---|---------|------------------|
+| 16 | `taxasEntregaApi.ts` | `taxas_entrega` (**PRECISA CRIAR**) |
+| 17 | `fluxoVendasApi.ts` | `fluxo_vendas` (existe) |
+| 18 | `atividadesGestoresApi.ts` | `atividades_gestores` + `execucoes_atividades` + `logs_atividades` (existem) |
+| 19 | `gestaoAdministrativaApi.ts` | `conferencias_gestao` + `logs_conferencia_gestao` (existem) |
+| 20 | `storiesMonitoramentoApi.ts` | Precisa tabela ou usa existente |
 
-| Arquivo | Uso localStorage | Tabela Necessaria |
-|---|---|---|
-| `fluxoVendasApi.ts` | Estado do fluxo de vendas | `fluxo_vendas` |
-| `atividadesGestoresApi.ts` | Atividades + execucoes diarias | `atividades_gestores`, `execucoes_atividades` |
-| `agendaGestaoApi.ts` | Anotacoes gestao | `anotacoes_gestao` |
-| `gestaoAdministrativaApi.ts` | Conferencias gestao | `conferencias_gestao` |
-
-## Categoria C: In-memory pendentes em arquivos ja migrados
-
-| Arquivo | Dados | Tabela Necessaria |
-|---|---|---|
-| `garantiasApi.ts` | contatosAtivos, registrosAnaliseGarantia | `contatos_ativos_garantia`, `registros_analise_garantia` |
-
----
-
-## Plano de Execucao Sugerido
-
-### Passo 1: Criar tabelas SQL (migracao unica)
-Uma unica migracao SQL criando todas as ~20 tabelas restantes com RLS permissivo temporario.
-
-### Passo 2: Migrar Categoria A (arquivos com mock data) - 12 arquivos
-Para cada arquivo: remover mocks, implementar cache + init async, converter CRUD para Supabase.
-Prioridade: `fiadoApi` e `conferenciaGestorApi` (mais complexos), depois os menores.
-
-### Passo 3: Migrar Categoria B (localStorage) - 4 arquivos
-Substituir `localStorage.getItem/setItem` por queries Supabase.
-O `fluxoVendasApi.ts` e o mais complexo (~800 linhas).
-
-### Passo 4: Completar Categoria C
-Migrar `contatosAtivos` e `registrosAnaliseGarantia` do garantiasApi.
-
-### Passo 5: Limpeza final
-- Remover qualquer referencia residual a localStorage
-- Verificar que nenhum dado mock permanece
-- Validar build sem erros
+### Dados de referencia (mantidos como constantes)
+- `cadastrosApi.ts`: origensVenda, produtosCadastro, tiposDesconto, cargos, modelosPagamento -- estes sao dados estaticos de baixa mutabilidade e ficam como constantes por decisao arquitetural.
+- `feedbackApi.ts`: `getUsuarioLogado()` mock -- sera substituido pelo auth real.
 
 ---
 
-## Estimativa
+## Tabelas a Criar
 
-- ~20 novas tabelas SQL
-- ~15 arquivos API refatorados
-- ~5.000 linhas de codigo afetadas
-- Recomendado dividir em 3-4 mensagens de implementacao
+1. **`taxas_entrega`** - local, valor, status, logs (JSONB)
+2. **`stories_monitoramento`** - competencia, loja_id, lote data (JSONB) -- ou verificar se ja existe
 
-## Recomendacao
+---
 
-Comecar pelo **Passo 1 (criar todas as tabelas)** seguido do **Passo 2** focando nos arquivos mais criticos: `fiadoApi`, `conferenciaGestorApi`, `vendasDigitalApi` e `garantiaExtendidaApi`.
+## Estrategia de Execucao
+
+Para cada arquivo, o padrao e o mesmo ja utilizado nos arquivos migrados:
+
+1. Importar `supabase` client
+2. Criar cache de modulo (`let _cache: T[] = []`) + funcao `init*Cache()` async
+3. Manter funcoes `get*()` sincronas lendo do cache
+4. Converter `add/update/delete` para `async` com `await supabase.from(...)`
+5. Seed automatico na primeira execucao (quando tabela vazia) usando os dados que hoje estao hardcoded
+6. Remover todo localStorage e arrays mock
+7. Atualizar componentes que chamam funcoes agora async (adicionar `await` + `try/catch`)
+
+### Ordem de execucao (por complexidade crescente)
+
+**Lote A (simples, ~6 arquivos por mensagem):**
+1. `planosGarantiaApi.ts`
+2. `valoresRecomendadosTrocaApi.ts`
+3. `taxasEntregaApi.ts` (+ criar tabela)
+4. `garantiaExtendidaApi.ts`
+5. `baseTrocasPendentesApi.ts`
+6. `retiradaPecasApi.ts`
+
+**Lote B (medio, ~5 arquivos):**
+7. `garantiasApi.ts` (residual contatosAtivos + analiseGarantia)
+8. `vendasDigitalApi.ts`
+9. `atividadesGestoresApi.ts`
+10. `gestaoAdministrativaApi.ts`
+11. `storiesMonitoramentoApi.ts`
+
+**Lote C (complexo, ~5 arquivos):**
+12. `fluxoVendasApi.ts`
+13. `conferenciaGestorApi.ts`
+14. `solicitacaoPecasApi.ts`
+15. `osApi.ts` (produtosPendentes)
+16. `pendenciasFinanceiraApi.ts`
+
+**Lote D (muito complexo):**
+17. `loteRevisaoApi.ts`
+18. `consignacaoApi.ts`
+19. `notaEntradaFluxoApi.ts` (~2000 linhas)
+
+### Notas sobre `notificationsApi.ts`
+O sistema de notificacoes e efemero (client-side, session-only). Pode permanecer em memoria sem Supabase, a menos que se deseje persistencia entre sessoes.
+
+---
+
+## Resultado Final
+
+- **0 dados mockados** no sistema
+- **0 uso de localStorage** para dados de negocio
+- Todos os dados persistidos no Supabase com RLS ativo
+- Cache local para performance, sincronizado com o banco
 

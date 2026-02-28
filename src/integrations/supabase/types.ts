@@ -14,6 +14,116 @@ export type Database = {
   }
   public: {
     Tables: {
+      acessorios: {
+        Row: {
+          categoria: string | null
+          created_at: string | null
+          id: string
+          loja_id: string | null
+          marca: string | null
+          nome: string
+          quantidade: number | null
+          status: string | null
+          valor_custo: number | null
+          valor_venda: number | null
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string | null
+          id?: string
+          loja_id?: string | null
+          marca?: string | null
+          nome: string
+          quantidade?: number | null
+          status?: string | null
+          valor_custo?: number | null
+          valor_venda?: number | null
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string | null
+          id?: string
+          loja_id?: string | null
+          marca?: string | null
+          nome?: string
+          quantidade?: number | null
+          status?: string | null
+          valor_custo?: number | null
+          valor_venda?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "acessorios_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clientes: {
+        Row: {
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          cpf: string | null
+          created_at: string | null
+          data_nascimento: string | null
+          email: string | null
+          endereco: string | null
+          estado: string | null
+          id: string
+          ids_compras: Json | null
+          nome: string
+          numero: string | null
+          origem_cliente: string | null
+          status: string | null
+          telefone: string | null
+          tipo_cliente: string | null
+          tipo_pessoa: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          data_nascimento?: string | null
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          ids_compras?: Json | null
+          nome: string
+          numero?: string | null
+          origem_cliente?: string | null
+          status?: string | null
+          telefone?: string | null
+          tipo_cliente?: string | null
+          tipo_pessoa?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          data_nascimento?: string | null
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          ids_compras?: Json | null
+          nome?: string
+          numero?: string | null
+          origem_cliente?: string | null
+          status?: string | null
+          telefone?: string | null
+          tipo_cliente?: string | null
+          tipo_pessoa?: string | null
+        }
+        Relationships: []
+      }
       colaboradores: {
         Row: {
           ativo: boolean | null
@@ -79,6 +189,140 @@ export type Database = {
           },
         ]
       }
+      contas_financeiras: {
+        Row: {
+          agencia: string | null
+          banco: string | null
+          cnpj: string | null
+          conta: string | null
+          created_at: string | null
+          habilitada: boolean | null
+          historico_alteracoes: Json | null
+          id: string
+          loja_vinculada: string | null
+          nome: string
+          nota_fiscal: boolean | null
+          saldo_atual: number | null
+          saldo_inicial: number | null
+          status: string | null
+          status_maquina: string | null
+          tipo: string | null
+          ultimo_movimento: string | null
+        }
+        Insert: {
+          agencia?: string | null
+          banco?: string | null
+          cnpj?: string | null
+          conta?: string | null
+          created_at?: string | null
+          habilitada?: boolean | null
+          historico_alteracoes?: Json | null
+          id?: string
+          loja_vinculada?: string | null
+          nome: string
+          nota_fiscal?: boolean | null
+          saldo_atual?: number | null
+          saldo_inicial?: number | null
+          status?: string | null
+          status_maquina?: string | null
+          tipo?: string | null
+          ultimo_movimento?: string | null
+        }
+        Update: {
+          agencia?: string | null
+          banco?: string | null
+          cnpj?: string | null
+          conta?: string | null
+          created_at?: string | null
+          habilitada?: boolean | null
+          historico_alteracoes?: Json | null
+          id?: string
+          loja_vinculada?: string | null
+          nome?: string
+          nota_fiscal?: boolean | null
+          saldo_atual?: number | null
+          saldo_inicial?: number | null
+          status?: string | null
+          status_maquina?: string | null
+          tipo?: string | null
+          ultimo_movimento?: string | null
+        }
+        Relationships: []
+      }
+      despesas: {
+        Row: {
+          categoria: string | null
+          competencia: string | null
+          comprovante: string | null
+          conta: string | null
+          created_at: string | null
+          data: string | null
+          data_pagamento: string | null
+          data_vencimento: string | null
+          descricao: string | null
+          documento: string | null
+          id: string
+          loja_id: string | null
+          observacoes: string | null
+          pago_por: string | null
+          periodicidade: string | null
+          recorrente: boolean | null
+          status: string | null
+          tipo: string | null
+          valor: number | null
+        }
+        Insert: {
+          categoria?: string | null
+          competencia?: string | null
+          comprovante?: string | null
+          conta?: string | null
+          created_at?: string | null
+          data?: string | null
+          data_pagamento?: string | null
+          data_vencimento?: string | null
+          descricao?: string | null
+          documento?: string | null
+          id?: string
+          loja_id?: string | null
+          observacoes?: string | null
+          pago_por?: string | null
+          periodicidade?: string | null
+          recorrente?: boolean | null
+          status?: string | null
+          tipo?: string | null
+          valor?: number | null
+        }
+        Update: {
+          categoria?: string | null
+          competencia?: string | null
+          comprovante?: string | null
+          conta?: string | null
+          created_at?: string | null
+          data?: string | null
+          data_pagamento?: string | null
+          data_vencimento?: string | null
+          descricao?: string | null
+          documento?: string | null
+          id?: string
+          loja_id?: string | null
+          observacoes?: string | null
+          pago_por?: string | null
+          periodicidade?: string | null
+          recorrente?: boolean | null
+          status?: string | null
+          tipo?: string | null
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "despesas_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       financeiro: {
         Row: {
           categoria: string | null
@@ -129,6 +373,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      fornecedores: {
+        Row: {
+          cnpj: string | null
+          created_at: string | null
+          endereco: string | null
+          id: string
+          nome: string
+          responsavel: string | null
+          status: string | null
+          telefone: string | null
+          ultima_compra: string | null
+        }
+        Insert: {
+          cnpj?: string | null
+          created_at?: string | null
+          endereco?: string | null
+          id?: string
+          nome: string
+          responsavel?: string | null
+          status?: string | null
+          telefone?: string | null
+          ultima_compra?: string | null
+        }
+        Update: {
+          cnpj?: string | null
+          created_at?: string | null
+          endereco?: string | null
+          id?: string
+          nome?: string
+          responsavel?: string | null
+          status?: string | null
+          telefone?: string | null
+          ultima_compra?: string | null
+        }
+        Relationships: []
       }
       garantias: {
         Row: {
@@ -285,6 +565,89 @@ export type Database = {
         }
         Relationships: []
       }
+      maquinas_cartao: {
+        Row: {
+          cnpj_vinculado: string | null
+          conta_origem: string | null
+          created_at: string | null
+          id: string
+          nome: string
+          parcelamentos: Json | null
+          percentual_maquina: number | null
+          status: string | null
+          taxas: Json | null
+        }
+        Insert: {
+          cnpj_vinculado?: string | null
+          conta_origem?: string | null
+          created_at?: string | null
+          id?: string
+          nome: string
+          parcelamentos?: Json | null
+          percentual_maquina?: number | null
+          status?: string | null
+          taxas?: Json | null
+        }
+        Update: {
+          cnpj_vinculado?: string | null
+          conta_origem?: string | null
+          created_at?: string | null
+          id?: string
+          nome?: string
+          parcelamentos?: Json | null
+          percentual_maquina?: number | null
+          status?: string | null
+          taxas?: Json | null
+        }
+        Relationships: []
+      }
+      metas_lojas: {
+        Row: {
+          ano: number | null
+          created_at: string | null
+          id: string
+          loja_id: string | null
+          mes: number | null
+          meta_acessorios: number | null
+          meta_assistencia: number | null
+          meta_faturamento: number | null
+          meta_garantia: number | null
+          ultima_atualizacao: string | null
+        }
+        Insert: {
+          ano?: number | null
+          created_at?: string | null
+          id?: string
+          loja_id?: string | null
+          mes?: number | null
+          meta_acessorios?: number | null
+          meta_assistencia?: number | null
+          meta_faturamento?: number | null
+          meta_garantia?: number | null
+          ultima_atualizacao?: string | null
+        }
+        Update: {
+          ano?: number | null
+          created_at?: string | null
+          id?: string
+          loja_id?: string | null
+          mes?: number | null
+          meta_acessorios?: number | null
+          meta_assistencia?: number | null
+          meta_faturamento?: number | null
+          meta_garantia?: number | null
+          ultima_atualizacao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metas_lojas_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       movimentacoes_estoque: {
         Row: {
           created_at: string | null
@@ -349,6 +712,102 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      movimentacoes_pecas: {
+        Row: {
+          created_at: string | null
+          data: string | null
+          descricao: string | null
+          id: string
+          os_id: string | null
+          peca_id: string | null
+          quantidade: number | null
+          tipo: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data?: string | null
+          descricao?: string | null
+          id?: string
+          os_id?: string | null
+          peca_id?: string | null
+          quantidade?: number | null
+          tipo?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data?: string | null
+          descricao?: string | null
+          id?: string
+          os_id?: string | null
+          peca_id?: string | null
+          quantidade?: number | null
+          tipo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimentacoes_pecas_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentacoes_pecas_peca_id_fkey"
+            columns: ["peca_id"]
+            isOneToOne: false
+            referencedRelation: "pecas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notas_compra: {
+        Row: {
+          created_at: string | null
+          dados_extras: Json | null
+          data: string | null
+          fornecedor: string | null
+          id: string
+          numero_nota: string | null
+          origem: string | null
+          pagamento: Json | null
+          produtos: Json | null
+          status: string | null
+          status_urgencia: string | null
+          timeline: Json | null
+          valor_total: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          dados_extras?: Json | null
+          data?: string | null
+          fornecedor?: string | null
+          id?: string
+          numero_nota?: string | null
+          origem?: string | null
+          pagamento?: Json | null
+          produtos?: Json | null
+          status?: string | null
+          status_urgencia?: string | null
+          timeline?: Json | null
+          valor_total?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          dados_extras?: Json | null
+          data?: string | null
+          fornecedor?: string | null
+          id?: string
+          numero_nota?: string | null
+          origem?: string | null
+          pagamento?: Json | null
+          produtos?: Json | null
+          status?: string | null
+          status_urgencia?: string | null
+          timeline?: Json | null
+          valor_total?: number | null
+        }
+        Relationships: []
       }
       ordens_servico: {
         Row: {
@@ -626,6 +1085,107 @@ export type Database = {
             columns: ["os_id"]
             isOneToOne: false
             referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pagamentos_financeiros: {
+        Row: {
+          conta: string | null
+          created_at: string | null
+          data: string | null
+          descricao: string | null
+          id: string
+          loja: string | null
+          meio_pagamento: string | null
+          status: string | null
+          valor: number | null
+        }
+        Insert: {
+          conta?: string | null
+          created_at?: string | null
+          data?: string | null
+          descricao?: string | null
+          id?: string
+          loja?: string | null
+          meio_pagamento?: string | null
+          status?: string | null
+          valor?: number | null
+        }
+        Update: {
+          conta?: string | null
+          created_at?: string | null
+          data?: string | null
+          descricao?: string | null
+          id?: string
+          loja?: string | null
+          meio_pagamento?: string | null
+          status?: string | null
+          valor?: number | null
+        }
+        Relationships: []
+      }
+      pecas: {
+        Row: {
+          created_at: string | null
+          data_entrada: string | null
+          descricao: string
+          fornecedor_id: string | null
+          id: string
+          loja_id: string | null
+          lote_consignacao_id: string | null
+          modelo: string | null
+          movimentacao_peca_id: string | null
+          nota_compra_id: string | null
+          origem: string | null
+          quantidade: number | null
+          status: string | null
+          status_movimentacao: string | null
+          valor_custo: number | null
+          valor_recomendado: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_entrada?: string | null
+          descricao: string
+          fornecedor_id?: string | null
+          id?: string
+          loja_id?: string | null
+          lote_consignacao_id?: string | null
+          modelo?: string | null
+          movimentacao_peca_id?: string | null
+          nota_compra_id?: string | null
+          origem?: string | null
+          quantidade?: number | null
+          status?: string | null
+          status_movimentacao?: string | null
+          valor_custo?: number | null
+          valor_recomendado?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          data_entrada?: string | null
+          descricao?: string
+          fornecedor_id?: string | null
+          id?: string
+          loja_id?: string | null
+          lote_consignacao_id?: string | null
+          modelo?: string | null
+          movimentacao_peca_id?: string | null
+          nota_compra_id?: string | null
+          origem?: string | null
+          quantidade?: number | null
+          status?: string | null
+          status_movimentacao?: string | null
+          valor_custo?: number | null
+          valor_recomendado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pecas_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "lojas"
             referencedColumns: ["id"]
           },
         ]

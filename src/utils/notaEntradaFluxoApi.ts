@@ -1928,11 +1928,11 @@ export interface ResultadoTriagem {
  * Produtos marcados como "verde" seguem para o Financeiro.
  * Produtos marcados como "amarelo" seguem para Assistência (lote de revisão).
  */
-export const processarTriagemIndividualizada = (
+export const processarTriagemIndividualizada = async (
   notaId: string,
   triagens: TriagemProduto[],
   usuario: string
-): ResultadoTriagem | null => {
+): Promise<ResultadoTriagem | null> => {
   const nota = notasEntrada.find(n => n.id === notaId);
   if (!nota) return null;
 
@@ -1988,9 +1988,9 @@ export const processarTriagemIndividualizada = (
           };
         });
         
-        const lote = criarLoteRevisao(notaId, itensLote, usuario);
+        const lote = await criarLoteRevisao(notaId, itensLote, usuario);
         if (lote) {
-          const loteEncaminhado = encaminharLoteParaAssistencia(lote.id, usuario);
+          const loteEncaminhado = await encaminharLoteParaAssistencia(lote.id, usuario);
           marcarProdutosEmRevisaoTecnica(imeisAmarelos, lote.id);
           resultado.loteRevisaoId = lote.id;
           resultado.osIds = loteEncaminhado?.osIds;

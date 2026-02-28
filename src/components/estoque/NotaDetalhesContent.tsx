@@ -174,10 +174,12 @@ export function NotaDetalhesContent({ nota, showActions = true }: NotaDetalhesCo
     if (reconciliacaoExecutada.current) return;
     if (loteExistente && loteExistente.status !== 'Finalizado') {
       const responsavel = user?.colaborador?.nome || user?.username || 'Sistema';
-      const reconciliou = reconciliarLoteComOS(loteExistente.id, responsavel);
-      if (reconciliou) {
-        console.log('[NotaDetalhes] Reconciliação retroativa executada para lote', loteExistente.id);
-      }
+      reconciliarLoteComOS(loteExistente.id, responsavel).then(reconciliou => {
+        if (reconciliou) {
+          console.log('[NotaDetalhes] Reconciliação retroativa executada para lote', loteExistente.id);
+        }
+        reconciliacaoExecutada.current = true;
+      });
       reconciliacaoExecutada.current = true;
     }
   }, [loteExistente, user]);
@@ -202,7 +204,7 @@ export function NotaDetalhesContent({ nota, showActions = true }: NotaDetalhesCo
     setItensSelecionados(prev => ({ ...prev, [produtoId]: !prev[produtoId] }));
   };
 
-  const handleConfirmarEncaminhamento = () => {
+  const handleConfirmarEncaminhamento = async () => {
     const selecionados = produtosElegiveis.filter(p => itensSelecionados[p.id]);
     if (selecionados.length === 0) {
       toast.error('Selecione ao menos um aparelho');
@@ -229,9 +231,9 @@ export function NotaDetalhesContent({ nota, showActions = true }: NotaDetalhesCo
       dataRegistro: new Date().toISOString()
     }));
 
-    const lote = criarLoteRevisao(nota.id, itensLote, responsavel);
+    const lote = await criarLoteRevisao(nota.id, itensLote, responsavel);
     if (lote) {
-      encaminharLoteParaAssistencia(lote.id, responsavel);
+      await encaminharLoteParaAssistencia(lote.id, responsavel);
       const notaRef = getNotaEntradaById(nota.id);
       if (notaRef) {
         notaRef.loteRevisaoId = lote.id;
@@ -244,7 +246,7 @@ export function NotaDetalhesContent({ nota, showActions = true }: NotaDetalhesCo
   };
   // ===== HANDLERS DE CONFERIR / RECUSAR =====
 
-  const handleConferirItem = (item: any, loteId: string) => {
+  const handleConferirItem = async (item: any, loteId: string) => {
     if (!item.osId) return;
     const osFresh = getOrdemServicoById(item.osId);
     if (!osFresh) return;
@@ -274,7 +276,7 @@ export function NotaDetalhesContent({ nota, showActions = true }: NotaDetalhesCo
     });
 
     // Atualizar item do lote para Concluido
-    atualizarItemRevisao(loteId, item.id, { statusReparo: 'Concluido', custoReparo });
+    await atualizarItemRevisao(loteId, item.id, { statusReparo: 'Concluido', custoReparo });
 
     // Registrar evento na timeline da nota
     registrarEventoTecnicoNaNota(loteId, item.osId, 'retorno', nomeResponsavel);
@@ -325,7 +327,7 @@ export function NotaDetalhesContent({ nota, showActions = true }: NotaDetalhesCo
 
     // Reverter item do lote para Em Andamento
     if (loteRevisao) {
-      atualizarItemRevisao(loteRevisao.id, itemRecusa.itemId, { statusReparo: 'Em Andamento', custoReparo: 0 });
+      atualizarItemRevisao(loteRevisao.id, itemRecusa.itemId, { statusReparo: 'Em Andamento', custoReparo: 0 }).catch(console.error);
     }
 
     toast.success(`OS ${itemRecusa.osId} devolvida para retrabalho.`);

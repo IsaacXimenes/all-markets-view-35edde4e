@@ -22,6 +22,7 @@ import { initPendenciasFinanceirasCache } from "@/utils/pendenciasFinanceiraApi"
 import { initSolicitacoesPecasCache, initNotasAssistenciaCache, initLotesPagamentoCache } from "@/utils/solicitacaoPecasApi";
 import { initProdutosPendentesCache } from "@/utils/osApi";
 import { initConsignacaoCache } from "@/utils/consignacaoApi";
+import { initLotesRevisaoCache } from "@/utils/loteRevisaoApi";
 import Login from "./pages/Login";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -184,6 +185,7 @@ const AppInitializer = ({ children }: { children: React.ReactNode }) => {
         initLotesPagamentoCache(),
         initProdutosPendentesCache(),
         initConsignacaoCache(),
+        initLotesRevisaoCache(),
       ]).catch(err => console.error('Erro ao inicializar caches:', err));
     }
   }, [inicializado]);

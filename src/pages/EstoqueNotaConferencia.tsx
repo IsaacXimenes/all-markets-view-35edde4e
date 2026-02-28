@@ -385,7 +385,7 @@ export default function EstoqueNotaConferencia() {
   };
 
   // Finalizar triagem individualizada
-  const handleFinalizarTriagem = () => {
+  const handleFinalizarTriagem = async () => {
     if (!nota || !todosTriados) return;
     if (!todosIMEIsPreenchidos) {
       toast.error('Todos os aparelhos devem ter o IMEI preenchido');
@@ -404,7 +404,7 @@ export default function EstoqueNotaConferencia() {
       motivoDefeito: motivosDefeito[produtoId]
     }));
 
-    const resultado = processarTriagemIndividualizada(nota.id, triagens, 'Carlos Estoque');
+    const resultado = await processarTriagemIndividualizada(nota.id, triagens, 'Carlos Estoque');
     if (!resultado) {
       toast.error('Erro ao processar triagem');
       return;

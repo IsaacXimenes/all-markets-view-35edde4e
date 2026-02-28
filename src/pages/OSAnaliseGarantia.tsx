@@ -228,7 +228,7 @@ export default function OSAnaliseGarantia() {
 
       // Atualizar item do lote de revisão com o ID da OS criada
       if (registroAprovado.metadata?.loteRevisaoId && registroAprovado.metadata?.loteRevisaoItemId && novaOS) {
-        atualizarItemRevisao(
+        await atualizarItemRevisao(
           registroAprovado.metadata.loteRevisaoId,
           registroAprovado.metadata.loteRevisaoItemId,
           { osId: novaOS.id, statusReparo: 'Em Andamento' }

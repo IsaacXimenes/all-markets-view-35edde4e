@@ -136,7 +136,7 @@ export const criarPendenciaFinanceira = async (nota: NotaCompra): Promise<Penden
   };
 
   pendenciasCache.push(novaPendencia);
-  const { error } = await supabase.from('pendencias_financeiras').insert(pendenciaToDb(novaPendencia));
+  const { error } = await supabase.from('pendencias_financeiras').insert(pendenciaToDb(novaPendencia) as any);
   if (error) console.error('[PendenciasFinanceiras] Erro insert:', error);
 
   addNotification({ type: 'nota_pendencia', title: 'Nova pendência financeira', description: `Nota ${nota.id} de ${nota.fornecedor} aguardando conferência - ${formatCurrency(nota.valorTotal)}`, targetUsers: ['financeiro', 'gestor'] });
@@ -185,7 +185,7 @@ export const atualizarPendencia = async (
   }
 
   pendenciasCache[index] = pendencia;
-  const { error } = await supabase.from('pendencias_financeiras').update(pendenciaToDb(pendencia)).eq('id', pendencia.id);
+  const { error } = await supabase.from('pendencias_financeiras').update(pendenciaToDb(pendencia) as any).eq('id', pendencia.id);
   if (error) console.error('[PendenciasFinanceiras] Erro update:', error);
   return pendencia;
 };
@@ -202,7 +202,7 @@ export const finalizarPagamentoPendencia = async (
   pendencia.timeline = [{ id: `TL-${notaId}-${String(pendencia.timeline.length + 1).padStart(3, '0')}`, data: new Date().toISOString(), tipo: 'pagamento', titulo: 'Pagamento Confirmado', descricao: `Pagamento de ${formatCurrency(pendencia.valorTotal)} via ${pagamento.formaPagamento}. ${pagamento.observacoes || ''}`, responsavel: pagamento.responsavel, valor: pendencia.valorTotal, comprovante: pagamento.comprovante }, ...pendencia.timeline];
 
   pendenciasCache[index] = pendencia;
-  const { error } = await supabase.from('pendencias_financeiras').update(pendenciaToDb(pendencia)).eq('id', pendencia.id);
+  const { error } = await supabase.from('pendencias_financeiras').update(pendenciaToDb(pendencia) as any).eq('id', pendencia.id);
   if (error) console.error('[PendenciasFinanceiras] Erro update:', error);
 
   const nota = getNotaById(notaId);
@@ -228,7 +228,7 @@ export const forcarFinalizacaoPendencia = async (
   pendencia.timeline = [{ id: `TL-${notaId}-${String(pendencia.timeline.length + 1).padStart(3, '0')}`, data: new Date().toISOString(), tipo: 'pagamento', titulo: 'Finalizada com Pendência', descricao: `Pagamento forçado com ${pendencia.percentualConferencia}% conferido. Valor não conferido: ${formatCurrency(valorNaoConferido)}. ${pagamento.observacoes || ''}`, responsavel: pagamento.responsavel, valor: pendencia.valorTotal, comprovante: pagamento.comprovante }, ...pendencia.timeline];
 
   pendenciasCache[index] = pendencia;
-  const { error } = await supabase.from('pendencias_financeiras').update(pendenciaToDb(pendencia)).eq('id', pendencia.id);
+  const { error } = await supabase.from('pendencias_financeiras').update(pendenciaToDb(pendencia) as any).eq('id', pendencia.id);
   if (error) console.error('[PendenciasFinanceiras] Erro update:', error);
 
   const nota = getNotaById(notaId);

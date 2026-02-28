@@ -138,7 +138,7 @@ export const initFluxoVendasCache = async () => {
 const saveFluxoToSupabase = async (vendaId: string, data: Partial<VendaComFluxo>) => {
   try {
     const record = cacheToRecord(vendaId, data);
-    const { error } = await supabase.from('fluxo_vendas').upsert(record, { onConflict: 'venda_id' });
+    const { error } = await supabase.from('fluxo_vendas').upsert(record as any, { onConflict: 'venda_id' });
     if (error) console.error('[FluxoVendas] Erro upsert:', error);
   } catch (err) {
     console.error('[FluxoVendas] Erro ao salvar:', err);

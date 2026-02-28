@@ -130,7 +130,7 @@ export const initConferenciasGestorCache = async () => {
     if (!data || data.length === 0) {
       // Seed
       const records = seedData.map(conferenciaToDb);
-      const { error: insertError } = await supabase.from('conferencias_gestor').insert(records);
+      const { error: insertError } = await supabase.from('conferencias_gestor').insert(records as any);
       if (insertError) console.error('[ConferenciasGestor] Erro seed:', insertError);
       conferenciaCache = [...seedData];
     } else {
@@ -182,7 +182,7 @@ export const validarVendaGestor = async (
   };
 
   conferenciaCache[index] = updated;
-  const { error } = await supabase.from('conferencias_gestor').update(conferenciaToDb(updated)).eq('id', id);
+  const { error } = await supabase.from('conferencias_gestor').update(conferenciaToDb(updated) as any).eq('id', id);
   if (error) console.error('[ConferenciasGestor] Erro update:', error);
 
   addNotification({ type: 'venda_conferencia', title: `Venda ${updated.vendaId} conferida pelo Gestor`, description: `${gestorNome} validou a venda - Enviada ao Financeiro`, targetUsers: ['COL-006'] });
@@ -206,7 +206,7 @@ export const finalizarVendaFinanceiro = async (
   };
 
   conferenciaCache[index] = updated;
-  const { error } = await supabase.from('conferencias_gestor').update(conferenciaToDb(updated)).eq('id', id);
+  const { error } = await supabase.from('conferencias_gestor').update(conferenciaToDb(updated) as any).eq('id', id);
   if (error) console.error('[ConferenciasGestor] Erro update:', error);
   return updated;
 };
@@ -227,7 +227,7 @@ export const adicionarVendaParaConferencia = async (
   };
 
   conferenciaCache.unshift(nova);
-  const { error } = await supabase.from('conferencias_gestor').insert(conferenciaToDb(nova));
+  const { error } = await supabase.from('conferencias_gestor').insert(conferenciaToDb(nova) as any);
   if (error) console.error('[ConferenciasGestor] Erro insert:', error);
   notificarGestores(nova);
   return nova;

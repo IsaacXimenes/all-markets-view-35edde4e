@@ -136,10 +136,10 @@ export default function FinanceiroNotasAssistencia() {
 
   const botaoDesabilitado = !contaPagamento || !formaPagamento || !responsavelFinanceiro || !comprovante;
 
-  const handleFinalizarNota = () => {
+  const handleFinalizarNota = async () => {
     if (!notaSelecionada || botaoDesabilitado) return;
 
-    const notaFinalizada = finalizarNotaAssistencia(notaSelecionada.id, {
+    const notaFinalizada = await finalizarNotaAssistencia(notaSelecionada.id, {
       responsavelFinanceiro,
       formaPagamento,
       contaPagamento

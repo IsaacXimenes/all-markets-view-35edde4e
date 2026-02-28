@@ -18,9 +18,7 @@ import { getStatusConferenciaByVendaId, StatusConferencia } from '@/utils/confer
 import { displayIMEI } from '@/utils/imeiMask';
 import { getGarantiasByVendaId, calcularStatusExpiracao } from '@/utils/garantiasApi';
 import { format, addMonths } from 'date-fns';
-
-// Mock do usuário logado
-const usuarioLogado = { id: 'COL-007', nome: 'Carlos Vendedor' };
+import { useAuthStore } from '@/store/authStore';
 
 export default function Vendas() {
   const navigate = useNavigate();
@@ -48,10 +46,14 @@ export default function Vendas() {
   }>({ open: false, tipo: 'fotos', tradeIn: null, vendaId: '' });
   const [fotoSelecionadaIndex, setFotoSelecionadaIndex] = useState(0);
   
+  // Usuário logado via authStore
+  const user = useAuthStore(s => s.user);
+  const usuarioLogado = { id: user?.colaborador?.id || '', nome: user?.colaborador?.nome || '' };
+
   // Identificar permissões do usuário logado
   const colaboradorLogado = useMemo(() => {
     return colaboradores.find(c => c.id === usuarioLogado.id);
-  }, [colaboradores]);
+  }, [colaboradores, usuarioLogado.id]);
   
   const isGestor = colaboradorLogado?.eh_gestor || false;
 

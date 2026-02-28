@@ -22,6 +22,7 @@ import { getContasFinanceirasHabilitadas, ContaFinanceira } from '@/utils/cadast
 import { useFluxoVendas } from '@/hooks/useFluxoVendas';
 import { finalizarVendaDowngrade, VendaComFluxo } from '@/utils/fluxoVendasApi';
 import { formatarMoeda } from '@/utils/formatUtils';
+import { useAuthStore } from '@/store/authStore';
 
 const formatCurrency = formatarMoeda;
 
@@ -64,10 +65,11 @@ export default function FinanceiroPagamentosDowngrade() {
   const [showDetalhesModal, setShowDetalhesModal] = useState(false);
   const [vendaDetalhes, setVendaDetalhes] = useState<VendaComFluxo | null>(null);
   
-  // Usuário logado (mockado)
+  // Usuário logado via authStore
+  const user = useAuthStore(s => s.user);
   const usuarioLogado = {
-    id: 'USR-FIN-001',
-    nome: 'Financeiro Admin'
+    id: user?.colaborador?.id || '',
+    nome: user?.colaborador?.nome || ''
   };
   
   // Vendas filtradas (pendentes)

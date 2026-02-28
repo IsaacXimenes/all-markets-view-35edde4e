@@ -28,6 +28,7 @@ import {
   getProximosMeses,
   calcularSituacaoParcelas
 } from '@/utils/adiantamentosApi';
+import { useAuthStore } from '@/store/authStore';
 
 const RHAdiantamentos: React.FC = () => {
   const { toast } = useToast();
@@ -195,7 +196,8 @@ const RHAdiantamentos: React.FC = () => {
     }
     
     const agora = new Date().toISOString();
-    const usuarioLogado = { id: 'COL-001', nome: 'Lucas Mendes' }; // Mock
+    const authUser = useAuthStore.getState().user;
+    const usuarioLogado = { id: authUser?.colaborador?.id || '', nome: authUser?.colaborador?.nome || '' };
     
     if (editingAdiantamento) {
       // Edição

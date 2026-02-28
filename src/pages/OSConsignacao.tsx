@@ -168,7 +168,7 @@ export default function OSConsignacao() {
     return acc + val * qty;
   }, 0);
 
-  const handleCriarLote = () => {
+  const handleCriarLote = async () => {
     if (!novoFornecedor) {
       toast({ title: 'Erro', description: 'Selecione um fornecedor', variant: 'destructive' });
       return;
@@ -191,7 +191,7 @@ export default function OSConsignacao() {
       })),
     };
 
-    const lote = criarLoteConsignacao(input);
+    const lote = await criarLoteConsignacao(input);
     setNovoFornecedor('');
     setNovoItens([{ descricao: '', modelo: '', quantidade: '1', valorCusto: '', lojaDestinoId: '' }]);
     toast({ title: 'Lote criado', description: `${lote.id} cadastrado com ${lote.itens.length} item(s)` });
@@ -346,7 +346,7 @@ export default function OSConsignacao() {
     setEditItens(prev => prev.filter(i => i.id !== itemId));
   };
 
-  const handleSalvarEdicao = () => {
+  const handleSalvarEdicao = async () => {
     if (!loteSelecionado) return;
 
     const parseVal = (v: string) => {
@@ -371,7 +371,7 @@ export default function OSConsignacao() {
       lojaDestinoId: i.lojaDestinoId,
     }));
 
-    const result = editarLoteConsignacao(loteSelecionado.id, {
+    const result = await editarLoteConsignacao(loteSelecionado.id, {
       fornecedorId: editFornecedor !== loteSelecionado.fornecedorId ? editFornecedor : undefined,
       itens: itensEditados,
       novosItens: novosItensValidos.length > 0 ? novosItensValidos : undefined,

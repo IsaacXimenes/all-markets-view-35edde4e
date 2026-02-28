@@ -676,7 +676,7 @@ export default function OSAssistenciaNova() {
     setConfirmarOpen(true);
   };
 
-  const handleRegistrarOS = () => {
+  const handleRegistrarOS = async () => {
     const tecnicoObj = tecnicos.find(t => t.id === confirmTecnico);
     const lojaObj = lojas.find(l => l.id === confirmLoja);
 
@@ -787,7 +787,7 @@ export default function OSAssistenciaNova() {
     const resultadosBaixa: string[] = [];
     
     for (const peca of pecasComBaixa) {
-      const resultado = darBaixaPeca(peca.pecaEstoqueId, peca.quantidadePeca || 1, novaOS.id);
+      const resultado = await darBaixaPeca(peca.pecaEstoqueId, peca.quantidadePeca || 1, novaOS.id);
       if (resultado.sucesso) {
         resultadosBaixa.push(resultado.mensagem);
         // Adicionar registro na timeline

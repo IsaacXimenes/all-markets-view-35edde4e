@@ -16,6 +16,7 @@ import { ComprovantePreview } from '@/components/vendas/ComprovantePreview';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { getOrdensServico, getOrdemServicoById, updateOrdemServico, formatCurrency, OrdemServico } from '@/utils/assistenciaApi';
+import { getConferenciaGestorData, salvarConferenciaGestorData } from '@/utils/fluxoVendasApi';
 import { getClientes, getContasFinanceirasHabilitadas } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { useAuthStore } from '@/store/authStore';
@@ -170,8 +171,8 @@ export default function OSConferenciaGestor() {
     const metodos = (fresh || os).pagamentos?.map(p => p.meio) || [];
     const metodosUnicos = [...new Set(metodos)];
 
-    const storedValidacoes = localStorage.getItem(`validacao_pagamentos_os_${os.id}`);
-    const existingValidacoes = storedValidacoes ? JSON.parse(storedValidacoes) : [];
+    const gestorData = getConferenciaGestorData(`OS-${os.id}`);
+    const existingValidacoes = gestorData.validacoesPagamento || [];
 
     const validacoes = metodosUnicos.map(metodo => {
       const existing = existingValidacoes.find((v: ValidacaoPagamento) => v.metodoPagamento === metodo);
@@ -204,7 +205,7 @@ export default function OSConferenciaGestor() {
     );
   };
 
-  const handleAprovar = () => {
+  const handleAprovar = async () => {
     if (!osSelecionada) return;
 
     const naoValidados = validacoesPagamento.filter(v => !v.validadoGestor);
@@ -213,13 +214,12 @@ export default function OSConferenciaGestor() {
       return;
     }
 
-    // Salvar validações
-    localStorage.setItem(
-      `validacao_pagamentos_os_${osSelecionada.id}`,
-      JSON.stringify(validacoesPagamento)
-    );
+    // Salvar validações no DB
+    await salvarConferenciaGestorData(`OS-${osSelecionada.id}`, {
+      validacoesPagamento,
+    });
 
-    // Salvar observação
+    // Salvar observação no DB
     if (observacaoGestor.trim()) {
       const obsGestor: ObservacaoGestor = {
         texto: observacaoGestor.trim(),
@@ -227,10 +227,9 @@ export default function OSConferenciaGestor() {
         usuarioId: user?.colaborador?.id || 'gestor',
         usuarioNome: user?.colaborador?.nome || 'Gestor'
       };
-      localStorage.setItem(
-        `observacao_gestor_os_${osSelecionada.id}`,
-        JSON.stringify(obsGestor)
-      );
+      await salvarConferenciaGestorData(`OS-${osSelecionada.id}`, {
+        observacao: obsGestor,
+      });
     }
 
     updateOrdemServico(osSelecionada.id, {

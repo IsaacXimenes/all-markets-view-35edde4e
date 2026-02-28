@@ -44,11 +44,12 @@ import { formatCurrency } from '@/utils/formatUtils';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { toast } from 'sonner';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
-
-// Mock do usuário logado
-const usuarioLogado = { id: 'COL-007', nome: 'Carlos Lançador', cargo: 'Vendedor' };
+import { useAuthStore } from '@/store/authStore';
 
 export default function VendasConferenciaLancamento() {
+  const user = useAuthStore(s => s.user);
+  const usuarioLogado = { id: user?.colaborador?.id || '', nome: user?.colaborador?.nome || '', cargo: user?.colaborador?.cargo || '' };
+
   const navigate = useNavigate();
   const { obterLojasAtivas, obterColaboradoresAtivos, obterVendedores, obterGestores, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   // Incluir histórico para manter vendas na tela após aprovação

@@ -27,6 +27,7 @@ import {
   getProximosMeses,
   calcularSituacaoParcelas
 } from '@/utils/valesApi';
+import { useAuthStore } from '@/store/authStore';
 
 const RHVales: React.FC = () => {
   const { toast } = useToast();
@@ -196,7 +197,8 @@ const RHVales: React.FC = () => {
     }
     
     const agora = new Date().toISOString();
-    const usuarioLogado = { id: 'COL-001', nome: 'Lucas Mendes' }; // Mock
+    const authUser = useAuthStore.getState().user;
+    const usuarioLogado = { id: authUser?.colaborador?.id || '', nome: authUser?.colaborador?.nome || '' };
     
     if (editingVale) {
       // Edição

@@ -1,5 +1,6 @@
 // API de Feedback para Recursos Humanos - Supabase Integration
 import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/store/authStore';
 
 export interface FeedbackRegistro {
   id: string;
@@ -147,13 +148,18 @@ export const isUsuarioGestor = (cargoNome: string): boolean => {
     cargoNome.toLowerCase().includes('supervisor'));
 };
 
-// Usuário logado mockado (gestor)
-export const getUsuarioLogado = () => ({
-  id: '7c1231ea',
-  nome: 'Fernanda Gabrielle Silva de Lima',
-  cargo: 'Assistente Administrativo',
-  isGestor: true
-});
+// Usuário logado real via authStore
+export const getUsuarioLogado = () => {
+  const user = useAuthStore.getState().user;
+  return {
+    id: user?.colaborador?.id || '',
+    nome: user?.colaborador?.nome || '',
+    cargo: user?.colaborador?.cargo || '',
+    isGestor: user?.colaborador?.cargo?.toLowerCase().includes('gerente') || 
+              user?.colaborador?.cargo?.toLowerCase().includes('gestor') || 
+              user?.colaborador?.cargo?.toLowerCase().includes('supervisor') || false
+  };
+};
 
 // Exportar CSV
 export const exportFeedbacksToCSV = (data: any[], filename: string) => {

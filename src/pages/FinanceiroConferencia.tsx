@@ -27,9 +27,7 @@ import {
 import { getOrdensServico, getOrdemServicoById, updateOrdemServico, formatCurrency as formatCurrencyOS } from '@/utils/assistenciaApi';
 import { formatCurrency } from '@/utils/formatUtils';
 import { toast } from 'sonner';
-
-// Mock do usuário logado (financeiro)
-const usuarioLogado = { id: 'COL-008', nome: 'Ana Financeiro' };
+import { useAuthStore } from '@/store/authStore';
 
 // Interface para linha da tabela (dividida por método de pagamento)
 interface LinhaConferencia {
@@ -118,6 +116,8 @@ interface AprovacaoGestor {
 
 export default function FinanceiroConferencia() {
   const navigate = useNavigate();
+  const user = useAuthStore(s => s.user);
+  const usuarioLogado = { id: user?.colaborador?.id || '', nome: user?.colaborador?.nome || '' };
   const { obterLojasAtivas, obterColaboradoresAtivos, obterFinanceiros, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   const { vendas, recarregar } = useFluxoVendas({
     status: ['Conferência Financeiro', 'Finalizado']

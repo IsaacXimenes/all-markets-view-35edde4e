@@ -210,6 +210,75 @@ export type Database = {
         }
         Relationships: []
       }
+      base_trocas_pendentes: {
+        Row: {
+          cliente_id: string | null
+          cliente_nome: string | null
+          created_at: string | null
+          data_recebimento: string | null
+          data_venda: string | null
+          fotos_aparelho: Json | null
+          fotos_recebimento: Json | null
+          id: string
+          loja_venda: string | null
+          observacoes_recebimento: string | null
+          responsavel_recebimento_id: string | null
+          responsavel_recebimento_nome: string | null
+          sla_congelado: string | null
+          sla_faixa_congelada: string | null
+          status: string | null
+          termo_responsabilidade: Json | null
+          trade_in: Json | null
+          venda_id: string | null
+          vendedor_id: string | null
+          vendedor_nome: string | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          data_recebimento?: string | null
+          data_venda?: string | null
+          fotos_aparelho?: Json | null
+          fotos_recebimento?: Json | null
+          id?: string
+          loja_venda?: string | null
+          observacoes_recebimento?: string | null
+          responsavel_recebimento_id?: string | null
+          responsavel_recebimento_nome?: string | null
+          sla_congelado?: string | null
+          sla_faixa_congelada?: string | null
+          status?: string | null
+          termo_responsabilidade?: Json | null
+          trade_in?: Json | null
+          venda_id?: string | null
+          vendedor_id?: string | null
+          vendedor_nome?: string | null
+        }
+        Update: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          data_recebimento?: string | null
+          data_venda?: string | null
+          fotos_aparelho?: Json | null
+          fotos_recebimento?: Json | null
+          id?: string
+          loja_venda?: string | null
+          observacoes_recebimento?: string | null
+          responsavel_recebimento_id?: string | null
+          responsavel_recebimento_nome?: string | null
+          sla_congelado?: string | null
+          sla_faixa_congelada?: string | null
+          status?: string | null
+          termo_responsabilidade?: Json | null
+          trade_in?: Json | null
+          venda_id?: string | null
+          vendedor_id?: string | null
+          vendedor_nome?: string | null
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           bairro: string | null
@@ -2861,6 +2930,39 @@ export type Database = {
           percentual_comissao?: number | null
           salario_fixo?: number | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      taxas_entrega: {
+        Row: {
+          created_at: string | null
+          data_atualizacao: string | null
+          data_criacao: string | null
+          id: string
+          local: string
+          logs: Json | null
+          status: string | null
+          valor: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_atualizacao?: string | null
+          data_criacao?: string | null
+          id?: string
+          local: string
+          logs?: Json | null
+          status?: string | null
+          valor?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          data_atualizacao?: string | null
+          data_criacao?: string | null
+          id?: string
+          local?: string
+          logs?: Json | null
+          status?: string | null
+          valor?: number | null
         }
         Relationships: []
       }

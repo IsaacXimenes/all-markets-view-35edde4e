@@ -294,7 +294,7 @@ export default function GarantiaExtendidaDetalhes() {
     });
     
     // Notificar financeiro
-    notificarFinanceiroAdesao(tratativa);
+    notificarFinanceiroAdesao(tratativa as TratativaComercial);
     
     toast.success('Adesão registrada com sucesso! Enviada para conferência financeira.');
     

@@ -1,5 +1,6 @@
-// API para Garantia Extendida - Tratativas Comerciais e Adesões
-import { format, differenceInDays, addMonths } from 'date-fns';
+// API para Garantia Extendida - Supabase
+import { supabase } from '@/integrations/supabase/client';
+import { differenceInDays } from 'date-fns';
 import { addNotification } from './notificationsApi';
 
 export type ResultadoContato = 'Interessado' | 'Sem interesse' | 'Sem resposta' | 'Agendou retorno';
@@ -16,14 +17,12 @@ export interface TratativaComercial {
   usuarioNome: string;
   descricao?: string;
   resultadoContato?: ResultadoContato;
-  // Dados de adesão
   planoId?: string;
   planoNome?: string;
   valorPlano?: number;
   mesesPlano?: number;
   novaDataFimGarantia?: string;
   statusAdesao?: StatusAdesao;
-  // Pagamento
   pagamento?: {
     meioPagamento: string;
     maquinaId?: string;
@@ -33,225 +32,144 @@ export interface TratativaComercial {
     valor: number;
     parcelas?: number;
   };
-  // Confirmação dupla
-  confirmacao1?: {
-    responsavelId: string;
-    responsavelNome: string;
-    dataHora: string;
-  };
-  confirmacao2?: {
-    responsavelId: string;
-    responsavelNome: string;
-    dataHora: string;
-    observacao?: string;
-  };
+  confirmacao1?: { responsavelId: string; responsavelNome: string; dataHora: string; };
+  confirmacao2?: { responsavelId: string; responsavelNome: string; dataHora: string; observacao?: string; };
   vendaConferenciaId?: string;
 }
 
-// Dados mockados
-let tratativasComerciais: TratativaComercial[] = [
-  // Contatos realizados
-  {
-    id: 'TC-0001',
-    garantiaId: 'GAR-0003',
-    vendaId: 'VEN-2025-0003',
-    tipo: 'Contato Realizado',
-    dataHora: '2026-01-02T10:00:00',
-    usuarioId: 'COL-001',
-    usuarioNome: 'Lucas Mendes',
-    descricao: 'Entramos em contato para informar sobre a garantia expirando em breve.',
-    resultadoContato: 'Interessado'
-  },
-  {
-    id: 'TC-0002',
-    garantiaId: 'GAR-0004',
-    vendaId: 'VEN-2025-0004',
-    tipo: 'Contato Realizado',
-    dataHora: '2026-01-03T14:30:00',
-    usuarioId: 'COL-002',
-    usuarioNome: 'Fernanda Lima',
-    descricao: 'Cliente não atendeu a ligação.',
-    resultadoContato: 'Sem resposta'
-  },
-  {
-    id: 'TC-0003',
-    garantiaId: 'GAR-0008',
-    vendaId: 'VEN-2024-0070',
-    tipo: 'Contato Realizado',
-    dataHora: '2026-01-04T09:15:00',
-    usuarioId: 'COL-003',
-    usuarioNome: 'Roberto Alves',
-    descricao: 'Cliente informou que não tem interesse em renovar no momento.',
-    resultadoContato: 'Sem interesse'
-  },
-  // Adesão Silver pendente
-  {
-    id: 'TC-0004',
-    garantiaId: 'GAR-0003',
-    vendaId: 'VEN-2025-0003',
-    tipo: 'Adesão Silver',
-    dataHora: '2026-01-05T11:00:00',
-    usuarioId: 'COL-001',
-    usuarioNome: 'Lucas Mendes',
-    descricao: 'Cliente decidiu aderir ao plano Silver.',
-    planoId: 'PLAN-001',
-    planoNome: 'Silver',
-    valorPlano: 219.90,
-    mesesPlano: 6,
-    novaDataFimGarantia: format(addMonths(new Date(), 6), 'yyyy-MM-dd'),
-    statusAdesao: 'Pendente Financeiro',
-    pagamento: {
-      meioPagamento: 'Pix',
-      contaDestinoId: 'CTA-002', // Bradesco Thiago Eduardo - Matriz
-      contaDestinoNome: 'Bradesco Thiago Eduardo',
-      valor: 219.90
-    },
-    confirmacao1: {
-      responsavelId: 'COL-001',
-      responsavelNome: 'Lucas Mendes',
-      dataHora: '2026-01-05T11:05:00'
-    },
-    confirmacao2: {
-      responsavelId: 'COL-001',
-      responsavelNome: 'Lucas Mendes',
-      dataHora: '2026-01-05T11:06:00',
-      observacao: 'Cliente realizou pagamento via Pix'
-    },
-    vendaConferenciaId: 'CONF-EXT-001'
-  },
-  // Adesão Gold concluída
-  {
-    id: 'TC-0005',
-    garantiaId: 'GAR-0008',
-    vendaId: 'VEN-2024-0070',
-    tipo: 'Adesão Gold',
-    dataHora: '2026-01-04T15:00:00',
-    usuarioId: 'COL-002',
-    usuarioNome: 'Fernanda Lima',
-    descricao: 'Cliente optou pelo plano Gold após ligação comercial.',
-    planoId: 'PLAN-005',
-    planoNome: 'Gold',
-    valorPlano: 349.90,
-    mesesPlano: 12,
-    novaDataFimGarantia: format(addMonths(new Date(), 12), 'yyyy-MM-dd'),
-    statusAdesao: 'Concluída',
-    pagamento: {
-      meioPagamento: 'Cartão Crédito',
-      maquinaId: 'MAQ-001',
-      maquinaNome: 'Stone Matriz',
-      contaDestinoId: 'CTA-002', // Bradesco Thiago Eduardo - Matriz
-      contaDestinoNome: 'Bradesco Thiago Eduardo',
-      valor: 349.90,
-      parcelas: 3
-    },
-    confirmacao1: {
-      responsavelId: 'COL-002',
-      responsavelNome: 'Fernanda Lima',
-      dataHora: '2026-01-04T15:10:00'
-    },
-    confirmacao2: {
-      responsavelId: 'COL-002',
-      responsavelNome: 'Fernanda Lima',
-      dataHora: '2026-01-04T15:12:00',
-      observacao: 'Pagamento parcelado em 3x'
-    },
-    vendaConferenciaId: 'CONF-EXT-002'
-  }
-];
+// Cache
+let _tratativasCache: TratativaComercial[] = [];
+let _initPromise: Promise<void> | null = null;
 
-let tratativaCounter = tratativasComerciais.length;
+const mapRow = (row: any): TratativaComercial => ({
+  id: row.id,
+  garantiaId: row.garantia_id || '',
+  vendaId: row.venda_id || '',
+  tipo: row.tipo || 'Contato Realizado',
+  dataHora: row.data_hora || '',
+  usuarioId: row.usuario_id || '',
+  usuarioNome: row.usuario_nome || '',
+  descricao: row.descricao,
+  resultadoContato: row.resultado_contato,
+  planoId: row.plano_id,
+  planoNome: row.plano_nome,
+  valorPlano: row.valor_plano != null ? Number(row.valor_plano) : undefined,
+  mesesPlano: row.meses_plano,
+  novaDataFimGarantia: row.nova_data_fim_garantia,
+  statusAdesao: row.status_adesao,
+  pagamento: row.pagamento || undefined,
+  confirmacao1: row.confirmacao1 || undefined,
+  confirmacao2: row.confirmacao2 || undefined,
+  vendaConferenciaId: row.venda_conferencia_id,
+});
 
-// ==================== FUNÇÕES CRUD ====================
-
-export const getTratativasComerciais = (): TratativaComercial[] => {
-  return [...tratativasComerciais];
+export const initTratativasComerciaisCache = async (): Promise<void> => {
+  if (_initPromise) return _initPromise;
+  _initPromise = (async () => {
+    const { data, error } = await supabase.from('tratativas_comerciais').select('*');
+    if (error) { console.error('Erro ao carregar tratativas_comerciais:', error); return; }
+    _tratativasCache = (data || []).map(mapRow);
+  })();
+  return _initPromise;
 };
 
-export const getTratativasComerciasByGarantiaId = (garantiaId: string): TratativaComercial[] => {
-  return tratativasComerciais.filter(t => t.garantiaId === garantiaId);
+// Leitura síncrona
+export const getTratativasComerciais = (): TratativaComercial[] => [..._tratativasCache];
+
+export const getTratativasComerciasByGarantiaId = (garantiaId: string): TratativaComercial[] =>
+  _tratativasCache.filter(t => t.garantiaId === garantiaId);
+
+// Mutações async
+export const addTratativaComercial = async (tratativa: Omit<TratativaComercial, 'id'>): Promise<TratativaComercial> => {
+  const { data, error } = await supabase.from('tratativas_comerciais').insert({
+    garantia_id: tratativa.garantiaId,
+    venda_id: tratativa.vendaId,
+    tipo: tratativa.tipo,
+    data_hora: tratativa.dataHora,
+    usuario_id: tratativa.usuarioId,
+    usuario_nome: tratativa.usuarioNome,
+    descricao: tratativa.descricao,
+    resultado_contato: tratativa.resultadoContato,
+    plano_id: tratativa.planoId,
+    plano_nome: tratativa.planoNome,
+    valor_plano: tratativa.valorPlano,
+    meses_plano: tratativa.mesesPlano,
+    nova_data_fim_garantia: tratativa.novaDataFimGarantia,
+    status_adesao: tratativa.statusAdesao,
+    pagamento: tratativa.pagamento as any,
+    confirmacao1: tratativa.confirmacao1 as any,
+    confirmacao2: tratativa.confirmacao2 as any,
+    venda_conferencia_id: tratativa.vendaConferenciaId,
+  }).select().single();
+  if (error) throw error;
+  const nova = mapRow(data);
+  _tratativasCache.push(nova);
+  return nova;
 };
 
-export const addTratativaComercial = (tratativa: Omit<TratativaComercial, 'id'>): TratativaComercial => {
-  tratativaCounter++;
-  const novaTratativa: TratativaComercial = {
-    ...tratativa,
-    id: `TC-${String(tratativaCounter).padStart(4, '0')}`
-  };
-  tratativasComerciais.push(novaTratativa);
-  return novaTratativa;
+export const updateTratativaComercial = async (id: string, updates: Partial<TratativaComercial>): Promise<void> => {
+  const dbUpdates: any = {};
+  if (updates.statusAdesao !== undefined) dbUpdates.status_adesao = updates.statusAdesao;
+  if (updates.confirmacao1 !== undefined) dbUpdates.confirmacao1 = updates.confirmacao1;
+  if (updates.confirmacao2 !== undefined) dbUpdates.confirmacao2 = updates.confirmacao2;
+  if (updates.pagamento !== undefined) dbUpdates.pagamento = updates.pagamento;
+  if (updates.vendaConferenciaId !== undefined) dbUpdates.venda_conferencia_id = updates.vendaConferenciaId;
+  if (updates.descricao !== undefined) dbUpdates.descricao = updates.descricao;
+  if (updates.resultadoContato !== undefined) dbUpdates.resultado_contato = updates.resultadoContato;
+
+  const { error } = await supabase.from('tratativas_comerciais').update(dbUpdates).eq('id', id);
+  if (error) throw error;
+  const idx = _tratativasCache.findIndex(t => t.id === id);
+  if (idx !== -1) _tratativasCache[idx] = { ..._tratativasCache[idx], ...updates };
 };
 
-export const updateTratativaComercial = (id: string, updates: Partial<TratativaComercial>): void => {
-  const index = tratativasComerciais.findIndex(t => t.id === id);
-  if (index !== -1) {
-    tratativasComerciais[index] = { ...tratativasComerciais[index], ...updates };
-  }
-};
-
-// ==================== UTILITÁRIOS ====================
-
+// Utilitários puros
 export const calcularTempoRestante = (dataFim: string): { texto: string; dias: number; status: 'normal' | 'atencao' | 'urgente' | 'expirada' } => {
   const hoje = new Date();
   const fim = new Date(dataFim);
   const diffDias = differenceInDays(fim, hoje);
-  
-  if (diffDias < 0) {
-    return { texto: 'Expirada', dias: diffDias, status: 'expirada' };
-  }
-  
+
+  if (diffDias < 0) return { texto: 'Expirada', dias: diffDias, status: 'expirada' };
+
   const meses = Math.floor(diffDias / 30);
   const dias = diffDias % 30;
-  
   let texto = '';
   if (meses > 0) {
     texto = `${meses} ${meses === 1 ? 'mês' : 'meses'}`;
-    if (dias > 0) {
-      texto += ` e ${dias} ${dias === 1 ? 'dia' : 'dias'}`;
-    }
+    if (dias > 0) texto += ` e ${dias} ${dias === 1 ? 'dia' : 'dias'}`;
   } else {
     texto = `${dias} ${dias === 1 ? 'dia' : 'dias'}`;
   }
-  
+
   let status: 'normal' | 'atencao' | 'urgente' | 'expirada' = 'normal';
-  if (diffDias <= 7) {
-    status = 'urgente';
-  } else if (diffDias <= 30) {
-    status = 'atencao';
-  }
-  
+  if (diffDias <= 7) status = 'urgente';
+  else if (diffDias <= 30) status = 'atencao';
+
   return { texto, dias: diffDias, status };
 };
 
 export const podeRenovar = (dataFimGarantia: string): boolean => {
-  const hoje = new Date();
-  const fim = new Date(dataFimGarantia);
-  return fim < hoje; // Somente pode renovar após expirar
+  return new Date(dataFimGarantia) < new Date();
 };
 
-export const getAdesoesPendentes = (): TratativaComercial[] => {
-  return tratativasComerciais.filter(t => 
-    (t.tipo === 'Adesão Silver' || t.tipo === 'Adesão Gold') && 
-    t.statusAdesao === 'Pendente Financeiro'
+export const getAdesoesPendentes = (): TratativaComercial[] =>
+  _tratativasCache.filter(t =>
+    (t.tipo === 'Adesão Silver' || t.tipo === 'Adesão Gold') && t.statusAdesao === 'Pendente Financeiro'
   );
-};
 
-export const getAdesoesConcluidas = (): TratativaComercial[] => {
-  return tratativasComerciais.filter(t => 
-    (t.tipo === 'Adesão Silver' || t.tipo === 'Adesão Gold') && 
-    t.statusAdesao === 'Concluída'
+export const getAdesoesConcluidas = (): TratativaComercial[] =>
+  _tratativasCache.filter(t =>
+    (t.tipo === 'Adesão Silver' || t.tipo === 'Adesão Gold') && t.statusAdesao === 'Concluída'
   );
-};
 
-// Notificar financeiro sobre nova adesão
 export const notificarFinanceiroAdesao = (tratativa: TratativaComercial): void => {
   addNotification({
     type: 'garantia_extendida',
     title: `Nova adesão ${tratativa.planoNome}`,
     description: `Adesão ao plano ${tratativa.planoNome} - R$ ${tratativa.valorPlano?.toFixed(2)} aguardando conferência`,
-    targetUsers: ['COL-006'] // Financeiro
+    targetUsers: ['COL-006']
   });
 };
 
-export const formatCurrency = (value: number): string => {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-};
+export const formatCurrency = (value: number): string =>
+  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });

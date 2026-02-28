@@ -354,7 +354,7 @@ export default function FinanceiroExtratoContas() {
       return;
     }
 
-    const nova = addMovimentacaoEntreConta({
+    const nova = await addMovimentacaoEntreConta({
       contaOrigemId: movForm.contaOrigemId,
       contaDestinoId: movForm.contaDestinoId,
       valor: movForm.valor,
@@ -364,7 +364,7 @@ export default function FinanceiroExtratoContas() {
       usuarioNome: user?.colaborador?.nome || user?.username || 'Sistema',
     });
 
-    addLogMovimentacao(nova);
+    await addLogMovimentacao(nova);
     setMovimentacoesEntreConta(getMovimentacoesEntreConta());
     setShowMovimentacaoModal(false);
     setMovForm({ contaOrigemId: '', contaDestinoId: '', valor: 0, dataHora: new Date().toISOString().slice(0, 16), observacao: '' });

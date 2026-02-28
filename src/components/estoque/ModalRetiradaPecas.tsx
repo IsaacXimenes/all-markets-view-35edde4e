@@ -49,7 +49,7 @@ export function ModalRetiradaPecas({ open, onOpenChange, produto, onSuccess }: M
     setIsSubmitting(true);
 
     try {
-      const resultado = solicitarRetiradaPecas(
+      const resultado = await solicitarRetiradaPecas(
         produto.id,
         motivo,
         user.username

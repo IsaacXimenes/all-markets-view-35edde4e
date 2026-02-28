@@ -163,7 +163,7 @@ export default function AssistRetiradaPecasDetalhes() {
 
     const valorRecomendado = novaPeca.valorRecomendado ? parseMoeda(novaPeca.valorRecomendado) : undefined;
 
-    const resultado = adicionarPecaRetirada(retirada.id, {
+    const resultado = await adicionarPecaRetirada(retirada.id, {
       marca: novaPeca.marca,
       nome: novaPeca.nome,
       valorCustoPeca: valor,
@@ -182,7 +182,7 @@ export default function AssistRetiradaPecasDetalhes() {
   };
 
   const handleRemoverPeca = (pecaId: string) => {
-    const resultado = removerPecaRetirada(retirada.id, pecaId);
+    const resultado = await removerPecaRetirada(retirada.id, pecaId);
     if (resultado.sucesso) {
       toast.success('Peça removida');
       carregarDados();

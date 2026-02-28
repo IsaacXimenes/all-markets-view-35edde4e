@@ -1,4 +1,5 @@
-// API para Taxas de Entrega (Delivery Fees)
+// API para Taxas de Entrega - Supabase
+import { supabase } from '@/integrations/supabase/client';
 
 export interface LogAlteracao {
   id: string;
@@ -20,196 +21,114 @@ export interface TaxaEntrega {
   logs: LogAlteracao[];
 }
 
-const STORAGE_KEY = 'taxas_entrega';
+// Cache
+let _taxasCache: TaxaEntrega[] = [];
+let _initPromise: Promise<void> | null = null;
 
-// Dados mockados iniciais
-// Dados mockados iniciais - ordenados alfabeticamente com IDs sequenciais
-const taxasIniciais: TaxaEntrega[] = [
-  { id: 'TX-001', local: 'Águas Claras', valor: 40.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-002', local: 'Asa Norte', valor: 30.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-003', local: 'Asa Sul', valor: 30.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-004', local: 'Ceilândia', valor: 50.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-005', local: 'Cruzeiro', valor: 25.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-006', local: 'Gama', valor: 55.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-007', local: 'Guará I', valor: 35.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-008', local: 'Guará II', valor: 35.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-009', local: 'Lago Norte', valor: 40.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-010', local: 'Lago Sul', valor: 40.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-011', local: 'Noroeste', valor: 30.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-012', local: 'Núcleo Bandeirante', valor: 45.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-013', local: 'Octogonal', valor: 30.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-014', local: 'Park Sul', valor: 35.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-015', local: 'Planaltina', valor: 60.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-016', local: 'Recanto das Emas', valor: 60.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-017', local: 'Riacho Fundo I', valor: 50.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-018', local: 'Riacho Fundo II', valor: 55.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-019', local: 'Samambaia', valor: 55.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-020', local: 'Santa Maria', valor: 60.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-021', local: 'SIA', valor: 35.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-022', local: 'Sobradinho', valor: 50.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-023', local: 'Sudoeste', valor: 25.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-024', local: 'Taguatinga', valor: 45.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] },
-  { id: 'TX-025', local: 'Vicente Pires', valor: 45.00, status: 'Ativo', dataCriacao: '2024-01-01', dataAtualizacao: '2024-01-01', logs: [] }
+const SEED_TAXAS = [
+  { local: 'Águas Claras', valor: 40 }, { local: 'Asa Norte', valor: 30 }, { local: 'Asa Sul', valor: 30 },
+  { local: 'Ceilândia', valor: 50 }, { local: 'Cruzeiro', valor: 25 }, { local: 'Gama', valor: 55 },
+  { local: 'Guará I', valor: 35 }, { local: 'Guará II', valor: 35 }, { local: 'Lago Norte', valor: 40 },
+  { local: 'Lago Sul', valor: 40 }, { local: 'Noroeste', valor: 30 }, { local: 'Núcleo Bandeirante', valor: 45 },
+  { local: 'Octogonal', valor: 30 }, { local: 'Park Sul', valor: 35 }, { local: 'Planaltina', valor: 60 },
+  { local: 'Recanto das Emas', valor: 60 }, { local: 'Riacho Fundo I', valor: 50 }, { local: 'Riacho Fundo II', valor: 55 },
+  { local: 'Samambaia', valor: 55 }, { local: 'Santa Maria', valor: 60 }, { local: 'SIA', valor: 35 },
+  { local: 'Sobradinho', valor: 50 }, { local: 'Sudoeste', valor: 25 }, { local: 'Taguatinga', valor: 45 },
+  { local: 'Vicente Pires', valor: 45 },
 ];
 
-// Inicializar storage
-const initStorage = (): TaxaEntrega[] => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (!stored) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(taxasIniciais));
-    return taxasIniciais;
-  }
-  return JSON.parse(stored);
+const mapRow = (row: any): TaxaEntrega => ({
+  id: row.id,
+  local: row.local,
+  valor: Number(row.valor) || 0,
+  status: row.status || 'Ativo',
+  dataCriacao: row.data_criacao || row.created_at,
+  dataAtualizacao: row.data_atualizacao || row.created_at,
+  logs: Array.isArray(row.logs) ? row.logs : [],
+});
+
+export const initTaxasEntregaCache = async (): Promise<void> => {
+  if (_initPromise) return _initPromise;
+  _initPromise = (async () => {
+    const { data, error } = await supabase.from('taxas_entrega').select('*');
+    if (error) { console.error('Erro ao carregar taxas_entrega:', error); return; }
+    if (!data || data.length === 0) {
+      const inserts = SEED_TAXAS.map(t => ({ local: t.local, valor: t.valor, status: 'Ativo' }));
+      const { data: seeded, error: seedErr } = await supabase.from('taxas_entrega').insert(inserts).select();
+      if (seedErr) { console.error('Erro ao seed taxas_entrega:', seedErr); return; }
+      _taxasCache = (seeded || []).map(mapRow);
+    } else {
+      _taxasCache = data.map(mapRow);
+    }
+  })();
+  return _initPromise;
 };
 
-// Gerar ID único
-const gerarId = (): string => {
-  const taxas = getTaxasEntrega();
-  const maxNum = taxas.reduce((max, t) => {
-    const num = parseInt(t.id.replace('TX-', ''));
-    return num > max ? num : max;
-  }, 0);
-  return `TX-${String(maxNum + 1).padStart(3, '0')}`;
-};
+export const getTaxasEntrega = (): TaxaEntrega[] => [..._taxasCache];
+export const getTaxasEntregaAtivas = (): TaxaEntrega[] => _taxasCache.filter(t => t.status === 'Ativo');
+export const getTaxaEntregaById = (id: string): TaxaEntrega | undefined => _taxasCache.find(t => t.id === id);
+export const getTaxaEntregaByLocal = (local: string): TaxaEntrega | undefined =>
+  _taxasCache.find(t => t.local.toLowerCase() === local.toLowerCase());
 
-// CRUD Operations
-export const getTaxasEntrega = (): TaxaEntrega[] => {
-  return initStorage();
-};
-
-export const getTaxasEntregaAtivas = (): TaxaEntrega[] => {
-  return getTaxasEntrega().filter(t => t.status === 'Ativo');
-};
-
-export const getTaxaEntregaById = (id: string): TaxaEntrega | undefined => {
-  return getTaxasEntrega().find(t => t.id === id);
-};
-
-export const getTaxaEntregaByLocal = (local: string): TaxaEntrega | undefined => {
-  return getTaxasEntrega().find(t => t.local.toLowerCase() === local.toLowerCase());
-};
-
-export const addTaxaEntrega = (
-  local: string, 
-  valor: number, 
-  usuarioId: string, 
-  usuarioNome: string
-): TaxaEntrega => {
-  const taxas = getTaxasEntrega();
+export const addTaxaEntrega = async (local: string, valor: number, usuarioId: string, usuarioNome: string): Promise<TaxaEntrega> => {
   const agora = new Date().toISOString();
-  
-  const novaTaxa: TaxaEntrega = {
-    id: gerarId(),
-    local,
-    valor,
-    status: 'Ativo',
-    dataCriacao: agora,
-    dataAtualizacao: agora,
-    logs: [{
-      id: `LOG-${Date.now()}`,
-      data: agora,
-      usuarioId,
-      usuarioNome,
-      valorAnterior: 0,
-      valorNovo: valor,
-      acao: 'criacao'
-    }]
-  };
-  
-  taxas.push(novaTaxa);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(taxas));
-  
-  return novaTaxa;
+  const log: LogAlteracao = { id: `LOG-${Date.now()}`, data: agora, usuarioId, usuarioNome, valorAnterior: 0, valorNovo: valor, acao: 'criacao' };
+  const { data, error } = await supabase.from('taxas_entrega').insert({
+    local, valor, status: 'Ativo', logs: [log] as any,
+  }).select().single();
+  if (error) throw error;
+  const nova = mapRow(data);
+  _taxasCache.push(nova);
+  return nova;
 };
 
-export const updateTaxaEntrega = (
-  id: string,
-  valor: number,
-  usuarioId: string,
-  usuarioNome: string
-): TaxaEntrega | null => {
-  const taxas = getTaxasEntrega();
-  const index = taxas.findIndex(t => t.id === id);
-  
-  if (index === -1) return null;
-  
-  const taxa = taxas[index];
+export const updateTaxaEntrega = async (id: string, valor: number, usuarioId: string, usuarioNome: string): Promise<TaxaEntrega | null> => {
+  const taxa = _taxasCache.find(t => t.id === id);
+  if (!taxa) return null;
   const agora = new Date().toISOString();
-  
-  const log: LogAlteracao = {
-    id: `LOG-${Date.now()}`,
-    data: agora,
-    usuarioId,
-    usuarioNome,
-    valorAnterior: taxa.valor,
-    valorNovo: valor,
-    acao: 'edicao'
-  };
-  
-  taxa.valor = valor;
-  taxa.dataAtualizacao = agora;
-  taxa.logs.push(log);
-  
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(taxas));
-  
-  return taxa;
+  const log: LogAlteracao = { id: `LOG-${Date.now()}`, data: agora, usuarioId, usuarioNome, valorAnterior: taxa.valor, valorNovo: valor, acao: 'edicao' };
+  const newLogs = [...taxa.logs, log];
+  const { data, error } = await supabase.from('taxas_entrega').update({
+    valor, data_atualizacao: agora, logs: newLogs as any,
+  }).eq('id', id).select().single();
+  if (error) throw error;
+  const updated = mapRow(data);
+  const idx = _taxasCache.findIndex(t => t.id === id);
+  if (idx !== -1) _taxasCache[idx] = updated;
+  return updated;
 };
 
-export const toggleStatusTaxaEntrega = (
-  id: string,
-  usuarioId: string,
-  usuarioNome: string
-): TaxaEntrega | null => {
-  const taxas = getTaxasEntrega();
-  const index = taxas.findIndex(t => t.id === id);
-  
-  if (index === -1) return null;
-  
-  const taxa = taxas[index];
+export const toggleStatusTaxaEntrega = async (id: string, usuarioId: string, usuarioNome: string): Promise<TaxaEntrega | null> => {
+  const taxa = _taxasCache.find(t => t.id === id);
+  if (!taxa) return null;
   const agora = new Date().toISOString();
-  
-  const log: LogAlteracao = {
-    id: `LOG-${Date.now()}`,
-    data: agora,
-    usuarioId,
-    usuarioNome,
-    valorAnterior: taxa.valor,
-    valorNovo: taxa.valor,
-    acao: 'status'
-  };
-  
-  taxa.status = taxa.status === 'Ativo' ? 'Inativo' : 'Ativo';
-  taxa.dataAtualizacao = agora;
-  taxa.logs.push(log);
-  
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(taxas));
-  
-  return taxa;
+  const novoStatus = taxa.status === 'Ativo' ? 'Inativo' : 'Ativo';
+  const log: LogAlteracao = { id: `LOG-${Date.now()}`, data: agora, usuarioId, usuarioNome, valorAnterior: taxa.valor, valorNovo: taxa.valor, acao: 'status' };
+  const newLogs = [...taxa.logs, log];
+  const { data, error } = await supabase.from('taxas_entrega').update({
+    status: novoStatus, data_atualizacao: agora, logs: newLogs as any,
+  }).eq('id', id).select().single();
+  if (error) throw error;
+  const updated = mapRow(data);
+  const idx = _taxasCache.findIndex(t => t.id === id);
+  if (idx !== -1) _taxasCache[idx] = updated;
+  return updated;
 };
 
-export const updateTaxaLocal = (
-  id: string,
-  local: string
-): TaxaEntrega | null => {
-  const taxas = getTaxasEntrega();
-  const index = taxas.findIndex(t => t.id === id);
-  
-  if (index === -1) return null;
-  
-  taxas[index].local = local;
-  taxas[index].dataAtualizacao = new Date().toISOString();
-  
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(taxas));
-  
-  return taxas[index];
+export const updateTaxaLocal = async (id: string, local: string): Promise<TaxaEntrega | null> => {
+  const { data, error } = await supabase.from('taxas_entrega').update({
+    local, data_atualizacao: new Date().toISOString(),
+  }).eq('id', id).select().single();
+  if (error) throw error;
+  const updated = mapRow(data);
+  const idx = _taxasCache.findIndex(t => t.id === id);
+  if (idx !== -1) _taxasCache[idx] = updated;
+  return updated;
 };
 
-export const deleteTaxaEntrega = (id: string): boolean => {
-  const taxas = getTaxasEntrega();
-  const filtradas = taxas.filter(t => t.id !== id);
-  
-  if (filtradas.length === taxas.length) return false;
-  
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtradas));
+export const deleteTaxaEntrega = async (id: string): Promise<boolean> => {
+  const { error } = await supabase.from('taxas_entrega').delete().eq('id', id);
+  if (error) throw error;
+  _taxasCache = _taxasCache.filter(t => t.id !== id);
   return true;
 };

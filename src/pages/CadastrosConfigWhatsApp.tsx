@@ -28,7 +28,7 @@ export default function CadastrosConfigWhatsApp() {
     setConfig(getConfigWhatsApp());
   }, []);
 
-  const handleSalvar = () => {
+  const handleSalvar = async () => {
     if (config.habilitado) {
       if (!config.apiUrl.startsWith('https://')) {
         toast({ title: 'URL inválida', description: 'A URL da API deve começar com https://', variant: 'destructive' });
@@ -39,7 +39,7 @@ export default function CadastrosConfigWhatsApp() {
         return;
       }
     }
-    salvarConfigWhatsApp(config);
+    await salvarConfigWhatsApp(config);
     toast({ title: 'Configurações salvas!' });
   };
 
@@ -50,7 +50,7 @@ export default function CadastrosConfigWhatsApp() {
     }
     setEnviandoTeste(true);
     // Salva config temporariamente para o teste usar
-    salvarConfigWhatsApp(config);
+    await salvarConfigWhatsApp(config);
     try {
       await enviarMensagemTeste();
       toast({ title: 'Teste enviado!', description: 'Verifique no painel da sua API WhatsApp se a mensagem foi recebida.' });
@@ -184,7 +184,7 @@ export default function CadastrosConfigWhatsApp() {
             <AlertDescription className="space-y-2 text-xs">
               <p>• A requisição é enviada com <code>mode: "no-cors"</code>. Isso significa que o sistema não consegue ler a resposta da API — verifique o recebimento diretamente no painel da sua API.</p>
               <p>• O payload enviado segue o formato <code>{`{ number, text }`}</code>. Ajuste conforme sua API (Evolution, Z-API, Twilio, etc.).</p>
-              <p>• O token é armazenado no navegador (localStorage). Adequado para uso interno.</p>
+              <p>• O token é armazenado no banco de dados (Supabase). Adequado para uso interno.</p>
             </AlertDescription>
           </Alert>
         </div>

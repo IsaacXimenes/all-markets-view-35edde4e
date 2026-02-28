@@ -1,4 +1,5 @@
 // WhatsApp Notification API - Configuração e disparo de notificações de vendas
+import { supabase } from "@/integrations/supabase/client";
 
 export interface ConfigWhatsApp {
   habilitado: boolean;
@@ -17,8 +18,6 @@ export interface DadosVendaNotificacao {
   forma_pagamento: string;
 }
 
-const STORAGE_KEY = 'config_whatsapp_notificacao';
-
 export const MENSAGEM_PADRAO = `🚀 Nova Venda Registrada!
 💰 Valor: R$ {{valor}}
 📍 Loja: {{loja}}
@@ -35,18 +34,72 @@ export const CONFIG_PADRAO: ConfigWhatsApp = {
   modeloMensagem: '',
 };
 
-export const getConfigWhatsApp = (): ConfigWhatsApp => {
+// ── Cache ──
+let _configCache: ConfigWhatsApp = { ...CONFIG_PADRAO };
+let _configId: string | null = null;
+let _cacheLoaded = false;
+
+export const initConfigWhatsAppCache = async (): Promise<void> => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...CONFIG_PADRAO };
-    return JSON.parse(raw);
-  } catch {
-    return { ...CONFIG_PADRAO };
+    const { data, error } = await supabase
+      .from('config_whatsapp')
+      .select('*')
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (data) {
+      _configCache = {
+        habilitado: data.habilitado ?? false,
+        apiUrl: data.api_url ?? '',
+        token: data.token ?? '',
+        destinatario: data.destinatario ?? '',
+        modeloMensagem: data.modelo_mensagem ?? '',
+      };
+      _configId = data.id;
+    }
+    _cacheLoaded = true;
+  } catch (err) {
+    console.error('[WhatsApp] Erro ao carregar config:', err);
+    _cacheLoaded = true;
   }
 };
 
-export const salvarConfigWhatsApp = (config: ConfigWhatsApp): void => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+export const getConfigWhatsApp = (): ConfigWhatsApp => {
+  return { ..._configCache };
+};
+
+export const salvarConfigWhatsApp = async (config: ConfigWhatsApp): Promise<void> => {
+  const row = {
+    habilitado: config.habilitado,
+    api_url: config.apiUrl,
+    token: config.token,
+    destinatario: config.destinatario,
+    modelo_mensagem: config.modeloMensagem,
+    updated_at: new Date().toISOString(),
+  };
+
+  try {
+    if (_configId) {
+      const { error } = await supabase
+        .from('config_whatsapp')
+        .update(row)
+        .eq('id', _configId);
+      if (error) throw error;
+    } else {
+      const { data, error } = await supabase
+        .from('config_whatsapp')
+        .insert(row)
+        .select('id')
+        .single();
+      if (error) throw error;
+      _configId = data.id;
+    }
+    _configCache = { ...config };
+  } catch (err) {
+    console.error('[WhatsApp] Erro ao salvar config:', err);
+  }
 };
 
 export const formatarMensagemVenda = (modelo: string, dados: DadosVendaNotificacao): string => {

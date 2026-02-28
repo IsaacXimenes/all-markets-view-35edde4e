@@ -599,6 +599,39 @@ export type Database = {
         }
         Relationships: []
       }
+      config_whatsapp: {
+        Row: {
+          api_url: string | null
+          created_at: string | null
+          destinatario: string | null
+          habilitado: boolean | null
+          id: string
+          modelo_mensagem: string | null
+          token: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          api_url?: string | null
+          created_at?: string | null
+          destinatario?: string | null
+          habilitado?: boolean | null
+          id?: string
+          modelo_mensagem?: string | null
+          token?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          api_url?: string | null
+          created_at?: string | null
+          destinatario?: string | null
+          habilitado?: boolean | null
+          id?: string
+          modelo_mensagem?: string | null
+          token?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       contas_financeiras: {
         Row: {
           agencia: string | null

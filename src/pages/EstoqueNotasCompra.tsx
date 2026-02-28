@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { getNotasCompra, addNotaCompra, NotaCompra, verificarConferenciaNota } from '@/utils/estoqueApi';
+import { getNotasCompra, addNotaCompra, NotaCompra, verificarConferenciaNota, updateNota } from '@/utils/estoqueApi';
 import { getFornecedores } from '@/utils/cadastrosApi';
 import { exportToCSV, formatCurrency, moedaMask, parseMoeda } from '@/utils/formatUtils';
 import { Download, Plus, Eye, FileText, DollarSign, CheckCircle, Clock, Zap, X, BarChart } from 'lucide-react';
@@ -495,8 +495,8 @@ export default function EstoqueNotasCompra() {
                     }
                   });
                   
-                  // Marcar como enviada para financeiro no localStorage
-                  localStorage.setItem(`nota_status_${novaNota.id}`, 'Enviado para Financeiro');
+                  // Marcar como enviada para financeiro no DB
+                  await updateNota(novaNota.id, { status: 'Enviado para Financeiro' as any });
                   
                   toast.success(`Nota de urgência ${novaNota.id} enviada para o Financeiro!`);
                   setShowUrgenciaModal(false);

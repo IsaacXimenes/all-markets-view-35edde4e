@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { getNotasCompra, finalizarNota, NotaCompra, migrarAparelhoNovoParaEstoque, ESTOQUE_SIA_LOJA_ID } from '@/utils/estoqueApi';
+import { getNotasCompra, finalizarNota, NotaCompra, migrarAparelhoNovoParaEstoque, ESTOQUE_SIA_LOJA_ID, updateNota } from '@/utils/estoqueApi';
 import { getNotasEntradaParaFinanceiro } from '@/utils/notaEntradaFluxoApi';
 import { getContasFinanceiras, getFornecedores } from '@/utils/cadastrosApi';
 import { Eye, CheckCircle, Download, Filter, X, Check, FileText, Clock, CheckCircle2, FileSearch } from 'lucide-react';
@@ -22,22 +22,21 @@ import { ModalDetalhePendencia } from '@/components/estoque/ModalDetalhePendenci
 
 import { formatCurrency } from '@/utils/formatUtils';
 
-// Tipo estendido para incluir status do localStorage
+// Tipo estendido para incluir status do DB
 interface NotaEstendida extends NotaCompra {
-  statusExtendido?: 'Pendente' | 'Concluído' | 'Recusado' | 'Enviado para Financeiro';
+  statusExtendido?: 'Pendente' | 'Concluído' | 'Recusado' | 'Enviado para Financeiro' | 'Pago - Aguardando Produtos';
 }
 
 export default function FinanceiroConferenciaNotas() {
   const [notasBase] = useState(getNotasCompra());
   
-  // Mesclar status do localStorage com notas + incluir notas do Caminho Verde
+  // Mesclar status do DB com notas + incluir notas do Caminho Verde
   const notas: NotaEstendida[] = useMemo(() => {
-    // Notas tradicionais do estoqueApi
+    // Notas tradicionais do estoqueApi (status já vem do DB via cache)
     const notasTradicionais: NotaEstendida[] = notasBase.map(nota => {
-      const storedStatus = localStorage.getItem(`nota_status_${nota.id}`);
       return {
         ...nota,
-        statusExtendido: (storedStatus as NotaEstendida['statusExtendido']) || nota.status as NotaEstendida['statusExtendido']
+        statusExtendido: (nota.status as NotaEstendida['statusExtendido']) || 'Pendente'
       };
     });
     
@@ -179,25 +178,25 @@ export default function FinanceiroConferenciaNotas() {
     // TRATAMENTO ESPECIAL PARA NOTAS DE URGÊNCIA
     if (notaSelecionada.origem === 'Urgência') {
       // Não finalizar a nota, apenas atualizar status para aguardar produtos
-      localStorage.setItem(`nota_status_${notaSelecionada.id}`, 'Pago - Aguardando Produtos');
-      localStorage.setItem(`nota_statusUrgencia_${notaSelecionada.id}`, 'Pago - Aguardando Produtos');
-      localStorage.setItem(`nota_dataPagamentoFinanceiro_${notaSelecionada.id}`, new Date().toISOString());
-      localStorage.setItem(`nota_pagamento_${notaSelecionada.id}`, JSON.stringify(pagamento));
-      localStorage.setItem(`nota_responsavelFinanceiro_${notaSelecionada.id}`, responsavelFinanceiro);
-      localStorage.setItem(`nota_lojaDestino_${notaSelecionada.id}`, lojaDestino);
-      
-      // Adicionar timeline de aprovação
-      const storedTimeline = localStorage.getItem(`nota_timeline_${notaSelecionada.id}`);
-      const timeline = storedTimeline ? JSON.parse(storedTimeline) : [];
+      const timelineAtual = notaSelecionada.timeline || [];
       const newEntry = {
-        id: `TL-${notaSelecionada.id}-${String(timeline.length + 1).padStart(3, '0')}`,
+        id: `TL-${notaSelecionada.id}-${String(timelineAtual.length + 1).padStart(3, '0')}`,
         dataHora: new Date().toISOString(),
-        usuarioId: 'FIN-001',
+        usuarioId: user?.colaborador?.id || 'FIN-001',
         usuarioNome: responsavelFinanceiro,
         tipoEvento: 'aprovado_financeiro_urgencia',
         observacoes: `Nota de urgência aprovada pelo financeiro. Pagamento: ${formaPagamento}, Parcelas: ${parcelas}. Aguardando inserção de produtos pelo Estoque.`
       };
-      localStorage.setItem(`nota_timeline_${notaSelecionada.id}`, JSON.stringify([newEntry, ...timeline]));
+      
+      await updateNota(notaSelecionada.id, {
+        status: 'Pago - Aguardando Produtos' as any,
+        statusUrgencia: 'Pago - Aguardando Produtos',
+        dataPagamentoFinanceiro: new Date().toISOString(),
+        pagamento: pagamento as any,
+        responsavelFinanceiro,
+        lojaDestino: lojaDestino,
+        timeline: [newEntry, ...timelineAtual] as any,
+      });
       
       setDialogOpen(false);
       
@@ -217,21 +216,20 @@ export default function FinanceiroConferenciaNotas() {
     const notaFinalizada = await finalizarNota(notaSelecionada.id, pagamento, responsavelFinanceiro);
     
     if (notaFinalizada) {
-      // Atualizar status no localStorage para Concluído
-      localStorage.setItem(`nota_status_${notaSelecionada.id}`, 'Concluído');
-      
-      // Adicionar timeline de aprovação
-      const storedTimeline = localStorage.getItem(`nota_timeline_${notaSelecionada.id}`);
-      const timeline = storedTimeline ? JSON.parse(storedTimeline) : [];
+      // Atualizar status e timeline no DB
+      const timelineAtual = notaSelecionada.timeline || [];
       const newEntry = {
-        id: `TL-${notaSelecionada.id}-${String(timeline.length + 1).padStart(3, '0')}`,
+        id: `TL-${notaSelecionada.id}-${String(timelineAtual.length + 1).padStart(3, '0')}`,
         dataHora: new Date().toISOString(),
-        usuarioId: 'FIN-001',
+        usuarioId: user?.colaborador?.id || 'FIN-001',
         usuarioNome: responsavelFinanceiro,
         tipoEvento: 'aprovado_financeiro',
         observacoes: `Nota aprovada pelo financeiro. Pagamento: ${formaPagamento}, Parcelas: ${parcelas}`
       };
-      localStorage.setItem(`nota_timeline_${notaSelecionada.id}`, JSON.stringify([newEntry, ...timeline]));
+      await updateNota(notaSelecionada.id, {
+        status: 'Concluído',
+        timeline: [newEntry, ...timelineAtual] as any,
+      });
       
       // NOVO: Separar aparelhos por tipo (Novo vs Seminovo)
       const todosAparelhos = notaFinalizada.produtos.filter(p => 

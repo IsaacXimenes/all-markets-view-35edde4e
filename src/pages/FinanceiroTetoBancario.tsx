@@ -24,7 +24,7 @@ import { useCadastroStore } from '@/store/cadastroStore';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { Label } from '@/components/ui/label';
 import { formatarMoeda } from '@/utils/formatUtils';
-import { getVendasPorStatus } from '@/utils/fluxoVendasApi';
+import { getVendasPorStatus, getConferenciaFinanceiroData, salvarConferenciaFinanceiroData, isNotaEmitidaFromDB, getDataEmissaoNotaFromDB, getNotasEmitidasPorContaFromDB } from '@/utils/fluxoVendasApi';
 import { getVendas, Venda } from '@/utils/vendasApi';
 
 const formatCurrency = formatarMoeda;
@@ -197,29 +197,17 @@ const meses = [
 
 const anos = [2025, 2026, 2027];
 
-// Helper para localStorage de notas emitidas
+// Helpers using DB-backed data from fluxoVendasApi
 const getNotasEmitidasPorConta = (mes: number, ano: number): Record<string, number> => {
-  try {
-    const key = `notas_emitidas_por_conta_${mes}_${ano}`;
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : {};
-  } catch {
-    return {};
-  }
-};
-
-const setNotasEmitidasPorConta = (mes: number, ano: number, data: Record<string, number>) => {
-  const key = `notas_emitidas_por_conta_${mes}_${ano}`;
-  localStorage.setItem(key, JSON.stringify(data));
+  return getNotasEmitidasPorContaFromDB(mes, ano);
 };
 
 const isNotaEmitida = (vendaId: string): boolean => {
-  return localStorage.getItem(`nota_emitida_${vendaId}`) === 'true';
+  return isNotaEmitidaFromDB(vendaId);
 };
 
 const getDataEmissaoNota = (vendaId: string): string | undefined => {
-  const data = localStorage.getItem(`data_emissao_nota_${vendaId}`);
-  return data || undefined;
+  return getDataEmissaoNotaFromDB(vendaId);
 };
 
 export default function FinanceiroTetoBancario() {
@@ -264,15 +252,14 @@ export default function FinanceiroTetoBancario() {
         qtd[venda.contaDestinoId] = (qtd[venda.contaDestinoId] || 0) + 1;
       });
     
-    // 2. Processar vendas reais finalizadas do localStorage
+    // 2. Processar vendas reais finalizadas do DB
     try {
       const vendasFinalizadas = getVendasPorStatus('Finalizado');
       
-      
       vendasFinalizadas.forEach(venda => {
-        // Buscar data de finalização
-        const dataFinalizacaoRaw = localStorage.getItem(`data_finalizacao_${venda.id}`);
-        
+        // Buscar data de finalização do fluxo (DB-backed)
+        const confData = getConferenciaFinanceiroData(venda.id);
+        const dataFinalizacaoRaw = confData.dataFinalizacao || venda.aprovacaoFinanceiro?.dataHora;
         
         if (!dataFinalizacaoRaw) return;
         
@@ -280,36 +267,25 @@ export default function FinanceiroTetoBancario() {
         const mesVenda = dataFinalizacao.getMonth();
         const anoVenda = dataFinalizacao.getFullYear();
         
-        
-        
         // Filtrar pelo período selecionado
         if (mesVenda !== mesSelecionado || anoVenda !== anoSelecionado) {
           return;
         }
         
-        // Buscar validações de pagamentos
-        const validacaoRaw = localStorage.getItem(`validacao_pagamentos_financeiro_${venda.id}`);
-        const historicoRaw = localStorage.getItem(`historico_conferencias_${venda.id}`);
+        // Buscar validações de pagamentos do DB
+        const validacoes = confData.validacoesPagamento;
+        const historico = confData.historicoConferencias;
         
-        
-        
-        if (validacaoRaw) {
-          const validacoes = JSON.parse(validacaoRaw);
-          const historico = historicoRaw ? JSON.parse(historicoRaw) : [];
-          
-          
-          
+        if (validacoes && validacoes.length > 0) {
           // Para cada validação confirmada pelo financeiro
           validacoes.forEach((validacao: any) => {
             if (!validacao.validadoFinanceiro) return;
 
             // Buscar o valor do histórico ou dos pagamentos da venda
-            const confHistorico = historico.find((h: any) => h.metodoPagamento === validacao.metodoPagamento);
+            const confHistorico = historico?.find((h: any) => h.metodoPagamento === validacao.metodoPagamento);
             const pagamentoVenda = venda.pagamentos?.find((p: any) => p.meioPagamento === validacao.metodoPagamento);
             const contaId = validacao.contaDestinoId || pagamentoVenda?.contaDestino;
             const valor = confHistorico?.valor || pagamentoVenda?.valor || 0;
-
-            
 
             if (contaId && valor > 0) {
               saldos[contaId] = (saldos[contaId] || 0) + valor;
@@ -317,8 +293,7 @@ export default function FinanceiroTetoBancario() {
             }
           });
         } else {
-          // Fallback de segurança: se a venda foi finalizada e tem data_finalizacao,
-          // mas não houver validação salva, usamos os pagamentos da própria venda.
+          // Fallback: usar pagamentos da própria venda
           venda.pagamentos?.forEach((p: any) => {
             const contaId = p.contaDestino;
             const valor = p.valor || 0;
@@ -367,7 +342,8 @@ export default function FinanceiroTetoBancario() {
     try {
       const vendasFinalizadas = getVendasPorStatus('Finalizado');
       vendasFinalizadas.forEach(venda => {
-        const dataFinalizacaoRaw = localStorage.getItem(`data_finalizacao_${venda.id}`);
+        const confData = getConferenciaFinanceiroData(venda.id);
+        const dataFinalizacaoRaw = confData.dataFinalizacao || venda.aprovacaoFinanceiro?.dataHora;
         if (!dataFinalizacaoRaw) return;
         
         const dataFinalizacao = new Date(dataFinalizacaoRaw);
@@ -409,7 +385,8 @@ export default function FinanceiroTetoBancario() {
       const vendasFinalizadas = getVendasPorStatus('Finalizado');
       
       vendasFinalizadas.forEach(venda => {
-        const dataFinalizacaoRaw = localStorage.getItem(`data_finalizacao_${venda.id}`);
+        const confData = getConferenciaFinanceiroData(venda.id);
+        const dataFinalizacaoRaw = confData.dataFinalizacao || venda.aprovacaoFinanceiro?.dataHora;
         if (!dataFinalizacaoRaw) return;
         
         const dataFinalizacao = new Date(dataFinalizacaoRaw);
@@ -559,20 +536,13 @@ export default function FinanceiroTetoBancario() {
   const confirmarEmissaoNota = useCallback(() => {
     if (!vendaSelecionada || !checkboxConfirmado) return;
     
-    // 1. Marcar venda como nota emitida
-    localStorage.setItem(`nota_emitida_${vendaSelecionada.vendaId}`, 'true');
-    localStorage.setItem(`data_emissao_nota_${vendaSelecionada.vendaId}`, new Date().toISOString());
-    
-    // 2. Atualizar valorNotasEmitidas por conta
-    const notasAtuais = getNotasEmitidasPorConta(mesSelecionado, anoSelecionado);
-    vendaSelecionada.pagamentos.forEach(pag => {
-      if (pag.contaId && pag.valor > 0) {
-        notasAtuais[pag.contaId] = (notasAtuais[pag.contaId] || 0) + pag.valor;
-      }
+    // 1. Marcar venda como nota emitida no DB
+    await salvarConferenciaFinanceiroData(vendaSelecionada.vendaId, {
+      notaEmitida: true,
+      dataEmissaoNota: new Date().toISOString(),
     });
-    setNotasEmitidasPorConta(mesSelecionado, anoSelecionado, notasAtuais);
     
-    // 3. Fechar modal e atualizar lista
+    // 2. Fechar modal e atualizar lista
     setSheetConfirmacaoAberto(false);
     setVendaSelecionada(null);
     setRefreshKey(prev => prev + 1);

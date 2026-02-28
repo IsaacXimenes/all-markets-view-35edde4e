@@ -1,4 +1,5 @@
-// Fiado API - Modelo de Crédito Flexível com Amortizações Variáveis
+// Fiado API - Supabase
+import { supabase } from '@/integrations/supabase/client';
 
 export interface DividaFiado {
   id: string;
@@ -35,117 +36,81 @@ export interface AnotacaoFiado {
   importante: boolean;
 }
 
-// Mock data
-let dividasFiado: DividaFiado[] = [
-  {
-    id: 'DIV-001',
-    vendaId: 'VEN-2025-0050',
-    clienteId: 'CLI-001',
-    clienteNome: 'João Silva',
-    lojaId: 'db894e7d',
-    lojaNome: 'Loja - JK Shopping',
-    valorFinal: 1500,
-    qtdVezes: 3,
-    tipoRecorrencia: 'Mensal',
-    inicioCompetencia: 'Dez-2024',
-    situacao: 'Em Aberto',
-    dataCriacao: '2024-12-01T10:00:00',
-    temAnotacaoImportante: true
-  },
-  {
-    id: 'DIV-002',
-    vendaId: 'VEN-2025-0055',
-    clienteId: 'CLI-003',
-    clienteNome: 'Carlos Oliveira',
-    lojaId: '3ac7e00c',
-    lojaNome: 'Loja - Matriz',
-    valorFinal: 2000,
-    qtdVezes: 5,
-    tipoRecorrencia: 'Mensal',
-    inicioCompetencia: 'Dez-2024',
-    situacao: 'Em Aberto',
-    dataCriacao: '2024-12-05T14:00:00'
-  },
-  {
-    id: 'DIV-003',
-    vendaId: 'VEN-2025-0060',
-    clienteId: 'CLI-005',
-    clienteNome: 'Ana Paula Ferreira',
-    lojaId: 'db894e7d',
-    lojaNome: 'Loja - JK Shopping',
-    valorFinal: 1500,
-    qtdVezes: 2,
-    tipoRecorrencia: 'Semanal',
-    inicioCompetencia: 'Jan-2025',
-    situacao: 'Em Aberto',
-    dataCriacao: '2025-01-03T09:30:00'
-  },
-  {
-    id: 'DIV-004',
-    vendaId: 'VEN-2025-0062',
-    clienteId: 'CLI-007',
-    clienteNome: 'Roberto Mendes',
-    lojaId: '5b9446d5',
-    lojaNome: 'Loja - Shopping Sul',
-    valorFinal: 1300,
-    qtdVezes: 4,
-    tipoRecorrencia: 'Mensal',
-    inicioCompetencia: 'Jan-2025',
-    situacao: 'Quitado',
-    dataCriacao: '2025-01-08T11:00:00'
-  }
-];
+// Caches
+let dividasCache: DividaFiado[] = [];
+let pagamentosCache: PagamentoFiado[] = [];
+let anotacoesCache: AnotacaoFiado[] = [];
+let cacheInitialized = false;
 
-let pagamentosFiado: PagamentoFiado[] = [
-  { id: 'PGT-001', dividaId: 'DIV-001', valor: 500, dataPagamento: '2024-12-04T14:30:00', responsavel: 'Maria Santos' },
-  { id: 'PGT-002', dividaId: 'DIV-001', valor: 500, dataPagamento: '2025-01-05T10:15:00', responsavel: 'Maria Santos' },
-  { id: 'PGT-003', dividaId: 'DIV-002', valor: 400, dataPagamento: '2024-12-10T16:45:00', responsavel: 'Pedro Costa' },
-  { id: 'PGT-004', dividaId: 'DIV-004', valor: 500, dataPagamento: '2025-01-15T09:00:00', responsavel: 'João Gestor' },
-  { id: 'PGT-005', dividaId: 'DIV-004', valor: 500, dataPagamento: '2025-02-10T14:20:00', responsavel: 'João Gestor' },
-  { id: 'PGT-006', dividaId: 'DIV-004', valor: 300, dataPagamento: '2025-03-05T11:30:00', responsavel: 'João Gestor' }
-];
+const mapDivida = (r: any): DividaFiado => ({
+  id: r.id,
+  vendaId: r.venda_id || '',
+  clienteId: r.cliente_id || '',
+  clienteNome: r.cliente_nome || '',
+  lojaId: r.loja_id || '',
+  lojaNome: r.loja_nome || '',
+  valorFinal: Number(r.valor_final) || 0,
+  qtdVezes: r.qtd_vezes || 1,
+  tipoRecorrencia: r.tipo_recorrencia || 'Mensal',
+  inicioCompetencia: r.inicio_competencia || '',
+  situacao: r.situacao || 'Em Aberto',
+  dataCriacao: r.created_at || '',
+  temAnotacaoImportante: r.tem_anotacao_importante || false,
+});
 
-let anotacoesFiado: AnotacaoFiado[] = [
-  {
-    id: 'ANO-001',
-    dividaId: 'DIV-001',
-    dataHora: '2024-12-10T09:00:00',
-    usuario: 'Maria Santos',
-    observacao: 'Cliente solicitou prazo extra para o próximo pagamento. Combinado para dia 15/01.',
-    importante: true
-  },
-  {
-    id: 'ANO-002',
-    dividaId: 'DIV-001',
-    dataHora: '2025-01-06T11:30:00',
-    usuario: 'Maria Santos',
-    observacao: 'Pagamento de janeiro realizado normalmente.',
-    importante: false
-  }
-];
+const mapPagamento = (r: any): PagamentoFiado => ({
+  id: r.id,
+  dividaId: r.divida_id || '',
+  valor: Number(r.valor) || 0,
+  dataPagamento: r.data_pagamento || '',
+  responsavel: r.responsavel || '',
+  comprovanteBase64: r.comprovante || undefined,
+  comprovanteNome: r.comprovante_nome || undefined,
+});
 
-let nextDividaId = 5;
-let nextPagamentoId = 7;
-let nextAnotacaoId = 3;
+const mapAnotacao = (r: any): AnotacaoFiado => ({
+  id: r.id,
+  dividaId: r.divida_id || '',
+  dataHora: r.data_hora || r.created_at || '',
+  usuario: r.usuario || '',
+  observacao: r.observacao || '',
+  importante: r.importante || false,
+});
+
+export const initFiadoCache = async () => {
+  const [divRes, pagRes, anoRes] = await Promise.all([
+    supabase.from('dividas_fiado').select('*').order('created_at', { ascending: false }),
+    supabase.from('pagamentos_fiado').select('*').order('data_pagamento', { ascending: false }),
+    supabase.from('anotacoes_fiado').select('*').order('data_hora', { ascending: false }),
+  ]);
+  if (divRes.error) console.error('[Fiado] dividas:', divRes.error);
+  if (pagRes.error) console.error('[Fiado] pagamentos:', pagRes.error);
+  if (anoRes.error) console.error('[Fiado] anotacoes:', anoRes.error);
+
+  dividasCache = (divRes.data || []).map(mapDivida);
+  pagamentosCache = (pagRes.data || []).map(mapPagamento);
+  anotacoesCache = (anoRes.data || []).map(mapAnotacao);
+  cacheInitialized = true;
+};
 
 // --- Consultas ---
 
 export function getDividasFiado(): DividaFiado[] {
-  return [...dividasFiado];
+  return [...dividasCache];
 }
 
 export function getPagamentosDivida(dividaId: string): PagamentoFiado[] {
-  return pagamentosFiado.filter(p => p.dividaId === dividaId);
+  return pagamentosCache.filter(p => p.dividaId === dividaId);
 }
 
 export function getAnotacoesDivida(dividaId: string): AnotacaoFiado[] {
-  return anotacoesFiado.filter(a => a.dividaId === dividaId).sort((a, b) =>
-    new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime()
-  );
+  return anotacoesCache
+    .filter(a => a.dividaId === dividaId)
+    .sort((a, b) => new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime());
 }
 
 export function getValorPagoDivida(dividaId: string): number {
-  return pagamentosFiado
+  return pagamentosCache
     .filter(p => p.dividaId === dividaId)
     .reduce((acc, p) => acc + p.valor, 0);
 }
@@ -162,7 +127,7 @@ export function getProgressoDivida(divida: DividaFiado): number {
 
 // --- Mutações ---
 
-export function criarDividaFiado(
+export async function criarDividaFiado(
   vendaId: string,
   clienteId: string,
   clienteNome: string,
@@ -171,79 +136,82 @@ export function criarDividaFiado(
   valorFinal: number,
   qtdVezes: number,
   tipoRecorrencia: 'Mensal' | 'Semanal'
-): DividaFiado {
+): Promise<DividaFiado> {
   const agora = new Date();
   const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-  const divida: DividaFiado = {
-    id: `DIV-${String(nextDividaId++).padStart(3, '0')}`,
-    vendaId,
-    clienteId,
-    clienteNome,
-    lojaId,
-    lojaNome,
-    valorFinal,
-    qtdVezes,
-    tipoRecorrencia,
-    inicioCompetencia: `${meses[agora.getMonth()]}-${agora.getFullYear()}`,
+  const { data, error } = await supabase.from('dividas_fiado').insert({
+    venda_id: vendaId,
+    cliente_id: clienteId,
+    cliente_nome: clienteNome,
+    loja_id: lojaId,
+    loja_nome: lojaNome,
+    valor_final: valorFinal,
+    qtd_vezes: qtdVezes,
+    tipo_recorrencia: tipoRecorrencia,
+    inicio_competencia: `${meses[agora.getMonth()]}-${agora.getFullYear()}`,
     situacao: 'Em Aberto',
-    dataCriacao: agora.toISOString()
-  };
-
-  dividasFiado.push(divida);
+  }).select().single();
+  if (error) throw error;
+  const divida = mapDivida(data);
+  dividasCache.unshift(divida);
   return divida;
 }
 
-export function registrarPagamentoFiado(
+export async function registrarPagamentoFiado(
   dividaId: string,
   valor: number,
   responsavel: string,
   comprovanteBase64?: string,
   comprovanteNome?: string
-): PagamentoFiado | null {
-  const divida = dividasFiado.find(d => d.id === dividaId);
+): Promise<PagamentoFiado | null> {
+  const divida = dividasCache.find(d => d.id === dividaId);
   if (!divida || divida.situacao === 'Quitado') return null;
 
-  const pagamento: PagamentoFiado = {
-    id: `PGT-${String(nextPagamentoId++).padStart(3, '0')}`,
-    dividaId,
+  const { data, error } = await supabase.from('pagamentos_fiado').insert({
+    divida_id: dividaId,
     valor,
-    dataPagamento: new Date().toISOString(),
     responsavel,
-    comprovanteBase64,
-    comprovanteNome
-  };
+    comprovante: comprovanteBase64 || null,
+    comprovante_nome: comprovanteNome || null,
+  }).select().single();
+  if (error) throw error;
+  const pagamento = mapPagamento(data);
+  pagamentosCache.unshift(pagamento);
 
-  pagamentosFiado.push(pagamento);
-
+  // Verificar quitação
   const totalPago = getValorPagoDivida(dividaId);
   if (totalPago >= divida.valorFinal - 0.01) {
     divida.situacao = 'Quitado';
+    await supabase.from('dividas_fiado').update({ situacao: 'Quitado' }).eq('id', dividaId);
   }
 
   return pagamento;
 }
 
-export function registrarAnotacaoFiado(
+export async function registrarAnotacaoFiado(
   dividaId: string,
   usuario: string,
   observacao: string,
   importante: boolean
-): AnotacaoFiado {
-  const anotacao: AnotacaoFiado = {
-    id: `ANO-${String(nextAnotacaoId++).padStart(3, '0')}`,
-    dividaId,
-    dataHora: new Date().toISOString(),
+): Promise<AnotacaoFiado> {
+  const { data, error } = await supabase.from('anotacoes_fiado').insert({
+    divida_id: dividaId,
+    data_hora: new Date().toISOString(),
     usuario,
     observacao,
-    importante
-  };
-
-  anotacoesFiado.push(anotacao);
+    importante,
+  }).select().single();
+  if (error) throw error;
+  const anotacao = mapAnotacao(data);
+  anotacoesCache.unshift(anotacao);
 
   if (importante) {
-    const divida = dividasFiado.find(d => d.id === dividaId);
-    if (divida) divida.temAnotacaoImportante = true;
+    const divida = dividasCache.find(d => d.id === dividaId);
+    if (divida) {
+      divida.temAnotacaoImportante = true;
+      await supabase.from('dividas_fiado').update({ tem_anotacao_importante: true }).eq('id', dividaId);
+    }
   }
 
   return anotacao;

@@ -1,56 +1,68 @@
-// Agenda Eletrônica para Gestão Administrativa
-// Reutilizável para Conferência Diária e Atividades dos Gestores
+// Agenda Eletrônica para Gestão Administrativa - Supabase
+import { supabase } from '@/integrations/supabase/client';
 
 export interface AnotacaoGestao {
   id: string;
-  chaveContexto: string; // "conferencia_LOJ001" ou "atividades_LOJ001"
-  dataHora: string;      // ISO
+  chaveContexto: string;
+  dataHora: string;
   usuario: string;
   observacao: string;
   importante: boolean;
 }
 
-const STORAGE_KEY = 'anotacoes_gestao';
+// Cache local
+let anotacoesCache: AnotacaoGestao[] = [];
+let cacheInitialized = false;
 
-function getAll(): AnotacaoGestao[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
+const mapRow = (row: any): AnotacaoGestao => ({
+  id: row.id,
+  chaveContexto: row.chave_contexto,
+  dataHora: row.data_hora || row.created_at,
+  usuario: row.usuario || '',
+  observacao: row.observacao || '',
+  importante: row.importante || false,
+});
 
-function saveAll(data: AnotacaoGestao[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
+export const initAnotacoesGestaoCache = async () => {
+  const { data, error } = await supabase
+    .from('anotacoes_gestao')
+    .select('*')
+    .order('data_hora', { ascending: false });
+  if (error) { console.error('[AgendaGestao] Erro ao carregar:', error); return; }
+  anotacoesCache = (data || []).map(mapRow);
+  cacheInitialized = true;
+};
 
 export function getAnotacoesGestao(chaveContexto: string): AnotacaoGestao[] {
-  return getAll()
+  return anotacoesCache
     .filter(a => a.chaveContexto === chaveContexto)
     .sort((a, b) => new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime());
 }
 
-export function registrarAnotacaoGestao(
+export async function registrarAnotacaoGestao(
   chaveContexto: string,
   usuario: string,
   observacao: string,
   importante: boolean
-): AnotacaoGestao {
-  const nova: AnotacaoGestao = {
-    id: `ANGEST-${Date.now()}`,
-    chaveContexto,
-    dataHora: new Date().toISOString(),
-    usuario,
-    observacao,
-    importante,
-  };
-  const todas = getAll();
-  todas.push(nova);
-  saveAll(todas);
+): Promise<AnotacaoGestao> {
+  const agora = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('anotacoes_gestao')
+    .insert({
+      chave_contexto: chaveContexto,
+      data_hora: agora,
+      usuario,
+      observacao,
+      importante,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  const nova = mapRow(data);
+  anotacoesCache.unshift(nova);
   return nova;
 }
 
 export function temAnotacaoImportante(chaveContexto: string): boolean {
-  return getAll().some(a => a.chaveContexto === chaveContexto && a.importante);
+  return anotacoesCache.some(a => a.chaveContexto === chaveContexto && a.importante);
 }

@@ -1,4 +1,5 @@
-// Atividades dos Gestores API
+// Atividades dos Gestores API - Supabase Integration
+import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
 // Interfaces
@@ -6,7 +7,7 @@ export interface AtividadeCadastro {
   id: string;
   nome: string;
   tipoHorario: 'fixo' | 'aberto';
-  horarioPrevisto?: string; // HH:mm
+  horarioPrevisto?: string;
   pontuacaoBase: number;
   lojasAtribuidas: string[] | 'todas';
   ativa: boolean;
@@ -16,12 +17,12 @@ export interface ExecucaoAtividade {
   id: string;
   atividadeId: string;
   atividadeNome: string;
-  data: string; // YYYY-MM-DD
+  data: string;
   lojaId: string;
   gestorId: string;
   gestorNome: string;
   executado: boolean;
-  horarioExecutado?: string; // ISO
+  horarioExecutado?: string;
   pontuacao: number;
   status: 'pendente' | 'executado' | 'executado_com_atraso';
   tipoHorario: 'fixo' | 'aberto';
@@ -40,16 +41,16 @@ export interface LogAtividade {
   gestorNome: string;
   acao: 'marcou' | 'desmarcou';
   pontuacao: number;
-  dataHora: string; // ISO
+  dataHora: string;
   detalhes: string;
 }
 
-// localStorage keys
-const ATIVIDADES_KEY = 'atividades_cadastro';
-const EXECUCAO_KEY_PREFIX = 'atividades_execucao_';
-const LOGS_KEY = 'atividades_logs';
+// ── Cache layer ──
+let _atividadesCache: AtividadeCadastro[] = [];
+let _execucoesCache: ExecucaoAtividade[] = [];
+let _logsCache: LogAtividade[] = [];
+let _atividadesCacheLoaded = false;
 
-// Initial mock data
 const MOCK_ATIVIDADES: AtividadeCadastro[] = [
   { id: 'ATV-001', nome: 'Abertura de Caixa', tipoHorario: 'fixo', horarioPrevisto: '09:00', pontuacaoBase: 1, lojasAtribuidas: 'todas', ativa: true },
   { id: 'ATV-002', nome: 'Verificação de Estoque', tipoHorario: 'aberto', pontuacaoBase: 1, lojasAtribuidas: 'todas', ativa: true },
@@ -61,60 +62,137 @@ const MOCK_ATIVIDADES: AtividadeCadastro[] = [
   { id: 'ATV-008', nome: 'Conferir Lançamentos da Assistência', tipoHorario: 'fixo', horarioPrevisto: '10:00', pontuacaoBase: 1, lojasAtribuidas: 'todas', ativa: true },
 ];
 
-// === CRUD Atividades ===
+// ── Mappers ──
+const mapAtividade = (r: any): AtividadeCadastro => ({
+  id: r.id,
+  nome: r.nome,
+  tipoHorario: (r.tipo_horario || 'aberto') as 'fixo' | 'aberto',
+  horarioPrevisto: r.horario_previsto || undefined,
+  pontuacaoBase: r.pontuacao_base ?? 1,
+  lojasAtribuidas: r.lojas_atribuidas ?? 'todas',
+  ativa: r.ativa ?? true,
+});
 
-export const getAtividades = (): AtividadeCadastro[] => {
-  const stored = localStorage.getItem(ATIVIDADES_KEY);
-  if (stored) return JSON.parse(stored);
-  localStorage.setItem(ATIVIDADES_KEY, JSON.stringify(MOCK_ATIVIDADES));
-  return [...MOCK_ATIVIDADES];
-};
+const mapExecucao = (r: any): ExecucaoAtividade => ({
+  id: r.id,
+  atividadeId: r.atividade_id,
+  atividadeNome: r.atividade_nome || '',
+  data: r.data,
+  lojaId: r.loja_id || '',
+  gestorId: r.gestor_id || '',
+  gestorNome: r.gestor_nome || '',
+  executado: r.executado ?? false,
+  horarioExecutado: r.horario_executado || undefined,
+  pontuacao: Number(r.pontuacao) || 0,
+  status: (r.status || 'pendente') as ExecucaoAtividade['status'],
+  tipoHorario: (r.tipo_horario || 'aberto') as 'fixo' | 'aberto',
+  horarioPrevisto: r.horario_previsto || undefined,
+  colaboradorDesignadoId: r.colaborador_designado_id || undefined,
+  colaboradorDesignadoNome: r.colaborador_designado_nome || undefined,
+});
 
-export const addAtividade = (data: Omit<AtividadeCadastro, 'id'>): AtividadeCadastro => {
-  const atividades = getAtividades();
-  const id = `ATV-${String(atividades.length + 1).padStart(3, '0')}-${Date.now().toString(36)}`;
-  const nova: AtividadeCadastro = { ...data, id };
-  atividades.push(nova);
-  localStorage.setItem(ATIVIDADES_KEY, JSON.stringify(atividades));
-  return nova;
-};
+const mapLog = (r: any): LogAtividade => ({
+  id: r.id,
+  modulo: r.modulo || 'Atividades Gestores',
+  atividadeId: r.atividade_id || '',
+  atividadeNome: r.atividade_nome || '',
+  data: r.data || '',
+  gestorId: r.gestor_id || '',
+  gestorNome: r.gestor_nome || '',
+  acao: (r.acao || 'marcou') as 'marcou' | 'desmarcou',
+  pontuacao: Number(r.pontuacao) || 0,
+  dataHora: r.data_hora || '',
+  detalhes: r.detalhes || '',
+});
 
-export const updateAtividade = (id: string, data: Partial<AtividadeCadastro>): void => {
-  const atividades = getAtividades();
-  const idx = atividades.findIndex(a => a.id === id);
-  if (idx >= 0) {
-    atividades[idx] = { ...atividades[idx], ...data };
-    localStorage.setItem(ATIVIDADES_KEY, JSON.stringify(atividades));
+// ── Init caches ──
+export const initAtividadesGestoresCache = async () => {
+  const [atvRes, logsRes] = await Promise.all([
+    supabase.from('atividades_gestores').select('*').order('created_at'),
+    supabase.from('logs_atividades').select('*').order('data_hora', { ascending: false }).limit(500),
+  ]);
+
+  if (atvRes.error) console.error('[ATV] init error', atvRes.error);
+  if (logsRes.error) console.error('[ATV-LOGS] init error', logsRes.error);
+
+  _atividadesCache = (atvRes.data || []).map(mapAtividade);
+  _logsCache = (logsRes.data || []).map(mapLog);
+
+  // Seed if empty
+  if (_atividadesCache.length === 0) {
+    for (const mock of MOCK_ATIVIDADES) {
+      const { data } = await supabase.from('atividades_gestores').insert({
+        nome: mock.nome,
+        tipo_horario: mock.tipoHorario,
+        horario_previsto: mock.horarioPrevisto || null,
+        pontuacao_base: mock.pontuacaoBase,
+        lojas_atribuidas: mock.lojasAtribuidas as any,
+        ativa: mock.ativa,
+      }).select().single();
+      if (data) _atividadesCache.push(mapAtividade(data));
+    }
   }
+
+  _atividadesCacheLoaded = true;
 };
 
-export const deleteAtividade = (id: string): void => {
-  const atividades = getAtividades().filter(a => a.id !== id);
-  localStorage.setItem(ATIVIDADES_KEY, JSON.stringify(atividades));
+// Auto-init
+initAtividadesGestoresCache();
+
+// === CRUD Atividades ===
+export const getAtividades = (): AtividadeCadastro[] => [..._atividadesCache];
+
+export const addAtividade = async (data: Omit<AtividadeCadastro, 'id'>): Promise<AtividadeCadastro> => {
+  const { data: row, error } = await supabase.from('atividades_gestores').insert({
+    nome: data.nome,
+    tipo_horario: data.tipoHorario,
+    horario_previsto: data.horarioPrevisto || null,
+    pontuacao_base: data.pontuacaoBase,
+    lojas_atribuidas: data.lojasAtribuidas as any,
+    ativa: data.ativa,
+  }).select().single();
+  if (error) throw error;
+  const mapped = mapAtividade(row);
+  _atividadesCache.push(mapped);
+  return mapped;
+};
+
+export const updateAtividade = async (id: string, updates: Partial<AtividadeCadastro>): Promise<void> => {
+  const dbUpdates: any = {};
+  if (updates.nome !== undefined) dbUpdates.nome = updates.nome;
+  if (updates.tipoHorario !== undefined) dbUpdates.tipo_horario = updates.tipoHorario;
+  if (updates.horarioPrevisto !== undefined) dbUpdates.horario_previsto = updates.horarioPrevisto || null;
+  if (updates.pontuacaoBase !== undefined) dbUpdates.pontuacao_base = updates.pontuacaoBase;
+  if (updates.lojasAtribuidas !== undefined) dbUpdates.lojas_atribuidas = updates.lojasAtribuidas as any;
+  if (updates.ativa !== undefined) dbUpdates.ativa = updates.ativa;
+
+  const { error } = await supabase.from('atividades_gestores').update(dbUpdates).eq('id', id);
+  if (error) throw error;
+  const idx = _atividadesCache.findIndex(a => a.id === id);
+  if (idx >= 0) _atividadesCache[idx] = { ..._atividadesCache[idx], ...updates };
+};
+
+export const deleteAtividade = async (id: string): Promise<void> => {
+  const { error } = await supabase.from('atividades_gestores').delete().eq('id', id);
+  if (error) throw error;
+  _atividadesCache = _atividadesCache.filter(a => a.id !== id);
 };
 
 // === Execução Diária ===
-
-const getExecucaoKey = (data: string) => `${EXECUCAO_KEY_PREFIX}${data}`;
-
 export const getExecucoesDoDia = (data: string, lojaId?: string): ExecucaoAtividade[] => {
-  const key = getExecucaoKey(data);
-  const stored = localStorage.getItem(key);
-  let execucoes: ExecucaoAtividade[] = stored ? JSON.parse(stored) : [];
+  let execucoes = _execucoesCache.filter(e => e.data === data);
 
-  // Sincronizar com atividades cadastradas
   const atividades = getAtividades().filter(a => a.ativa);
   const atividadesParaLoja = atividades.filter(a => {
     if (a.lojasAtribuidas === 'todas') return true;
-    return lojaId ? a.lojasAtribuidas.includes(lojaId) : true;
+    return lojaId ? (a.lojasAtribuidas as string[]).includes(lojaId) : true;
   });
 
-  // Criar execuções faltantes
-  let changed = false;
+  // Criar execuções faltantes em memória (serão persistidas ao toggle)
   for (const atv of atividadesParaLoja) {
     const existe = execucoes.find(e => e.atividadeId === atv.id && (!lojaId || e.lojaId === lojaId));
     if (!existe && lojaId) {
-      execucoes.push({
+      const nova: ExecucaoAtividade = {
         id: `EXEC-${atv.id}-${lojaId}-${data}`,
         atividadeId: atv.id,
         atividadeNome: atv.nome,
@@ -127,38 +205,38 @@ export const getExecucoesDoDia = (data: string, lojaId?: string): ExecucaoAtivid
         status: 'pendente',
         tipoHorario: atv.tipoHorario,
         horarioPrevisto: atv.horarioPrevisto,
-      });
-      changed = true;
+      };
+      execucoes.push(nova);
     }
   }
 
-  if (changed) {
-    localStorage.setItem(key, JSON.stringify(execucoes));
-  }
-
-  if (lojaId) {
-    return execucoes.filter(e => e.lojaId === lojaId);
-  }
+  if (lojaId) return execucoes.filter(e => e.lojaId === lojaId);
   return execucoes;
 };
 
-export const toggleExecucao = (
+export const loadExecucoesDoDia = async (data: string): Promise<void> => {
+  const { data: rows, error } = await supabase
+    .from('execucoes_atividades')
+    .select('*')
+    .eq('data', data);
+  if (error) { console.error('[EXEC] load error', error); return; }
+  // Remove old entries for this date, add fresh ones
+  _execucoesCache = _execucoesCache.filter(e => e.data !== data);
+  _execucoesCache.push(...(rows || []).map(mapExecucao));
+};
+
+export const toggleExecucao = async (
   data: string,
   atividadeId: string,
   lojaId: string,
   gestorId: string,
   gestorNome: string
-): ExecucaoAtividade => {
-  const key = getExecucaoKey(data);
-  const execucoes: ExecucaoAtividade[] = JSON.parse(localStorage.getItem(key) || '[]');
-  const idx = execucoes.findIndex(e => e.atividadeId === atividadeId && e.lojaId === lojaId);
-
-  if (idx < 0) throw new Error('Execução não encontrada');
-
-  const exec = execucoes[idx];
+): Promise<ExecucaoAtividade> => {
+  // Find or create in cache
+  let exec = _execucoesCache.find(e => e.atividadeId === atividadeId && e.lojaId === lojaId && e.data === data);
   const atividade = getAtividades().find(a => a.id === atividadeId);
   const agora = new Date();
-  const novoExecutado = !exec.executado;
+  const novoExecutado = exec ? !exec.executado : true;
 
   let pontuacao = 0;
   let status: ExecucaoAtividade['status'] = 'pendente';
@@ -181,70 +259,103 @@ export const toggleExecucao = (
     }
   }
 
-  execucoes[idx] = {
-    ...exec,
+  const updatedFields = {
     executado: novoExecutado,
-    horarioExecutado: novoExecutado ? agora.toISOString() : undefined,
+    horario_executado: novoExecutado ? agora.toISOString() : null,
     pontuacao,
     status,
-    gestorId,
-    gestorNome,
+    gestor_id: gestorId,
+    gestor_nome: gestorNome,
   };
 
-  localStorage.setItem(key, JSON.stringify(execucoes));
+  if (exec && !exec.id.startsWith('EXEC-')) {
+    // Existing DB record - update
+    const { data: row, error } = await supabase
+      .from('execucoes_atividades')
+      .update(updatedFields)
+      .eq('id', exec.id)
+      .select().single();
+    if (error) throw error;
+    const mapped = mapExecucao(row);
+    const idx = _execucoesCache.findIndex(e => e.id === exec!.id);
+    if (idx >= 0) _execucoesCache[idx] = mapped;
+    exec = mapped;
+  } else {
+    // New - insert
+    const { data: row, error } = await supabase
+      .from('execucoes_atividades')
+      .insert({
+        atividade_id: atividadeId,
+        atividade_nome: atividade?.nome || '',
+        data,
+        loja_id: lojaId,
+        tipo_horario: atividade?.tipoHorario || 'aberto',
+        horario_previsto: atividade?.horarioPrevisto || null,
+        ...updatedFields,
+      })
+      .select().single();
+    if (error) throw error;
+    const mapped = mapExecucao(row);
+    // Remove placeholder
+    _execucoesCache = _execucoesCache.filter(e => !(e.atividadeId === atividadeId && e.lojaId === lojaId && e.data === data));
+    _execucoesCache.push(mapped);
+    exec = mapped;
+  }
 
   // Log
-  const logs = getLogsAtividades();
-  logs.unshift({
-    id: `LOG-ATV-${Date.now()}`,
+  const logEntry = {
     modulo: 'Atividades Gestores',
-    atividadeId,
-    atividadeNome: exec.atividadeNome,
+    atividade_id: atividadeId,
+    atividade_nome: exec.atividadeNome,
     data,
-    gestorId,
-    gestorNome,
+    gestor_id: gestorId,
+    gestor_nome: gestorNome,
     acao: novoExecutado ? 'marcou' : 'desmarcou',
     pontuacao,
-    dataHora: agora.toISOString(),
+    data_hora: agora.toISOString(),
     detalhes: novoExecutado
       ? `Atividade "${exec.atividadeNome}" marcada como executada. Pontuação: ${pontuacao}. Status: ${status === 'executado_com_atraso' ? 'Executado com Atraso' : 'Executado'}${exec.colaboradorDesignadoNome ? `. Colaborador designado: ${exec.colaboradorDesignadoNome}` : ''}`
       : `Atividade "${exec.atividadeNome}" desmarcada. Pontuação zerada.`,
-  });
-  localStorage.setItem(LOGS_KEY, JSON.stringify(logs));
+  };
 
-  return execucoes[idx];
+  const { data: logRow } = await supabase.from('logs_atividades').insert(logEntry).select().single();
+  if (logRow) _logsCache.unshift(mapLog(logRow));
+
+  return exec;
 };
 
 // === Atualizar Colaborador Designado ===
-
-export const atualizarColaboradorExecucao = (
+export const atualizarColaboradorExecucao = async (
   data: string,
   atividadeId: string,
   lojaId: string,
   colaboradorId: string,
   colaboradorNome: string
-): void => {
-  const key = getExecucaoKey(data);
-  const execucoes: ExecucaoAtividade[] = JSON.parse(localStorage.getItem(key) || '[]');
-  const idx = execucoes.findIndex(e => e.atividadeId === atividadeId && e.lojaId === lojaId);
-  if (idx < 0) return;
-  execucoes[idx] = {
-    ...execucoes[idx],
-    colaboradorDesignadoId: colaboradorId || undefined,
-    colaboradorDesignadoNome: colaboradorNome || undefined,
-  };
-  localStorage.setItem(key, JSON.stringify(execucoes));
+): Promise<void> => {
+  const exec = _execucoesCache.find(e => e.atividadeId === atividadeId && e.lojaId === lojaId && e.data === data);
+  if (!exec) return;
+
+  if (!exec.id.startsWith('EXEC-')) {
+    await supabase.from('execucoes_atividades').update({
+      colaborador_designado_id: colaboradorId || null,
+      colaborador_designado_nome: colaboradorNome || null,
+    }).eq('id', exec.id);
+  }
+
+  const idx = _execucoesCache.findIndex(e => e.id === exec.id);
+  if (idx >= 0) {
+    _execucoesCache[idx] = {
+      ..._execucoesCache[idx],
+      colaboradorDesignadoId: colaboradorId || undefined,
+      colaboradorDesignadoNome: colaboradorNome || undefined,
+    };
+  }
 };
 
 // === Logs ===
-
-export const getLogsAtividades = (): LogAtividade[] => {
-  const stored = localStorage.getItem(LOGS_KEY);
-  return stored ? JSON.parse(stored) : [];
-};
+export const getLogsAtividades = (): LogAtividade[] => [..._logsCache];
 
 // === Dashboard helpers ===
-
 export const calcularResumoExecucao = (execucoes: ExecucaoAtividade[]) => {
   const total = execucoes.length;
   const executados = execucoes.filter(e => e.executado).length;
@@ -254,7 +365,6 @@ export const calcularResumoExecucao = (execucoes: ExecucaoAtividade[]) => {
     return acc + (atv?.pontuacaoBase ?? 1);
   }, 0);
   const percentual = total > 0 ? Math.round((executados / total) * 100) : 0;
-
   return { total, executados, pontuacaoObtida, pontuacaoMaxima, percentual };
 };
 
@@ -267,43 +377,37 @@ export interface RankingGestor {
   percentual: number;
 }
 
-export const calcularRankingGestores = (dataInicio: string, dataFim: string, lojaId?: string): RankingGestor[] => {
+export const calcularRankingGestores = async (dataInicio: string, dataFim: string, lojaId?: string): Promise<RankingGestor[]> => {
+  const { data: rows } = await supabase
+    .from('execucoes_atividades')
+    .select('*')
+    .gte('data', dataInicio)
+    .lte('data', dataFim);
+
+  const execucoes: ExecucaoAtividade[] = (rows || []).map(mapExecucao);
   const ranking = new Map<string, RankingGestor>();
 
-  // Iterate over days in range
-  const start = new Date(dataInicio);
-  const end = new Date(dataFim);
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const dataStr = format(d, 'yyyy-MM-dd');
-    const key = getExecucaoKey(dataStr);
-    const stored = localStorage.getItem(key);
-    if (!stored) continue;
-    const execucoes: ExecucaoAtividade[] = JSON.parse(stored);
+  for (const exec of execucoes) {
+    if (lojaId && exec.lojaId !== lojaId) continue;
+    if (!exec.gestorId) continue;
 
-    for (const exec of execucoes) {
-      if (lojaId && exec.lojaId !== lojaId) continue;
-      if (!exec.gestorId) continue;
+    const existing = ranking.get(exec.gestorId) || {
+      gestorId: exec.gestorId,
+      gestorNome: exec.gestorNome,
+      pontuacaoTotal: 0,
+      atividadesExecutadas: 0,
+      atividadesTotal: 0,
+      percentual: 0,
+    };
 
-      const existing = ranking.get(exec.gestorId) || {
-        gestorId: exec.gestorId,
-        gestorNome: exec.gestorNome,
-        pontuacaoTotal: 0,
-        atividadesExecutadas: 0,
-        atividadesTotal: 0,
-        percentual: 0,
-      };
-
-      existing.atividadesTotal++;
-      if (exec.executado) {
-        existing.atividadesExecutadas++;
-        existing.pontuacaoTotal += exec.pontuacao;
-      }
-      existing.percentual = existing.atividadesTotal > 0
-        ? Math.round((existing.atividadesExecutadas / existing.atividadesTotal) * 100)
-        : 0;
-
-      ranking.set(exec.gestorId, existing);
+    existing.atividadesTotal++;
+    if (exec.executado) {
+      existing.atividadesExecutadas++;
+      existing.pontuacaoTotal += exec.pontuacao;
     }
+    existing.percentual = existing.atividadesTotal > 0
+      ? Math.round((existing.atividadesExecutadas / existing.atividadesTotal) * 100) : 0;
+    ranking.set(exec.gestorId, existing);
   }
 
   return Array.from(ranking.values()).sort((a, b) => b.pontuacaoTotal - a.pontuacaoTotal);
@@ -318,35 +422,32 @@ export interface ExecucaoPorLoja {
   pontuacaoMedia: number;
 }
 
-export const calcularExecucaoPorLoja = (dataInicio: string, dataFim: string, getLojaNome: (id: string) => string): ExecucaoPorLoja[] => {
+export const calcularExecucaoPorLoja = async (dataInicio: string, dataFim: string, getLojaNome: (id: string) => string): Promise<ExecucaoPorLoja[]> => {
+  const { data: rows } = await supabase
+    .from('execucoes_atividades')
+    .select('*')
+    .gte('data', dataInicio)
+    .lte('data', dataFim);
+
+  const execucoes: ExecucaoAtividade[] = (rows || []).map(mapExecucao);
   const porLoja = new Map<string, { executadas: number; total: number; pontuacao: number }>();
 
-  const start = new Date(dataInicio);
-  const end = new Date(dataFim);
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const dataStr = format(d, 'yyyy-MM-dd');
-    const key = getExecucaoKey(dataStr);
-    const stored = localStorage.getItem(key);
-    if (!stored) continue;
-    const execucoes: ExecucaoAtividade[] = JSON.parse(stored);
-
-    for (const exec of execucoes) {
-      const existing = porLoja.get(exec.lojaId) || { executadas: 0, total: 0, pontuacao: 0 };
-      existing.total++;
-      if (exec.executado) {
-        existing.executadas++;
-        existing.pontuacao += exec.pontuacao;
-      }
-      porLoja.set(exec.lojaId, existing);
+  for (const exec of execucoes) {
+    const existing = porLoja.get(exec.lojaId) || { executadas: 0, total: 0, pontuacao: 0 };
+    existing.total++;
+    if (exec.executado) {
+      existing.executadas++;
+      existing.pontuacao += exec.pontuacao;
     }
+    porLoja.set(exec.lojaId, existing);
   }
 
-  return Array.from(porLoja.entries()).map(([lojaId, data]) => ({
+  return Array.from(porLoja.entries()).map(([lojaId, d]) => ({
     lojaId,
     lojaNome: getLojaNome(lojaId),
-    executadas: data.executadas,
-    total: data.total,
-    percentual: data.total > 0 ? Math.round((data.executadas / data.total) * 100) : 0,
-    pontuacaoMedia: data.total > 0 ? Math.round((data.pontuacao / data.total) * 100) / 100 : 0,
+    executadas: d.executadas,
+    total: d.total,
+    percentual: d.total > 0 ? Math.round((d.executadas / d.total) * 100) : 0,
+    pontuacaoMedia: d.total > 0 ? Math.round((d.pontuacao / d.total) * 100) / 100 : 0,
   })).sort((a, b) => b.percentual - a.percentual);
 };

@@ -2933,6 +2933,66 @@ export type Database = {
         }
         Relationships: []
       }
+      stories_lotes: {
+        Row: {
+          competencia: string
+          conferido_por: string | null
+          conferido_por_nome: string | null
+          created_at: string | null
+          data: string
+          data_conferencia: string | null
+          data_validacao: string | null
+          id: string
+          loja_id: string
+          loja_nome: string | null
+          percentual_stories: number | null
+          status: string | null
+          total_vendas: number | null
+          validado_por: string | null
+          validado_por_nome: string | null
+          vendas: Json | null
+          vendas_com_story: number | null
+        }
+        Insert: {
+          competencia: string
+          conferido_por?: string | null
+          conferido_por_nome?: string | null
+          created_at?: string | null
+          data: string
+          data_conferencia?: string | null
+          data_validacao?: string | null
+          id?: string
+          loja_id: string
+          loja_nome?: string | null
+          percentual_stories?: number | null
+          status?: string | null
+          total_vendas?: number | null
+          validado_por?: string | null
+          validado_por_nome?: string | null
+          vendas?: Json | null
+          vendas_com_story?: number | null
+        }
+        Update: {
+          competencia?: string
+          conferido_por?: string | null
+          conferido_por_nome?: string | null
+          created_at?: string | null
+          data?: string
+          data_conferencia?: string | null
+          data_validacao?: string | null
+          id?: string
+          loja_id?: string
+          loja_nome?: string | null
+          percentual_stories?: number | null
+          status?: string | null
+          total_vendas?: number | null
+          validado_por?: string | null
+          validado_por_nome?: string | null
+          vendas?: Json | null
+          vendas_com_story?: number | null
+        }
+        Relationships: []
+      }
       taxas_entrega: {
         Row: {
           created_at: string | null

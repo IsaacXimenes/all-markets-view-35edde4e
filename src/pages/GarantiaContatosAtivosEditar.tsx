@@ -108,7 +108,7 @@ export default function GarantiaContatosAtivosEditar() {
 
   const getMotoboyNome = (id: string) => motoboys.find(m => m.id === id)?.nome || id;
 
-  const handleSalvar = () => {
+  const handleSalvar = async () => {
     if (!form.aparelhoModelo || !form.aparelhoImei || !form.aparelhoCondicao || !form.motoboyId || !form.dataEntregaPrevista) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
@@ -150,7 +150,7 @@ export default function GarantiaContatosAtivosEditar() {
       status: form.status
     };
 
-    updateContatoAtivo(contato.id, updates);
+    await updateContatoAtivo(contato.id, updates);
     toast.success('Contato atualizado com sucesso!');
     navigate('/garantias/contatos-ativos');
   };

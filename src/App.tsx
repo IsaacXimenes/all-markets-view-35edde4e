@@ -7,6 +7,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useCadastroStore } from "@/store/cadastroStore";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { initPlanosGarantiaCache } from "@/utils/planosGarantiaApi";
+import { initTaxasEntregaCache } from "@/utils/taxasEntregaApi";
+import { initValoresTrocaCache } from "@/utils/valoresRecomendadosTrocaApi";
+import { initTratativasComerciaisCache } from "@/utils/garantiaExtendidaApi";
+import { initMovimentacoesEntreContasCache } from "@/utils/movimentacoesEntreContasApi";
+import { initContatosAtivosCache, initRegistrosAnaliseCache } from "@/utils/garantiasApi";
 import Login from "./pages/Login";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -146,6 +152,21 @@ const AppInitializer = ({ children }: { children: React.ReactNode }) => {
       inicializarDadosMockados();
     }
   }, [inicializarDadosMockados, inicializado]);
+
+  // Inicializar caches de APIs migradas para Supabase
+  useEffect(() => {
+    if (inicializado) {
+      Promise.all([
+        initPlanosGarantiaCache(),
+        initTaxasEntregaCache(),
+        initValoresTrocaCache(),
+        initTratativasComerciaisCache(),
+        initMovimentacoesEntreContasCache(),
+        initContatosAtivosCache(),
+        initRegistrosAnaliseCache(),
+      ]).catch(err => console.error('Erro ao inicializar caches:', err));
+    }
+  }, [inicializado]);
   
   return <>{children}</>;
 };

@@ -111,11 +111,67 @@ let _tratativasCache: TratativaGarantia[] = [];
 let _timelineCache: TimelineGarantia[] = [];
 let _cacheInitialized = false;
 
-// In-memory only (no DB table yet - Lote 5)
-let contatosAtivos: ContatoAtivoGarantia[] = [];
-let registrosAnaliseGarantia: RegistroAnaliseGarantia[] = [];
-let contatoAtivoCounter = 0;
-let registroAnaliseCounter = 0;
+// Supabase-backed caches
+let _contatosAtivosCache: ContatoAtivoGarantia[] = [];
+let _registrosAnaliseCache: RegistroAnaliseGarantia[] = [];
+let _contatosInitPromise: Promise<void> | null = null;
+let _registrosInitPromise: Promise<void> | null = null;
+
+// ==================== MAPPERS - CONTATOS ATIVOS ====================
+
+const mapContatoAtivoFromDB = (row: any): ContatoAtivoGarantia => ({
+  id: row.id,
+  garantiaId: row.garantia_id || undefined,
+  dataLancamento: row.data_lancamento || '',
+  cliente: row.cliente || { id: '', nome: '', telefone: '', email: '' },
+  aparelho: row.aparelho || { modelo: '', imei: '' },
+  logistica: row.logistica || { motoboyId: '', motoboyNome: '', dataEntregaPrevista: '', enderecoEntrega: '', observacoes: '' },
+  garantiaEstendida: row.garantia_estendida || undefined,
+  status: row.status || 'Pendente',
+  timeline: Array.isArray(row.timeline) ? row.timeline : [],
+  autoGerado: row.auto_gerado || false,
+});
+
+const mapRegistroAnaliseFromDB = (row: any): RegistroAnaliseGarantia => ({
+  id: row.id,
+  origem: row.origem || 'Garantia',
+  origemId: row.origem_id || '',
+  clienteDescricao: row.cliente_descricao || '',
+  dataChegada: row.data_chegada || '',
+  status: row.status || 'Pendente',
+  tecnicoId: row.tecnico_id,
+  tecnicoNome: row.tecnico_nome,
+  dataAprovacao: row.data_aprovacao,
+  usuarioAprovacao: row.usuario_aprovacao,
+  observacao: row.observacao,
+  motivoRecusa: row.motivo_recusa,
+  dataRecusa: row.data_recusa,
+  metadata: row.metadata || undefined,
+});
+
+// ==================== INIT CONTATOS/ANALISE ====================
+
+export const initContatosAtivosCache = async (): Promise<void> => {
+  if (_contatosInitPromise) return _contatosInitPromise;
+  _contatosInitPromise = (async () => {
+    const { data, error } = await supabase.from('contatos_ativos_garantia').select('*').order('data_lancamento', { ascending: false });
+    if (error) { console.error('Erro ao carregar contatos_ativos_garantia:', error); return; }
+    _contatosAtivosCache = (data || []).map(mapContatoAtivoFromDB);
+    console.log(`[GARANTIA] Contatos ativos cache: ${_contatosAtivosCache.length}`);
+  })();
+  return _contatosInitPromise;
+};
+
+export const initRegistrosAnaliseCache = async (): Promise<void> => {
+  if (_registrosInitPromise) return _registrosInitPromise;
+  _registrosInitPromise = (async () => {
+    const { data, error } = await supabase.from('registros_analise_garantia').select('*').order('data_chegada', { ascending: false });
+    if (error) { console.error('Erro ao carregar registros_analise_garantia:', error); return; }
+    _registrosAnaliseCache = (data || []).map(mapRegistroAnaliseFromDB);
+    console.log(`[GARANTIA] Registros análise cache: ${_registrosAnaliseCache.length}`);
+  })();
+  return _registrosInitPromise;
+};
 
 // ==================== MAPPERS ====================
 
@@ -401,83 +457,115 @@ export const exportGarantiasToCSV = (garantiasFiltradas: GarantiaItem[], filenam
   link.click();
 };
 
-// ==================== CONTATOS ATIVOS (in-memory, Lote 5) ====================
+// ==================== CONTATOS ATIVOS (Supabase) ====================
 
-export const getContatosAtivos = (): ContatoAtivoGarantia[] => [...contatosAtivos];
+export const getContatosAtivos = (): ContatoAtivoGarantia[] => [..._contatosAtivosCache];
 
-export const addContatoAtivo = (contato: Omit<ContatoAtivoGarantia, 'id' | 'timeline'>): ContatoAtivoGarantia => {
-  contatoAtivoCounter++;
-  const newContato: ContatoAtivoGarantia = {
-    ...contato,
-    id: `CTA-${String(contatoAtivoCounter).padStart(4, '0')}`,
-    timeline: [{ id: `TLC-${Date.now()}`, dataHora: new Date().toISOString(), tipo: 'criacao', descricao: 'Contato registrado' }]
-  };
-  contatosAtivos.push(newContato);
-  return newContato;
+export const addContatoAtivo = async (contato: Omit<ContatoAtivoGarantia, 'id' | 'timeline'>): Promise<ContatoAtivoGarantia> => {
+  const timelineInit = [{ id: `TLC-${Date.now()}`, dataHora: new Date().toISOString(), tipo: 'criacao', descricao: 'Contato registrado' }];
+  const { data, error } = await supabase.from('contatos_ativos_garantia').insert({
+    garantia_id: contato.garantiaId || null,
+    data_lancamento: contato.dataLancamento || new Date().toISOString(),
+    cliente: contato.cliente as any,
+    aparelho: contato.aparelho as any,
+    logistica: contato.logistica as any,
+    garantia_estendida: contato.garantiaEstendida as any || null,
+    status: contato.status || 'Pendente',
+    timeline: timelineInit as any,
+    auto_gerado: contato.autoGerado || false,
+  }).select().single();
+  if (error) throw error;
+  const novo = mapContatoAtivoFromDB(data);
+  _contatosAtivosCache.unshift(novo);
+  return novo;
 };
 
-export const updateContatoAtivo = (id: string, updates: Partial<ContatoAtivoGarantia>): void => {
-  const index = contatosAtivos.findIndex(c => c.id === id);
-  if (index !== -1) {
-    contatosAtivos[index] = { ...contatosAtivos[index], ...updates };
-    contatosAtivos[index].timeline.push({
-      id: `TLC-${Date.now()}`, dataHora: new Date().toISOString(), tipo: 'edicao', descricao: 'Contato atualizado'
-    });
-  }
+export const updateContatoAtivo = async (id: string, updates: Partial<ContatoAtivoGarantia>): Promise<void> => {
+  const index = _contatosAtivosCache.findIndex(c => c.id === id);
+  if (index === -1) return;
+
+  const current = _contatosAtivosCache[index];
+  const newTimeline = [...current.timeline, { id: `TLC-${Date.now()}`, dataHora: new Date().toISOString(), tipo: 'edicao' as const, descricao: 'Contato atualizado' }];
+
+  const dbUpdates: any = { timeline: newTimeline as any };
+  if (updates.status !== undefined) dbUpdates.status = updates.status;
+  if (updates.cliente !== undefined) dbUpdates.cliente = updates.cliente;
+  if (updates.aparelho !== undefined) dbUpdates.aparelho = updates.aparelho;
+  if (updates.logistica !== undefined) dbUpdates.logistica = updates.logistica;
+  if (updates.garantiaEstendida !== undefined) dbUpdates.garantia_estendida = updates.garantiaEstendida;
+
+  await supabase.from('contatos_ativos_garantia').update(dbUpdates).eq('id', id);
+  _contatosAtivosCache[index] = { ...current, ...updates, timeline: newTimeline };
 };
 
-export const verificarEGerarContatosAutomaticos = (): ContatoAtivoGarantia[] => {
+export const verificarEGerarContatosAutomaticos = async (): Promise<ContatoAtivoGarantia[]> => {
   const garantiasExpirando = [...getGarantiasExpirandoEm7Dias(), ...getGarantiasExpirandoEm30Dias()];
   const novosContatos: ContatoAtivoGarantia[] = [];
   for (const garantia of garantiasExpirando) {
-    if (contatosAtivos.some(c => c.garantiaId === garantia.id)) continue;
-    contatoAtivoCounter++;
-    const novoContato: ContatoAtivoGarantia = {
-      id: `CTA-${String(contatoAtivoCounter).padStart(4, '0')}`,
-      garantiaId: garantia.id,
-      dataLancamento: new Date().toISOString(),
-      cliente: { id: garantia.clienteId, nome: garantia.clienteNome, telefone: garantia.clienteTelefone || '', email: garantia.clienteEmail || '' },
-      aparelho: { modelo: garantia.modelo, imei: garantia.imei },
-      logistica: { motoboyId: '', motoboyNome: '', dataEntregaPrevista: '', enderecoEntrega: '', observacoes: `Contato gerado automaticamente - Garantia ${garantia.id} expira em ${format(new Date(garantia.dataFimGarantia), 'dd/MM/yyyy')}` },
-      status: 'Pendente',
-      timeline: [{ id: `TLC-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, dataHora: new Date().toISOString(), tipo: 'criacao', descricao: 'Contato gerado automaticamente' }],
-      autoGerado: true
-    };
-    contatosAtivos.push(novoContato);
-    novosContatos.push(novoContato);
+    if (_contatosAtivosCache.some(c => c.garantiaId === garantia.id)) continue;
+    try {
+      const novo = await addContatoAtivo({
+        garantiaId: garantia.id,
+        dataLancamento: new Date().toISOString(),
+        cliente: { id: garantia.clienteId, nome: garantia.clienteNome, telefone: garantia.clienteTelefone || '', email: garantia.clienteEmail || '' },
+        aparelho: { modelo: garantia.modelo, imei: garantia.imei },
+        logistica: { motoboyId: '', motoboyNome: '', dataEntregaPrevista: '', enderecoEntrega: '', observacoes: `Contato gerado automaticamente - Garantia ${garantia.id} expira em ${format(new Date(garantia.dataFimGarantia), 'dd/MM/yyyy')}` },
+        status: 'Pendente',
+        autoGerado: true,
+      });
+      novosContatos.push(novo);
+    } catch (err) {
+      console.error('[GARANTIA] Erro ao gerar contato automático:', err);
+    }
   }
   return novosContatos;
 };
 
-// ==================== ANÁLISE GARANTIA (in-memory, Lote 5) ====================
+// ==================== ANÁLISE GARANTIA (Supabase) ====================
 
-export const getRegistrosAnaliseGarantia = (): RegistroAnaliseGarantia[] => [...registrosAnaliseGarantia];
+export const getRegistrosAnaliseGarantia = (): RegistroAnaliseGarantia[] => [..._registrosAnaliseCache];
 
-export const aprovarAnaliseGarantia = (id: string, dados: { tecnicoId: string; tecnicoNome: string; dataAprovacao: string; usuarioAprovacao: string }): RegistroAnaliseGarantia | null => {
-  const index = registrosAnaliseGarantia.findIndex(r => r.id === id);
+export const aprovarAnaliseGarantia = async (id: string, dados: { tecnicoId: string; tecnicoNome: string; dataAprovacao: string; usuarioAprovacao: string }): Promise<RegistroAnaliseGarantia | null> => {
+  const { error } = await supabase.from('registros_analise_garantia').update({
+    status: 'Solicitação Aprovada',
+    tecnico_id: dados.tecnicoId,
+    tecnico_nome: dados.tecnicoNome,
+    data_aprovacao: dados.dataAprovacao,
+    usuario_aprovacao: dados.usuarioAprovacao,
+  }).eq('id', id);
+  if (error) { console.error('Erro ao aprovar análise:', error); return null; }
+  const index = _registrosAnaliseCache.findIndex(r => r.id === id);
   if (index !== -1) {
-    registrosAnaliseGarantia[index] = { ...registrosAnaliseGarantia[index], status: 'Solicitação Aprovada', ...dados };
-    return registrosAnaliseGarantia[index];
+    _registrosAnaliseCache[index] = { ..._registrosAnaliseCache[index], status: 'Solicitação Aprovada', ...dados };
+    return _registrosAnaliseCache[index];
   }
   return null;
 };
 
-export const recusarAnaliseGarantia = (id: string, motivo: string): RegistroAnaliseGarantia | null => {
-  const index = registrosAnaliseGarantia.findIndex(r => r.id === id);
+export const recusarAnaliseGarantia = async (id: string, motivo: string): Promise<RegistroAnaliseGarantia | null> => {
+  const agora = new Date().toISOString();
+  const { error } = await supabase.from('registros_analise_garantia').update({
+    status: 'Recusada',
+    motivo_recusa: motivo,
+    data_recusa: agora,
+  }).eq('id', id);
+  if (error) { console.error('Erro ao recusar análise:', error); return null; }
+  const index = _registrosAnaliseCache.findIndex(r => r.id === id);
   if (index !== -1) {
-    registrosAnaliseGarantia[index] = { ...registrosAnaliseGarantia[index], status: 'Recusada', motivoRecusa: motivo, dataRecusa: new Date().toISOString() };
-    return registrosAnaliseGarantia[index];
+    _registrosAnaliseCache[index] = { ..._registrosAnaliseCache[index], status: 'Recusada', motivoRecusa: motivo, dataRecusa: agora };
+    return _registrosAnaliseCache[index];
   }
   return null;
 };
 
-export const encaminharParaAnaliseGarantia = (origemId: string, origem: 'Garantia' | 'Estoque', descricao: string, observacao?: string, metadata?: MetadadosEstoque): void => {
-  registroAnaliseCounter++;
-  registrosAnaliseGarantia.push({
-    id: `RAG-${String(registroAnaliseCounter).padStart(4, '0')}`,
-    origem, origemId, clienteDescricao: descricao,
-    dataChegada: new Date().toISOString(), status: 'Pendente', observacao, metadata
-  });
+export const encaminharParaAnaliseGarantia = async (origemId: string, origem: 'Garantia' | 'Estoque', descricao: string, observacao?: string, metadata?: MetadadosEstoque): Promise<void> => {
+  const { data, error } = await supabase.from('registros_analise_garantia').insert({
+    origem, origem_id: origemId, cliente_descricao: descricao,
+    data_chegada: new Date().toISOString(), status: 'Pendente',
+    observacao: observacao || null, metadata: (metadata || {}) as any,
+  }).select().single();
+  if (error) { console.error('Erro ao encaminhar para análise:', error); return; }
+  _registrosAnaliseCache.unshift(mapRegistroAnaliseFromDB(data));
 };
 
 // ==================== FLUXO DE APROVAÇÃO DE TRATATIVAS ====================
@@ -542,7 +630,7 @@ export const aprovarTratativa = async (id: string, gestorId: string, gestorNome:
         observacoes: `Troca Direta - Garantia ${garantia.id}.`, status: 'Concluída',
       });
 
-      encaminharParaAnaliseGarantia(garantia.id, 'Garantia', `${garantia.clienteNome} - ${garantia.modelo} (IMEI: ${garantia.imei}) - Troca Direta`);
+      await encaminharParaAnaliseGarantia(garantia.id, 'Garantia', `${garantia.clienteNome} - ${garantia.modelo} (IMEI: ${garantia.imei}) - Troca Direta`);
 
       await addTimelineEntry({
         garantiaId: garantia.id, dataHora: agora, tipo: 'troca',
@@ -658,7 +746,7 @@ export const processarTratativaGarantia = async (dados: ProcessarTratativaReques
       });
 
       if (dados.tipo === 'Assistência + Empréstimo') {
-        encaminharParaAnaliseGarantia(garantia.id, 'Garantia', `${garantia.clienteNome} - ${garantia.modelo} (IMEI: ${garantia.imei}) - Assistência + Empréstimo`);
+        await encaminharParaAnaliseGarantia(garantia.id, 'Garantia', `${garantia.clienteNome} - ${garantia.modelo} (IMEI: ${garantia.imei}) - Assistência + Empréstimo`);
       }
     }
 
@@ -715,7 +803,7 @@ export const processarTratativaGarantia = async (dados: ProcessarTratativaReques
         observacoes: `Troca Direta - Garantia ${garantia.id}.`, status: 'Concluída',
       });
 
-      encaminharParaAnaliseGarantia(garantia.id, 'Garantia', `${garantia.clienteNome} - ${garantia.modelo} (IMEI: ${garantia.imei}) - Troca Direta`);
+      await encaminharParaAnaliseGarantia(garantia.id, 'Garantia', `${garantia.clienteNome} - ${garantia.modelo} (IMEI: ${garantia.imei}) - Troca Direta`);
 
       await addTimelineEntry({
         garantiaId: garantia.id, dataHora: agora, tipo: 'troca',

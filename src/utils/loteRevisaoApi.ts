@@ -133,15 +133,15 @@ export const atualizarItemRevisao = (
   return lote;
 };
 
-export const encaminharLoteParaAssistencia = (
+export const encaminharLoteParaAssistencia = async (
   loteId: string,
   responsavel: string
-): LoteRevisao | null => {
+): Promise<LoteRevisao | null> => {
   const lote = lotesRevisao.find(l => l.id === loteId);
   if (!lote || lote.status !== 'Em Revisao') return null;
 
   // Encaminhar cada item para Análise de Tratativas (não criar OS diretamente)
-  lote.itens.forEach(item => {
+  for (const item of lote.itens) {
     const descricao = `Lote ${lote.id} — ${item.marca} ${item.modelo}${item.imei ? ` (IMEI: ${item.imei})` : ''}`;
     const observacao = `Motivo: ${item.motivoAssistencia}${item.observacao ? `\nObs: ${item.observacao}` : ''}\nNota: ${lote.numeroNota}`;
     const metadata: MetadadosEstoque = {
@@ -153,8 +153,8 @@ export const encaminharLoteParaAssistencia = (
       modeloAparelho: item.modelo,
       marcaAparelho: item.marca
     };
-    encaminharParaAnaliseGarantia(item.produtoNotaId, 'Estoque', descricao, observacao, metadata);
-  });
+    await encaminharParaAnaliseGarantia(item.produtoNotaId, 'Estoque', descricao, observacao, metadata);
+  }
 
   lote.status = 'Encaminhado';
 

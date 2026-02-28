@@ -239,7 +239,7 @@ export default function EstoqueNotaCadastrarProdutos() {
     return true;
   };
 
-  const handleSalvar = () => {
+  const handleSalvar = async () => {
     if (!nota) return;
     
     if (!validarProdutos()) return;
@@ -262,10 +262,9 @@ export default function EstoqueNotaCadastrarProdutos() {
     
     if (resultado) {
       // Encaminhar produtos marcados para assistência via Análise de Tratativas
-      produtosMarcadosAssistencia.forEach(marcacao => {
+      for (const marcacao of produtosMarcadosAssistencia) {
         const prod = produtos[marcacao.index];
         if (prod) {
-          // Buscar o ID do produto recém-cadastrado na nota atualizada
           const notaAtualizada = getNotaEntradaById(nota.id);
           const produtoNotaCadastrado = notaAtualizada?.produtos.find(
             p => p.imei === prod.imei && p.modelo === prod.modelo
@@ -280,9 +279,9 @@ export default function EstoqueNotaCadastrarProdutos() {
             modeloAparelho: prod.modelo,
             marcaAparelho: prod.marca
           };
-          encaminharParaAnaliseGarantia(produtoNotaId, 'Estoque', descricao, marcacao.motivo, metadata);
+          await encaminharParaAnaliseGarantia(produtoNotaId, 'Estoque', descricao, marcacao.motivo, metadata);
         }
-      });
+      }
 
       const msgAssistencia = produtosMarcadosAssistencia.length > 0
         ? ` | ${produtosMarcadosAssistencia.length} encaminhado(s) para Análise de Tratativas`

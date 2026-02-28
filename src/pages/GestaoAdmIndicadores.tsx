@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import type { RankingGestor, ExecucaoPorLoja } from '@/utils/atividadesGestoresApi';
 import { GestaoAdministrativaLayout } from '@/components/layout/GestaoAdministrativaLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -66,8 +67,13 @@ export default function GestaoAdmIndicadores() {
 
   const getLojaNome = (id: string) => lojas.find(l => l.id === id)?.nome || id;
 
-  const rankingGestores = useMemo(() => calcularRankingGestores(atvDataInicio, atvDataFim, atvLojaFiltro || undefined), [atvDataInicio, atvDataFim, atvLojaFiltro]);
-  const execucaoPorLoja = useMemo(() => calcularExecucaoPorLoja(atvDataInicio, atvDataFim, getLojaNome), [atvDataInicio, atvDataFim, lojas]);
+  const [rankingGestores, setRankingGestores] = useState<any[]>([]);
+  const [execucaoPorLoja, setExecucaoPorLoja] = useState<any[]>([]);
+
+  useEffect(() => {
+    calcularRankingGestores(atvDataInicio, atvDataFim, atvLojaFiltro || undefined).then(setRankingGestores);
+    calcularExecucaoPorLoja(atvDataInicio, atvDataFim, getLojaNome).then(setExecucaoPorLoja);
+  }, [atvDataInicio, atvDataFim, atvLojaFiltro, lojas]);
 
   if (!ehGestor) {
     return (

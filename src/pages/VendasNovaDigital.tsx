@@ -49,7 +49,7 @@ export default function VendasNovaDigital() {
     return parseInt(numeros) / 100 || 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!responsavelId || !clienteNome || !valorTotal) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
@@ -65,19 +65,23 @@ export default function VendasNovaDigital() {
       return;
     }
 
-    const novaVenda = criarPreCadastro(
-      responsavelId,
-      nomeResponsavel,
-      clienteNome,
-      getValorNumerico()
-    );
+    try {
+      const novaVenda = await criarPreCadastro(
+        responsavelId,
+        nomeResponsavel,
+        clienteNome,
+        getValorNumerico()
+      );
 
-    toast.success('Pré-cadastro enviado para finalização', {
-      description: `ID: ${novaVenda.id}`
-    });
-
-    setLoading(false);
-    navigate('/vendas/pendentes-digitais');
+      toast.success('Pré-cadastro enviado para finalização', {
+        description: `ID: ${novaVenda.id}`
+      });
+      navigate('/vendas/pendentes-digitais');
+    } catch (err) {
+      toast.error('Erro ao criar pré-cadastro');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

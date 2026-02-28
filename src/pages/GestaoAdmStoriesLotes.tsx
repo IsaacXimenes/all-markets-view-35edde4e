@@ -54,8 +54,7 @@ export default function GestaoAdmStoriesLotes() {
   // Generate batches on load - store result in state to trigger re-render
   useEffect(() => {
     const lojasAtivas = lojas.filter(l => l.ativa);
-    const resultado = gerarLotesDiarios(competencia, lojasAtivas.map(l => ({ id: l.id, nome: l.nome })));
-    setLotesGerados(resultado);
+    gerarLotesDiarios(competencia, lojasAtivas.map(l => ({ id: l.id, nome: l.nome }))).then(setLotesGerados);
   }, [competencia, lojas]);
 
   const lotesFiltrados = useMemo(() => {

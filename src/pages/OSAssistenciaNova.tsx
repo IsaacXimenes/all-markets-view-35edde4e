@@ -595,7 +595,7 @@ export default function OSAssistenciaNova() {
     setBuscarClienteOpen(false);
   };
 
-  const handleSalvarNovoCliente = () => {
+  const handleSalvarNovoCliente = async () => {
     if (!novoClienteForm.nome || !novoClienteForm.cpf) {
       toast({
         title: 'Erro',

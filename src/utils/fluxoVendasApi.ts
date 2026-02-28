@@ -600,6 +600,8 @@ export const exportFluxoToCSV = (data: VendaComFluxo[], filename: string) => {
 };
 
 // ============= CONFERENCE DATA HELPERS (replacing localStorage) =============
+// For OS IDs (starting with "OS-"), we fall back to localStorage since they don't have fluxo_vendas entries.
+const isOSId = (id: string) => id.startsWith('OS-');
 
 export interface ConferenciaFinanceiroData {
   validacoesPagamento?: Array<{
@@ -650,8 +652,27 @@ export interface ConferenciaGestorData {
   };
 }
 
-/** Get financial conference data from fluxo_vendas.aprovacao_financeiro JSONB */
+/** Get financial conference data from fluxo_vendas.aprovacao_financeiro JSONB (or localStorage for OS) */
 export const getConferenciaFinanceiroData = (vendaId: string): ConferenciaFinanceiroData => {
+  if (isOSId(vendaId)) {
+    // Fallback to localStorage for OS items
+    try {
+      const validacoesRaw = localStorage.getItem(`validacao_pagamentos_financeiro_${vendaId}`);
+      const obsRaw = localStorage.getItem(`observacao_financeiro_${vendaId}`);
+      const histRaw = localStorage.getItem(`historico_conferencias_${vendaId}`);
+      const finRaw = localStorage.getItem(`data_finalizacao_${vendaId}`);
+      const contaRaw = localStorage.getItem(`conta_destino_${vendaId}`);
+      const rejRaw = localStorage.getItem(`rejeicao_financeiro_${vendaId}`);
+      return {
+        validacoesPagamento: validacoesRaw ? JSON.parse(validacoesRaw) : undefined,
+        observacaoFinanceiro: obsRaw ? JSON.parse(obsRaw) : undefined,
+        historicoConferencias: histRaw ? JSON.parse(histRaw) : undefined,
+        dataFinalizacao: finRaw || undefined,
+        contaDestinoId: contaRaw || undefined,
+        rejeicao: rejRaw ? JSON.parse(rejRaw) : undefined,
+      };
+    } catch { return {}; }
+  }
   const dados = fluxoCache[vendaId];
   const af = dados?.aprovacaoFinanceiro as any;
   if (!af) return {};
@@ -667,8 +688,36 @@ export const getConferenciaFinanceiroData = (vendaId: string): ConferenciaFinanc
   };
 };
 
-/** Save financial conference data to fluxo_vendas.aprovacao_financeiro JSONB */
+/** Save financial conference data to fluxo_vendas.aprovacao_financeiro JSONB (or localStorage for OS) */
 export const salvarConferenciaFinanceiroData = async (vendaId: string, conferencia: Partial<ConferenciaFinanceiroData>) => {
+  if (isOSId(vendaId)) {
+    // Fallback to localStorage for OS items
+    if (conferencia.validacoesPagamento !== undefined) {
+      localStorage.setItem(`validacao_pagamentos_financeiro_${vendaId}`, JSON.stringify(conferencia.validacoesPagamento));
+    }
+    if (conferencia.observacaoFinanceiro !== undefined) {
+      localStorage.setItem(`observacao_financeiro_${vendaId}`, JSON.stringify(conferencia.observacaoFinanceiro));
+    }
+    if (conferencia.historicoConferencias !== undefined) {
+      localStorage.setItem(`historico_conferencias_${vendaId}`, JSON.stringify(conferencia.historicoConferencias));
+    }
+    if (conferencia.dataFinalizacao !== undefined) {
+      localStorage.setItem(`data_finalizacao_${vendaId}`, conferencia.dataFinalizacao);
+    }
+    if (conferencia.contaDestinoId !== undefined) {
+      localStorage.setItem(`conta_destino_${vendaId}`, conferencia.contaDestinoId);
+    }
+    if (conferencia.rejeicao !== undefined) {
+      localStorage.setItem(`rejeicao_financeiro_${vendaId}`, JSON.stringify(conferencia.rejeicao));
+    }
+    if (conferencia.notaEmitida !== undefined) {
+      localStorage.setItem(`nota_emitida_${vendaId}`, String(conferencia.notaEmitida));
+    }
+    if (conferencia.dataEmissaoNota !== undefined) {
+      localStorage.setItem(`data_emissao_nota_${vendaId}`, conferencia.dataEmissaoNota);
+    }
+    return;
+  }
   const dados = fluxoCache[vendaId] || {};
   const existingAf = (dados.aprovacaoFinanceiro || {}) as any;
   const updatedAf = { ...existingAf, ...conferencia };
@@ -677,8 +726,19 @@ export const salvarConferenciaFinanceiroData = async (vendaId: string, conferenc
   await saveFluxoToSupabase(vendaId, updated);
 };
 
-/** Get gestor conference data from fluxo_vendas.aprovacao_gestor JSONB */
+/** Get gestor conference data from fluxo_vendas.aprovacao_gestor JSONB (or localStorage for OS) */
 export const getConferenciaGestorData = (vendaId: string): ConferenciaGestorData => {
+  if (isOSId(vendaId)) {
+    try {
+      const valRaw = localStorage.getItem(`validacao_pagamentos_${vendaId}`);
+      const obsKey = `observacao_gestor_os_${vendaId}`;
+      const obsRaw = localStorage.getItem(obsKey);
+      return {
+        validacoesPagamento: valRaw ? JSON.parse(valRaw) : undefined,
+        observacao: obsRaw ? JSON.parse(obsRaw) : undefined,
+      };
+    } catch { return {}; }
+  }
   const dados = fluxoCache[vendaId];
   const ag = dados?.aprovacaoGestor as any;
   if (!ag) return {};

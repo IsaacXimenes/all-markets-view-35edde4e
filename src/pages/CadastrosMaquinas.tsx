@@ -132,10 +132,10 @@ export default function CadastrosMaquinas() {
     };
 
     if (editingMaquina) {
-      updateMaquinaCartao(editingMaquina.id, maquinaData);
+      await updateMaquinaCartao(editingMaquina.id, maquinaData);
       toast.success('Máquina atualizada com sucesso!');
     } else {
-      const novaMaquina = addMaquinaCartao(maquinaData);
+      const novaMaquina = await addMaquinaCartao(maquinaData);
       toast.success(`Máquina criada: ${novaMaquina.id}`);
     }
 

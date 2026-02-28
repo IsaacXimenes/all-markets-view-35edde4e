@@ -109,10 +109,10 @@ export default function FinanceiroContas() {
     };
 
     if (editingConta) {
-      updateContaFinanceira(editingConta.id, contaData);
+      await updateContaFinanceira(editingConta.id, contaData);
       toast.success('Conta atualizada com sucesso!');
     } else {
-      const novaConta = addContaFinanceira(contaData);
+      const novaConta = await addContaFinanceira(contaData);
       toast.success(`Conta criada: ${novaConta.id}`);
     }
 

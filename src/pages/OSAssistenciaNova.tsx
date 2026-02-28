@@ -605,7 +605,7 @@ export default function OSAssistenciaNova() {
       return;
     }
 
-    const novoCliente = addCliente({
+    const novoCliente = await addCliente({
       ...novoClienteForm,
       status: 'Ativo',
       origemCliente: 'Assistência',

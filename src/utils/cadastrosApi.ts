@@ -1,5 +1,7 @@
-// Cadastros API - Supabase-backed + legacy in-memory data
+// Cadastros API - Supabase-backed with sync cache for backward compatibility
 import { supabase } from '@/integrations/supabase/client';
+
+// ==================== INTERFACES ====================
 
 export interface Loja {
   id: string;
@@ -34,12 +36,6 @@ export interface Cliente {
   tipoCliente: 'Novo' | 'Normal' | 'VIP';
   tipoPessoa: 'Pessoa Física' | 'Pessoa Jurídica';
 }
-
-// Helper para calcular tipo de pessoa baseado no CPF/CNPJ
-export const calcularTipoPessoa = (cpfCnpj: string): 'Pessoa Física' | 'Pessoa Jurídica' => {
-  const numeros = cpfCnpj.replace(/\D/g, '');
-  return numeros.length <= 11 ? 'Pessoa Física' : 'Pessoa Jurídica';
-};
 
 export interface Colaborador {
   id: string;
@@ -130,18 +126,24 @@ export interface ContaFinanceira {
 export interface MaquinaCartao {
   id: string;
   nome: string;
-  cnpjVinculado: string; // ID da loja
-  contaOrigem: string;   // ID da conta financeira
+  cnpjVinculado: string;
+  contaOrigem: string;
   status: 'Ativo' | 'Inativo';
-  percentualMaquina?: number; // % da Máquina (0-100)
+  percentualMaquina?: number;
   taxas: {
-    credito: { [parcela: number]: number }; // Ex: { 1: 2, 2: 4, 3: 6, ... }
-    debito: number; // Taxa fixa
+    credito: { [parcela: number]: number };
+    debito: number;
   };
-  parcelamentos?: { parcelas: number; taxa: number }[]; // Parcelamento 1x-36x com taxas
+  parcelamentos?: { parcelas: number; taxa: number }[];
 }
 
-// Helper para calcular tipo de cliente
+// ==================== HELPERS ====================
+
+export const calcularTipoPessoa = (cpfCnpj: string): 'Pessoa Física' | 'Pessoa Jurídica' => {
+  const numeros = cpfCnpj.replace(/\D/g, '');
+  return numeros.length <= 11 ? 'Pessoa Física' : 'Pessoa Jurídica';
+};
+
 const calcularTipoCliente = (idsCompras: string[]): 'Novo' | 'Normal' | 'VIP' => {
   const numCompras = idsCompras.length;
   if (numCompras === 0) return 'Novo';
@@ -149,98 +151,25 @@ const calcularTipoCliente = (idsCompras: string[]): 'Novo' | 'Normal' | 'VIP' =>
   return 'VIP';
 };
 
-// Mock Data
-// Loja Online - Digital (não pode ser deletada ou editada)
-const LOJA_ONLINE: Loja = { 
-  id: 'LOJA-ONLINE', 
-  nome: 'Online - Digital', 
-  cnpj: '00.000.000/0000-00', 
-  endereco: 'Vendas Online', 
-  telefone: '', 
-  cep: '', 
-  cidade: 'Online', 
-  estado: 'BR', 
-  responsavel: '', 
-  horarioFuncionamento: '24h', 
-  status: 'Ativo' 
-};
+// ==================== CACHE MODULE-LEVEL ====================
+// Cache local para compatibilidade com chamadas síncronas legadas.
+// Populado automaticamente na primeira chamada async.
 
-let lojas: Loja[] = [
-  LOJA_ONLINE, // Loja online sempre primeira
-  { id: 'LOJA-001', nome: 'Thiago Imports Centro', cnpj: '12.345.678/0001-01', endereco: 'Rua das Flores, 123', telefone: '(11) 3456-7890', cep: '01310-100', cidade: 'São Paulo', estado: 'SP', responsavel: 'COL-001', horarioFuncionamento: '09:00 - 18:00', status: 'Ativo' },
-  { id: 'LOJA-002', nome: 'Thiago Imports Norte', cnpj: '12.345.678/0002-02', endereco: 'Av. Norte, 456', telefone: '(11) 3456-7891', cep: '02020-000', cidade: 'São Paulo', estado: 'SP', responsavel: 'COL-002', horarioFuncionamento: '09:00 - 18:00', status: 'Ativo' },
-  { id: 'LOJA-003', nome: 'Thiago Imports Sul', cnpj: '12.345.678/0003-03', endereco: 'Rua Sul, 789', telefone: '(11) 3456-7892', cep: '04040-000', cidade: 'São Paulo', estado: 'SP', responsavel: 'COL-003', horarioFuncionamento: '09:00 - 18:00', status: 'Ativo' },
-  { id: 'LOJA-004', nome: 'Thiago Imports Shopping', cnpj: '12.345.678/0004-04', endereco: 'Shopping Center, Loja 10', telefone: '(11) 3456-7893', cep: '05050-000', cidade: 'São Paulo', estado: 'SP', responsavel: 'COL-004', horarioFuncionamento: '10:00 - 22:00', status: 'Ativo' },
-  { id: 'LOJA-005', nome: 'Thiago Imports Oeste', cnpj: '12.345.678/0005-05', endereco: 'Av. Oeste, 321', telefone: '(11) 3456-7894', cep: '06060-000', cidade: 'São Paulo', estado: 'SP', responsavel: 'COL-005', horarioFuncionamento: '09:00 - 18:00', status: 'Ativo' },
-  { id: 'LOJA-006', nome: 'Thiago Imports Leste', cnpj: '12.345.678/0006-06', endereco: 'Rua Leste, 654', telefone: '(11) 3456-7895', cep: '07070-000', cidade: 'São Paulo', estado: 'SP', responsavel: 'COL-006', horarioFuncionamento: '09:00 - 18:00', status: 'Ativo' },
-  { id: 'LOJA-007', nome: 'Thiago Imports Guarulhos', cnpj: '12.345.678/0007-07', endereco: 'Av. Guarulhos, 987', telefone: '(11) 3456-7896', cep: '07190-000', cidade: 'Guarulhos', estado: 'SP', responsavel: 'COL-001', horarioFuncionamento: '09:00 - 18:00', status: 'Ativo' },
-  { id: 'LOJA-008', nome: 'Thiago Imports Osasco', cnpj: '12.345.678/0008-08', endereco: 'Rua Osasco, 159', telefone: '(11) 3456-7897', cep: '06010-000', cidade: 'Osasco', estado: 'SP', responsavel: 'COL-002', horarioFuncionamento: '09:00 - 18:00', status: 'Ativo' },
-  { id: 'LOJA-009', nome: 'Thiago Imports ABC', cnpj: '12.345.678/0009-09', endereco: 'Av. ABC, 753', telefone: '(11) 3456-7898', cep: '09010-000', cidade: 'Santo André', estado: 'SP', responsavel: 'COL-003', horarioFuncionamento: '09:00 - 18:00', status: 'Ativo' },
-  { id: 'LOJA-010', nome: 'Thiago Imports Campinas', cnpj: '12.345.678/0010-10', endereco: 'Rua Campinas, 852', telefone: '(19) 3456-7899', cep: '13010-000', cidade: 'Campinas', estado: 'SP', responsavel: 'COL-004', horarioFuncionamento: '09:00 - 18:00', status: 'Ativo' },
-  { id: 'LOJA-011', nome: 'Thiago Imports Ribeirão', cnpj: '12.345.678/0011-11', endereco: 'Av. Ribeirão, 741', telefone: '(16) 3456-7800', cep: '14010-000', cidade: 'Ribeirão Preto', estado: 'SP', responsavel: 'COL-005', horarioFuncionamento: '09:00 - 18:00', status: 'Ativo' },
-];
+let _lojasCache: Loja[] = [];
+let _clientesCache: Cliente[] = [];
+let _colaboradoresCache: Colaborador[] = [];
+let _fornecedoresCache: Fornecedor[] = [];
+let _contasFinanceirasCache: ContaFinanceira[] = [];
+let _maquinasCartaoCache: MaquinaCartao[] = [];
 
-let clientes: Cliente[] = [
-  { id: 'CLI-001', nome: 'João Silva', cpf: '123.456.789-00', telefone: '(11) 99999-1111', dataNascimento: '1985-05-15', email: 'joao@email.com', cep: '01310-100', endereco: 'Rua das Flores', numero: '123', bairro: 'Centro', cidade: 'São Paulo', estado: 'SP', status: 'Ativo', origemCliente: 'Venda', idsCompras: ['VEN-2025-0001', 'VEN-2025-0005', 'VEN-2025-0008'], tipoCliente: 'VIP', tipoPessoa: 'Pessoa Física' },
-  { id: 'CLI-002', nome: 'Maria Santos', cpf: '234.567.890-11', telefone: '(11) 99999-2222', dataNascimento: '1990-08-20', email: 'maria@email.com', cep: '02020-000', endereco: 'Av. Norte', numero: '456', bairro: 'Santana', cidade: 'São Paulo', estado: 'SP', status: 'Ativo', origemCliente: 'Venda', idsCompras: ['VEN-2025-0002'], tipoCliente: 'Normal', tipoPessoa: 'Pessoa Física' },
-  { id: 'CLI-003', nome: 'Pedro Oliveira', cpf: '345.678.901-22', telefone: '(11) 99999-3333', dataNascimento: '1988-12-10', email: 'pedro@email.com', cep: '04040-000', endereco: 'Rua Sul', numero: '789', bairro: 'Moema', cidade: 'São Paulo', estado: 'SP', status: 'Ativo', origemCliente: 'Assistência', idsCompras: [], tipoCliente: 'Novo', tipoPessoa: 'Pessoa Física' },
-  { id: 'CLI-004', nome: 'Ana Costa', cpf: '456.789.012-33', telefone: '(11) 99999-4444', dataNascimento: '1995-03-25', email: 'ana@email.com', cep: '05050-000', endereco: 'Av. Paulista', numero: '1000', bairro: 'Bela Vista', cidade: 'São Paulo', estado: 'SP', status: 'Ativo', origemCliente: 'Venda', idsCompras: ['VEN-2025-0003', 'VEN-2025-0006'], tipoCliente: 'VIP', tipoPessoa: 'Pessoa Física' },
-  { id: 'CLI-005', nome: 'Carlos Ferreira', cpf: '567.890.123-44', telefone: '(11) 99999-5555', dataNascimento: '1982-07-30', email: 'carlos@email.com', cep: '06060-000', endereco: 'Rua Augusta', numero: '500', bairro: 'Consolação', cidade: 'São Paulo', estado: 'SP', status: 'Inativo', origemCliente: 'Venda', idsCompras: ['VEN-2025-0004'], tipoCliente: 'Normal', tipoPessoa: 'Pessoa Física' },
-  { id: 'CLI-006', nome: 'Tech Solutions Ltda', cpf: '12.345.678/0001-99', telefone: '(11) 3333-4444', dataNascimento: '', email: 'contato@techsolutions.com.br', cep: '01310-200', endereco: 'Av. Brigadeiro Faria Lima', numero: '2000', bairro: 'Jardim Paulistano', cidade: 'São Paulo', estado: 'SP', status: 'Ativo', origemCliente: 'Venda', idsCompras: ['VEN-2025-0007'], tipoCliente: 'Normal', tipoPessoa: 'Pessoa Jurídica' },
-];
+let _lojasLoaded = false;
+let _clientesLoaded = false;
+let _colaboradoresLoaded = false;
+let _fornecedoresLoaded = false;
+let _contasLoaded = false;
+let _maquinasLoaded = false;
 
-let colaboradores: Colaborador[] = [
-  { id: 'COL-001', cpf: '111.222.333-44', nome: 'Lucas Mendes', cargo: 'CARGO-001', loja: 'LOJA-001', dataAdmissao: '2020-01-15', dataNascimento: '1988-01-10', email: 'lucas@thiagoimports.com', telefone: '(11) 98888-1111', modeloPagamento: 'MP-002', salario: 5000, status: 'Ativo' },
-  { id: 'COL-002', cpf: '222.333.444-55', nome: 'Fernanda Lima', cargo: 'CARGO-002', loja: 'LOJA-002', dataAdmissao: '2019-06-20', dataNascimento: '1990-06-15', email: 'fernanda@thiagoimports.com', telefone: '(11) 98888-2222', modeloPagamento: 'MP-001', salario: 4500, status: 'Ativo' },
-  { id: 'COL-003', cpf: '333.444.555-66', nome: 'Roberto Alves', cargo: 'CARGO-003', loja: 'LOJA-003', dataAdmissao: '2021-03-10', dataNascimento: '1985-03-22', email: 'roberto@thiagoimports.com', telefone: '(11) 98888-3333', modeloPagamento: 'MP-002', salario: 4200, status: 'Ativo' },
-  { id: 'COL-004', cpf: '444.555.666-77', nome: 'Juliana Costa', cargo: 'CARGO-004', loja: 'LOJA-004', dataAdmissao: '2022-09-05', dataNascimento: '1995-09-30', email: 'juliana@thiagoimports.com', telefone: '(11) 98888-4444', modeloPagamento: 'MP-003', salario: 2500, status: 'Ativo' },
-  { id: 'COL-005', cpf: '555.666.777-88', nome: 'Marcos Silva', cargo: 'CARGO-005', loja: 'LOJA-005', dataAdmissao: '2018-11-25', dataNascimento: '1992-11-18', email: 'marcos@thiagoimports.com', telefone: '(11) 98888-5555', modeloPagamento: 'MP-001', salario: 3200, status: 'Ativo' },
-  { id: 'COL-006', cpf: '666.777.888-99', nome: 'Patricia Souza', cargo: 'CARGO-006', loja: 'LOJA-001', dataAdmissao: '2023-02-14', dataNascimento: '1998-02-05', email: 'patricia@thiagoimports.com', telefone: '(11) 98888-6666', modeloPagamento: 'MP-002', salario: 2200, status: 'Ativo' },
-  { id: 'COL-007', cpf: '777.888.999-00', nome: 'Carlos Eduardo', cargo: 'CARGO-004', loja: 'LOJA-002', dataAdmissao: '2021-07-10', dataNascimento: '1993-07-12', email: 'carlos@thiagoimports.com', telefone: '(11) 98888-7777', modeloPagamento: 'MP-003', salario: 2500, status: 'Ativo' },
-  { id: 'COL-008', cpf: '888.999.000-11', nome: 'Amanda Santos', cargo: 'CARGO-004', loja: 'LOJA-003', dataAdmissao: '2022-01-20', dataNascimento: '1996-01-25', email: 'amanda@thiagoimports.com', telefone: '(11) 98888-8888', modeloPagamento: 'MP-003', salario: 2500, status: 'Ativo' },
-  { id: 'COL-009', cpf: '999.000.111-22', nome: 'Ricardo Oliveira', cargo: 'CARGO-005', loja: 'LOJA-004', dataAdmissao: '2020-05-15', dataNascimento: '1987-05-08', email: 'ricardo@thiagoimports.com', telefone: '(11) 98888-9999', modeloPagamento: 'MP-002', salario: 3200, status: 'Ativo' },
-  { id: 'COL-010', cpf: '000.111.222-33', nome: 'Bianca Ferreira', cargo: 'CARGO-006', loja: 'LOJA-005', dataAdmissao: '2023-04-01', dataNascimento: '1999-04-20', email: 'bianca@thiagoimports.com', telefone: '(11) 98889-0000', modeloPagamento: 'MP-001', salario: 2200, status: 'Ativo' },
-  { id: 'COL-011', cpf: '111.000.222-33', nome: 'Diego Martins', cargo: 'CARGO-008', loja: 'LOJA-006', dataAdmissao: '2019-09-10', dataNascimento: '1991-12-03', email: 'diego@thiagoimports.com', telefone: '(11) 98889-1111', modeloPagamento: 'MP-002', salario: 3800, status: 'Ativo' },
-  { id: 'COL-012', cpf: '222.111.333-44', nome: 'Camila Rocha', cargo: 'CARGO-004', loja: 'LOJA-006', dataAdmissao: '2022-06-15', dataNascimento: '1994-08-14', email: 'camila@thiagoimports.com', telefone: '(11) 98889-2222', modeloPagamento: 'MP-003', salario: 2500, status: 'Ativo' },
-  { id: 'COL-013', cpf: '333.222.444-55', nome: 'Felipe Nunes', cargo: 'CARGO-004', loja: 'LOJA-007', dataAdmissao: '2021-11-08', dataNascimento: '1997-10-28', email: 'felipe@thiagoimports.com', telefone: '(11) 98889-3333', modeloPagamento: 'MP-003', salario: 2500, status: 'Ativo' },
-  { id: 'COL-014', cpf: '444.333.555-66', nome: 'Larissa Gomes', cargo: 'CARGO-008', loja: 'LOJA-008', dataAdmissao: '2020-03-20', dataNascimento: '1989-04-11', email: 'larissa@thiagoimports.com', telefone: '(11) 98889-4444', modeloPagamento: 'MP-002', salario: 3800, status: 'Ativo' },
-  { id: 'COL-015', cpf: '555.444.666-77', nome: 'Bruno Pereira', cargo: 'CARGO-004', loja: 'LOJA-008', dataAdmissao: '2023-01-10', dataNascimento: '1996-06-22', email: 'bruno@thiagoimports.com', telefone: '(11) 98889-5555', modeloPagamento: 'MP-003', salario: 2500, status: 'Ativo' },
-  { id: 'COL-016', cpf: '666.555.777-88', nome: 'Natália Castro', cargo: 'CARGO-004', loja: 'LOJA-009', dataAdmissao: '2022-04-05', dataNascimento: '1995-03-18', email: 'natalia@thiagoimports.com', telefone: '(11) 98889-6666', modeloPagamento: 'MP-003', salario: 2500, status: 'Ativo' },
-  { id: 'COL-017', cpf: '777.666.888-99', nome: 'Thiago Ribeiro', cargo: 'CARGO-005', loja: 'LOJA-009', dataAdmissao: '2021-08-12', dataNascimento: '1990-09-05', email: 'thiago.r@thiagoimports.com', telefone: '(11) 98889-7777', modeloPagamento: 'MP-002', salario: 3200, status: 'Ativo' },
-  { id: 'COL-018', cpf: '888.777.999-00', nome: 'Gabriela Monteiro', cargo: 'CARGO-008', loja: 'LOJA-010', dataAdmissao: '2019-12-01', dataNascimento: '1988-11-30', email: 'gabriela@thiagoimports.com', telefone: '(11) 98889-8888', modeloPagamento: 'MP-002', salario: 3800, status: 'Ativo' },
-  { id: 'COL-019', cpf: '999.888.000-11', nome: 'Vinícius Barbosa', cargo: 'CARGO-004', loja: 'LOJA-010', dataAdmissao: '2022-10-20', dataNascimento: '1997-02-14', email: 'vinicius@thiagoimports.com', telefone: '(11) 98889-9999', modeloPagamento: 'MP-003', salario: 2500, status: 'Ativo' },
-  { id: 'COL-020', cpf: '000.999.111-22', nome: 'Carla Mendonça', cargo: 'CARGO-004', loja: 'LOJA-011', dataAdmissao: '2021-05-25', dataNascimento: '1994-07-08', email: 'carla@thiagoimports.com', telefone: '(11) 98880-0000', modeloPagamento: 'MP-003', salario: 2500, status: 'Ativo' },
-  { id: 'COL-021', cpf: '111.999.222-33', nome: 'Rafael Cardoso', cargo: 'CARGO-005', loja: 'LOJA-011', dataAdmissao: '2020-08-10', dataNascimento: '1986-12-20', email: 'rafael@thiagoimports.com', telefone: '(11) 98880-1111', modeloPagamento: 'MP-002', salario: 3200, status: 'Ativo' },
-  { id: 'COL-022', cpf: '222.999.333-44', nome: 'Beatriz Almeida', cargo: 'CARGO-007', loja: 'LOJA-001', dataAdmissao: '2022-02-28', dataNascimento: '1993-05-15', email: 'beatriz@thiagoimports.com', telefone: '(11) 98880-2222', modeloPagamento: 'MP-001', salario: 3500, status: 'Ativo' },
-  { id: 'COL-023', cpf: '333.888.444-55', nome: 'João Silva Motoboy', cargo: 'CARGO-009', loja: 'LOJA-001', dataAdmissao: '2023-06-15', dataNascimento: '1992-03-10', email: 'joao.motoboy@thiagoimports.com', telefone: '(11) 97777-1111', modeloPagamento: 'MP-002', salario: 2000, status: 'Ativo' },
-  { id: 'COL-024', cpf: '444.888.555-66', nome: 'Maria Santos Motoboy', cargo: 'CARGO-009', loja: 'LOJA-002', dataAdmissao: '2023-08-20', dataNascimento: '1995-08-25', email: 'maria.motoboy@thiagoimports.com', telefone: '(11) 97777-2222', modeloPagamento: 'MP-002', salario: 2000, status: 'Ativo' },
-];
-
-let fornecedores: Fornecedor[] = [
-  { id: 'FORN-001', nome: 'Apple Brasil Distribuidora', cnpj: '11.111.111/0001-11', endereco: 'Av. Paulista, 1000, São Paulo - SP', responsavel: 'Carlos Distribuidor', telefone: '(11) 3000-1111', status: 'Ativo', ultimaCompra: '2025-01-15' },
-  { id: 'FORN-002', nome: 'TechCell Importadora', cnpj: '22.222.222/0002-22', endereco: 'Rua Augusta, 500, São Paulo - SP', responsavel: 'Marina Tech', telefone: '(11) 3000-2222', status: 'Ativo', ultimaCompra: '2025-01-10' },
-  { id: 'FORN-003', nome: 'MobileWorld LTDA', cnpj: '33.333.333/0003-33', endereco: 'Av. Brasil, 200, Rio de Janeiro - RJ', responsavel: 'Pedro Mobile', telefone: '(21) 3000-3333', status: 'Ativo', ultimaCompra: '2025-01-08' },
-  { id: 'FORN-004', nome: 'SmartDevices Inc', cnpj: '44.444.444/0004-44', endereco: 'Rua das Tecnologias, 150, Campinas - SP', responsavel: 'Ana Smart', telefone: '(19) 3000-4444', status: 'Ativo', ultimaCompra: '2024-12-20' },
-  { id: 'FORN-005', nome: 'Gadget Plus Comércio', cnpj: '55.555.555/0005-55', endereco: 'Av. Gadgets, 300, Curitiba - PR', responsavel: 'Roberto Gadget', telefone: '(41) 3000-5555', status: 'Ativo', ultimaCompra: '2025-01-12' },
-  { id: 'FORN-006', nome: 'Digital Express', cnpj: '66.666.666/0006-66', endereco: 'Rua Digital, 400, Belo Horizonte - MG', responsavel: 'Fernanda Digital', telefone: '(31) 3000-6666', status: 'Ativo', ultimaCompra: '2024-11-30' },
-  { id: 'FORN-007', nome: 'iStore Distribuição', cnpj: '77.777.777/0007-77', endereco: 'Av. Apple, 600, Brasília - DF', responsavel: 'Lucas iStore', telefone: '(61) 3000-7777', status: 'Ativo', ultimaCompra: '2025-01-05' },
-  { id: 'FORN-008', nome: 'Premium Tech Brasil', cnpj: '88.888.888/0008-88', endereco: 'Rua Premium, 700, Porto Alegre - RS', responsavel: 'Juliana Premium', telefone: '(51) 3000-8888', status: 'Ativo', ultimaCompra: '2024-12-15' },
-  { id: 'FORN-009', nome: 'Celular Center', cnpj: '99.999.999/0009-99', endereco: 'Av. Celular, 800, Salvador - BA', responsavel: 'Marcos Celular', telefone: '(71) 3000-9999', status: 'Ativo', ultimaCompra: '2025-01-18' },
-  { id: 'FORN-010', nome: 'Eletronic World', cnpj: '10.101.010/0010-10', endereco: 'Rua Eletrônica, 900, Recife - PE', responsavel: 'Patricia Eletro', telefone: '(81) 3000-1010', status: 'Ativo', ultimaCompra: '2024-10-25' },
-  { id: 'FORN-011', nome: 'Mobile Solutions', cnpj: '11.121.314/0011-11', endereco: 'Av. Mobile, 1100, Fortaleza - CE', responsavel: 'André Mobile', telefone: '(85) 3000-1111', status: 'Ativo', ultimaCompra: '2025-01-02' },
-  { id: 'FORN-012', nome: 'Tech Import Brasil', cnpj: '12.131.415/0012-12', endereco: 'Rua Import, 1200, Manaus - AM', responsavel: 'Carla Import', telefone: '(92) 3000-1212', status: 'Ativo', ultimaCompra: '2024-09-18' },
-  { id: 'FORN-013', nome: 'Apple Premium Partner', cnpj: '13.141.516/0013-13', endereco: 'Av. Premium, 1300, Goiânia - GO', responsavel: 'Ricardo Premium', telefone: '(62) 3000-1313', status: 'Ativo', ultimaCompra: '2025-01-20' },
-  { id: 'FORN-014', nome: 'Smart Import LTDA', cnpj: '14.151.617/0014-14', endereco: 'Rua Smart, 1400, Florianópolis - SC', responsavel: 'Bianca Smart', telefone: '(48) 3000-1414', status: 'Ativo', ultimaCompra: '2024-12-28' },
-  { id: 'FORN-015', nome: 'Device World', cnpj: '15.161.718/0015-15', endereco: 'Av. Device, 1500, Vitória - ES', responsavel: 'Thiago Device', telefone: '(27) 3000-1515', status: 'Ativo', ultimaCompra: '2024-11-10' },
-  { id: 'FORN-016', nome: 'Gadgets Brasil', cnpj: '16.171.819/0016-16', endereco: 'Rua Gadgets, 1600, Natal - RN', responsavel: 'Amanda Gadget', telefone: '(84) 3000-1616', status: 'Ativo', ultimaCompra: '2025-01-08' },
-  { id: 'FORN-017', nome: 'iWorld Distribuidora', cnpj: '17.181.920/0017-17', endereco: 'Av. iWorld, 1700, João Pessoa - PB', responsavel: 'Felipe iWorld', telefone: '(83) 3000-1717', status: 'Ativo', ultimaCompra: '2024-08-22' },
-  { id: 'FORN-018', nome: 'Tech Store Brasil', cnpj: '18.192.021/0018-18', endereco: 'Rua Tech, 1800, Maceió - AL', responsavel: 'Vanessa Tech', telefone: '(82) 3000-1818', status: 'Inativo', ultimaCompra: '2024-05-15' },
-  { id: 'FORN-019', nome: 'Mobile Express', cnpj: '19.202.122/0019-19', endereco: 'Av. Express, 1900, Aracaju - SE', responsavel: 'Gustavo Express', telefone: '(79) 3000-1919', status: 'Ativo', ultimaCompra: '2025-01-14' },
-  { id: 'FORN-020', nome: 'Digital Import', cnpj: '20.212.223/0020-20', endereco: 'Rua Digital Import, 2000, Teresina - PI', responsavel: 'Larissa Digital', telefone: '(86) 3000-2020', status: 'Ativo', ultimaCompra: '2024-12-05' },
-  { id: 'FORN-021', nome: 'Premium Devices', cnpj: '21.222.324/0021-21', endereco: 'Av. Premium Devices, 2100, São Luís - MA', responsavel: 'Bruno Premium', telefone: '(98) 3000-2121', status: 'Ativo', ultimaCompra: '2024-07-30' },
-  { id: 'FORN-022', nome: 'Apple Zone', cnpj: '22.232.425/0022-22', endereco: 'Rua Apple Zone, 2200, Belém - PA', responsavel: 'Daniela Zone', telefone: '(91) 3000-2222', status: 'Ativo', ultimaCompra: '2025-01-16' },
-  { id: 'FORN-023', nome: 'Tech Solutions Brasil', cnpj: '23.242.526/0023-23', endereco: 'Av. Solutions, 2300, Cuiabá - MT', responsavel: 'Eduardo Solutions', telefone: '(65) 3000-2323', status: 'Ativo', ultimaCompra: '2024-06-12' },
-];
+// ==================== DADOS DE REFERÊNCIA (estáticos) ====================
 
 let origensVenda: OrigemVenda[] = [
   { id: 'ORIG-001', origem: 'Loja Física', status: 'Ativo' },
@@ -252,7 +181,6 @@ let origensVenda: OrigemVenda[] = [
 ];
 
 let produtosCadastro: ProdutoCadastro[] = [
-  // iPhones - 108 registros com capacidade de armazenamento
   { id: 'PROD-CAD-001', marca: 'Apple', categoria: 'iPhone', produto: 'iPhone 7 – 32 GB' },
   { id: 'PROD-CAD-002', marca: 'Apple', categoria: 'iPhone', produto: 'iPhone 7 – 128 GB' },
   { id: 'PROD-CAD-003', marca: 'Apple', categoria: 'iPhone', produto: 'iPhone 7 – 256 GB' },
@@ -361,26 +289,21 @@ let produtosCadastro: ProdutoCadastro[] = [
   { id: 'PROD-CAD-106', marca: 'Apple', categoria: 'iPhone', produto: 'iPhone 17 Pro Max – 256 GB' },
   { id: 'PROD-CAD-107', marca: 'Apple', categoria: 'iPhone', produto: 'iPhone 17 Pro Max – 512 GB' },
   { id: 'PROD-CAD-108', marca: 'Apple', categoria: 'iPhone', produto: 'iPhone 17 Pro Max – 1 TB' },
-  // iPad
   { id: 'PROD-CAD-109', marca: 'Apple', categoria: 'iPad', produto: 'iPad Pro 12.9"' },
   { id: 'PROD-CAD-110', marca: 'Apple', categoria: 'iPad', produto: 'iPad Pro 11"' },
   { id: 'PROD-CAD-111', marca: 'Apple', categoria: 'iPad', produto: 'iPad Air' },
   { id: 'PROD-CAD-112', marca: 'Apple', categoria: 'iPad', produto: 'iPad Mini' },
   { id: 'PROD-CAD-113', marca: 'Apple', categoria: 'iPad', produto: 'iPad 10ª geração' },
-  // MacBook
   { id: 'PROD-CAD-114', marca: 'Apple', categoria: 'MacBook', produto: 'MacBook Pro 16"' },
   { id: 'PROD-CAD-115', marca: 'Apple', categoria: 'MacBook', produto: 'MacBook Pro 14"' },
   { id: 'PROD-CAD-116', marca: 'Apple', categoria: 'MacBook', produto: 'MacBook Air M2' },
   { id: 'PROD-CAD-117', marca: 'Apple', categoria: 'MacBook', produto: 'MacBook Air M1' },
-  // Watch
   { id: 'PROD-CAD-118', marca: 'Apple', categoria: 'Watch', produto: 'Apple Watch Ultra 2' },
   { id: 'PROD-CAD-119', marca: 'Apple', categoria: 'Watch', produto: 'Apple Watch Series 9' },
   { id: 'PROD-CAD-120', marca: 'Apple', categoria: 'Watch', produto: 'Apple Watch SE' },
-  // AirPods
   { id: 'PROD-CAD-121', marca: 'Apple', categoria: 'AirPods', produto: 'AirPods Pro 2' },
   { id: 'PROD-CAD-122', marca: 'Apple', categoria: 'AirPods', produto: 'AirPods 3' },
   { id: 'PROD-CAD-123', marca: 'Apple', categoria: 'AirPods', produto: 'AirPods Max' },
-  // Acessórios
   { id: 'PROD-CAD-124', marca: 'Apple', categoria: 'Acessórios', produto: 'MagSafe Charger' },
   { id: 'PROD-CAD-125', marca: 'Apple', categoria: 'Acessórios', produto: 'Apple Pencil 2' },
   { id: 'PROD-CAD-126', marca: 'Apple', categoria: 'Acessórios', produto: 'Magic Keyboard' },
@@ -413,120 +336,79 @@ let modelosPagamento: ModeloPagamento[] = [
   { id: 'MP-003', modelo: 'Comissão 100%' },
 ];
 
-let contasFinanceiras: ContaFinanceira[] = [
-  // Loja - Matriz
-  { id: 'CTA-001', nome: 'Santander (Unicred)', tipo: 'Conta Bancária', lojaVinculada: '3ac7e00c', banco: 'Santander', agencia: '', conta: '', cnpj: '53.295.194/0001-66', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false, habilitada: true, historicoAlteracoes: [] },
-  { id: 'CTA-002', nome: 'Bradesco Thiago Eduardo', tipo: 'Conta Bancária', lojaVinculada: '3ac7e00c', banco: 'Bradesco', agencia: '', conta: '', cnpj: '53.295.194/0001-66', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
-  // Loja - Online
-  { id: 'CTA-003', nome: 'Santander (Unicred)', tipo: 'Conta Bancária', lojaVinculada: 'fcc78c1a', banco: 'Santander', agencia: '', conta: '', cnpj: '46.197.533/0001-06', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false, habilitada: true, historicoAlteracoes: [] },
-  { id: 'CTA-004', nome: 'Bradesco Thiago Imports', tipo: 'Conta Bancária', lojaVinculada: 'fcc78c1a', banco: 'Bradesco', agencia: '', conta: '', cnpj: '46.197.533/0001-06', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
-  // Loja - JK Shopping
-  { id: 'CTA-005', nome: 'Santander (Santander JK)', tipo: 'Conta Bancária', lojaVinculada: 'db894e7d', banco: 'Santander', agencia: '', conta: '', cnpj: '62.968.637/0001-23', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false, habilitada: true, historicoAlteracoes: [] },
-  { id: 'CTA-006', nome: 'Sicoob (Sicoob JK)', tipo: 'Conta Bancária', lojaVinculada: 'db894e7d', banco: 'Sicoob', agencia: '', conta: '', cnpj: '62.968.637/0001-23', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
-  // Loja - Águas Lindas Shopping
-  { id: 'CTA-007', nome: 'Santander (Unicred TH Imports)', tipo: 'Conta Bancária', lojaVinculada: '0d06e7db', banco: 'Santander', agencia: '', conta: '', cnpj: '56.221.743/0001-46', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false, habilitada: true, historicoAlteracoes: [] },
-  { id: 'CTA-008', nome: 'Pagbank (Pix Carol)', tipo: 'Conta Digital', lojaVinculada: '0d06e7db', banco: 'Pagbank', agencia: '', conta: '', cnpj: '56.221.743/0001-46', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
-  // Loja - Shopping Sul
-  { id: 'CTA-009', nome: 'Santander (Bradesco Shopping Sul)', tipo: 'Conta Bancária', lojaVinculada: '5b9446d5', banco: 'Santander', agencia: '', conta: '', cnpj: '55.449.390/0001-73', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Terceirizada', notaFiscal: false, habilitada: true, historicoAlteracoes: [] },
-  { id: 'CTA-010', nome: 'Bradesco Acessórios', tipo: 'Conta Bancária', lojaVinculada: '5b9446d5', banco: 'Bradesco', agencia: '', conta: '', cnpj: '55.449.390/0001-73', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
-  // Contas de Dinheiro por Loja
-  { id: 'CTA-015', nome: 'Dinheiro - JK Shopping', tipo: 'Dinheiro', lojaVinculada: 'db894e7d', banco: '', agencia: '', conta: '', cnpj: '62.968.637/0001-23', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
-  { id: 'CTA-016', nome: 'Dinheiro - Shopping Sul', tipo: 'Dinheiro', lojaVinculada: '5b9446d5', banco: '', agencia: '', conta: '', cnpj: '55.449.390/0001-73', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
-  { id: 'CTA-017', nome: 'Dinheiro - Águas Lindas Shopping', tipo: 'Dinheiro', lojaVinculada: '0d06e7db', banco: '', agencia: '', conta: '', cnpj: '56.221.743/0001-46', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
-  { id: 'CTA-018', nome: 'Dinheiro - Online', tipo: 'Dinheiro', lojaVinculada: 'fcc78c1a', banco: '', agencia: '', conta: '', cnpj: '46.197.533/0001-06', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
-  { id: 'CTA-019', nome: 'Dinheiro - Loja Matriz', tipo: 'Dinheiro', lojaVinculada: '3ac7e00c', banco: '', agencia: '', conta: '', cnpj: '53.295.194/0001-66', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
-  { id: 'CTA-020', nome: 'Cofre', tipo: 'Dinheiro - Geral', lojaVinculada: 'geral-dinheiro', banco: '', agencia: '', conta: '', cnpj: '62.968.637/0001-23', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
-  // Assistência - Geral
-  { id: 'CTA-021', nome: 'Bradesco Assistência', tipo: 'Conta Bancária', lojaVinculada: 'geral-assistencia', banco: 'Bradesco', agencia: '', conta: '', cnpj: '54.872.234/0001-58', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
-  // Dinheiro - Assistência (centralizada)
-  { id: 'CTA-022', nome: 'Dinheiro - Assistência', tipo: 'Dinheiro', lojaVinculada: 'geral-assistencia', banco: '', agencia: '', conta: '', cnpj: '53.295.194/0001-66', saldoInicial: 0, saldoAtual: 0, status: 'Ativo', statusMaquina: 'Própria', notaFiscal: true, habilitada: true, historicoAlteracoes: [] },
-];
+// ==================== MAPPERS ====================
 
-let maquinasCartao: MaquinaCartao[] = [
-  { 
-    id: 'MAQ-001', 
-    nome: 'Stone Matriz', 
-    cnpjVinculado: '3ac7e00c', // Loja - Matriz
-    contaOrigem: 'CTA-002', // Bradesco Thiago Eduardo (Própria)
-    status: 'Ativo',
-    percentualMaquina: 2.5,
-    taxas: {
-      credito: { 1: 3, 2: 5, 3: 7, 4: 9, 5: 11, 6: 13, 7: 15, 8: 17, 9: 19, 10: 21, 11: 23, 12: 25 },
-      debito: 2
-    }
-  },
-  { 
-    id: 'MAQ-002', 
-    nome: 'PagSeguro Online', 
-    cnpjVinculado: 'fcc78c1a', // Loja - Online
-    contaOrigem: 'CTA-004', // Bradesco Thiago Imports (Própria)
-    status: 'Ativo',
-    percentualMaquina: 1.99,
-    taxas: {
-      credito: { 1: 2, 2: 4, 3: 6, 4: 8, 5: 10, 6: 12, 7: 14, 8: 16, 9: 18, 10: 20, 11: 22, 12: 24 },
-      debito: 2
-    }
-  },
-  { 
-    id: 'MAQ-003', 
-    nome: 'Stone JK Shopping', 
-    cnpjVinculado: 'db894e7d', // Loja - JK Shopping
-    contaOrigem: 'CTA-006', // Sicoob (Sicoob JK) (Própria)
-    status: 'Ativo',
-    percentualMaquina: 3,
-    taxas: {
-      credito: { 1: 3, 2: 5, 3: 7, 4: 9, 5: 11, 6: 13, 7: 15, 8: 17, 9: 19, 10: 21, 11: 23, 12: 25 },
-      debito: 2
-    }
-  },
-  { 
-    id: 'MAQ-004', 
-    nome: 'Cielo Águas Lindas', 
-    cnpjVinculado: '0d06e7db', // Loja - Águas Lindas Shopping
-    contaOrigem: 'CTA-008', // Pagbank (Pix Carol) (Própria)
-    status: 'Ativo',
-    percentualMaquina: 2.2,
-    taxas: {
-      credito: { 1: 2, 2: 4, 3: 6, 4: 8, 5: 10, 6: 12, 7: 14, 8: 16, 9: 18, 10: 20, 11: 22, 12: 24 },
-      debito: 2
-    }
-  },
-  { 
-    id: 'MAQ-005', 
-    nome: 'GetNet Shopping Sul', 
-    cnpjVinculado: '5b9446d5', // Loja - Shopping Sul
-    contaOrigem: 'CTA-010', // Bradesco Acessórios (Própria)
-    status: 'Ativo',
-    percentualMaquina: 2.0,
-    taxas: {
-      credito: { 1: 2, 2: 4, 3: 6, 4: 8, 5: 10, 6: 12, 7: 14, 8: 16, 9: 18, 10: 20, 11: 22, 12: 24 },
-      debito: 1.5
-    }
-  },
-];
+const mapRowToLoja = (row: any): Loja => ({
+  id: row.id, nome: row.nome, cnpj: row.cnpj || '', endereco: row.endereco || '',
+  telefone: row.telefone || '', cep: row.cep || '', cidade: row.cidade || '',
+  estado: row.estado || '', responsavel: row.responsavel || '',
+  horarioFuncionamento: row.horario_funcionamento || '',
+  status: row.ativa === false ? 'Inativo' : 'Ativo',
+});
 
-// API Functions - Lojas (Supabase-backed with sync fallback)
-// Sync version: returns in-memory cache (for legacy callers)
-export const getLojas = (): Loja[] => [...lojas];
+const mapRowToCliente = (row: any): Cliente => ({
+  id: row.id, nome: row.nome, cpf: row.cpf || '', telefone: row.telefone || '',
+  dataNascimento: row.data_nascimento || '', email: row.email || '',
+  cep: row.cep || '', endereco: row.endereco || '', numero: row.numero || '',
+  bairro: row.bairro || '', cidade: row.cidade || '', estado: row.estado || '',
+  status: (row.status as 'Ativo' | 'Inativo') || 'Ativo',
+  origemCliente: (row.origem_cliente as 'Assistência' | 'Venda') || 'Venda',
+  idsCompras: Array.isArray(row.ids_compras) ? row.ids_compras : [],
+  tipoCliente: calcularTipoCliente(Array.isArray(row.ids_compras) ? row.ids_compras : []),
+  tipoPessoa: (row.tipo_pessoa as 'Pessoa Física' | 'Pessoa Jurídica') || calcularTipoPessoa(row.cpf || ''),
+});
 
-// Async version: fetches from Supabase
+const mapRowToColaborador = (row: any): Colaborador => ({
+  id: row.id, cpf: row.cpf || '', nome: row.nome, cargo: row.cargo || '',
+  loja: row.loja_id || '', dataAdmissao: row.data_admissao || '',
+  dataInativacao: row.data_inativacao || undefined, dataNascimento: row.data_nascimento || undefined,
+  email: row.email || '', telefone: row.telefone || '',
+  modeloPagamento: row.modelo_pagamento || '', salario: row.salario ?? undefined,
+  foto: row.foto || undefined,
+  status: row.ativo === false ? 'Inativo' : (row.status as 'Ativo' | 'Inativo') || 'Ativo',
+});
+
+const mapRowToFornecedor = (row: any): Fornecedor => ({
+  id: row.id, nome: row.nome, cnpj: row.cnpj || '', endereco: row.endereco || '',
+  responsavel: row.responsavel || '', telefone: row.telefone || '',
+  status: (row.status as 'Ativo' | 'Inativo') || 'Ativo',
+  ultimaCompra: row.ultima_compra || undefined,
+});
+
+const mapRowToContaFinanceira = (row: any): ContaFinanceira => ({
+  id: row.id, nome: row.nome, tipo: row.tipo || '', lojaVinculada: row.loja_vinculada || '',
+  banco: row.banco || '', agencia: row.agencia || '', conta: row.conta || '', cnpj: row.cnpj || '',
+  saldoInicial: row.saldo_inicial ?? 0, saldoAtual: row.saldo_atual ?? 0,
+  status: (row.status as 'Ativo' | 'Inativo') || 'Ativo',
+  ultimoMovimento: row.ultimo_movimento || undefined,
+  statusMaquina: (row.status_maquina as 'Terceirizada' | 'Própria') || 'Própria',
+  notaFiscal: row.nota_fiscal ?? false, habilitada: row.habilitada ?? true,
+  historicoAlteracoes: Array.isArray(row.historico_alteracoes) ? row.historico_alteracoes : [],
+});
+
+const mapRowToMaquinaCartao = (row: any): MaquinaCartao => ({
+  id: row.id, nome: row.nome, cnpjVinculado: row.cnpj_vinculado || '',
+  contaOrigem: row.conta_origem || '', status: (row.status as 'Ativo' | 'Inativo') || 'Ativo',
+  percentualMaquina: row.percentual_maquina ?? 0,
+  taxas: row.taxas && typeof row.taxas === 'object' ? row.taxas : { credito: {}, debito: 0 },
+  parcelamentos: Array.isArray(row.parcelamentos) ? row.parcelamentos : [],
+});
+
+// ==================== LOJAS ====================
+
+export const getLojas = (): Loja[] => [..._lojasCache];
+
 export const getLojasAsync = async (): Promise<Loja[]> => {
-  const { data, error } = await supabase.from('lojas').select('*').order('nome');
-  if (error) { console.error('Erro ao buscar lojas:', error); return [...lojas]; }
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    nome: row.nome,
-    cnpj: row.cnpj || '',
-    endereco: row.endereco || '',
-    telefone: row.telefone || '',
-    cep: row.cep || '',
-    cidade: row.cidade || '',
-    estado: row.estado || '',
-    responsavel: row.responsavel || '',
-    horarioFuncionamento: row.horario_funcionamento || '',
-    status: row.ativa === false ? 'Inativo' : 'Ativo',
-  }));
+  try {
+    const { data, error } = await supabase.from('lojas').select('*').order('nome');
+    if (error) throw error;
+    _lojasCache = (data || []).map(mapRowToLoja);
+    _lojasLoaded = true;
+    return [..._lojasCache];
+  } catch (e) { console.error('Erro ao buscar lojas:', e); return [..._lojasCache]; }
 };
+
+export const getLojaById = (id: string): Loja | undefined => _lojasCache.find(l => l.id === id);
 
 export const addLoja = async (loja: Omit<Loja, 'id'>): Promise<Loja> => {
   const { data, error } = await supabase.from('lojas').insert({
@@ -536,7 +418,9 @@ export const addLoja = async (loja: Omit<Loja, 'id'>): Promise<Loja> => {
     comissao_percentual: loja.nome.toLowerCase().includes('online') ? 6 : 10,
   }).select().single();
   if (error) throw error;
-  return { ...loja, id: data.id };
+  const nova = mapRowToLoja(data);
+  _lojasCache.push(nova);
+  return nova;
 };
 
 export const updateLoja = async (id: string, updates: Partial<Loja>): Promise<Loja | null> => {
@@ -551,78 +435,126 @@ export const updateLoja = async (id: string, updates: Partial<Loja>): Promise<Lo
   if (updates.responsavel !== undefined) mapped.responsavel = updates.responsavel;
   if (updates.horarioFuncionamento !== undefined) mapped.horario_funcionamento = updates.horarioFuncionamento;
   if (updates.status !== undefined) mapped.ativa = updates.status === 'Ativo';
-  const { error } = await supabase.from('lojas').update(mapped).eq('id', id);
+  const { data, error } = await supabase.from('lojas').update(mapped).eq('id', id).select().single();
   if (error) { console.error('Erro ao atualizar loja:', error); return null; }
-  return { id, ...updates } as Loja;
+  const updated = mapRowToLoja(data);
+  const idx = _lojasCache.findIndex(l => l.id === id);
+  if (idx !== -1) _lojasCache[idx] = updated;
+  return updated;
 };
 
 export const deleteLoja = async (id: string): Promise<void> => {
   const { error } = await supabase.from('lojas').delete().eq('id', id);
   if (error) console.error('Erro ao deletar loja:', error);
+  _lojasCache = _lojasCache.filter(l => l.id !== id);
 };
 
-export const getClientes = () => [...clientes];
-export const getClienteById = (id: string) => clientes.find(c => c.id === id);
-export const getClienteByCpf = (cpf: string) => clientes.find(c => c.cpf === cpf);
-export const addCliente = (cliente: Omit<Cliente, 'id' | 'tipoCliente' | 'tipoPessoa'>) => {
-  const newId = `CLI-${String(clientes.length + 1).padStart(3, '0')}`;
+// ==================== CLIENTES ====================
+
+export const getClientes = (): Cliente[] => [..._clientesCache];
+
+export const getClientesAsync = async (): Promise<Cliente[]> => {
+  try {
+    const { data, error } = await supabase.from('clientes').select('*').order('nome');
+    if (error) throw error;
+    _clientesCache = (data || []).map(mapRowToCliente);
+    _clientesLoaded = true;
+    return [..._clientesCache];
+  } catch (e) { console.error('Erro ao buscar clientes:', e); return [..._clientesCache]; }
+};
+
+export const getClienteById = (id: string): Cliente | undefined => _clientesCache.find(c => c.id === id);
+export const getClienteByCpf = (cpf: string): Cliente | undefined => _clientesCache.find(c => c.cpf === cpf);
+
+export const addCliente = async (cliente: Omit<Cliente, 'id' | 'tipoCliente' | 'tipoPessoa'>): Promise<Cliente> => {
   const idsCompras = cliente.idsCompras || [];
-  const newCliente: Cliente = { 
-    ...cliente, 
-    id: newId, 
-    idsCompras,
-    tipoCliente: calcularTipoCliente(idsCompras),
-    origemCliente: cliente.origemCliente || 'Venda',
-    tipoPessoa: calcularTipoPessoa(cliente.cpf)
-  };
-  clientes.push(newCliente);
-  return newCliente;
-};
-export const updateCliente = (id: string, updates: Partial<Cliente>) => {
-  const index = clientes.findIndex(c => c.id === id);
-  if (index !== -1) {
-    const updatedCliente = { ...clientes[index], ...updates };
-    // Recalcular tipo de cliente se idsCompras foi atualizado
-    if (updates.idsCompras) {
-      updatedCliente.tipoCliente = calcularTipoCliente(updates.idsCompras);
-    }
-    clientes[index] = updatedCliente;
-    return clientes[index];
-  }
-  return null;
-};
-export const deleteCliente = (id: string) => {
-  clientes = clientes.filter(c => c.id !== id);
-};
-// Adicionar compra ao cliente
-export const addCompraToCliente = (clienteId: string, vendaId: string) => {
-  const cliente = clientes.find(c => c.id === clienteId);
-  if (cliente) {
-    if (!cliente.idsCompras.includes(vendaId)) {
-      cliente.idsCompras.push(vendaId);
-      cliente.tipoCliente = calcularTipoCliente(cliente.idsCompras);
-    }
-    return cliente;
-  }
-  return null;
+  const { data, error } = await supabase.from('clientes').insert({
+    nome: cliente.nome, cpf: cliente.cpf, telefone: cliente.telefone,
+    data_nascimento: cliente.dataNascimento || null, email: cliente.email,
+    cep: cliente.cep, endereco: cliente.endereco, numero: cliente.numero,
+    bairro: cliente.bairro, cidade: cliente.cidade, estado: cliente.estado,
+    status: cliente.status || 'Ativo', origem_cliente: cliente.origemCliente || 'Venda',
+    ids_compras: idsCompras, tipo_pessoa: calcularTipoPessoa(cliente.cpf),
+    tipo_cliente: calcularTipoCliente(idsCompras),
+  }).select().single();
+  if (error) throw error;
+  const novo = mapRowToCliente(data);
+  _clientesCache.push(novo);
+  return novo;
 };
 
-export const getColaboradores = () => [...colaboradores];
-export const getColaboradoresByPermissao = (permissao: string) => {
-  return colaboradores.filter(col => {
+export const updateCliente = async (id: string, updates: Partial<Cliente>): Promise<Cliente | null> => {
+  const mapped: any = {};
+  if (updates.nome !== undefined) mapped.nome = updates.nome;
+  if (updates.cpf !== undefined) { mapped.cpf = updates.cpf; mapped.tipo_pessoa = calcularTipoPessoa(updates.cpf); }
+  if (updates.telefone !== undefined) mapped.telefone = updates.telefone;
+  if (updates.dataNascimento !== undefined) mapped.data_nascimento = updates.dataNascimento || null;
+  if (updates.email !== undefined) mapped.email = updates.email;
+  if (updates.cep !== undefined) mapped.cep = updates.cep;
+  if (updates.endereco !== undefined) mapped.endereco = updates.endereco;
+  if (updates.numero !== undefined) mapped.numero = updates.numero;
+  if (updates.bairro !== undefined) mapped.bairro = updates.bairro;
+  if (updates.cidade !== undefined) mapped.cidade = updates.cidade;
+  if (updates.estado !== undefined) mapped.estado = updates.estado;
+  if (updates.status !== undefined) mapped.status = updates.status;
+  if (updates.origemCliente !== undefined) mapped.origem_cliente = updates.origemCliente;
+  if (updates.idsCompras !== undefined) {
+    mapped.ids_compras = updates.idsCompras;
+    mapped.tipo_cliente = calcularTipoCliente(updates.idsCompras);
+  }
+  const { data, error } = await supabase.from('clientes').update(mapped).eq('id', id).select().single();
+  if (error) { console.error('Erro ao atualizar cliente:', error); return null; }
+  const updated = mapRowToCliente(data);
+  const idx = _clientesCache.findIndex(c => c.id === id);
+  if (idx !== -1) _clientesCache[idx] = updated;
+  return updated;
+};
+
+export const deleteCliente = async (id: string): Promise<void> => {
+  const { error } = await supabase.from('clientes').delete().eq('id', id);
+  if (error) console.error('Erro ao deletar cliente:', error);
+  _clientesCache = _clientesCache.filter(c => c.id !== id);
+};
+
+export const addCompraToCliente = async (clienteId: string, vendaId: string): Promise<Cliente | null> => {
+  const cliente = _clientesCache.find(c => c.id === clienteId);
+  if (!cliente) return null;
+  const idsCompras = [...cliente.idsCompras];
+  if (!idsCompras.includes(vendaId)) idsCompras.push(vendaId);
+  return await updateCliente(clienteId, { idsCompras });
+};
+
+// ==================== COLABORADORES ====================
+
+export const getColaboradores = (): Colaborador[] => [..._colaboradoresCache];
+
+export const getColaboradoresAsync = async (): Promise<Colaborador[]> => {
+  try {
+    const { data, error } = await supabase.from('colaboradores').select('*').order('nome');
+    if (error) throw error;
+    _colaboradoresCache = (data || []).map(mapRowToColaborador);
+    _colaboradoresLoaded = true;
+    return [..._colaboradoresCache];
+  } catch (e) { console.error('Erro ao buscar colaboradores:', e); return [..._colaboradoresCache]; }
+};
+
+export const getColaboradorById = (id: string): Colaborador | undefined => _colaboradoresCache.find(c => c.id === id);
+
+export const getColaboradoresByLoja = (lojaId: string): Colaborador[] =>
+  _colaboradoresCache.filter(c => c.loja === lojaId && c.status === 'Ativo');
+
+export const getColaboradoresByPermissao = (permissao: string): Colaborador[] => {
+  return _colaboradoresCache.filter(col => {
     const cargo = cargos.find(c => c.id === col.cargo);
     return cargo?.permissoes.includes(permissao);
   });
 };
-export const getColaboradoresByLoja = (lojaId: string) => 
-  colaboradores.filter(c => c.loja === lojaId && c.status === 'Ativo');
 
-export const getAniversariantesDaSemana = () => {
+export const getAniversariantesDaSemana = (): Colaborador[] => {
   const today = new Date();
   const nextWeek = new Date(today);
   nextWeek.setDate(today.getDate() + 7);
-  
-  return colaboradores.filter(col => {
+  return _colaboradoresCache.filter(col => {
     if (!col.dataNascimento || col.status !== 'Ativo') return false;
     const birthday = new Date(col.dataNascimento);
     birthday.setFullYear(today.getFullYear());
@@ -636,9 +568,9 @@ export const getAniversariantesDaSemana = () => {
   });
 };
 
-export const getContagemColaboradoresPorLoja = () => {
+export const getContagemColaboradoresPorLoja = (): Record<string, number> => {
   const contagem: Record<string, number> = {};
-  colaboradores.forEach(col => {
+  _colaboradoresCache.forEach(col => {
     if (col.status === 'Ativo' && col.loja) {
       contagem[col.loja] = (contagem[col.loja] || 0) + 1;
     }
@@ -651,66 +583,239 @@ export const getCargoNome = (cargoId: string) => {
   return cargo?.funcao || cargoId;
 };
 
-// Sync versions kept for legacy callers
-export const addColaborador = (colaborador: Omit<Colaborador, 'id'>) => {
-  const newId = `COL-${String(colaboradores.length + 1).padStart(3, '0')}`;
-  const newColaborador = { ...colaborador, id: newId };
-  colaboradores.push(newColaborador);
-  // Also persist to Supabase in background
-  supabase.from('colaboradores').insert({
+export const addColaborador = async (colaborador: Omit<Colaborador, 'id'>): Promise<Colaborador> => {
+  const { data, error } = await supabase.from('colaboradores').insert({
     nome: colaborador.nome, cpf: colaborador.cpf, email: colaborador.email,
     telefone: colaborador.telefone, loja_id: colaborador.loja || null,
     cargo: colaborador.cargo, data_admissao: colaborador.dataAdmissao || null,
-    salario: colaborador.salario, status: colaborador.status,
-  }).then(({ error }) => { if (error) console.error('Erro ao persistir colaborador:', error); });
-  return newColaborador;
-};
-export const updateColaborador = (id: string, updates: Partial<Colaborador>) => {
-  const index = colaboradores.findIndex(c => c.id === id);
-  if (index !== -1) {
-    colaboradores[index] = { ...colaboradores[index], ...updates };
-    // Persist to Supabase
-    const mapped: any = {};
-    if (updates.nome !== undefined) mapped.nome = updates.nome;
-    if (updates.cpf !== undefined) mapped.cpf = updates.cpf;
-    if (updates.email !== undefined) mapped.email = updates.email;
-    if (updates.telefone !== undefined) mapped.telefone = updates.telefone;
-    if (updates.cargo !== undefined) mapped.cargo = updates.cargo;
-    if (updates.status !== undefined) { mapped.ativo = updates.status === 'Ativo'; mapped.status = updates.status; }
-    if (Object.keys(mapped).length > 0) {
-      supabase.from('colaboradores').update(mapped).eq('id', id).then(({ error }) => {
-        if (error) console.error('Erro ao atualizar colaborador:', error);
-      });
-    }
-    return colaboradores[index];
-  }
-  return null;
-};
-export const deleteColaborador = (id: string) => {
-  colaboradores = colaboradores.filter(c => c.id !== id);
-  supabase.from('colaboradores').delete().eq('id', id).then(({ error }) => {
-    if (error) console.error('Erro ao deletar colaborador:', error);
-  });
+    data_nascimento: colaborador.dataNascimento || null,
+    modelo_pagamento: colaborador.modeloPagamento || null,
+    salario: colaborador.salario ?? null, status: colaborador.status,
+    ativo: colaborador.status === 'Ativo', foto: colaborador.foto || null,
+  }).select().single();
+  if (error) throw error;
+  const novo = mapRowToColaborador(data);
+  _colaboradoresCache.push(novo);
+  return novo;
 };
 
-export const getFornecedores = () => [...fornecedores];
-export const addFornecedor = (fornecedor: Omit<Fornecedor, 'id'>) => {
-  const newId = `FORN-${String(fornecedores.length + 1).padStart(3, '0')}`;
-  const newFornecedor = { ...fornecedor, id: newId };
-  fornecedores.push(newFornecedor);
-  return newFornecedor;
+export const updateColaborador = async (id: string, updates: Partial<Colaborador>): Promise<Colaborador | null> => {
+  const mapped: any = {};
+  if (updates.nome !== undefined) mapped.nome = updates.nome;
+  if (updates.cpf !== undefined) mapped.cpf = updates.cpf;
+  if (updates.email !== undefined) mapped.email = updates.email;
+  if (updates.telefone !== undefined) mapped.telefone = updates.telefone;
+  if (updates.cargo !== undefined) mapped.cargo = updates.cargo;
+  if (updates.loja !== undefined) mapped.loja_id = updates.loja;
+  if (updates.dataAdmissao !== undefined) mapped.data_admissao = updates.dataAdmissao;
+  if (updates.dataInativacao !== undefined) mapped.data_inativacao = updates.dataInativacao;
+  if (updates.dataNascimento !== undefined) mapped.data_nascimento = updates.dataNascimento;
+  if (updates.modeloPagamento !== undefined) mapped.modelo_pagamento = updates.modeloPagamento;
+  if (updates.salario !== undefined) mapped.salario = updates.salario;
+  if (updates.foto !== undefined) mapped.foto = updates.foto;
+  if (updates.status !== undefined) { mapped.status = updates.status; mapped.ativo = updates.status === 'Ativo'; }
+  const { data, error } = await supabase.from('colaboradores').update(mapped).eq('id', id).select().single();
+  if (error) { console.error('Erro ao atualizar colaborador:', error); return null; }
+  const updated = mapRowToColaborador(data);
+  const idx = _colaboradoresCache.findIndex(c => c.id === id);
+  if (idx !== -1) _colaboradoresCache[idx] = updated;
+  return updated;
 };
-export const updateFornecedor = (id: string, updates: Partial<Fornecedor>) => {
-  const index = fornecedores.findIndex(f => f.id === id);
-  if (index !== -1) {
-    fornecedores[index] = { ...fornecedores[index], ...updates };
-    return fornecedores[index];
-  }
-  return null;
+
+export const deleteColaborador = async (id: string): Promise<void> => {
+  const { error } = await supabase.from('colaboradores').delete().eq('id', id);
+  if (error) console.error('Erro ao deletar colaborador:', error);
+  _colaboradoresCache = _colaboradoresCache.filter(c => c.id !== id);
 };
-export const deleteFornecedor = (id: string) => {
-  fornecedores = fornecedores.filter(f => f.id !== id);
+
+// ==================== FORNECEDORES ====================
+
+export const getFornecedores = (): Fornecedor[] => [..._fornecedoresCache];
+
+export const getFornecedoresAsync = async (): Promise<Fornecedor[]> => {
+  try {
+    const { data, error } = await supabase.from('fornecedores').select('*').order('nome');
+    if (error) throw error;
+    _fornecedoresCache = (data || []).map(mapRowToFornecedor);
+    _fornecedoresLoaded = true;
+    return [..._fornecedoresCache];
+  } catch (e) { console.error('Erro ao buscar fornecedores:', e); return [..._fornecedoresCache]; }
 };
+
+export const getFornecedorById = (id: string): Fornecedor | undefined => _fornecedoresCache.find(f => f.id === id);
+
+export const addFornecedor = async (fornecedor: Omit<Fornecedor, 'id'>): Promise<Fornecedor> => {
+  const { data, error } = await supabase.from('fornecedores').insert({
+    nome: fornecedor.nome, cnpj: fornecedor.cnpj, endereco: fornecedor.endereco,
+    responsavel: fornecedor.responsavel, telefone: fornecedor.telefone,
+    status: fornecedor.status || 'Ativo', ultima_compra: fornecedor.ultimaCompra || null,
+  }).select().single();
+  if (error) throw error;
+  const novo = mapRowToFornecedor(data);
+  _fornecedoresCache.push(novo);
+  return novo;
+};
+
+export const updateFornecedor = async (id: string, updates: Partial<Fornecedor>): Promise<Fornecedor | null> => {
+  const mapped: any = {};
+  if (updates.nome !== undefined) mapped.nome = updates.nome;
+  if (updates.cnpj !== undefined) mapped.cnpj = updates.cnpj;
+  if (updates.endereco !== undefined) mapped.endereco = updates.endereco;
+  if (updates.responsavel !== undefined) mapped.responsavel = updates.responsavel;
+  if (updates.telefone !== undefined) mapped.telefone = updates.telefone;
+  if (updates.status !== undefined) mapped.status = updates.status;
+  if (updates.ultimaCompra !== undefined) mapped.ultima_compra = updates.ultimaCompra;
+  const { data, error } = await supabase.from('fornecedores').update(mapped).eq('id', id).select().single();
+  if (error) { console.error('Erro ao atualizar fornecedor:', error); return null; }
+  const updated = mapRowToFornecedor(data);
+  const idx = _fornecedoresCache.findIndex(f => f.id === id);
+  if (idx !== -1) _fornecedoresCache[idx] = updated;
+  return updated;
+};
+
+export const deleteFornecedor = async (id: string): Promise<void> => {
+  const { error } = await supabase.from('fornecedores').delete().eq('id', id);
+  if (error) console.error('Erro ao deletar fornecedor:', error);
+  _fornecedoresCache = _fornecedoresCache.filter(f => f.id !== id);
+};
+
+// ==================== CONTAS FINANCEIRAS ====================
+
+export const getContasFinanceiras = (): ContaFinanceira[] => [..._contasFinanceirasCache];
+
+export const getContasFinanceirasAsync = async (): Promise<ContaFinanceira[]> => {
+  try {
+    const { data, error } = await supabase.from('contas_financeiras').select('*').order('nome');
+    if (error) throw error;
+    _contasFinanceirasCache = (data || []).map(mapRowToContaFinanceira);
+    _contasLoaded = true;
+    return [..._contasFinanceirasCache];
+  } catch (e) { console.error('Erro ao buscar contas financeiras:', e); return [..._contasFinanceirasCache]; }
+};
+
+export const getContasFinanceirasHabilitadas = (): ContaFinanceira[] =>
+  _contasFinanceirasCache.filter(c => c.habilitada !== false && c.status === 'Ativo');
+
+export const getContaFinanceiraById = (id: string): ContaFinanceira | undefined =>
+  _contasFinanceirasCache.find(c => c.id === id);
+
+export const toggleContaFinanceira = async (id: string, usuario: string, observacao?: string): Promise<ContaFinanceira | null> => {
+  try {
+    const conta = _contasFinanceirasCache.find(c => c.id === id);
+    if (!conta) return null;
+    const statusAnterior = conta.habilitada ? 'Habilitada' : 'Desabilitada';
+    const novoStatus = conta.habilitada ? 'Desabilitada' : 'Habilitada';
+    const historico = [...conta.historicoAlteracoes];
+    historico.unshift({ dataHora: new Date().toISOString(), usuario, statusAnterior, novoStatus, observacao });
+    const { data, error } = await supabase.from('contas_financeiras').update({
+      habilitada: !conta.habilitada, historico_alteracoes: historico as any,
+    }).eq('id', id).select().single();
+    if (error) throw error;
+    const updated = mapRowToContaFinanceira(data);
+    const idx = _contasFinanceirasCache.findIndex(c => c.id === id);
+    if (idx !== -1) _contasFinanceirasCache[idx] = updated;
+    return updated;
+  } catch (e) { console.error('Erro ao toggle conta financeira:', e); return null; }
+};
+
+export const addContaFinanceira = async (conta: Omit<ContaFinanceira, 'id'>): Promise<ContaFinanceira> => {
+  const { data, error } = await supabase.from('contas_financeiras').insert({
+    nome: conta.nome, tipo: conta.tipo, loja_vinculada: conta.lojaVinculada,
+    banco: conta.banco, agencia: conta.agencia, conta: conta.conta, cnpj: conta.cnpj,
+    saldo_inicial: conta.saldoInicial, saldo_atual: conta.saldoAtual, status: conta.status || 'Ativo',
+    status_maquina: conta.statusMaquina, nota_fiscal: conta.notaFiscal,
+    habilitada: conta.habilitada ?? true, historico_alteracoes: (conta.historicoAlteracoes || []) as any,
+  } as any).select().single();
+  if (error) throw error;
+  const nova = mapRowToContaFinanceira(data);
+  _contasFinanceirasCache.push(nova);
+  return nova;
+};
+
+export const updateContaFinanceira = async (id: string, updates: Partial<ContaFinanceira>): Promise<ContaFinanceira | null> => {
+  const mapped: any = {};
+  if (updates.nome !== undefined) mapped.nome = updates.nome;
+  if (updates.tipo !== undefined) mapped.tipo = updates.tipo;
+  if (updates.lojaVinculada !== undefined) mapped.loja_vinculada = updates.lojaVinculada;
+  if (updates.banco !== undefined) mapped.banco = updates.banco;
+  if (updates.agencia !== undefined) mapped.agencia = updates.agencia;
+  if (updates.conta !== undefined) mapped.conta = updates.conta;
+  if (updates.cnpj !== undefined) mapped.cnpj = updates.cnpj;
+  if (updates.saldoInicial !== undefined) mapped.saldo_inicial = updates.saldoInicial;
+  if (updates.saldoAtual !== undefined) mapped.saldo_atual = updates.saldoAtual;
+  if (updates.status !== undefined) mapped.status = updates.status;
+  if (updates.statusMaquina !== undefined) mapped.status_maquina = updates.statusMaquina;
+  if (updates.notaFiscal !== undefined) mapped.nota_fiscal = updates.notaFiscal;
+  if (updates.habilitada !== undefined) mapped.habilitada = updates.habilitada;
+  if (updates.historicoAlteracoes !== undefined) mapped.historico_alteracoes = updates.historicoAlteracoes;
+  const { data, error } = await supabase.from('contas_financeiras').update(mapped).eq('id', id).select().single();
+  if (error) { console.error('Erro ao atualizar conta financeira:', error); return null; }
+  const updated = mapRowToContaFinanceira(data);
+  const idx = _contasFinanceirasCache.findIndex(c => c.id === id);
+  if (idx !== -1) _contasFinanceirasCache[idx] = updated;
+  return updated;
+};
+
+export const deleteContaFinanceira = async (id: string): Promise<void> => {
+  const { error } = await supabase.from('contas_financeiras').delete().eq('id', id);
+  if (error) console.error('Erro ao deletar conta financeira:', error);
+  _contasFinanceirasCache = _contasFinanceirasCache.filter(c => c.id !== id);
+};
+
+// ==================== MÁQUINAS DE CARTÃO ====================
+
+export const getMaquinasCartao = (): MaquinaCartao[] => [..._maquinasCartaoCache];
+
+export const getMaquinasCartaoAsync = async (): Promise<MaquinaCartao[]> => {
+  try {
+    const { data, error } = await supabase.from('maquinas_cartao').select('*').order('nome');
+    if (error) throw error;
+    _maquinasCartaoCache = (data || []).map(mapRowToMaquinaCartao);
+    _maquinasLoaded = true;
+    return [..._maquinasCartaoCache];
+  } catch (e) { console.error('Erro ao buscar máquinas de cartão:', e); return [..._maquinasCartaoCache]; }
+};
+
+export const getMaquinaCartaoById = (id: string): MaquinaCartao | undefined =>
+  _maquinasCartaoCache.find(m => m.id === id);
+
+export const addMaquinaCartao = async (maquina: Omit<MaquinaCartao, 'id'>): Promise<MaquinaCartao> => {
+  const { data, error } = await supabase.from('maquinas_cartao').insert({
+    nome: maquina.nome, cnpj_vinculado: maquina.cnpjVinculado,
+    conta_origem: maquina.contaOrigem, status: maquina.status || 'Ativo',
+    percentual_maquina: maquina.percentualMaquina ?? 0,
+    taxas: maquina.taxas, parcelamentos: maquina.parcelamentos || [],
+  }).select().single();
+  if (error) throw error;
+  const nova = mapRowToMaquinaCartao(data);
+  _maquinasCartaoCache.push(nova);
+  return nova;
+};
+
+export const updateMaquinaCartao = async (id: string, updates: Partial<MaquinaCartao>): Promise<MaquinaCartao | null> => {
+  const mapped: any = {};
+  if (updates.nome !== undefined) mapped.nome = updates.nome;
+  if (updates.cnpjVinculado !== undefined) mapped.cnpj_vinculado = updates.cnpjVinculado;
+  if (updates.contaOrigem !== undefined) mapped.conta_origem = updates.contaOrigem;
+  if (updates.status !== undefined) mapped.status = updates.status;
+  if (updates.percentualMaquina !== undefined) mapped.percentual_maquina = updates.percentualMaquina;
+  if (updates.taxas !== undefined) mapped.taxas = updates.taxas;
+  if (updates.parcelamentos !== undefined) mapped.parcelamentos = updates.parcelamentos;
+  const { data, error } = await supabase.from('maquinas_cartao').update(mapped).eq('id', id).select().single();
+  if (error) { console.error('Erro ao atualizar máquina de cartão:', error); return null; }
+  const updated = mapRowToMaquinaCartao(data);
+  const idx = _maquinasCartaoCache.findIndex(m => m.id === id);
+  if (idx !== -1) _maquinasCartaoCache[idx] = updated;
+  return updated;
+};
+
+export const deleteMaquinaCartao = async (id: string): Promise<void> => {
+  const { error } = await supabase.from('maquinas_cartao').delete().eq('id', id);
+  if (error) console.error('Erro ao deletar máquina de cartão:', error);
+  _maquinasCartaoCache = _maquinasCartaoCache.filter(m => m.id !== id);
+};
+
+// ==================== DADOS DE REFERÊNCIA (in-memory) ====================
 
 export const getOrigensVenda = () => [...origensVenda];
 export const addOrigemVenda = (origem: Omit<OrigemVenda, 'id'>) => {
@@ -721,15 +826,10 @@ export const addOrigemVenda = (origem: Omit<OrigemVenda, 'id'>) => {
 };
 export const updateOrigemVenda = (id: string, updates: Partial<OrigemVenda>) => {
   const index = origensVenda.findIndex(o => o.id === id);
-  if (index !== -1) {
-    origensVenda[index] = { ...origensVenda[index], ...updates };
-    return origensVenda[index];
-  }
+  if (index !== -1) { origensVenda[index] = { ...origensVenda[index], ...updates }; return origensVenda[index]; }
   return null;
 };
-export const deleteOrigemVenda = (id: string) => {
-  origensVenda = origensVenda.filter(o => o.id !== id);
-};
+export const deleteOrigemVenda = (id: string) => { origensVenda = origensVenda.filter(o => o.id !== id); };
 
 export const getProdutosCadastro = () => [...produtosCadastro];
 export const addProdutoCadastro = (produto: Omit<ProdutoCadastro, 'id'>) => {
@@ -740,15 +840,10 @@ export const addProdutoCadastro = (produto: Omit<ProdutoCadastro, 'id'>) => {
 };
 export const updateProdutoCadastro = (id: string, updates: Partial<ProdutoCadastro>) => {
   const index = produtosCadastro.findIndex(p => p.id === id);
-  if (index !== -1) {
-    produtosCadastro[index] = { ...produtosCadastro[index], ...updates };
-    return produtosCadastro[index];
-  }
+  if (index !== -1) { produtosCadastro[index] = { ...produtosCadastro[index], ...updates }; return produtosCadastro[index]; }
   return null;
 };
-export const deleteProdutoCadastro = (id: string) => {
-  produtosCadastro = produtosCadastro.filter(p => p.id !== id);
-};
+export const deleteProdutoCadastro = (id: string) => { produtosCadastro = produtosCadastro.filter(p => p.id !== id); };
 
 export const getTiposDesconto = () => [...tiposDesconto];
 export const addTipoDesconto = (tipo: Omit<TipoDesconto, 'id'>) => {
@@ -759,15 +854,10 @@ export const addTipoDesconto = (tipo: Omit<TipoDesconto, 'id'>) => {
 };
 export const updateTipoDesconto = (id: string, updates: Partial<TipoDesconto>) => {
   const index = tiposDesconto.findIndex(t => t.id === id);
-  if (index !== -1) {
-    tiposDesconto[index] = { ...tiposDesconto[index], ...updates };
-    return tiposDesconto[index];
-  }
+  if (index !== -1) { tiposDesconto[index] = { ...tiposDesconto[index], ...updates }; return tiposDesconto[index]; }
   return null;
 };
-export const deleteTipoDesconto = (id: string) => {
-  tiposDesconto = tiposDesconto.filter(t => t.id !== id);
-};
+export const deleteTipoDesconto = (id: string) => { tiposDesconto = tiposDesconto.filter(t => t.id !== id); };
 
 export const getCargos = () => [...cargos];
 export const addCargo = (cargo: Omit<Cargo, 'id'>) => {
@@ -778,15 +868,10 @@ export const addCargo = (cargo: Omit<Cargo, 'id'>) => {
 };
 export const updateCargo = (id: string, updates: Partial<Cargo>) => {
   const index = cargos.findIndex(c => c.id === id);
-  if (index !== -1) {
-    cargos[index] = { ...cargos[index], ...updates };
-    return cargos[index];
-  }
+  if (index !== -1) { cargos[index] = { ...cargos[index], ...updates }; return cargos[index]; }
   return null;
 };
-export const deleteCargo = (id: string) => {
-  cargos = cargos.filter(c => c.id !== id);
-};
+export const deleteCargo = (id: string) => { cargos = cargos.filter(c => c.id !== id); };
 
 export const getModelosPagamento = () => [...modelosPagamento];
 export const addModeloPagamento = (modelo: Omit<ModeloPagamento, 'id'>) => {
@@ -797,79 +882,17 @@ export const addModeloPagamento = (modelo: Omit<ModeloPagamento, 'id'>) => {
 };
 export const updateModeloPagamento = (id: string, updates: Partial<ModeloPagamento>) => {
   const index = modelosPagamento.findIndex(m => m.id === id);
-  if (index !== -1) {
-    modelosPagamento[index] = { ...modelosPagamento[index], ...updates };
-    return modelosPagamento[index];
-  }
+  if (index !== -1) { modelosPagamento[index] = { ...modelosPagamento[index], ...updates }; return modelosPagamento[index]; }
   return null;
 };
-export const deleteModeloPagamento = (id: string) => {
-  modelosPagamento = modelosPagamento.filter(m => m.id !== id);
-};
+export const deleteModeloPagamento = (id: string) => { modelosPagamento = modelosPagamento.filter(m => m.id !== id); };
 
-export const getContasFinanceiras = () => [...contasFinanceiras];
-export const getContasFinanceirasHabilitadas = () => contasFinanceiras.filter(c => c.habilitada !== false && c.status === 'Ativo');
-export const toggleContaFinanceira = (id: string, usuario: string, observacao?: string) => {
-  const index = contasFinanceiras.findIndex(c => c.id === id);
-  if (index === -1) return null;
-  const conta = contasFinanceiras[index];
-  const statusAnterior = conta.habilitada !== false ? 'Habilitada' : 'Desabilitada';
-  const novoStatus = conta.habilitada !== false ? 'Desabilitada' : 'Habilitada';
-  conta.habilitada = !conta.habilitada;
-  conta.historicoAlteracoes = conta.historicoAlteracoes || [];
-  conta.historicoAlteracoes.unshift({
-    dataHora: new Date().toISOString(),
-    usuario,
-    statusAnterior,
-    novoStatus,
-    observacao
-  });
-  return conta;
-};
-export const addContaFinanceira = (conta: Omit<ContaFinanceira, 'id'>) => {
-  const newId = `CTA-${String(contasFinanceiras.length + 1).padStart(3, '0')}`;
-  const newConta = { ...conta, id: newId, habilitada: conta.habilitada ?? true, historicoAlteracoes: conta.historicoAlteracoes || [] };
-  contasFinanceiras.push(newConta);
-  return newConta;
-};
-export const updateContaFinanceira = (id: string, updates: Partial<ContaFinanceira>) => {
-  const index = contasFinanceiras.findIndex(c => c.id === id);
-  if (index !== -1) {
-    contasFinanceiras[index] = { ...contasFinanceiras[index], ...updates };
-    return contasFinanceiras[index];
-  }
-  return null;
-};
-export const deleteContaFinanceira = (id: string) => {
-  contasFinanceiras = contasFinanceiras.filter(c => c.id !== id);
-};
+// Motoboys
+export const getMotoboys = (): Colaborador[] =>
+  _colaboradoresCache.filter(c => c.status === 'Ativo' && c.cargo === 'CARGO-009');
 
-// Máquinas de Cartão CRUD
-export const getMaquinasCartao = () => [...maquinasCartao];
-export const getMaquinaCartaoById = (id: string) => maquinasCartao.find(m => m.id === id);
-export const addMaquinaCartao = (maquina: Omit<MaquinaCartao, 'id'>) => {
-  const newId = `MAQ-${String(maquinasCartao.length + 1).padStart(3, '0')}`;
-  const newMaquina = { ...maquina, id: newId };
-  maquinasCartao.push(newMaquina);
-  return newMaquina;
-};
-export const updateMaquinaCartao = (id: string, updates: Partial<MaquinaCartao>) => {
-  const index = maquinasCartao.findIndex(m => m.id === id);
-  if (index !== -1) {
-    maquinasCartao[index] = { ...maquinasCartao[index], ...updates };
-    return maquinasCartao[index];
-  }
-  return null;
-};
-export const deleteMaquinaCartao = (id: string) => {
-  maquinasCartao = maquinasCartao.filter(m => m.id !== id);
-};
+// ==================== UTILITIES ====================
 
-// Motoboys - colaboradores com cargo Motoboy
-export const getMotoboys = () => colaboradores.filter(c => c.status === 'Ativo' && c.cargo === 'CARGO-009');
-
-// Utility functions
-// formatCurrency removido - usar import { formatCurrency } from '@/utils/formatUtils'
 export { formatCurrency } from '@/utils/formatUtils';
 
 export const formatCPF = (value: string): string => {
@@ -887,10 +910,21 @@ export const formatPhone = (value: string): string => {
   return value.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
 };
 
-// Get lookups
-export const getLojaById = (id: string) => lojas.find(l => l.id === id);
-export const getColaboradorById = (id: string) => colaboradores.find(c => c.id === id);
 export const getCargoById = (id: string) => cargos.find(c => c.id === id);
-export const getFornecedorById = (id: string) => fornecedores.find(f => f.id === id);
-export const getContaFinanceiraById = (id: string) => contasFinanceiras.find(c => c.id === id);
 export const getModeloPagamentoById = (id: string) => modelosPagamento.find(m => m.id === id);
+
+// ==================== INICIALIZAÇÃO ====================
+// Carrega todos os caches do Supabase em background
+export const initCadastrosCache = async (): Promise<void> => {
+  await Promise.all([
+    getLojasAsync(),
+    getClientesAsync(),
+    getColaboradoresAsync(),
+    getFornecedoresAsync(),
+    getContasFinanceirasAsync(),
+    getMaquinasCartaoAsync(),
+  ]);
+};
+
+// Auto-init on import
+initCadastrosCache().catch(e => console.error('Erro ao inicializar cache cadastros:', e));

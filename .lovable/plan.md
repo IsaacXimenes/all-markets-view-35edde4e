@@ -1,165 +1,86 @@
 
-# Plano de Migração Completa: localStorage/Mock Data para Supabase
 
-## Visao Geral
+# Proximo Passo: Lote 5C - Modulos Restantes com Mock/localStorage
 
-O sistema possui mais de **40 arquivos API** com dados mockados em memoria e/ou persistidos via `localStorage`. A migracaoo completa requer refatorar cada um desses arquivos para usar `supabase.from().select/insert/update/delete`. Ao final, todas as telas estarao vazias e prontas para cadastros reais.
+## Status Atual da Migracao
 
----
+**Concluidos (Lotes 1-5B):**
+- Cadastros (Lojas, Colaboradores, Clientes, Fornecedores, Contas, Maquinas)
+- Estoque e Pecas (Produtos, Notas, Movimentacoes)
+- Vendas e Financeiro (Vendas, Itens, Pagamentos, Despesas)
+- Assistencia e Garantias (OS, Garantias - parcial)
+- RH (Vales, Adiantamentos, Feedback, Salarios, Comissoes, Motoboy)
+- Acessorios e Metas
 
-## Escopo Total: Arquivos a Migrar
-
-### Grupo 1: Cadastros (parcialmente feito)
-Ja migrados: `lojas` e `colaboradores` no `cadastroStore.ts`.
-
-Pendentes no `cadastrosApi.ts`:
-- **Clientes** (~6 clientes mock) -> tabela `clientes`
-- **Fornecedores** (~20 fornecedores mock) -> tabela `fornecedores`
-- **Contas Financeiras** (~22 contas mock) -> tabela `contas_financeiras`
-- **Maquinas de Cartao** (~6 maquinas mock) -> tabela `maquinas_cartao`
-- **Origens de Venda, Tipos Desconto, Cargos, Modelos Pagamento, Produtos Cadastro, Cores** -> Dados de referencia que ficam em memoria (manter como constantes ou criar tabelas auxiliares)
-
-### Grupo 2: Estoque (estoqueApi.ts - 2180 linhas)
-- **Produtos** (~15 produtos mock) -> tabela `produtos`
-- **Notas de Compra** (~10 notas mock) -> tabela `notas_compra`
-- **Movimentacoes** (in-memory) -> tabela `movimentacoes_estoque`
-- **Movimentacoes Matriz** (in-memory) -> necessita nova tabela ou JSONB
-
-### Grupo 3: Pecas (pecasApi.ts)
-- **Pecas** (~13 pecas mock) -> tabela `pecas`
-- **Movimentacoes de Pecas** -> tabela `movimentacoes_pecas`
-
-### Grupo 4: Vendas (vendasApi.ts - 1136 linhas)
-- **Vendas** (~5 vendas mock + localStorage) -> tabela `vendas`
-- **Itens de Venda** -> tabela `venda_itens`
-- **Pagamentos de Venda** -> tabela `venda_pagamentos`
-- **Trade-Ins** -> tabela `venda_trade_ins`
-
-### Grupo 5: Financeiro (financeApi.ts - 725 linhas)
-- **Pagamentos** (~10 mock) -> tabela `pagamentos_financeiros`
-- **Despesas** (~10 mock) -> tabela `despesas`
-
-### Grupo 6: Assistencia (assistenciaApi.ts - 684 linhas)
-- **Ordens de Servico** (~10 OS mock) -> tabela `ordens_servico`
-- **Pecas de OS** -> tabela `os_pecas`
-- **Pagamentos de OS** -> tabela `os_pagamentos`
-
-### Grupo 7: Garantias (garantiasApi.ts - 1162 linhas)
-- **Garantias** (mock + localStorage) -> tabela `garantias`
-
-### Grupo 8: Modulos Secundarios (~20 arquivos)
-- `acessoriosApi.ts` -> tabela `acessorios`
-- `metasApi.ts` -> tabela `metas_lojas`
-- `fiadoApi.ts`, `comissoesApi.ts`, `adiantamentosApi.ts`, `valesApi.ts` -> localStorage/mock
-- `osApi.ts` (produtos pendentes) -> mock
-- `consignacaoApi.ts`, `solicitacaoPecasApi.ts`, `retiradaPecasApi.ts` -> mock
-- `taxasEntregaApi.ts`, `planosGarantiaApi.ts`, `baseTrocasPendentesApi.ts` -> localStorage/mock
-- `feedbackApi.ts`, `motoboyApi.ts`, `loteRevisaoApi.ts` -> mock
-- `movimentacoesEntreContasApi.ts`, `agendaGestaoApi.ts`, `storiesMonitoramentoApi.ts` -> localStorage
-- `conferenciaGestorApi.ts`, `gestaoAdministrativaApi.ts`, `pendenciasFinanceiraApi.ts` -> mock
-- `notificationsApi.ts`, `whatsappNotificacaoApi.ts` -> mock
+**Pendentes - 15 arquivos em 3 categorias:**
 
 ---
 
-## Estrategia de Execucao
+## Categoria A: Arquivos com Mock Data (precisam de novas tabelas)
 
-Devido ao volume (40+ arquivos, 15.000+ linhas de codigo), a migracao sera feita em **lotes sequenciais**, cada lote focando em um grupo de modulos relacionados.
+| Arquivo | Dados Mock | Tabela Necessaria |
+|---|---|---|
+| `fiadoApi.ts` | ~5 dividas, pagamentos, anotacoes | `dividas_fiado`, `pagamentos_fiado`, `anotacoes_fiado` |
+| `vendasDigitalApi.ts` | ~5 pre-cadastros digitais | `vendas_digitais` |
+| `conferenciaGestorApi.ts` | ~10 vendas conferencia | `vendas_conferencia` |
+| `garantiaExtendidaApi.ts` | ~5 tratativas comerciais | `tratativas_comerciais` |
+| `consignacaoApi.ts` | lotes consignacao (vazio) | `lotes_consignacao`, `itens_consignacao` |
+| `coresApi.ts` | ~15 cores Apple | `cores_aparelho` |
+| `planosGarantiaApi.ts` | ~10 planos garantia | `planos_garantia` |
+| `valoresRecomendadosTrocaApi.ts` | ~70 valores recomendados | `valores_recomendados_troca` |
+| `loteRevisaoApi.ts` | lotes revisao (vazio) | `lotes_revisao` |
+| `retiradaPecasApi.ts` | retiradas (vazio) | `retiradas_pecas` |
+| `pendenciasFinanceiraApi.ts` | pendencias (vazio) | `pendencias_financeiras` |
+| `notaEntradaFluxoApi.ts` | notas entrada (vazio) + creditos | `notas_entrada`, `creditos_fornecedor` |
 
-### Lote 1: Cadastros Restantes
-**Arquivos:** `cadastrosApi.ts`
-**Acoes:**
-- Refatorar funcoes de Clientes (`getClientes`, `addCliente`, `updateCliente`, `deleteCliente`) para async com Supabase
-- Refatorar funcoes de Fornecedores (CRUD completo)
-- Refatorar funcoes de Contas Financeiras (CRUD completo)
-- Refatorar funcoes de Maquinas de Cartao (CRUD completo)
-- Remover arrays mock de clientes, fornecedores, contas, maquinas
-- Manter dados de referencia estaticos (cores, cargos, modelos pagamento, origens venda, tipos desconto, produtos cadastro) como constantes -- nao precisam de tabela
+## Categoria B: Arquivos com localStorage (precisam de novas tabelas)
 
-### Lote 2: Estoque e Pecas
-**Arquivos:** `estoqueApi.ts`, `pecasApi.ts`
-**Acoes:**
-- Refatorar CRUD de Produtos para Supabase (tabela `produtos`)
-- Refatorar Notas de Compra para Supabase (tabela `notas_compra`)
-- Refatorar Movimentacoes (tabela `movimentacoes_estoque`)
-- Refatorar CRUD de Pecas para Supabase (tabela `pecas`)
-- Refatorar Movimentacoes de Pecas (tabela `movimentacoes_pecas`)
-- Remover arrays mock (15 produtos, 10 notas, 13 pecas)
-- Todas as funcoes de leitura/escrita passam a ser `async`
+| Arquivo | Uso localStorage | Tabela Necessaria |
+|---|---|---|
+| `fluxoVendasApi.ts` | Estado do fluxo de vendas | `fluxo_vendas` |
+| `atividadesGestoresApi.ts` | Atividades + execucoes diarias | `atividades_gestores`, `execucoes_atividades` |
+| `agendaGestaoApi.ts` | Anotacoes gestao | `anotacoes_gestao` |
+| `gestaoAdministrativaApi.ts` | Conferencias gestao | `conferencias_gestao` |
 
-### Lote 3: Vendas e Financeiro
-**Arquivos:** `vendasApi.ts`, `financeApi.ts`, `fluxoVendasApi.ts`
-**Acoes:**
-- Refatorar Vendas CRUD para Supabase (tabela `vendas` + `venda_itens` + `venda_pagamentos` + `venda_trade_ins`)
-- Remover `loadFromStorage`/`saveVendasToStorage`
-- Refatorar Pagamentos e Despesas para Supabase
-- Remover dados mock de pagamentos e despesas
+## Categoria C: In-memory pendentes em arquivos ja migrados
 
-### Lote 4: Assistencia e Garantias
-**Arquivos:** `assistenciaApi.ts`, `garantiasApi.ts`, `garantiaExtendidaApi.ts`
-**Acoes:**
-- Refatorar OS CRUD para Supabase (tabela `ordens_servico` + `os_pecas` + `os_pagamentos`)
-- Remover array mock de 10 OS
-- Refatorar Garantias para Supabase (tabela `garantias`)
-- Remover `loadFromStorage`/`saveToStorage` de garantias
-
-### Lote 5: Modulos Secundarios
-**Arquivos:** Todos os ~20 arquivos restantes
-**Acoes:**
-- Modulos com tabela Supabase existente: migrar para queries reais (`acessoriosApi`, `metasApi`)
-- Modulos sem tabela: necessitam novas tabelas via migracao SQL (ex: `adiantamentos`, `vales`, `fiado`, `comissoes`, `solicitacoes_pecas`, `consignacoes`, `taxas_entrega`, `planos_garantia`, `feedback`, `motoboy`, `lote_revisao`, `produtos_pendentes`)
-- Modulos de infraestrutura (notificacoes, whatsapp, agenda gestao, stories): migrar localStorage para Supabase ou simplificar
+| Arquivo | Dados | Tabela Necessaria |
+|---|---|---|
+| `garantiasApi.ts` | contatosAtivos, registrosAnaliseGarantia | `contatos_ativos_garantia`, `registros_analise_garantia` |
 
 ---
 
-## Migracoes SQL Necessarias
+## Plano de Execucao Sugerido
 
-Antes dos lotes de codigo, sera necessario criar tabelas adicionais para modulos que ainda nao possuem tabelas no Supabase:
+### Passo 1: Criar tabelas SQL (migracao unica)
+Uma unica migracao SQL criando todas as ~20 tabelas restantes com RLS permissivo temporario.
 
-- `adiantamentos` (RH)
-- `vales` (RH)
-- `comissoes` (RH)
-- `fiado` (Financeiro)
-- `solicitacoes_pecas` (OS)
-- `consignacoes` (Estoque)
-- `taxas_entrega` (Cadastros)
-- `planos_garantia` (Cadastros)
-- `feedback_colaboradores` (RH)
-- `demandas_motoboy` (Logistica)
-- `lotes_revisao` (Estoque)
-- `produtos_pendentes` (OS)
-- `movimentacoes_matriz` (Estoque)
-- `origens_venda`, `tipos_desconto`, `cargos`, `modelos_pagamento` (se necessario persistir no banco)
+### Passo 2: Migrar Categoria A (arquivos com mock data) - 12 arquivos
+Para cada arquivo: remover mocks, implementar cache + init async, converter CRUD para Supabase.
+Prioridade: `fiadoApi` e `conferenciaGestorApi` (mais complexos), depois os menores.
 
----
+### Passo 3: Migrar Categoria B (localStorage) - 4 arquivos
+Substituir `localStorage.getItem/setItem` por queries Supabase.
+O `fluxoVendasApi.ts` e o mais complexo (~800 linhas).
 
-## Padrao de Migracao por Arquivo
+### Passo 4: Completar Categoria C
+Migrar `contatosAtivos` e `registrosAnaliseGarantia` do garantiasApi.
 
-Para cada arquivo `*Api.ts`:
-
-1. Importar `supabase` de `@/integrations/supabase/client`
-2. Remover arrays mock (`let dados = [...]`)
-3. Remover helpers `loadFromStorage`/`saveToStorage`
-4. Converter funcoes `get*` para `async` com `supabase.from('tabela').select('*')`
-5. Converter funcoes `add*` para `async` com `supabase.from('tabela').insert()`
-6. Converter funcoes `update*` para `async` com `supabase.from('tabela').update().eq('id', id)`
-7. Converter funcoes `delete*` para `async` com `supabase.from('tabela').delete().eq('id', id)`
-8. Mapear campos camelCase do TS para snake_case do Supabase
-9. Tratar erros com `try/catch` e retornos adequados
-10. Atualizar componentes React que chamam essas funcoes para usar `async/await`
+### Passo 5: Limpeza final
+- Remover qualquer referencia residual a localStorage
+- Verificar que nenhum dado mock permanece
+- Validar build sem erros
 
 ---
 
-## Resultado Esperado
+## Estimativa
 
-- **0 dados mockados** em qualquer arquivo `*Api.ts`
-- **0 chamadas a localStorage** para persistencia de dados de negocio
-- **Todas as telas vazias** prontas para cadastros reais
-- **Supabase como unica fonte de verdade** para todos os dados
-- **Tratamento de erros** em todas as operacoes de banco
-- **Funcoes async/await** em toda a camada de dados
+- ~20 novas tabelas SQL
+- ~15 arquivos API refatorados
+- ~5.000 linhas de codigo afetadas
+- Recomendado dividir em 3-4 mensagens de implementacao
 
----
+## Recomendacao
 
-## Nota Importante
+Comecar pelo **Passo 1 (criar todas as tabelas)** seguido do **Passo 2** focando nos arquivos mais criticos: `fiadoApi`, `conferenciaGestorApi`, `vendasDigitalApi` e `garantiaExtendidaApi`.
 
-Este plano envolve a refatoracao de **~15.000 linhas de codigo** em 40+ arquivos. A implementacao sera feita em lotes para manter o sistema funcional a cada etapa. Cada lote sera testavel de forma independente -- ao final de cada lote, as telas correspondentes estarao funcionando com Supabase (porem vazias).

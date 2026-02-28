@@ -325,7 +325,7 @@ export default function EstoqueProdutosPendentes() {
   }, [produtosSelecionadosInfo]);
 
   // Handler para validação em lote
-  const handleValidarLote = () => {
+  const handleValidarLote = async () => {
     if (!loteForm.responsavel) {
       toast.error('Selecione o responsável pela conferência');
       return;
@@ -339,7 +339,7 @@ export default function EstoqueProdutosPendentes() {
     const notaId = notasDosSeleccionados[0];
     const imeisParaValidar = produtosSelecionadosInfo.map(p => p.imei);
 
-    const resultado = validarAparelhosEmLote(
+    const resultado = await validarAparelhosEmLote(
       notaId,
       imeisParaValidar,
       loteForm.responsavel,

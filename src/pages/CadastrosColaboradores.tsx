@@ -221,27 +221,34 @@ export default function CadastrosColaboradores() {
     toast({ title: 'Sucesso', description: 'Rodízio encerrado com sucesso' });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.nome || !form.loja_id || !form.cargo) {
       toast({ title: 'Erro', description: 'Nome, Loja e Cargo são obrigatórios', variant: 'destructive' });
       return;
     }
 
-    if (editingColaborador) {
-      atualizarColaborador(editingColaborador.id, form);
-      toast({ title: 'Sucesso', description: 'Colaborador atualizado com sucesso' });
-    } else {
-      adicionarColaborador(form);
-      toast({ title: 'Sucesso', description: 'Colaborador cadastrado com sucesso' });
+    try {
+      if (editingColaborador) {
+        await atualizarColaborador(editingColaborador.id, form);
+        toast({ title: 'Sucesso', description: 'Colaborador atualizado com sucesso' });
+      } else {
+        await adicionarColaborador(form);
+        toast({ title: 'Sucesso', description: 'Colaborador cadastrado com sucesso' });
+      }
+      setIsDialogOpen(false);
+      resetForm();
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Falha ao salvar colaborador', variant: 'destructive' });
     }
-
-    setIsDialogOpen(false);
-    resetForm();
   };
 
-  const handleDelete = (id: string) => {
-    deletarColaborador(id);
-    toast({ title: 'Sucesso', description: 'Colaborador removido com sucesso' });
+  const handleDelete = async (id: string) => {
+    try {
+      await deletarColaborador(id);
+      toast({ title: 'Sucesso', description: 'Colaborador removido com sucesso' });
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Falha ao remover colaborador', variant: 'destructive' });
+    }
   };
 
   const handleExport = () => {
@@ -864,7 +871,7 @@ export default function CadastrosColaboradores() {
               const novoStatus = !colToggle.ativo;
               const usuario = user?.colaborador?.nome || user?.username || 'Usuário';
               const usuarioId = user?.colaborador?.id || user?.username || 'unknown';
-              atualizarColaborador(toggleColaboradorId, { ativo: novoStatus });
+              atualizarColaborador(toggleColaboradorId, { ativo: novoStatus }).catch(() => {});
               // Registrar na timeline
               addTimelineEntry({
                 entidadeId: toggleColaboradorId,

@@ -126,13 +126,18 @@ export type Database = {
       }
       colaboradores: {
         Row: {
+          ajuda_custo: number | null
           ativo: boolean | null
           cargo: string | null
+          comissao: number | null
           cpf: string | null
           created_at: string | null
           data_admissao: string | null
           data_inativacao: string | null
           data_nascimento: string | null
+          eh_estoquista: boolean | null
+          eh_gestor: boolean | null
+          eh_vendedor: boolean | null
           email: string | null
           foto: string | null
           id: string
@@ -140,17 +145,23 @@ export type Database = {
           modelo_pagamento: string | null
           nome: string
           salario: number | null
+          salario_fixo: number | null
           status: string | null
           telefone: string | null
         }
         Insert: {
+          ajuda_custo?: number | null
           ativo?: boolean | null
           cargo?: string | null
+          comissao?: number | null
           cpf?: string | null
           created_at?: string | null
           data_admissao?: string | null
           data_inativacao?: string | null
           data_nascimento?: string | null
+          eh_estoquista?: boolean | null
+          eh_gestor?: boolean | null
+          eh_vendedor?: boolean | null
           email?: string | null
           foto?: string | null
           id?: string
@@ -158,17 +169,23 @@ export type Database = {
           modelo_pagamento?: string | null
           nome: string
           salario?: number | null
+          salario_fixo?: number | null
           status?: string | null
           telefone?: string | null
         }
         Update: {
+          ajuda_custo?: number | null
           ativo?: boolean | null
           cargo?: string | null
+          comissao?: number | null
           cpf?: string | null
           created_at?: string | null
           data_admissao?: string | null
           data_inativacao?: string | null
           data_nascimento?: string | null
+          eh_estoquista?: boolean | null
+          eh_gestor?: boolean | null
+          eh_vendedor?: boolean | null
           email?: string | null
           foto?: string | null
           id?: string
@@ -176,6 +193,7 @@ export type Database = {
           modelo_pagamento?: string | null
           nome?: string
           salario?: number | null
+          salario_fixo?: number | null
           status?: string | null
           telefone?: string | null
         }
@@ -519,6 +537,7 @@ export type Database = {
           cnpj: string | null
           comissao_percentual: number
           created_at: string | null
+          email: string | null
           endereco: string | null
           estado: string | null
           horario_funcionamento: string | null
@@ -536,6 +555,7 @@ export type Database = {
           cnpj?: string | null
           comissao_percentual: number
           created_at?: string | null
+          email?: string | null
           endereco?: string | null
           estado?: string | null
           horario_funcionamento?: string | null
@@ -553,6 +573,7 @@ export type Database = {
           cnpj?: string | null
           comissao_percentual?: number
           created_at?: string | null
+          email?: string | null
           endereco?: string | null
           estado?: string | null
           horario_funcionamento?: string | null

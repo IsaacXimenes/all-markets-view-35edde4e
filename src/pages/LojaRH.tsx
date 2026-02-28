@@ -157,24 +157,33 @@ export default function LojaRH() {
       ativo: true
     };
 
-    if (editingEmployee) {
-      atualizarColaborador(editingEmployee.id, employeeData);
-      toast.success('Funcionário atualizado com sucesso!');
-    } else {
-      adicionarColaborador(employeeData);
-      toast.success('Funcionário adicionado com sucesso!');
-    }
-
-    // Atualizar lista local
-    setEmployees(obterColaboradoresPorLoja(id!));
-    setIsDialogOpen(false);
-    resetForm();
+    const saveAndRefresh = async () => {
+      try {
+        if (editingEmployee) {
+          await atualizarColaborador(editingEmployee.id, employeeData);
+          toast.success('Funcionário atualizado com sucesso!');
+        } else {
+          await adicionarColaborador(employeeData);
+          toast.success('Funcionário adicionado com sucesso!');
+        }
+        setEmployees(obterColaboradoresPorLoja(id!));
+        setIsDialogOpen(false);
+        resetForm();
+      } catch (error) {
+        toast.error('Falha ao salvar funcionário');
+      }
+    };
+    saveAndRefresh();
   };
 
-  const handleDeleteEmployee = (empId: string) => {
-    deletarColaborador(empId);
-    setEmployees(obterColaboradoresPorLoja(id!));
-    toast.success('Funcionário removido com sucesso!');
+  const handleDeleteEmployee = async (empId: string) => {
+    try {
+      await deletarColaborador(empId);
+      setEmployees(obterColaboradoresPorLoja(id!));
+      toast.success('Funcionário removido com sucesso!');
+    } catch (error) {
+      toast.error('Falha ao remover funcionário');
+    }
   };
 
   return (

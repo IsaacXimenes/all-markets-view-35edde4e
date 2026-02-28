@@ -149,11 +149,12 @@ export default function VendaDetalhes() {
               <Button 
                 className="bg-green-600 hover:bg-green-700"
                 onClick={() => {
-                  const resultado = aprovarLancamento(
+                   const user = useAuthStore.getState().user;
+                   const resultado = aprovarLancamento(
                     venda.id,
-                    'COL-007',
-                    'Carlos Lançador'
-                  );
+                    user?.colaborador?.id || '',
+                    user?.colaborador?.nome || ''
+                   );
                   if (resultado) {
                     toast.success(`Lançamento da venda ${venda.id} aprovado! Enviado para Conferência do Gestor.`);
                     navigate(-1);

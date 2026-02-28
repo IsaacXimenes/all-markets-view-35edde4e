@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { useAuthStore } from '@/store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { VendasLayout } from '@/components/layout/VendasLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,7 +43,9 @@ import {
   getCorBadgeStatus,
   exportFluxoToCSV,
   VendaComFluxo,
-  StatusVenda
+  StatusVenda,
+  getConferenciaGestorData,
+  salvarConferenciaGestorData,
 } from '@/utils/fluxoVendasApi';
 import { formatCurrency } from '@/utils/formatUtils';
 import { useCadastroStore } from '@/store/cadastroStore';
@@ -51,8 +54,7 @@ import { toast } from 'sonner';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 
-// Mock do usuário logado (gestor)
-const usuarioLogado = { id: 'COL-001', nome: 'João Gestor' };
+// Usuário logado removido do escopo global - agora via hook dentro do componente
 
 // Interface para validação de pagamentos
 interface ValidacaoPagamento {
@@ -71,6 +73,8 @@ interface ObservacaoGestor {
 
 export default function VendasConferenciaGestor() {
   const navigate = useNavigate();
+  const user = useAuthStore(s => s.user);
+  const usuarioLogado = { id: user?.colaborador?.id || '', nome: user?.colaborador?.nome || '' };
   const { obterLojasAtivas, obterColaboradoresAtivos, obterNomeLoja, obterNomeColaborador } = useCadastroStore();
   const { vendas, recarregar } = useFluxoVendas({
     status: ['Conferência Gestor', 'Devolvido pelo Financeiro', 'Conferência Financeiro', 'Pagamento Downgrade', 'Finalizado']
@@ -218,9 +222,9 @@ export default function VendasConferenciaGestor() {
     const metodos = venda.pagamentos?.map(p => p.meioPagamento) || [];
     const metodosUnicos = [...new Set(metodos)];
     
-    // Carregar validações existentes do localStorage
-    const storedValidacoes = localStorage.getItem(`validacao_pagamentos_${venda.id}`);
-    const existingValidacoes = storedValidacoes ? JSON.parse(storedValidacoes) : [];
+    // Carregar validações existentes do DB
+    const gestorData = getConferenciaGestorData(venda.id);
+    const existingValidacoes = gestorData.validacoesPagamento || [];
     
     // Criar array de validações com estado atual
     const validacoes = metodosUnicos.map(metodo => {
@@ -277,14 +281,13 @@ export default function VendasConferenciaGestor() {
         return;
       }
 
-      // Salvar validações de pagamento
-      localStorage.setItem(
-        `validacao_pagamentos_${vendaSelecionada.id}`,
-        JSON.stringify(validacoesPagamento)
-      );
+      // Salvar validações de pagamento no DB
+      await salvarConferenciaGestorData(vendaSelecionada.id, {
+        validacoesPagamento,
+      });
     }
 
-    // Salvar observação do gestor (ou limpar se vazio)
+    // Salvar observação do gestor no DB
     if (observacaoGestor.trim()) {
       const obsGestor: ObservacaoGestor = {
         texto: observacaoGestor.trim(),
@@ -292,12 +295,9 @@ export default function VendasConferenciaGestor() {
         usuarioId: usuarioLogado.id,
         usuarioNome: usuarioLogado.nome
       };
-      localStorage.setItem(
-        `observacao_gestor_${vendaSelecionada.id}`,
-        JSON.stringify(obsGestor)
-      );
-    } else {
-      localStorage.removeItem(`observacao_gestor_${vendaSelecionada.id}`);
+      await salvarConferenciaGestorData(vendaSelecionada.id, {
+        observacao: obsGestor,
+      });
     }
 
     // Se for Downgrade, enviar para Pagamento Downgrade

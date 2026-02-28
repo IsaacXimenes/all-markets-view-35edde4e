@@ -18,7 +18,7 @@ import {
 import { getContasFinanceiras, ContaFinanceira } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { formatarMoeda } from '@/utils/formatUtils';
-import { getVendasPorStatus } from '@/utils/fluxoVendasApi';
+import { getVendasPorStatus, getConferenciaFinanceiroData } from '@/utils/fluxoVendasApi';
 import { getDespesas } from '@/utils/financeApi';
 import { getOrdensServico } from '@/utils/assistenciaApi';
 import { getMovimentacoesEntreConta, addMovimentacaoEntreConta, addLogMovimentacao, MovimentacaoEntreConta } from '@/utils/movimentacoesEntreContasApi';
@@ -100,7 +100,8 @@ export default function FinanceiroExtratoContas() {
       const vendasFinalizadas = getVendasPorStatus('Finalizado');
       
       vendasFinalizadas.forEach(venda => {
-        const dataFinalizacaoRaw = localStorage.getItem(`data_finalizacao_${venda.id}`);
+        const confData = getConferenciaFinanceiroData(venda.id);
+        const dataFinalizacaoRaw = confData.dataFinalizacao;
         if (!dataFinalizacaoRaw) return;
         
         const dataFinalizacao = new Date(dataFinalizacaoRaw);
@@ -109,35 +110,30 @@ export default function FinanceiroExtratoContas() {
         
         if (mesVenda !== mesSelecionado || anoVenda !== anoSelecionado) return;
         
-        // Buscar validações de pagamentos
-        const validacaoRaw = localStorage.getItem(`validacao_pagamentos_financeiro_${venda.id}`);
+        const validacoes = confData.validacoesPagamento || [];
         
-        if (validacaoRaw) {
-          const validacoes = JSON.parse(validacaoRaw);
+        validacoes.forEach((validacao: any) => {
+          if (!validacao.validadoFinanceiro) return;
           
-          validacoes.forEach((validacao: any) => {
-            if (!validacao.validadoFinanceiro) return;
+          const pagamentoVenda = venda.pagamentos?.find((p: any) => p.meioPagamento === validacao.metodoPagamento);
+          const contaId = validacao.contaDestinoId || pagamentoVenda?.contaDestino;
+          const valor = pagamentoVenda?.valor || 0;
+          
+          if (contaId && valor > 0) {
+            entradas[contaId] = (entradas[contaId] || 0) + valor;
             
-            const pagamentoVenda = venda.pagamentos?.find((p: any) => p.meioPagamento === validacao.metodoPagamento);
-            const contaId = validacao.contaDestinoId || pagamentoVenda?.contaDestino;
-            const valor = pagamentoVenda?.valor || 0;
-            
-            if (contaId && valor > 0) {
-              entradas[contaId] = (entradas[contaId] || 0) + valor;
-              
-              if (!movimentacoes[contaId]) movimentacoes[contaId] = [];
-              movimentacoes[contaId].push({
-                id: `${venda.id}-${validacao.metodoPagamento}`,
-                tipo: 'entrada',
-                descricao: `Venda #${venda.id} - ${validacao.metodoPagamento}`,
-                valor,
-                data: dataFinalizacaoRaw,
-                contaId,
-                vendaId: venda.id
-              });
-            }
-          });
-        }
+            if (!movimentacoes[contaId]) movimentacoes[contaId] = [];
+            movimentacoes[contaId].push({
+              id: `${venda.id}-${validacao.metodoPagamento}`,
+              tipo: 'entrada',
+              descricao: `Venda #${venda.id} - ${validacao.metodoPagamento}`,
+              valor,
+              data: dataFinalizacaoRaw,
+              contaId,
+              vendaId: venda.id
+            });
+          }
+        });
       });
     } catch (e) {
       console.error('[ExtratoContas] Erro ao processar vendas:', e);
@@ -149,7 +145,8 @@ export default function FinanceiroExtratoContas() {
       const osLiquidadas = todasOS.filter(os => os.status === 'Liquidado');
       
       osLiquidadas.forEach(os => {
-        const dataFinalizacaoRaw = localStorage.getItem(`data_finalizacao_${os.id}`);
+        const confData = getConferenciaFinanceiroData(`OS-${os.id}`);
+        const dataFinalizacaoRaw = confData.dataFinalizacao;
         if (!dataFinalizacaoRaw) return;
         
         const dataFinalizacao = new Date(dataFinalizacaoRaw);
@@ -158,34 +155,30 @@ export default function FinanceiroExtratoContas() {
         
         if (mesOS !== mesSelecionado || anoOS !== anoSelecionado) return;
         
-        const validacaoRaw = localStorage.getItem(`validacao_pagamentos_financeiro_${os.id}`);
+        const validacoes = confData.validacoesPagamento || [];
         
-        if (validacaoRaw) {
-          const validacoes = JSON.parse(validacaoRaw);
+        validacoes.forEach((validacao: any) => {
+          if (!validacao.validadoFinanceiro) return;
           
-          validacoes.forEach((validacao: any) => {
-            if (!validacao.validadoFinanceiro) return;
+          const pagamentoOS = os.pagamentos?.find((p: any) => p.meio === validacao.metodoPagamento);
+          const contaId = validacao.contaDestinoId || pagamentoOS?.contaDestino;
+          const valor = pagamentoOS?.valor || 0;
+          
+          if (contaId && valor > 0) {
+            entradas[contaId] = (entradas[contaId] || 0) + valor;
             
-            const pagamentoOS = os.pagamentos?.find((p: any) => p.meio === validacao.metodoPagamento);
-            const contaId = validacao.contaDestinoId || pagamentoOS?.contaDestino;
-            const valor = pagamentoOS?.valor || 0;
-            
-            if (contaId && valor > 0) {
-              entradas[contaId] = (entradas[contaId] || 0) + valor;
-              
-              if (!movimentacoes[contaId]) movimentacoes[contaId] = [];
-              movimentacoes[contaId].push({
-                id: `${os.id}-${validacao.metodoPagamento}`,
-                tipo: 'entrada',
-                descricao: `Assistência #${os.id} - ${validacao.metodoPagamento}`,
-                valor,
-                data: dataFinalizacaoRaw,
-                contaId,
-                vendaId: os.id
-              });
-            }
-          });
-        }
+            if (!movimentacoes[contaId]) movimentacoes[contaId] = [];
+            movimentacoes[contaId].push({
+              id: `${os.id}-${validacao.metodoPagamento}`,
+              tipo: 'entrada',
+              descricao: `Assistência #${os.id} - ${validacao.metodoPagamento}`,
+              valor,
+              data: dataFinalizacaoRaw,
+              contaId,
+              vendaId: os.id
+            });
+          }
+        });
       });
     } catch (e) {
       console.error('[ExtratoContas] Erro ao processar OS assistência:', e);

@@ -608,7 +608,7 @@ export const aprovarTratativa = async (id: string, gestorId: string, gestorNome:
         responsavel: gestorNome, motivo: `Troca aprovada garantia ${garantia.id}`
       });
 
-      addProdutoPendente({
+      await addProdutoPendente({
         imei: garantia.imei, marca: 'Apple', modelo: garantia.modelo,
         cor: aparelhoTroca?.cor || '-', tipo: 'Seminovo', condicao: 'Semi-novo',
         origemEntrada: 'Garantia', notaOuVendaId: `GAR-${garantia.id}`,
@@ -781,7 +781,7 @@ export const processarTratativaGarantia = async (dados: ProcessarTratativaReques
         responsavel: dados.usuarioNome, motivo: `Troca direta garantia ${garantia.id}`
       });
 
-      addProdutoPendente({
+      await addProdutoPendente({
         imei: garantia.imei, marca: 'Apple', modelo: garantia.modelo,
         cor: dados.aparelhoSelecionado.cor || '-', tipo: 'Seminovo', condicao: 'Semi-novo',
         origemEntrada: 'Garantia', notaOuVendaId: `GAR-${garantia.id}`,

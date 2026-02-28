@@ -1,4 +1,5 @@
 // API para Lista de Reparos (OS)
+import { supabase } from '@/integrations/supabase/client';
 import { Produto, addProdutoMigrado, validarAparelhoNota, verificarConferenciaNota } from './estoqueApi';
 import { generateProductId, registerProductId, isProductIdRegistered } from './idManager';
 import { encaminharParaAnaliseGarantia } from './garantiasApi';
@@ -41,7 +42,7 @@ export interface TimelineEntry {
 }
 
 export interface ProdutoPendente {
-  id: string; // PROD-XXXX - ID único e persistente
+  id: string;
   imei: string;
   imagem?: string;
   marca: string;
@@ -52,12 +53,12 @@ export interface ProdutoPendente {
   origemEntrada: 'Base de Troca' | 'Fornecedor' | 'Emprestado - Garantia' | 'NEGOCIADO';
   notaOuVendaId?: string;
   valorCusto: number;
-  valorCustoOriginal: number; // Valor original preservado (não soma custo assistência)
-  valorOrigem: number; // NOVO - Valor original de aquisição (nunca altera)
+  valorCustoOriginal: number;
+  valorOrigem: number;
   saudeBateria: number;
   loja: string;
   dataEntrada: string;
-  fornecedor?: string; // Nome do fornecedor para notas de entrada
+  fornecedor?: string;
   parecerEstoque?: ParecerEstoque;
   parecerAssistencia?: ParecerAssistencia;
   timeline: TimelineEntry[];
@@ -66,10 +67,12 @@ export interface ProdutoPendente {
   contadorEncaminhamentos: number;
 }
 
-// Dados mockados de produtos pendentes - IDs PROD-XXXX únicos para rastreabilidade
-// IMPORTANTE: Estes IDs são DIFERENTES dos IDs em estoqueApi.ts para evitar duplicação
-let produtosPendentes: ProdutoPendente[] = [
-  // 3 produtos em Produtos Pendentes (IDs PROD-0001 a PROD-0003) - com SLA variado
+// ============= CACHE LOCAL =============
+let produtosPendentesCache: ProdutoPendente[] = [];
+let cacheInitialized = false;
+
+// Dados seed iniciais
+const SEED_DATA: ProdutoPendente[] = [
   {
     id: 'PROD-0001',
     imei: '352999888777001',
@@ -84,18 +87,9 @@ let produtosPendentes: ProdutoPendente[] = [
     valorCustoOriginal: 3100.00,
     valorOrigem: 3100.00,
     saudeBateria: 86,
-    loja: 'db894e7d', // Loja - JK Shopping
-    dataEntrada: '2025-12-13', // 1 dia atrás - SLA normal
-    timeline: [
-      {
-        id: 'TL-001',
-        data: '2025-12-13T09:30:00',
-        tipo: 'entrada',
-        titulo: 'Entrada via Fornecedor',
-        descricao: 'Produto PROD-0001 recebido da nota NC-2025-0010 - Fornecedor TechSupply Imports',
-        responsavel: 'Lucas Mendes'
-      }
-    ],
+    loja: 'db894e7d',
+    dataEntrada: '2025-12-13',
+    timeline: [{ id: 'TL-001', data: '2025-12-13T09:30:00', tipo: 'entrada', titulo: 'Entrada via Fornecedor', descricao: 'Produto PROD-0001 recebido da nota NC-2025-0010 - Fornecedor TechSupply Imports', responsavel: 'Lucas Mendes' }],
     custoAssistencia: 0,
     statusGeral: 'Pendente Estoque',
     contadorEncaminhamentos: 0
@@ -114,18 +108,9 @@ let produtosPendentes: ProdutoPendente[] = [
     valorCustoOriginal: 3500.00,
     valorOrigem: 3500.00,
     saudeBateria: 91,
-    loja: '3ac7e00c', // Loja - Matriz
-    dataEntrada: '2025-12-10', // 4 dias atrás - SLA amarelo
-    timeline: [
-      {
-        id: 'TL-002',
-        data: '2025-12-10T10:00:00',
-        tipo: 'entrada',
-        titulo: 'Entrada via Base de Troca',
-        descricao: 'Produto PROD-0002 recebido como base de troca na venda VEN-2025-0050',
-        responsavel: 'Roberto Alves'
-      }
-    ],
+    loja: '3ac7e00c',
+    dataEntrada: '2025-12-10',
+    timeline: [{ id: 'TL-002', data: '2025-12-10T10:00:00', tipo: 'entrada', titulo: 'Entrada via Base de Troca', descricao: 'Produto PROD-0002 recebido como base de troca na venda VEN-2025-0050', responsavel: 'Roberto Alves' }],
     custoAssistencia: 0,
     statusGeral: 'Pendente Estoque',
     contadorEncaminhamentos: 0
@@ -144,23 +129,13 @@ let produtosPendentes: ProdutoPendente[] = [
     valorCustoOriginal: 1800.00,
     valorOrigem: 1800.00,
     saudeBateria: 72,
-    loja: '5b9446d5', // Loja - Shopping Sul
-    dataEntrada: '2025-12-08', // 6 dias atrás - SLA vermelho
-    timeline: [
-      {
-        id: 'TL-004',
-        data: '2025-12-08T08:30:00',
-        tipo: 'entrada',
-        titulo: 'Entrada via Fornecedor',
-        descricao: 'Produto PROD-0003 recebido da nota NC-2025-0012 - Fornecedor FastCell Distribuição',
-        responsavel: 'Ana Paula'
-      }
-    ],
+    loja: '5b9446d5',
+    dataEntrada: '2025-12-08',
+    timeline: [{ id: 'TL-004', data: '2025-12-08T08:30:00', tipo: 'entrada', titulo: 'Entrada via Fornecedor', descricao: 'Produto PROD-0003 recebido da nota NC-2025-0012 - Fornecedor FastCell Distribuição', responsavel: 'Ana Paula' }],
     custoAssistencia: 0,
     statusGeral: 'Pendente Estoque',
     contadorEncaminhamentos: 0
   },
-  // 2 produtos em OS > Produtos para Análise (já encaminhados para assistência) - IDs PROD-0004 e PROD-0005
   {
     id: 'PROD-0004',
     imei: '352999888777004',
@@ -175,32 +150,12 @@ let produtosPendentes: ProdutoPendente[] = [
     valorCustoOriginal: 1500.00,
     valorOrigem: 1500.00,
     saudeBateria: 78,
-    loja: '0d06e7db', // Loja - Águas Lindas Shopping
-    dataEntrada: '2025-12-09', // 5 dias atrás - SLA vermelho
-    parecerEstoque: {
-      id: 'PE-003',
-      data: '2025-12-09T11:30:00',
-      status: 'Encaminhado para conferência da Assistência',
-      observacoes: 'Base de troca com bateria degradada, encaminhar para troca de bateria.',
-      responsavel: 'Roberto Alves'
-    },
+    loja: '0d06e7db',
+    dataEntrada: '2025-12-09',
+    parecerEstoque: { id: 'PE-003', data: '2025-12-09T11:30:00', status: 'Encaminhado para conferência da Assistência', observacoes: 'Base de troca com bateria degradada, encaminhar para troca de bateria.', responsavel: 'Roberto Alves' },
     timeline: [
-      {
-        id: 'TL-006',
-        data: '2025-12-09T10:00:00',
-        tipo: 'entrada',
-        titulo: 'Entrada via Base de Troca',
-        descricao: 'Produto PROD-0004 recebido como base de troca na venda VEN-2025-0045 - Cliente Maria Silva',
-        responsavel: 'Vendedor João'
-      },
-      {
-        id: 'TL-007',
-        data: '2025-12-09T11:30:00',
-        tipo: 'parecer_estoque',
-        titulo: 'Parecer Estoque - Encaminhado Assistência',
-        descricao: 'PROD-0004 encaminhado para conferência da Assistência. Bateria degradada.',
-        responsavel: 'Roberto Alves'
-      }
+      { id: 'TL-006', data: '2025-12-09T10:00:00', tipo: 'entrada', titulo: 'Entrada via Base de Troca', descricao: 'Produto PROD-0004 recebido como base de troca na venda VEN-2025-0045 - Cliente Maria Silva', responsavel: 'Vendedor João' },
+      { id: 'TL-007', data: '2025-12-09T11:30:00', tipo: 'parecer_estoque', titulo: 'Parecer Estoque - Encaminhado Assistência', descricao: 'PROD-0004 encaminhado para conferência da Assistência. Bateria degradada.', responsavel: 'Roberto Alves' }
     ],
     custoAssistencia: 0,
     statusGeral: 'Aguardando Recebimento Assistência',
@@ -220,38 +175,17 @@ let produtosPendentes: ProdutoPendente[] = [
     valorCustoOriginal: 2200.00,
     valorOrigem: 2200.00,
     saudeBateria: 82,
-    loja: 'fcc78c1a', // Loja - Online
-    dataEntrada: '2025-12-11', // 3 dias atrás - SLA amarelo
-    parecerEstoque: {
-      id: 'PE-004',
-      data: '2025-12-11T15:00:00',
-      status: 'Encaminhado para conferência da Assistência',
-      observacoes: 'Tela com pequeno risco, encaminhar para polimento.',
-      responsavel: 'Fernanda Lima'
-    },
+    loja: 'fcc78c1a',
+    dataEntrada: '2025-12-11',
+    parecerEstoque: { id: 'PE-004', data: '2025-12-11T15:00:00', status: 'Encaminhado para conferência da Assistência', observacoes: 'Tela com pequeno risco, encaminhar para polimento.', responsavel: 'Fernanda Lima' },
     timeline: [
-      {
-        id: 'TL-009',
-        data: '2025-12-11T10:30:00',
-        tipo: 'entrada',
-        titulo: 'Entrada via Fornecedor',
-        descricao: 'Produto PROD-0005 recebido da nota NC-2025-0015 - Fornecedor TechnoImports',
-        responsavel: 'Vendedora Ana'
-      },
-      {
-        id: 'TL-010',
-        data: '2025-12-11T15:00:00',
-        tipo: 'parecer_estoque',
-        titulo: 'Parecer Estoque - Encaminhado Assistência',
-        descricao: 'PROD-0005 encaminhado para conferência da Assistência. Tela com pequeno risco.',
-        responsavel: 'Fernanda Lima'
-      }
+      { id: 'TL-009', data: '2025-12-11T10:30:00', tipo: 'entrada', titulo: 'Entrada via Fornecedor', descricao: 'Produto PROD-0005 recebido da nota NC-2025-0015 - Fornecedor TechnoImports', responsavel: 'Vendedora Ana' },
+      { id: 'TL-010', data: '2025-12-11T15:00:00', tipo: 'parecer_estoque', titulo: 'Parecer Estoque - Encaminhado Assistência', descricao: 'PROD-0005 encaminhado para conferência da Assistência. Tela com pequeno risco.', responsavel: 'Fernanda Lima' }
     ],
     custoAssistencia: 0,
     statusGeral: 'Aguardando Recebimento Assistência',
     contadorEncaminhamentos: 1
   },
-  // Produto de teste para validação pós-laboratório (vinculado à OS-2025-0009)
   {
     id: 'PROD-0006',
     imei: '999888777666555',
@@ -268,39 +202,11 @@ let produtosPendentes: ProdutoPendente[] = [
     saudeBateria: 88,
     loja: 'db894e7d',
     dataEntrada: '2025-01-20',
-    parecerEstoque: {
-      id: 'PE-006',
-      data: '2025-01-20T14:00:00',
-      status: 'Encaminhado para conferência da Assistência',
-      observacoes: 'Tela com defeito, encaminhar para reparo.',
-      responsavel: 'Roberto Alves'
-    },
+    parecerEstoque: { id: 'PE-006', data: '2025-01-20T14:00:00', status: 'Encaminhado para conferência da Assistência', observacoes: 'Tela com defeito, encaminhar para reparo.', responsavel: 'Roberto Alves' },
     timeline: [
-      {
-        id: 'TL-020',
-        data: '2025-01-20T10:00:00',
-        tipo: 'entrada',
-        titulo: 'Entrada via Base de Troca',
-        descricao: 'Produto PROD-0006 recebido como base de troca na venda VEN-2025-0060',
-        responsavel: 'Vendedor João'
-      },
-      {
-        id: 'TL-021',
-        data: '2025-01-20T14:00:00',
-        tipo: 'parecer_estoque',
-        titulo: 'Parecer Estoque - Encaminhado Assistência',
-        descricao: 'Tela com defeito, encaminhar para reparo.',
-        responsavel: 'Roberto Alves'
-      },
-      {
-        id: 'TL-022',
-        data: '2025-01-22T16:00:00',
-        tipo: 'parecer_assistencia',
-        titulo: 'Serviço Concluído no Laboratório – OS-2025-0009',
-        descricao: 'Tela OLED substituída com sucesso. Aparelho testado e funcionando normalmente.',
-        responsavel: 'Jeferson Sousa Cabral',
-        valor: 450
-      }
+      { id: 'TL-020', data: '2025-01-20T10:00:00', tipo: 'entrada', titulo: 'Entrada via Base de Troca', descricao: 'Produto PROD-0006 recebido como base de troca na venda VEN-2025-0060', responsavel: 'Vendedor João' },
+      { id: 'TL-021', data: '2025-01-20T14:00:00', tipo: 'parecer_estoque', titulo: 'Parecer Estoque - Encaminhado Assistência', descricao: 'Tela com defeito, encaminhar para reparo.', responsavel: 'Roberto Alves' },
+      { id: 'TL-022', data: '2025-01-22T16:00:00', tipo: 'parecer_assistencia', titulo: 'Serviço Concluído no Laboratório – OS-2025-0009', descricao: 'Tela OLED substituída com sucesso. Aparelho testado e funcionando normalmente.', responsavel: 'Jeferson Sousa Cabral', valor: 450 }
     ],
     custoAssistencia: 450,
     statusGeral: 'Serviço Concluído - Validar Aparelho',
@@ -308,23 +214,127 @@ let produtosPendentes: ProdutoPendente[] = [
   }
 ];
 
-// Registrar IDs dos produtos pendentes no sistema central
-const initializePendingIds = () => {
-  produtosPendentes.forEach(p => {
-    registerProductId(p.id);
-  });
+// Helper: mapear row do Supabase para ProdutoPendente
+const mapRowToProduto = (row: any): ProdutoPendente => ({
+  id: row.id,
+  imei: row.imei || '',
+  imagem: row.imagem || undefined,
+  marca: row.marca || '',
+  modelo: row.modelo || '',
+  cor: row.cor || '',
+  tipo: row.tipo || 'Seminovo',
+  condicao: row.condicao || 'Semi-novo',
+  origemEntrada: row.origem_entrada || 'Fornecedor',
+  notaOuVendaId: row.nota_ou_venda_id || undefined,
+  valorCusto: Number(row.valor_custo) || 0,
+  valorCustoOriginal: Number(row.valor_custo_original) || 0,
+  valorOrigem: Number(row.valor_origem) || 0,
+  saudeBateria: row.saude_bateria || 100,
+  loja: row.loja || '',
+  dataEntrada: row.data_entrada || new Date().toISOString().split('T')[0],
+  fornecedor: row.fornecedor || undefined,
+  parecerEstoque: row.parecer_estoque || undefined,
+  parecerAssistencia: row.parecer_assistencia || undefined,
+  timeline: row.timeline || [],
+  custoAssistencia: Number(row.custo_assistencia) || 0,
+  statusGeral: row.status_geral || 'Pendente Estoque',
+  contadorEncaminhamentos: row.contador_encaminhamentos || 0
+});
+
+// Helper: mapear ProdutoPendente para row do Supabase
+const mapProdutoToRow = (p: ProdutoPendente): any => ({
+  id: p.id,
+  imei: p.imei,
+  imagem: p.imagem || null,
+  marca: p.marca,
+  modelo: p.modelo,
+  cor: p.cor,
+  tipo: p.tipo,
+  condicao: p.condicao,
+  origem_entrada: p.origemEntrada,
+  nota_ou_venda_id: p.notaOuVendaId || null,
+  valor_custo: p.valorCusto,
+  valor_custo_original: p.valorCustoOriginal,
+  valor_origem: p.valorOrigem,
+  saude_bateria: p.saudeBateria,
+  loja: p.loja,
+  data_entrada: p.dataEntrada,
+  fornecedor: p.fornecedor || null,
+  parecer_estoque: p.parecerEstoque || null,
+  parecer_assistencia: p.parecerAssistencia || null,
+  timeline: p.timeline,
+  custo_assistencia: p.custoAssistencia,
+  status_geral: p.statusGeral,
+  contador_encaminhamentos: p.contadorEncaminhamentos
+});
+
+// Sync helper
+const syncToSupabase = async (produto: ProdutoPendente) => {
+  try {
+    const row = mapProdutoToRow(produto);
+    await supabase.from('produtos_pendentes_os').upsert(row as any, { onConflict: 'id' });
+  } catch (err) {
+    console.error('[osApi] Erro ao sincronizar com Supabase:', err);
+  }
 };
 
-// Inicializa ao carregar o módulo
-initializePendingIds();
+const deleteFromSupabase = async (id: string) => {
+  try {
+    await supabase.from('produtos_pendentes_os').delete().eq('id', id);
+  } catch (err) {
+    console.error('[osApi] Erro ao deletar do Supabase:', err);
+  }
+};
 
-// Lista de produtos migrados para o estoque (para integração)
+// ============= INIT CACHE =============
+export const initProdutosPendentesCache = async () => {
+  if (cacheInitialized) return;
+  try {
+    const { data, error } = await supabase.from('produtos_pendentes_os').select('*');
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      produtosPendentesCache = data.map(mapRowToProduto);
+    } else {
+      // Seed
+      produtosPendentesCache = [...SEED_DATA];
+      for (const p of SEED_DATA) {
+        await syncToSupabase(p);
+      }
+    }
+
+    // Register IDs
+    produtosPendentesCache.forEach(p => registerProductId(p.id));
+    cacheInitialized = true;
+    console.log(`[osApi] Cache inicializado com ${produtosPendentesCache.length} produtos pendentes`);
+  } catch (err) {
+    console.error('[osApi] Erro ao inicializar cache, usando seed:', err);
+    produtosPendentesCache = [...SEED_DATA];
+    produtosPendentesCache.forEach(p => registerProductId(p.id));
+    cacheInitialized = true;
+  }
+};
+
+// Lista de produtos migrados para o estoque (referência local)
 let produtosMigrados: Produto[] = [];
 
-// Funções de API
+// ============= GET (SÍNCRONO VIA CACHE) =============
 export const getProdutosPendentes = (): ProdutoPendente[] => {
-  // Retorna TODOS os produtos não liberados para manter visibilidade durante todo o fluxo
-  return produtosPendentes.filter(p => p.statusGeral !== 'Liberado');
+  return produtosPendentesCache.filter(p => p.statusGeral !== 'Liberado');
+};
+
+export const getProdutoPendenteById = (id: string): ProdutoPendente | null => {
+  return produtosPendentesCache.find(p => p.id === id) || null;
+};
+
+export const getProdutosParaAnaliseOS = (): ProdutoPendente[] => {
+  return produtosPendentesCache.filter(p => 
+    p.statusGeral === 'Em Análise Assistência' || p.statusGeral === 'Aguardando Peça'
+  );
+};
+
+export const getProdutosMigrados = (): Produto[] => {
+  return [...produtosMigrados];
 };
 
 // Atualizar status do produto pendente via IMEI (sincronização OS ↔ Estoque)
@@ -333,7 +343,7 @@ export const atualizarStatusProdutoPendente = (
   novoStatus: ProdutoPendente['statusGeral'], 
   dadosOS?: { osId: string; resumo?: string; custoPecas?: number; tecnico?: string }
 ): ProdutoPendente | null => {
-  const produto = produtosPendentes.find(p => p.imei === imei);
+  const produto = produtosPendentesCache.find(p => p.imei === imei);
   if (!produto) {
     console.warn(`[OS API] Produto pendente com IMEI ${imei} não encontrado para atualização.`);
     return null;
@@ -341,7 +351,6 @@ export const atualizarStatusProdutoPendente = (
 
   produto.statusGeral = novoStatus;
 
-  // Adicionar entrada na timeline
   if (dadosOS) {
     produto.timeline.push({
       id: `TL-SYNC-${Date.now()}`,
@@ -355,29 +364,15 @@ export const atualizarStatusProdutoPendente = (
       valor: dadosOS.custoPecas
     });
 
-    // Se serviço concluído, registrar custo de assistência
     if (novoStatus === 'Serviço Concluído - Validar Aparelho' && dadosOS.custoPecas) {
       produto.custoAssistencia = (produto.custoAssistencia || 0) + dadosOS.custoPecas;
     }
   }
 
+  // Sync async
+  syncToSupabase(produto);
   console.log(`[OS API] Produto pendente ${produto.id} (IMEI: ${imei}) atualizado para: ${novoStatus}`);
   return produto;
-};
-
-export const getProdutoPendenteById = (id: string): ProdutoPendente | null => {
-  return produtosPendentes.find(p => p.id === id) || null;
-};
-
-export const getProdutosParaAnaliseOS = (): ProdutoPendente[] => {
-  // Retorna produtos encaminhados para assistência ou aguardando peça
-  return produtosPendentes.filter(p => 
-    p.statusGeral === 'Em Análise Assistência' || p.statusGeral === 'Aguardando Peça'
-  );
-};
-
-export const getProdutosMigrados = (): Produto[] => {
-  return [...produtosMigrados];
 };
 
 // Calcular SLA em dias e horas
@@ -409,9 +404,7 @@ export const calcularSLA = (dataEntrada: string): {
 };
 
 // Migrar produto para o estoque PRINCIPAL (via estoqueApi)
-// IMPORTANTE: NÃO soma custo assistência ao valor original
 const migrarParaEstoque = (produto: ProdutoPendente, origemDeferimento: 'Estoque' | 'Assistência', responsavel: string): Produto => {
-  // Adiciona entrada de liberação na timeline
   const timelineLiberacao: TimelineEntry = {
     id: `TL-LIB-${Date.now()}`,
     data: new Date().toISOString(),
@@ -421,11 +414,9 @@ const migrarParaEstoque = (produto: ProdutoPendente, origemDeferimento: 'Estoque
     responsavel
   };
 
-  // Calcular custo composto: aquisição + reparo
   const custoReparo = produto.custoAssistencia || 0;
   const custoComposto = produto.valorCustoOriginal + custoReparo;
 
-  // Timeline entry para composição do custo (apenas quando houve reparo)
   const timelineCusto: TimelineEntry | null = custoReparo > 0 ? {
     id: `TL-CUSTO-${Date.now()}`,
     tipo: 'parecer_estoque',
@@ -435,9 +426,8 @@ const migrarParaEstoque = (produto: ProdutoPendente, origemDeferimento: 'Estoque
     responsavel
   } : null;
 
-  // Produtos validados diretamente pelo estoque ficam com vendaRecomendada pendente (null) e statusNota: 'Pendente'
   const novoProduto: Produto = {
-    id: produto.id, // ID PERSISTENTE - nunca muda
+    id: produto.id,
     imei: produto.imei,
     imagem: produto.imagem,
     marca: produto.marca,
@@ -445,9 +435,9 @@ const migrarParaEstoque = (produto: ProdutoPendente, origemDeferimento: 'Estoque
     cor: produto.cor,
     tipo: produto.tipo,
     quantidade: 1,
-    valorCusto: custoComposto, // CUSTO COMPOSTO: aquisição + reparo
-    valorVendaSugerido: custoComposto * 1.8, // Baseado no custo composto
-    vendaRecomendada: null, // Pendente - habilita botão "Informar Valor" na tela de Estoque > Produtos
+    valorCusto: custoComposto,
+    valorVendaSugerido: custoComposto * 1.8,
+    vendaRecomendada: null,
     saudeBateria: produto.saudeBateria,
     loja: produto.loja,
     estoqueConferido: true,
@@ -455,30 +445,17 @@ const migrarParaEstoque = (produto: ProdutoPendente, origemDeferimento: 'Estoque
     condicao: produto.condicao === 'Semi-novo' ? 'Seminovo' : 'Lacrado',
     custoAssistencia: custoReparo > 0 ? custoReparo : undefined,
     historicoCusto: [
-      { 
-        data: new Date().toISOString().split('T')[0], 
-        fornecedor: produto.origemEntrada, 
-        valor: produto.valorCustoOriginal 
-      },
-      ...(custoReparo > 0 ? [{
-        data: new Date().toISOString().split('T')[0],
-        fornecedor: 'Assistência Técnica',
-        valor: custoReparo
-      }] : [])
+      { data: new Date().toISOString().split('T')[0], fornecedor: produto.origemEntrada, valor: produto.valorCustoOriginal },
+      ...(custoReparo > 0 ? [{ data: new Date().toISOString().split('T')[0], fornecedor: 'Assistência Técnica', valor: custoReparo }] : [])
     ],
     historicoValorRecomendado: [],
-    statusNota: 'Pendente', // Pendente para habilitar informar valor recomendado
+    statusNota: 'Pendente',
     origemEntrada: produto.origemEntrada,
-    // PRESERVA A TIMELINE COMPLETA DO PRODUTO PENDENTE + LIBERAÇÃO + CUSTO COMPOSTO
     timeline: [...produto.timeline, timelineLiberacao, ...(timelineCusto ? [timelineCusto] : [])]
   };
 
-  // Adiciona ao estoque PRINCIPAL via estoqueApi
   addProdutoMigrado(novoProduto);
-  
-  // Também mantém na lista local para referência
   produtosMigrados.push(novoProduto);
-  
   console.log(`[OS API] Produto ${produto.id} migrado para estoque principal com sucesso!`);
   return novoProduto;
 };
@@ -489,10 +466,9 @@ export const salvarParecerEstoque = async (
   observacoes: string, 
   responsavel: string
 ): Promise<{ produto: ProdutoPendente | null; migrado: boolean; produtoMigrado?: Produto }> => {
-  const produto = produtosPendentes.find(p => p.id === id);
+  const produto = produtosPendentesCache.find(p => p.id === id);
   if (!produto) return { produto: null, migrado: false };
 
-  // Auto-incremento para encaminhamentos para assistência
   let contadorEncaminhamento = produto.contadorEncaminhamentos || 0;
   
   if (status === 'Encaminhado para conferência da Assistência') {
@@ -513,7 +489,6 @@ export const salvarParecerEstoque = async (
 
   produto.parecerEstoque = parecer;
   
-  // Adicionar na timeline com ID do produto e contador
   produto.timeline.push({
     id: `TL-${Date.now()}`,
     data: new Date().toISOString(),
@@ -527,43 +502,27 @@ export const salvarParecerEstoque = async (
     responsavel
   });
 
-  // ============= VALIDAÇÃO PROGRESSIVA =============
-  // Se o produto veio de uma nota, atualizar validação progressiva
+  // Validação progressiva
   if (produto.notaOuVendaId && produto.notaOuVendaId.startsWith('NC-') || produto.notaOuVendaId?.startsWith('URG-')) {
     try {
-      
-      // Validar o aparelho na nota
-      const resultado = await validarAparelhoNota(produto.notaOuVendaId, produto.imei, {
-        responsavel,
-        observacoes
-      });
-      
+      const resultado = await validarAparelhoNota(produto.notaOuVendaId!, produto.imei, { responsavel, observacoes });
       if (resultado.sucesso) {
-        // Atualizar pendência financeira
-        const conferencia = verificarConferenciaNota(produto.notaOuVendaId);
-        
-        atualizarPendencia(produto.notaOuVendaId, {
+        const conferencia = verificarConferenciaNota(produto.notaOuVendaId!);
+        atualizarPendencia(produto.notaOuVendaId!, {
           valorConferido: resultado.nota?.valorConferido,
           aparelhosConferidos: conferencia.aparelhosConferidos,
           statusConferencia: resultado.conferidoCompleto 
             ? (resultado.discrepancia ? 'Discrepância Detectada' : 'Conferência Completa') 
             : 'Em Conferência',
           responsavel,
-          aparelhoInfo: {
-            modelo: `${produto.marca} ${produto.modelo}`,
-            imei: produto.imei,
-            valor: produto.valorCusto
-          }
+          aparelhoInfo: { modelo: `${produto.marca} ${produto.modelo}`, imei: produto.imei, valor: produto.valorCusto }
         });
-        
-        console.log(`[Validação Progressiva] Aparelho ${produto.imei} validado na nota ${produto.notaOuVendaId}. Progresso: ${conferencia.percentual}%`);
       }
     } catch (error) {
       console.warn('[Validação Progressiva] Erro ao atualizar nota:', error);
     }
   }
 
-  // Se aprovado direto pelo estoque OU produto revisado e deferido
   if (status === 'Análise Realizada – Produto em ótimo estado' || status === 'Produto revisado e deferido') {
     produto.timeline.push({
       id: `TL-${Date.now()}-lib`,
@@ -575,31 +534,24 @@ export const salvarParecerEstoque = async (
     });
 
     produto.statusGeral = 'Liberado';
-    
     const produtoMigrado = migrarParaEstoque(produto, 'Estoque', responsavel);
     
-    const index = produtosPendentes.findIndex(p => p.id === id);
-    if (index !== -1) {
-      produtosPendentes.splice(index, 1);
-    }
+    // Remove from cache and Supabase
+    const index = produtosPendentesCache.findIndex(p => p.id === id);
+    if (index !== -1) produtosPendentesCache.splice(index, 1);
+    deleteFromSupabase(id);
 
     return { produto, migrado: true, produtoMigrado };
   } else {
-    // Encaminhado para assistência - criar registro na Análise de Tratativas
     produto.statusGeral = 'Aguardando Recebimento Assistência';
     
-    // Adicionar à Análise de Tratativas
     try {
-      await encaminharParaAnaliseGarantia(
-        produto.id,
-        'Estoque',
-        `${produto.marca} ${produto.modelo} - ${produto.cor} (IMEI: ${produto.imei})`,
-        observacoes
-      );
+      await encaminharParaAnaliseGarantia(produto.id, 'Estoque', `${produto.marca} ${produto.modelo} - ${produto.cor} (IMEI: ${produto.imei})`, observacoes);
     } catch (error) {
       console.warn('[salvarParecerEstoque] Erro ao encaminhar para análise:', error);
     }
     
+    await syncToSupabase(produto);
     return { produto, migrado: false };
   }
 };
@@ -611,7 +563,7 @@ export const salvarParecerAssistencia = (
   responsavel: string,
   pecas?: { descricao: string; valor: number; fornecedor: string; origemPeca?: 'Fornecedor' | 'Tinha na Assistência' }[]
 ): { produto: ProdutoPendente | null; migrado: boolean; produtoMigrado?: Produto; retornadoPendentes?: boolean } => {
-  const produto = produtosPendentes.find(p => p.id === id);
+  const produto = produtosPendentesCache.find(p => p.id === id);
   if (!produto) return { produto: null, migrado: false };
 
   const parecer: ParecerAssistencia = {
@@ -625,7 +577,6 @@ export const salvarParecerAssistencia = (
 
   produto.parecerAssistencia = parecer;
 
-  // Adicionar na timeline
   produto.timeline.push({
     id: `TL-${Date.now()}`,
     data: new Date().toISOString(),
@@ -635,7 +586,6 @@ export const salvarParecerAssistencia = (
     responsavel
   });
 
-  // Adicionar despesas na timeline (apenas para registro, NÃO soma ao custo do produto)
   if (pecas && pecas.length > 0) {
     let custoTotal = 0;
     pecas.forEach(peca => {
@@ -650,11 +600,9 @@ export const salvarParecerAssistencia = (
         responsavel
       });
     });
-    // Custo assistência é registrado mas NÃO altera valor do produto
     produto.custoAssistencia = (produto.custoAssistencia || 0) + custoTotal;
   }
 
-  // Se produto validado pela assistência -> RETORNA para Produtos Pendentes para revisão final do Estoque
   if (status === 'Validado pela assistência') {
     produto.timeline.push({
       id: `TL-${Date.now()}-ret`,
@@ -664,40 +612,35 @@ export const salvarParecerAssistencia = (
       descricao: `Produto ${id} validado pela assistência. Aguardando revisão final do Estoque para deferimento.`,
       responsavel
     });
-
-    // Muda status para Retornado da Assistência (vai aparecer em Produtos Pendentes)
     produto.statusGeral = 'Retornado da Assistência';
-    // parecerEstoque preservado - não limpar para manter histórico do ciclo
-
+    syncToSupabase(produto);
     return { produto, migrado: false, retornadoPendentes: true };
   } else if (status === 'Aguardando peça') {
     produto.statusGeral = 'Aguardando Peça';
+    syncToSupabase(produto);
     return { produto, migrado: false };
   } else {
-    // Ajustes realizados - ainda está na assistência
     produto.statusGeral = 'Em Análise Assistência';
+    syncToSupabase(produto);
     return { produto, migrado: false };
   }
 };
 
 export const liberarProdutoPendente = (id: string): boolean => {
-  // Esta função é mantida por compatibilidade mas a migração agora é automática
-  const index = produtosPendentes.findIndex(p => p.id === id);
+  const index = produtosPendentesCache.findIndex(p => p.id === id);
   if (index === -1) return false;
   return true;
 };
 
-// Atualizar produto pendente (ex: parecer técnico)
 export const updateProdutoPendente = (id: string, dados: Partial<ProdutoPendente>): ProdutoPendente | null => {
-  const index = produtosPendentes.findIndex(p => p.id === id);
+  const index = produtosPendentesCache.findIndex(p => p.id === id);
   if (index === -1) return null;
   
-  produtosPendentes[index] = {
-    ...produtosPendentes[index],
+  produtosPendentesCache[index] = {
+    ...produtosPendentesCache[index],
     ...dados
   };
   
-  // Se tem parecer assistência, adiciona na timeline
   if (dados.parecerAssistencia) {
     const timelineEntry = {
       id: `TL-${Date.now()}`,
@@ -707,34 +650,31 @@ export const updateProdutoPendente = (id: string, dados: Partial<ProdutoPendente
       descricao: dados.parecerAssistencia.observacoes || '',
       responsavel: dados.parecerAssistencia.responsavel
     };
-    
-    produtosPendentes[index].timeline.push(timelineEntry);
+    produtosPendentesCache[index].timeline.push(timelineEntry);
   }
   
-  return produtosPendentes[index];
+  syncToSupabase(produtosPendentesCache[index]);
+  return produtosPendentesCache[index];
 };
 
-export const addProdutoPendente = (
+export const addProdutoPendente = async (
   produto: Omit<ProdutoPendente, 'id' | 'timeline' | 'custoAssistencia' | 'statusGeral' | 'valorCustoOriginal' | 'contadorEncaminhamentos'>,
   forcarCriacao: boolean = false
-): ProdutoPendente => {
-  // VALIDAÇÃO: Verificar se já existe produto com mesmo IMEI (evitar duplicatas)
-  // EXCEÇÃO: Se forcarCriacao=true (ex: Base de Trocas), ignora verificação
+): Promise<ProdutoPendente> => {
   if (!forcarCriacao && produto.imei) {
-    const jaExiste = produtosPendentes.find(p => p.imei === produto.imei);
+    const jaExiste = produtosPendentesCache.find(p => p.imei === produto.imei);
     if (jaExiste) {
       console.log(`[OS API] Produto com IMEI ${produto.imei} já existe nos pendentes (ID: ${jaExiste.id}), retornando existente.`);
       return jaExiste;
     }
   }
   
-  // Gerar ID único usando o sistema centralizado
   const newId = generateProductId();
   
   const newProduto: ProdutoPendente = {
     ...produto,
     id: newId,
-    valorCustoOriginal: produto.valorCusto, // Preserva valor original
+    valorCustoOriginal: produto.valorCusto,
     timeline: [
       {
         id: `TL-${Date.now()}`,
@@ -750,7 +690,8 @@ export const addProdutoPendente = (
     contadorEncaminhamentos: 0
   };
 
-  produtosPendentes.push(newProduto);
+  produtosPendentesCache.push(newProduto);
+  await syncToSupabase(newProduto);
   console.log(`[OS API] Novo produto pendente criado: ${newId} (IMEI: ${produto.imei || 'N/A'}, forcarCriacao: ${forcarCriacao})`);
   return newProduto;
 };
@@ -768,17 +709,16 @@ interface TradeInItem {
 }
 
 // Migrar trade-ins da venda finalizada para Aparelhos Pendentes - Estoque
-export const migrarTradeInsParaPendentes = (
+export const migrarTradeInsParaPendentes = async (
   tradeIns: TradeInItem[],
   vendaId: string,
   lojaId: string,
   responsavel: string
-): ProdutoPendente[] => {
-  const produtosMigrados: ProdutoPendente[] = [];
+): Promise<ProdutoPendente[]> => {
+  const migrados: ProdutoPendente[] = [];
   
   for (const tradeIn of tradeIns) {
-    // Verificar se já não foi migrado (evitar duplicatas)
-    const jaExiste = produtosPendentes.find(p => p.imei === tradeIn.imei);
+    const jaExiste = produtosPendentesCache.find(p => p.imei === tradeIn.imei);
     if (jaExiste) {
       console.log(`[OS API] Trade-in ${tradeIn.imei} já existe nos pendentes, ignorando duplicata.`);
       continue;
@@ -789,9 +729,9 @@ export const migrarTradeInsParaPendentes = (
     const novoProdutoPendente: ProdutoPendente = {
       id: newId,
       imei: tradeIn.imei,
-      marca: 'Apple', // Por padrão, pode ser ajustado
+      marca: 'Apple',
       modelo: tradeIn.modelo,
-      cor: 'N/A', // Definir cor padrão, será ajustado na análise
+      cor: 'N/A',
       tipo: 'Seminovo',
       condicao: tradeIn.condicao,
       origemEntrada: 'Base de Troca',
@@ -799,7 +739,7 @@ export const migrarTradeInsParaPendentes = (
       valorCusto: tradeIn.valorCompraUsado,
       valorCustoOriginal: tradeIn.valorCompraUsado,
       valorOrigem: tradeIn.valorCompraUsado,
-      saudeBateria: 80, // Valor padrão, será ajustado na análise
+      saudeBateria: 80,
       loja: lojaId,
       dataEntrada: new Date().toISOString().split('T')[0],
       timeline: [
@@ -817,14 +757,15 @@ export const migrarTradeInsParaPendentes = (
       contadorEncaminhamentos: 0
     };
     
-    produtosPendentes.push(novoProdutoPendente);
+    produtosPendentesCache.push(novoProdutoPendente);
     registerProductId(newId);
-    produtosMigrados.push(novoProdutoPendente);
+    await syncToSupabase(novoProdutoPendente);
+    migrados.push(novoProdutoPendente);
     
     console.log(`[OS API] Trade-in ${tradeIn.modelo} (IMEI: ${tradeIn.imei}) migrado para Aparelhos Pendentes - Estoque com ID ${newId}`);
   }
   
-  return produtosMigrados;
+  return migrados;
 };
 
 // Interface para produtos de nota de entrada
@@ -842,25 +783,23 @@ interface ProdutoNota {
 }
 
 // Migrar produtos de nota de entrada para Aparelhos Pendentes - Estoque
-export const migrarProdutosNotaParaPendentes = (
+export const migrarProdutosNotaParaPendentes = async (
   produtos: ProdutoNota[],
   notaId: string,
   fornecedor: string,
   lojaDestino: string,
   responsavel: string,
   origemEntrada: 'Fornecedor' | 'Base de Troca' | 'Emprestado - Garantia' | 'NEGOCIADO' = 'Fornecedor'
-): ProdutoPendente[] => {
-  const produtosMigrados: ProdutoPendente[] = [];
+): Promise<ProdutoPendente[]> => {
+  const migrados: ProdutoPendente[] = [];
   
   for (const produto of produtos) {
-    // Ignorar acessórios - eles vão direto para o estoque de acessórios
     if (produto.tipoProduto === 'Acessório') {
       console.log(`[OS API] Produto ${produto.modelo} é acessório, ignorando migração para pendentes.`);
       continue;
     }
     
-    // Verificar duplicata por IMEI
-    const jaExiste = produtosPendentes.find(p => p.imei === produto.imei);
+    const jaExiste = produtosPendentesCache.find(p => p.imei === produto.imei);
     if (jaExiste) {
       console.log(`[OS API] Produto ${produto.imei} já existe nos pendentes, ignorando duplicata.`);
       continue;
@@ -900,12 +839,13 @@ export const migrarProdutosNotaParaPendentes = (
       contadorEncaminhamentos: 0
     };
     
-    produtosPendentes.push(novoProduto);
+    produtosPendentesCache.push(novoProduto);
     registerProductId(newId);
-    produtosMigrados.push(novoProduto);
+    await syncToSupabase(novoProduto);
+    migrados.push(novoProduto);
     
     console.log(`[OS API] Produto ${produto.marca} ${produto.modelo} (IMEI: ${produto.imei}) migrado para Aparelhos Pendentes com ID ${newId}`);
   }
   
-  return produtosMigrados;
+  return migrados;
 };

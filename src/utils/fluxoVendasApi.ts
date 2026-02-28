@@ -386,7 +386,7 @@ export const finalizarVenda = async (
   ativarDemandasPorVenda(vendaId).catch(e => console.error('[FLUXO] Erro motoboy:', e));
 
   if (venda && venda.tradeIns && venda.tradeIns.length > 0) {
-    migrarTradeInsParaPendentes(venda.tradeIns, vendaId, venda.lojaVenda, usuarioNome);
+    await migrarTradeInsParaPendentes(venda.tradeIns, vendaId, venda.lojaVenda, usuarioNome);
   }
 
   try {
@@ -497,7 +497,7 @@ export const finalizarVendaDowngrade = async (
   }
 
   if (venda && venda.tradeIns && venda.tradeIns.length > 0) {
-    migrarTradeInsParaPendentes(venda.tradeIns, vendaId, venda.lojaVenda, usuarioNome);
+    await migrarTradeInsParaPendentes(venda.tradeIns, vendaId, venda.lojaVenda, usuarioNome);
   }
 
   return getVendaComFluxo(vendaId);
@@ -542,7 +542,7 @@ export const finalizarVendaFiado = async (
   }
 
   if (venda.tradeIns && venda.tradeIns.length > 0) {
-    migrarTradeInsParaPendentes(venda.tradeIns, vendaId, venda.lojaVenda, usuarioNome);
+    await migrarTradeInsParaPendentes(venda.tradeIns, vendaId, venda.lojaVenda, usuarioNome);
   }
 
   return getVendaComFluxo(vendaId);

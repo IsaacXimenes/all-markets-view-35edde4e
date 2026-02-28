@@ -150,7 +150,7 @@ export function calcularSLA(dataVenda: string): SLAInfo {
 }
 
 // Integração com Estoque
-export function migrarParaProdutosPendentes(tradeInPendenteId: string): ProdutoPendente | null {
+export async function migrarParaProdutosPendentes(tradeInPendenteId: string): Promise<ProdutoPendente | null> {
   const tradeIn = getTradeInPendenteById(tradeInPendenteId);
   if (!tradeIn || tradeIn.status !== 'Recebido') return null;
 
@@ -158,7 +158,7 @@ export function migrarParaProdutosPendentes(tradeInPendenteId: string): ProdutoP
     const marca = tradeIn.tradeIn.modelo?.toLowerCase().includes('iphone') ? 'Apple' : 'Outro';
     const imeiLimpo = tradeIn.tradeIn.imei?.replace(/-/g, '') || '';
 
-    const produtoPendente = addProdutoPendente({
+    const produtoPendente = await addProdutoPendente({
       imei: imeiLimpo,
       marca,
       modelo: tradeIn.tradeIn.modelo,

@@ -336,11 +336,11 @@ export function NotaDetalhesContent({ nota, showActions = true }: NotaDetalhesCo
   };
 
   // Verificar se conferência atingiu 100% e migrar produtos automaticamente
-  const verificarEMigrarProdutos = (notaId: string, nomeResponsavel: string) => {
+  const verificarEMigrarProdutos = async (notaId: string, nomeResponsavel: string) => {
     const notaAtualizada = getNotaFresh(notaId);
     if (!notaAtualizada) return;
     if (notaAtualizada.qtdConferida >= notaAtualizada.qtdInformada && notaAtualizada.qtdInformada > 0) {
-      const resultado = migrarProdutosConferidosPorCategoria(notaAtualizada, nomeResponsavel);
+      const resultado = await migrarProdutosConferidosPorCategoria(notaAtualizada, nomeResponsavel);
       if (resultado.novos > 0 || resultado.seminovos > 0) {
         toast.success(
           `Conferência 100% concluída! ${resultado.novos} novo(s) → Estoque, ${resultado.seminovos} seminovo(s) → Pendentes.`,

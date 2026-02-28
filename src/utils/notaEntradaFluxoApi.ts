@@ -1204,11 +1204,11 @@ export const recolherProdutoNota = (
  * - Novo: Vai direto para Estoque > Produtos (disponível para venda)
  * - Seminovo: Vai para Estoque > Produtos Pendentes (triagem necessária)
  */
-export const migrarProdutosConferidosPorCategoria = (
+export const migrarProdutosConferidosPorCategoria = async (
   nota: NotaEntrada,
   responsavel: string,
   lojaDestino?: string
-): { novos: number; seminovos: number } => {
+): Promise<{ novos: number; seminovos: number }> => {
   const loja = lojaDestino || ESTOQUE_SIA_LOJA_ID;
   let novos = 0;
   let seminovos = 0;
@@ -1271,7 +1271,7 @@ export const migrarProdutosConferidosPorCategoria = (
       capacidade: p.capacidade
     }));
     
-    const migrados = migrarProdutosNotaParaPendentes(
+    const migrados = await migrarProdutosNotaParaPendentes(
       produtosParaMigrar,
       nota.id,
       nota.fornecedor,

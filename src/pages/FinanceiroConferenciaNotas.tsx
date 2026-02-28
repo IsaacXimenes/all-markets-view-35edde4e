@@ -264,7 +264,7 @@ export default function FinanceiroConferenciaNotas() {
       // Migrar aparelhos SEMI-NOVOS para triagem (Aparelhos Pendentes)
       let qtdSeminovos = 0;
       if (aparelhosSeminovos.length > 0) {
-        const produtosMigrados = migrarProdutosNotaParaPendentes(
+        const produtosMigrados = await migrarProdutosNotaParaPendentes(
           aparelhosSeminovos,
           notaFinalizada.id,
           notaFinalizada.fornecedor,

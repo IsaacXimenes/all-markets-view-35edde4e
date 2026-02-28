@@ -1,4 +1,6 @@
 // API para gestão de Peças em Consignação
+// MIGRADO PARA SUPABASE - tabelas: lotes_consignacao, itens_consignacao
+import { supabase } from '@/integrations/supabase/client';
 import { addPeca, getPecaById, darBaixaPeca, deletePeca, updatePeca } from './pecasApi';
 import { NotaAssistencia } from './solicitacaoPecasApi';
 
@@ -49,10 +51,12 @@ export interface LoteConsignacao {
   pagamentosParciais: PagamentoParcial[];
 }
 
+// ============= CACHE =============
 let lotes: LoteConsignacao[] = [];
 let nextLoteId = 1;
 let nextItemId = 1;
 let nextPagamentoId = 1;
+let cacheInitialized = false;
 
 // Referência para notas de assistência (importação circular evitada via callback)
 let notasAssistenciaRef: NotaAssistencia[] = [];
@@ -61,6 +65,105 @@ let notaCounterRef = 100;
 export const setNotasRef = (notas: NotaAssistencia[], counter: number) => {
   notasAssistenciaRef = notas;
   notaCounterRef = counter;
+};
+
+// ============= MAPPING =============
+const mapItemFromDb = (r: any): ItemConsignacao => ({
+  id: r.id,
+  pecaId: r.peca_id || '',
+  descricao: r.descricao || '',
+  modelo: r.modelo || '',
+  quantidade: r.quantidade || 0,
+  quantidadeOriginal: r.quantidade_original || 0,
+  valorCusto: Number(r.valor_custo) || 0,
+  lojaAtualId: r.loja_atual_id || '',
+  status: r.status || 'Disponivel',
+  osVinculada: r.os_vinculada || undefined,
+  dataConsumo: r.data_consumo || undefined,
+  tecnicoConsumo: r.tecnico_consumo || undefined,
+  devolvidoPor: r.devolvido_por || undefined,
+  dataDevolucao: r.data_devolucao || undefined,
+});
+
+const mapLoteFromDb = (r: any, itens: ItemConsignacao[]): LoteConsignacao => ({
+  id: r.id,
+  fornecedorId: r.fornecedor_id || '',
+  dataCriacao: r.data_criacao || r.created_at,
+  responsavelCadastro: r.responsavel_cadastro || '',
+  status: r.status || 'Aberto',
+  itens,
+  timeline: (r.timeline as TimelineConsignacao[]) || [],
+  pagamentosParciais: (r.pagamentos_parciais as PagamentoParcial[]) || [],
+});
+
+const loteToDb = (l: LoteConsignacao) => ({
+  id: l.id,
+  fornecedor_id: l.fornecedorId,
+  data_criacao: l.dataCriacao,
+  responsavel_cadastro: l.responsavelCadastro,
+  status: l.status,
+  timeline: l.timeline as any,
+  pagamentos_parciais: l.pagamentosParciais as any,
+});
+
+const itemToDb = (item: ItemConsignacao, loteId: string) => ({
+  id: item.id,
+  lote_id: loteId,
+  peca_id: item.pecaId,
+  descricao: item.descricao,
+  modelo: item.modelo,
+  quantidade: item.quantidade,
+  quantidade_original: item.quantidadeOriginal,
+  valor_custo: item.valorCusto,
+  loja_atual_id: item.lojaAtualId,
+  status: item.status,
+  os_vinculada: item.osVinculada || null,
+  data_consumo: item.dataConsumo || null,
+  tecnico_consumo: item.tecnicoConsumo || null,
+  devolvido_por: item.devolvidoPor || null,
+  data_devolucao: item.dataDevolucao || null,
+});
+
+// Sync helpers
+const syncLoteToDb = async (lote: LoteConsignacao) => {
+  const { error } = await supabase.from('lotes_consignacao').upsert(loteToDb(lote) as any);
+  if (error) console.error('[CONSIGNACAO] Erro sync lote:', error);
+};
+
+const syncItemToDb = async (item: ItemConsignacao, loteId: string) => {
+  const { error } = await supabase.from('itens_consignacao').upsert(itemToDb(item, loteId) as any);
+  if (error) console.error('[CONSIGNACAO] Erro sync item:', error);
+};
+
+// ============= INIT CACHE =============
+export const initConsignacaoCache = async () => {
+  if (cacheInitialized) return;
+  try {
+    const [lotesRes, itensRes] = await Promise.all([
+      supabase.from('lotes_consignacao').select('*').order('created_at', { ascending: false }),
+      supabase.from('itens_consignacao').select('*'),
+    ]);
+    if (lotesRes.error) throw lotesRes.error;
+    if (itensRes.error) throw itensRes.error;
+
+    const itensMap = new Map<string, ItemConsignacao[]>();
+    (itensRes.data || []).forEach(r => {
+      const item = mapItemFromDb(r);
+      const loteId = r.lote_id;
+      if (!itensMap.has(loteId)) itensMap.set(loteId, []);
+      itensMap.get(loteId)!.push(item);
+    });
+
+    lotes = (lotesRes.data || []).map(r => mapLoteFromDb(r, itensMap.get(r.id) || []));
+    nextLoteId = lotes.length + 1;
+    nextItemId = (itensRes.data || []).length + 1;
+    nextPagamentoId = lotes.reduce((acc, l) => acc + l.pagamentosParciais.length, 0) + 1;
+    cacheInitialized = true;
+    console.log(`[CONSIGNACAO] Cache: ${lotes.length} lotes, ${(itensRes.data || []).length} itens`);
+  } catch (err) {
+    console.error('[CONSIGNACAO] Erro init:', err);
+    cacheInitialized = true;
+  }
 };
 
 // ========== GETTERS ==========
@@ -88,7 +191,6 @@ export const criarLoteConsignacao = async (dados: CriarLoteInput): Promise<LoteC
   const loteId = `CONS-${String(nextLoteId++).padStart(3, '0')}`;
 
   const itensConsignacao: ItemConsignacao[] = await Promise.all(dados.itens.map(async (item) => {
-    // Injetar peça no estoque com origem Consignacao
     const pecaCriada = await addPeca({
       descricao: item.descricao,
       lojaId: item.lojaDestinoId,
@@ -134,14 +236,21 @@ export const criarLoteConsignacao = async (dados: CriarLoteInput): Promise<LoteC
   };
 
   lotes.push(lote);
+
+  // Persist to Supabase
+  await syncLoteToDb(lote);
+  for (const item of itensConsignacao) {
+    await syncItemToDb(item, loteId);
+  }
+
   return lote;
 };
 
 // ========== REGISTRAR CONSUMO ==========
 
-export const registrarConsumoConsignacao = (
+export const registrarConsumoConsignacao = async (
   loteId: string, itemId: string, osId: string, tecnico: string, quantidade: number = 1
-): boolean => {
+): Promise<boolean> => {
   const lote = lotes.find(l => l.id === loteId);
   if (!lote || lote.status === 'Concluido') return false;
 
@@ -164,16 +273,17 @@ export const registrarConsumoConsignacao = (
     responsavel: tecnico,
   });
 
+  await Promise.all([syncItemToDb(item, loteId), syncLoteToDb(lote)]);
   return true;
 };
 
 // Busca consumo por pecaId (chamado pelo darBaixaPeca)
-export const registrarConsumoPorPecaId = (pecaId: string, osId: string, tecnico: string, quantidade: number = 1): void => {
+export const registrarConsumoPorPecaId = async (pecaId: string, osId: string, tecnico: string, quantidade: number = 1): Promise<void> => {
   for (const lote of lotes) {
     if (lote.status === 'Concluido') continue;
     const item = lote.itens.find(i => i.pecaId === pecaId && i.status === 'Disponivel');
     if (item) {
-      registrarConsumoConsignacao(lote.id, item.id, osId, tecnico, quantidade);
+      await registrarConsumoConsignacao(lote.id, item.id, osId, tecnico, quantidade);
       return;
     }
   }
@@ -181,9 +291,9 @@ export const registrarConsumoPorPecaId = (pecaId: string, osId: string, tecnico:
 
 // ========== TRANSFERÊNCIA ==========
 
-export const transferirItemConsignacao = (
+export const transferirItemConsignacao = async (
   loteId: string, itemId: string, novaLojaId: string, responsavel: string
-): boolean => {
+): Promise<boolean> => {
   const lote = lotes.find(l => l.id === loteId);
   if (!lote || lote.status !== 'Aberto') return false;
 
@@ -193,7 +303,6 @@ export const transferirItemConsignacao = (
   const lojaAnterior = item.lojaAtualId;
   item.lojaAtualId = novaLojaId;
 
-  // Atualizar peça no estoque
   const peca = getPecaById(item.pecaId);
   if (peca) {
     peca.lojaId = novaLojaId;
@@ -206,18 +315,17 @@ export const transferirItemConsignacao = (
     responsavel,
   });
 
+  await Promise.all([syncItemToDb(item, loteId), syncLoteToDb(lote)]);
   return true;
 };
 
-// ========== ACERTO DE CONTAS (LEGADO - simplificado) ==========
+// ========== ACERTO DE CONTAS ==========
 
-export const iniciarAcertoContas = (loteId: string, responsavel: string): boolean => {
+export const iniciarAcertoContas = async (loteId: string, responsavel: string): Promise<boolean> => {
   const lote = lotes.find(l => l.id === loteId);
   if (!lote || lote.status !== 'Aberto') return false;
 
-  // Não congela mais as peças disponíveis
   lote.status = 'Em Acerto';
-
   lote.timeline.push({
     data: new Date().toISOString(),
     tipo: 'acerto',
@@ -225,6 +333,7 @@ export const iniciarAcertoContas = (loteId: string, responsavel: string): boolea
     responsavel,
   });
 
+  await syncLoteToDb(lote);
   return true;
 };
 
@@ -239,7 +348,7 @@ export const getValorConsumido = (lote: LoteConsignacao): number => {
 
 // ========== PAGAMENTO PARCIAL ==========
 
-export const gerarPagamentoParcial = (
+export const gerarPagamentoParcial = async (
   loteId: string,
   itemIds: string[],
   dadosPagamento: {
@@ -250,17 +359,14 @@ export const gerarPagamentoParcial = (
     observacao?: string;
   },
   pushNota: (nota: NotaAssistencia) => void
-): PagamentoParcial | null => {
+): Promise<PagamentoParcial | null> => {
   const lote = lotes.find(l => l.id === loteId);
   if (!lote || lote.status === 'Concluido') return null;
 
   const itensSelecionados = lote.itens.filter(i => itemIds.includes(i.id) && i.status === 'Consumido');
   if (itensSelecionados.length === 0) return null;
 
-  // Mudar status dos itens para 'Em Pagamento'
-  itensSelecionados.forEach(item => {
-    item.status = 'Em Pagamento';
-  });
+  itensSelecionados.forEach(item => { item.status = 'Em Pagamento'; });
 
   const valorTotal = itensSelecionados.reduce((acc, i) => {
     const qtdConsumida = i.quantidadeOriginal - i.quantidade || i.quantidadeOriginal;
@@ -320,15 +426,20 @@ export const gerarPagamentoParcial = (
     responsavel: lote.responsavelCadastro,
   });
 
-  // Atualizar status do lote para Aguardando Pagamento
   if (lote.status === 'Aberto' || lote.status === 'Em Acerto') {
     lote.status = 'Aguardando Pagamento';
+  }
+
+  // Persist
+  await syncLoteToDb(lote);
+  for (const item of itensSelecionados) {
+    await syncItemToDb(item, loteId);
   }
 
   return pagamento;
 };
 
-export const confirmarPagamentoParcial = (loteId: string, pagamentoId: string, responsavel: string, comprovanteUrl?: string): boolean => {
+export const confirmarPagamentoParcial = async (loteId: string, pagamentoId: string, responsavel: string, comprovanteUrl?: string): Promise<boolean> => {
   const lote = lotes.find(l => l.id === loteId);
   if (!lote) return false;
 
@@ -339,10 +450,11 @@ export const confirmarPagamentoParcial = (loteId: string, pagamentoId: string, r
   pagamento.comprovanteUrl = comprovanteUrl;
   pagamento.dataPagamento = new Date().toISOString();
 
-  // Mudar status dos itens vinculados para 'Pago'
+  const itensAtualizados: ItemConsignacao[] = [];
   lote.itens.forEach(item => {
     if (pagamento.itensIds.includes(item.id) && item.status === 'Em Pagamento') {
       item.status = 'Pago';
+      itensAtualizados.push(item);
     }
   });
 
@@ -354,7 +466,6 @@ export const confirmarPagamentoParcial = (loteId: string, pagamentoId: string, r
     comprovanteUrl,
   });
 
-  // Verificar se todos os pagamentos foram pagos
   const todosPagos = lote.pagamentosParciais.every(p => p.status === 'Pago');
   const todosItensFinalizados = lote.itens.every(i => ['Pago', 'Devolvido'].includes(i.status));
   if (todosPagos && todosItensFinalizados) {
@@ -367,12 +478,17 @@ export const confirmarPagamentoParcial = (loteId: string, pagamentoId: string, r
     });
   }
 
+  await syncLoteToDb(lote);
+  for (const item of itensAtualizados) {
+    await syncItemToDb(item, loteId);
+  }
+
   return true;
 };
 
 // ========== FINALIZAR LOTE ==========
 
-export const finalizarLote = (
+export const finalizarLote = async (
   loteId: string,
   responsavel: string,
   dadosPagamento: {
@@ -383,7 +499,7 @@ export const finalizarLote = (
     observacao?: string;
   },
   pushNota: (nota: NotaAssistencia) => void
-): boolean => {
+): Promise<boolean> => {
   const lote = lotes.find(l => l.id === loteId);
   if (!lote || lote.status === 'Concluido') return false;
 
@@ -392,10 +508,11 @@ export const finalizarLote = (
   // Gerar pagamento parcial final para itens consumidos remanescentes
   const consumidosRemanescentes = lote.itens.filter(i => i.status === 'Consumido');
   if (consumidosRemanescentes.length > 0) {
-    gerarPagamentoParcial(loteId, consumidosRemanescentes.map(i => i.id), dadosPagamento, pushNota);
+    await gerarPagamentoParcial(loteId, consumidosRemanescentes.map(i => i.id), dadosPagamento, pushNota);
   }
 
   // Marcar sobras como Devolvido
+  const itensDevolvidos: ItemConsignacao[] = [];
   lote.itens.filter(i => i.status === 'Disponivel').forEach(item => {
     item.status = 'Devolvido';
     item.dataDevolucao = agora;
@@ -409,9 +526,9 @@ export const finalizarLote = (
       descricao: `${item.descricao} (${item.quantidade} un.) devolvido ao fornecedor no fechamento`,
       responsavel,
     });
+    itensDevolvidos.push(item);
   });
 
-  // Se há pagamentos pendentes, aguardar pagamento; senão, concluído
   const temPagamentosPendentes = lote.pagamentosParciais.some(p => p.status === 'Pendente');
   lote.status = temPagamentosPendentes ? 'Aguardando Pagamento' : 'Concluido';
   lote.timeline.push({
@@ -423,12 +540,17 @@ export const finalizarLote = (
     responsavel,
   });
 
+  await syncLoteToDb(lote);
+  for (const item of itensDevolvidos) {
+    await syncItemToDb(item, loteId);
+  }
+
   return true;
 };
 
 // ========== DEVOLUÇÃO ==========
 
-export const confirmarDevolucaoItem = (loteId: string, itemId: string, responsavel: string): boolean => {
+export const confirmarDevolucaoItem = async (loteId: string, itemId: string, responsavel: string): Promise<boolean> => {
   const lote = lotes.find(l => l.id === loteId);
   if (!lote) return false;
 
@@ -439,7 +561,6 @@ export const confirmarDevolucaoItem = (loteId: string, itemId: string, responsav
   item.devolvidoPor = responsavel;
   item.dataDevolucao = new Date().toISOString();
 
-  // Manter no estoque como histórico (indisponível)
   if (item.pecaId) {
     updatePeca(item.pecaId, { status: 'Devolvida', quantidade: 0 });
   }
@@ -451,12 +572,12 @@ export const confirmarDevolucaoItem = (loteId: string, itemId: string, responsav
     responsavel,
   });
 
-  // Verificar se todos os itens foram devolvidos ou consumidos
   const todosFinalizados = lote.itens.every(i => ['Consumido', 'Devolvido', 'Em Pagamento', 'Pago'].includes(i.status));
   if (todosFinalizados && lote.status === 'Aberto') {
     lote.status = 'Devolvido';
   }
 
+  await Promise.all([syncItemToDb(item, loteId), syncLoteToDb(lote)]);
   return true;
 };
 
@@ -509,13 +630,16 @@ export const gerarLoteFinanceiro = (loteId: string, dadosPagamento?: {
     responsavel: lote.responsavelCadastro,
   });
 
+  // Sync timeline update
+  syncLoteToDb(lote);
+
   return nota;
 };
 
 // Confirmar pagamento por notaFinanceiraId (chamado pelo Financeiro)
-export const confirmarPagamentoPorNotaId = (
+export const confirmarPagamentoPorNotaId = async (
   loteId: string, notaFinanceiraId: string, responsavel: string, comprovanteUrl?: string
-): boolean => {
+): Promise<boolean> => {
   const lote = lotes.find(l => l.id === loteId);
   if (!lote) return false;
 
@@ -525,13 +649,13 @@ export const confirmarPagamentoPorNotaId = (
   return confirmarPagamentoParcial(loteId, pagamento.id, responsavel, comprovanteUrl);
 };
 
-export const finalizarAcerto = (loteId: string): boolean => {
+export const finalizarAcerto = async (loteId: string): Promise<boolean> => {
   const lote = lotes.find(l => l.id === loteId);
   if (!lote || lote.status !== 'Em Acerto') return false;
 
   const agora = new Date().toISOString();
+  const itensAtualizados: ItemConsignacao[] = [];
 
-  // Marcar sobras (Em Acerto) como Devolvido no lote e no estoque
   lote.itens.filter(i => i.status === 'Em Acerto').forEach(item => {
     item.status = 'Devolvido';
     item.dataDevolucao = agora;
@@ -545,6 +669,7 @@ export const finalizarAcerto = (loteId: string): boolean => {
       descricao: `${item.descricao} (${item.quantidade} un.) devolvido automaticamente ao fornecedor`,
       responsavel: 'Financeiro',
     });
+    itensAtualizados.push(item);
   });
 
   lote.status = 'Pago';
@@ -554,6 +679,11 @@ export const finalizarAcerto = (loteId: string): boolean => {
     descricao: 'Acerto finalizado. Pagamento confirmado pelo financeiro.',
     responsavel: 'Financeiro',
   });
+
+  await syncLoteToDb(lote);
+  for (const item of itensAtualizados) {
+    await syncItemToDb(item, loteId);
+  }
 
   return true;
 };
@@ -586,7 +716,6 @@ export const editarLoteConsignacao = async (loteId: string, dados: EditarLoteInp
 
   const alteracoes: string[] = [];
 
-  // Editar fornecedor
   if (dados.fornecedorId && dados.fornecedorId !== lote.fornecedorId) {
     alteracoes.push(`Fornecedor alterado`);
     lote.fornecedorId = dados.fornecedorId;
@@ -594,24 +723,23 @@ export const editarLoteConsignacao = async (loteId: string, dados: EditarLoteInp
 
   // Remover itens
   if (dados.itensRemovidos && dados.itensRemovidos.length > 0) {
-    dados.itensRemovidos.forEach(itemId => {
+    for (const itemId of dados.itensRemovidos) {
       const item = lote.itens.find(i => i.id === itemId);
       if (item && item.status === 'Disponivel') {
-        // Remover peça do estoque
-        if (item.pecaId) {
-          deletePeca(item.pecaId);
-        }
+        if (item.pecaId) { deletePeca(item.pecaId); }
         alteracoes.push(`Item removido: ${item.descricao}`);
+        // Remove from DB
+        await supabase.from('itens_consignacao').delete().eq('id', itemId);
       }
-    });
+    }
     lote.itens = lote.itens.filter(i => !dados.itensRemovidos!.includes(i.id));
   }
 
   // Editar itens existentes
   if (dados.itens) {
-    dados.itens.forEach(editItem => {
+    for (const editItem of dados.itens) {
       const item = lote.itens.find(i => i.id === editItem.id);
-      if (!item || item.status !== 'Disponivel') return;
+      if (!item || item.status !== 'Disponivel') continue;
 
       const changes: string[] = [];
       if (item.descricao !== editItem.descricao) changes.push(`desc: ${item.descricao} → ${editItem.descricao}`);
@@ -627,7 +755,6 @@ export const editarLoteConsignacao = async (loteId: string, dados: EditarLoteInp
       item.valorCusto = editItem.valorCusto;
       item.lojaAtualId = editItem.lojaDestinoId;
 
-      // Atualizar peça no estoque
       if (item.pecaId) {
         updatePeca(item.pecaId, {
           descricao: editItem.descricao,
@@ -641,7 +768,8 @@ export const editarLoteConsignacao = async (loteId: string, dados: EditarLoteInp
       if (changes.length > 0) {
         alteracoes.push(`${editItem.descricao}: ${changes.join(', ')}`);
       }
-    });
+      await syncItemToDb(item, loteId);
+    }
   }
 
   // Adicionar novos itens
@@ -662,7 +790,7 @@ export const editarLoteConsignacao = async (loteId: string, dados: EditarLoteInp
       });
 
       const itemId = `CONS-ITEM-${String(nextItemId++).padStart(3, '0')}`;
-      lote.itens.push({
+      const newItem: ItemConsignacao = {
         id: itemId,
         pecaId: pecaCriada.id,
         descricao: novoItem.descricao,
@@ -672,8 +800,10 @@ export const editarLoteConsignacao = async (loteId: string, dados: EditarLoteInp
         valorCusto: novoItem.valorCusto,
         lojaAtualId: novoItem.lojaDestinoId,
         status: 'Disponivel',
-      });
+      };
+      lote.itens.push(newItem);
       alteracoes.push(`Novo item: ${novoItem.descricao} (${novoItem.quantidade} un.)`);
+      await syncItemToDb(newItem, loteId);
     }
   }
 
@@ -686,5 +816,6 @@ export const editarLoteConsignacao = async (loteId: string, dados: EditarLoteInp
     });
   }
 
+  await syncLoteToDb(lote);
   return lote;
 };

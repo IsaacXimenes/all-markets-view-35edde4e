@@ -18,26 +18,56 @@ export type Database = {
         Row: {
           ativo: boolean | null
           cargo: string | null
+          cpf: string | null
           created_at: string | null
+          data_admissao: string | null
+          data_inativacao: string | null
+          data_nascimento: string | null
+          email: string | null
+          foto: string | null
           id: string
           loja_id: string | null
+          modelo_pagamento: string | null
           nome: string
+          salario: number | null
+          status: string | null
+          telefone: string | null
         }
         Insert: {
           ativo?: boolean | null
           cargo?: string | null
+          cpf?: string | null
           created_at?: string | null
+          data_admissao?: string | null
+          data_inativacao?: string | null
+          data_nascimento?: string | null
+          email?: string | null
+          foto?: string | null
           id?: string
           loja_id?: string | null
+          modelo_pagamento?: string | null
           nome: string
+          salario?: number | null
+          status?: string | null
+          telefone?: string | null
         }
         Update: {
           ativo?: boolean | null
           cargo?: string | null
+          cpf?: string | null
           created_at?: string | null
+          data_admissao?: string | null
+          data_inativacao?: string | null
+          data_nascimento?: string | null
+          email?: string | null
+          foto?: string | null
           id?: string
           loja_id?: string | null
+          modelo_pagamento?: string | null
           nome?: string
+          salario?: number | null
+          status?: string | null
+          telefone?: string | null
         }
         Relationships: [
           {
@@ -153,24 +183,54 @@ export type Database = {
       }
       lojas: {
         Row: {
+          ativa: boolean | null
+          cep: string | null
+          cidade: string | null
+          cnpj: string | null
           comissao_percentual: number
           created_at: string | null
+          endereco: string | null
+          estado: string | null
+          horario_funcionamento: string | null
           id: string
           nome: string
+          responsavel: string | null
+          status: string | null
+          telefone: string | null
           tipo: string | null
         }
         Insert: {
+          ativa?: boolean | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
           comissao_percentual: number
           created_at?: string | null
+          endereco?: string | null
+          estado?: string | null
+          horario_funcionamento?: string | null
           id?: string
           nome: string
+          responsavel?: string | null
+          status?: string | null
+          telefone?: string | null
           tipo?: string | null
         }
         Update: {
+          ativa?: boolean | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
           comissao_percentual?: number
           created_at?: string | null
+          endereco?: string | null
+          estado?: string | null
+          horario_funcionamento?: string | null
           id?: string
           nome?: string
+          responsavel?: string | null
+          status?: string | null
+          telefone?: string | null
           tipo?: string | null
         }
         Relationships: []
@@ -299,48 +359,142 @@ export type Database = {
       }
       produtos: {
         Row: {
+          assistencia_conferida: boolean | null
+          bloqueado_em_troca_garantia_id: string | null
+          bloqueado_em_venda_id: string | null
+          condicao: string | null
           cor: string | null
           created_at: string | null
+          custo_assistencia: number | null
+          emprestimo_cliente_id: string | null
+          emprestimo_cliente_nome: string | null
+          emprestimo_data_hora: string | null
+          emprestimo_garantia_id: string | null
+          emprestimo_os_id: string | null
+          estoque_conferido: boolean | null
+          historico_custo: Json | null
+          historico_valor_recomendado: Json | null
           id: string
+          imagem: string | null
           imei: string | null
+          loja_atual_id: string | null
           loja_id: string | null
+          lote_revisao_id: string | null
           marca: string
           modelo: string
+          movimentacao_id: string | null
+          origem_entrada: string | null
+          pareceres: string | null
+          quantidade: number | null
+          retirada_pecas_id: string | null
           saude_bateria: number | null
           status: string | null
+          status_emprestimo: string | null
+          status_movimentacao: string | null
+          status_nota: string | null
+          status_retirada_pecas: string | null
+          status_revisao_tecnica: string | null
+          tag_retorno_assistencia: string | null
+          timeline: Json | null
           tipo: string | null
           valor_custo: number | null
           valor_venda_sugerido: number | null
+          venda_recomendada: number | null
         }
         Insert: {
+          assistencia_conferida?: boolean | null
+          bloqueado_em_troca_garantia_id?: string | null
+          bloqueado_em_venda_id?: string | null
+          condicao?: string | null
           cor?: string | null
           created_at?: string | null
+          custo_assistencia?: number | null
+          emprestimo_cliente_id?: string | null
+          emprestimo_cliente_nome?: string | null
+          emprestimo_data_hora?: string | null
+          emprestimo_garantia_id?: string | null
+          emprestimo_os_id?: string | null
+          estoque_conferido?: boolean | null
+          historico_custo?: Json | null
+          historico_valor_recomendado?: Json | null
           id?: string
+          imagem?: string | null
           imei?: string | null
+          loja_atual_id?: string | null
           loja_id?: string | null
+          lote_revisao_id?: string | null
           marca: string
           modelo: string
+          movimentacao_id?: string | null
+          origem_entrada?: string | null
+          pareceres?: string | null
+          quantidade?: number | null
+          retirada_pecas_id?: string | null
           saude_bateria?: number | null
           status?: string | null
+          status_emprestimo?: string | null
+          status_movimentacao?: string | null
+          status_nota?: string | null
+          status_retirada_pecas?: string | null
+          status_revisao_tecnica?: string | null
+          tag_retorno_assistencia?: string | null
+          timeline?: Json | null
           tipo?: string | null
           valor_custo?: number | null
           valor_venda_sugerido?: number | null
+          venda_recomendada?: number | null
         }
         Update: {
+          assistencia_conferida?: boolean | null
+          bloqueado_em_troca_garantia_id?: string | null
+          bloqueado_em_venda_id?: string | null
+          condicao?: string | null
           cor?: string | null
           created_at?: string | null
+          custo_assistencia?: number | null
+          emprestimo_cliente_id?: string | null
+          emprestimo_cliente_nome?: string | null
+          emprestimo_data_hora?: string | null
+          emprestimo_garantia_id?: string | null
+          emprestimo_os_id?: string | null
+          estoque_conferido?: boolean | null
+          historico_custo?: Json | null
+          historico_valor_recomendado?: Json | null
           id?: string
+          imagem?: string | null
           imei?: string | null
+          loja_atual_id?: string | null
           loja_id?: string | null
+          lote_revisao_id?: string | null
           marca?: string
           modelo?: string
+          movimentacao_id?: string | null
+          origem_entrada?: string | null
+          pareceres?: string | null
+          quantidade?: number | null
+          retirada_pecas_id?: string | null
           saude_bateria?: number | null
           status?: string | null
+          status_emprestimo?: string | null
+          status_movimentacao?: string | null
+          status_nota?: string | null
+          status_retirada_pecas?: string | null
+          status_revisao_tecnica?: string | null
+          tag_retorno_assistencia?: string | null
+          timeline?: Json | null
           tipo?: string | null
           valor_custo?: number | null
           valor_venda_sugerido?: number | null
+          venda_recomendada?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "produtos_loja_atual_id_fkey"
+            columns: ["loja_atual_id"]
+            isOneToOne: false
+            referencedRelation: "lojas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "produtos_loja_id_fkey"
             columns: ["loja_id"]

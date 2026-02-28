@@ -447,7 +447,7 @@ export const finalizarVenda = (
   saveFluxoData(fluxoData);
 
   // INTEGRAÇÃO MOTOBOY: Ativar demandas pendentes após conferência financeira
-  ativarDemandasPorVenda(vendaId);
+  ativarDemandasPorVenda(vendaId).catch(e => console.error('[FLUXO] Erro motoboy:', e));
   
   // MIGRAÇÃO AUTOMÁTICA: Após pagamento financeiro, trade-ins vão para Aparelhos Pendentes - Estoque
   if (venda && venda.tradeIns && venda.tradeIns.length > 0) {
@@ -629,7 +629,7 @@ export const finalizarVendaDowngrade = (
   saveFluxoData(fluxoData);
 
   // INTEGRAÇÃO MOTOBOY: Ativar demandas pendentes após conferência financeira
-  ativarDemandasPorVenda(vendaId);
+  ativarDemandasPorVenda(vendaId).catch(e => console.error('[FLUXO] Erro motoboy:', e));
 
   // Registrar saída financeira no extrato
   if (saldoDevolver > 0) {
@@ -752,7 +752,7 @@ export const finalizarVendaFiado = (
   saveFluxoData(fluxoData);
 
   // INTEGRAÇÃO MOTOBOY: Ativar demandas pendentes após conferência financeira
-  ativarDemandasPorVenda(vendaId);
+  ativarDemandasPorVenda(vendaId).catch(e => console.error('[FLUXO] Erro motoboy:', e));
 
   // Criar dívida automaticamente
   const pagFiado = venda.pagamentos?.find((p: any) => p.isFiado);

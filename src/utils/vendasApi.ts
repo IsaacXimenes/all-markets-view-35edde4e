@@ -541,7 +541,7 @@ export const addVenda = async (venda: Omit<Venda, 'id' | 'numero'>): Promise<Ven
       const colaboradorMotoboy = getColaboradorById(venda.motoboyId);
       const motoboyNome = colaboradorMotoboy?.nome || 'Motoboy';
       const localEntrega = (venda as any).localEntregaNome || venda.clienteCidade || 'Endereço Cliente';
-      addDemandaMotoboy({
+      await addDemandaMotoboy({
         motoboyId: venda.motoboyId,
         motoboyNome,
         data: venda.dataHora ? venda.dataHora.split('T')[0] : new Date().toISOString().split('T')[0],

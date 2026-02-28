@@ -39,21 +39,26 @@ export default function VendasConferenciaGestorDetalhes() {
     }
   }, [id]);
 
-  const handleValidar = () => {
+  const handleValidar = async () => {
     if (!gestorSelecionado || !venda) return;
     setLoading(true);
-    const gestor = gestores.find(g => g.id === gestorSelecionado);
-    const result = validarVendaGestor(venda.id, gestorSelecionado, gestor?.nome || '', observacao);
-    
-    if (result) {
-      toast({
-        title: "Venda Validada!",
-        description: `Venda ${venda.vendaId} conferida e enviada ao Financeiro.`,
-      });
-      setShowModal(false);
-      navigate('/vendas/conferencia-gestor');
+    try {
+      const gestor = gestores.find(g => g.id === gestorSelecionado);
+      const result = await validarVendaGestor(venda.id, gestorSelecionado, gestor?.nome || '', observacao);
+      
+      if (result) {
+        toast({
+          title: "Venda Validada!",
+          description: `Venda ${venda.vendaId} conferida e enviada ao Financeiro.`,
+        });
+        setShowModal(false);
+        navigate('/vendas/conferencia-gestor');
+      }
+    } catch (err) {
+      console.error('Erro ao validar venda:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (!venda) {

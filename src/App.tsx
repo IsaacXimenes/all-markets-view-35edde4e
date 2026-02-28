@@ -16,6 +16,11 @@ import { initContatosAtivosCache, initRegistrosAnaliseCache } from "@/utils/gara
 import { initAtividadesGestoresCache } from "@/utils/atividadesGestoresApi";
 import { initVendasDigitaisCache } from "@/utils/vendasDigitalApi";
 import { initGestaoAdministrativaCache } from "@/utils/gestaoAdministrativaApi";
+import { initConferenciasGestorCache } from "@/utils/conferenciaGestorApi";
+import { initFluxoVendasCache } from "@/utils/fluxoVendasApi";
+import { initPendenciasFinanceirasCache } from "@/utils/pendenciasFinanceiraApi";
+import { initSolicitacoesPecasCache, initNotasAssistenciaCache, initLotesPagamentoCache } from "@/utils/solicitacaoPecasApi";
+import { initProdutosPendentesCache } from "@/utils/osApi";
 import Login from "./pages/Login";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -170,6 +175,13 @@ const AppInitializer = ({ children }: { children: React.ReactNode }) => {
         initAtividadesGestoresCache(),
         initVendasDigitaisCache(),
         initGestaoAdministrativaCache(),
+        initConferenciasGestorCache(),
+        initFluxoVendasCache(),
+        initPendenciasFinanceirasCache(),
+        initSolicitacoesPecasCache(),
+        initNotasAssistenciaCache(),
+        initLotesPagamentoCache(),
+        initProdutosPendentesCache(),
       ]).catch(err => console.error('Erro ao inicializar caches:', err));
     }
   }, [inicializado]);

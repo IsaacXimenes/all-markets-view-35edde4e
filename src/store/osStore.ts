@@ -45,15 +45,8 @@ export const useOSStore = create<OSState>()(
       })),
       
       syncFromLocalStorage: () => {
-        try {
-          const osData = localStorage.getItem('ordens_servico');
-          if (osData) set({ ordensServico: JSON.parse(osData) });
-          
-          const spData = localStorage.getItem('solicitacoes_pecas');
-          if (spData) set({ solicitacoesPecas: JSON.parse(spData) });
-        } catch (error) {
-          console.error('Erro ao sincronizar do localStorage:', error);
-        }
+        // Legacy: localStorage sync removido - dados agora persistidos no Supabase
+        console.log('[OSStore] syncFromLocalStorage é legado - dados vêm do Supabase');
       }
     }),
     {

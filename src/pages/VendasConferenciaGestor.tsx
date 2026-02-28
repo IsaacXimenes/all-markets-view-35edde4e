@@ -262,7 +262,7 @@ export default function VendasConferenciaGestor() {
     );
   };
 
-  const handleFinalizarAprovacao = () => {
+  const handleFinalizarAprovacao = async () => {
     if (!vendaSelecionada) return;
 
     // Para vendas Downgrade, não há validação de pagamentos
@@ -297,13 +297,12 @@ export default function VendasConferenciaGestor() {
         JSON.stringify(obsGestor)
       );
     } else {
-      // Limpar observação residual do localStorage se vazio
       localStorage.removeItem(`observacao_gestor_${vendaSelecionada.id}`);
     }
 
     // Se for Downgrade, enviar para Pagamento Downgrade
     if (isDowngrade) {
-      const resultado = enviarParaPagamentoDowngrade(
+      const resultado = await enviarParaPagamentoDowngrade(
         vendaSelecionada.id,
         usuarioLogado.id,
         usuarioLogado.nome,
@@ -318,8 +317,7 @@ export default function VendasConferenciaGestor() {
         toast.error('Erro ao aprovar venda. Verifique o status.');
       }
     } else {
-      // Fluxo normal: enviar para Conferência Financeiro (ou Fiado se aplicável)
-      const resultado = aprovarGestor(
+      const resultado = await aprovarGestor(
         vendaSelecionada.id,
         usuarioLogado.id,
         usuarioLogado.nome
@@ -337,13 +335,13 @@ export default function VendasConferenciaGestor() {
     }
   };
 
-  const handleRecusarGestor = () => {
+  const handleRecusarGestor = async () => {
     if (!vendaSelecionada || !motivoRecusa.trim()) {
       toast.error('Por favor, informe o motivo da recusa.');
       return;
     }
 
-    const resultado = recusarGestor(
+    const resultado = await recusarGestor(
       vendaSelecionada.id,
       usuarioLogado.id,
       usuarioLogado.nome,

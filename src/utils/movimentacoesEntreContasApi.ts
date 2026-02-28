@@ -106,6 +106,6 @@ export const addLogMovimentacao = async (mov: MovimentacaoEntreConta): Promise<v
     valor: mov.valor,
     observacao: mov.observacao,
   }).select().single();
-  if (error) console.error('Erro ao adicionar log movimentação:', error);
+  if (error) { console.error('Erro ao adicionar log movimentação:', error); throw error; }
   if (row) _logsCache.unshift(mapLogRow(row));
 };

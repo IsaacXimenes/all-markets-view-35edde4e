@@ -117,7 +117,7 @@ export default function GarantiasNova() {
       const meses = item.mesesGarantia || 12;
       const dataFimCalc = format(addMonths(dataVenda, meses), 'yyyy-MM-dd');
       
-      const novaGarantia = addGarantia({
+      const novaGarantia = await addGarantia({
         vendaId: venda.id,
         itemVendaId: item.id,
         produtoId: item.produtoId,

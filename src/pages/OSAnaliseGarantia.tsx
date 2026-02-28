@@ -135,7 +135,7 @@ export default function OSAnaliseGarantia() {
     setShowDetalhesModal(true);
   };
 
-  const handleConfirmarAprovacao = () => {
+  const handleConfirmarAprovacao = async () => {
     if (!registroSelecionado || !tecnicoSelecionado) {
       toast.error('Selecione um técnico');
       return;
@@ -197,7 +197,7 @@ export default function OSAnaliseGarantia() {
         }
       }
 
-      const novaOS = addOrdemServico({
+      const novaOS = await addOrdemServico({
         dataHora: new Date().toISOString(),
         clienteId,
         lojaId: lojaSelecionada,

@@ -756,7 +756,7 @@ export default function OSAssistenciaNova() {
       : origemOS === 'estoque' ? 'Estoque' as const
       : 'Balcão' as const;
 
-    const novaOS = addOrdemServico({
+    const novaOS = await addOrdemServico({
       dataHora,
       clienteId,
       setor: (setor || 'ASSISTÊNCIA') as 'GARANTIA' | 'ASSISTÊNCIA' | 'TROCA',
@@ -808,7 +808,7 @@ export default function OSAssistenciaNova() {
 
     // Persistir timeline de baixa de estoque na OS recém-criada
     if (pecasComBaixa.length > 0 && timeline.length > 1) {
-      updateOrdemServico(novaOS.id, { timeline: [...timeline] });
+      await updateOrdemServico(novaOS.id, { timeline: [...timeline] });
     }
 
     // Persistir solicitações de peças na API
@@ -826,7 +826,7 @@ export default function OSAssistenciaNova() {
 
       // Atualizar status da OS para "Solicitação Enviada"
       const timelineAtual = novaOS.timeline || timeline;
-      updateOrdemServico(novaOS.id, {
+      await updateOrdemServico(novaOS.id, {
         status: 'Solicitação Enviada',
         timeline: [...timelineAtual, {
           data: new Date().toISOString(),

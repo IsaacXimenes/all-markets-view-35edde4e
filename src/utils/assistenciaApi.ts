@@ -1,42 +1,9 @@
-// Assistência API - Mock Data
-
+// Assistência API - Supabase
+import { supabase } from '@/integrations/supabase/client';
 import { getClientes, getLojas, getColaboradoresByPermissao, getFornecedores, addCliente, Cliente } from './cadastrosApi';
 import { getPecaById, getPecaByDescricao, updatePeca } from './pecasApi';
 import { formatCurrency } from './formatUtils';
 import { marcarSolicitacoesOSCancelada } from './solicitacaoPecasApi';
-
-// Sistema centralizado de IDs para OS
-let globalOSIdCounter = 100;
-const registeredOSIds = new Set<string>();
-
-const initializeOSIds = (existingIds: string[]) => {
-  existingIds.forEach(id => registeredOSIds.add(id));
-  existingIds.forEach(id => {
-    const match = id.match(/OS-\d{4}-(\d+)/);
-    if (match) {
-      const num = parseInt(match[1]);
-      if (num >= globalOSIdCounter) {
-        globalOSIdCounter = num + 1;
-      }
-    }
-  });
-};
-
-const generateOSId = (): string => {
-  const year = new Date().getFullYear();
-  let newId: string;
-  do {
-    newId = `OS-${year}-${String(globalOSIdCounter).padStart(4, '0')}`;
-    globalOSIdCounter++;
-  } while (registeredOSIds.has(newId));
-  
-  registeredOSIds.add(newId);
-  return newId;
-};
-
-export const isOSIdRegistered = (id: string): boolean => {
-  return registeredOSIds.has(id);
-};
 
 export interface PecaServico {
   id: string;
@@ -52,13 +19,11 @@ export interface PecaServico {
   unidadeServico: string;
   pecaNoEstoque: boolean;
   pecaDeFornecedor: boolean;
-  // Novos campos para fluxo de aprovação
   statusAprovacao?: 'Pendente' | 'Aguardando Aprovação' | 'Aprovado' | 'Rejeitado' | 'Pagamento - Financeiro' | 'Pagamento Finalizado' | 'Aguardando Chegada' | 'Em Estoque' | 'Utilizado' | 'Não Utilizado';
   motivoRejeicao?: string;
   contaOrigemPagamento?: string;
   dataPagamento?: string;
   dataRecebimento?: string;
-  // DNA da Peça - Rastreabilidade Cruzada
   origemServico?: 'Balcao' | 'Garantia' | 'Estoque';
   origemPeca?: 'Consignado' | 'Estoque Thiago' | 'Retirada de Pecas' | 'Fornecedor';
   valorCustoReal?: number;
@@ -76,7 +41,7 @@ export interface Pagamento {
 
 export interface TimelineOS {
   data: string;
-  fotos?: string[]; // URLs/base64 de fotos associadas ao evento
+  fotos?: string[];
   tipo: 'registro' | 'status' | 'peca' | 'pagamento' | 'aprovacao' | 'rejeicao' | 'financeiro' | 'baixa_estoque' | 'foto' | 'conclusao_servico' | 'validacao_financeiro';
   descricao: string;
   responsavel: string;
@@ -97,7 +62,6 @@ export interface OrdemServico {
   timeline: TimelineOS[];
   valorTotal: number;
   custoTotal: number;
-  // Novos campos para origem e valor do produto
   origemOS?: 'Venda' | 'Garantia' | 'Estoque' | 'Balcão';
   vendaId?: string;
   garantiaId?: string;
@@ -106,7 +70,6 @@ export interface OrdemServico {
   modeloAparelho?: string;
   imeiAparelho?: string;
   idVendaAntiga?: string;
-  // Campos do fluxo de 3 etapas
   proximaAtuacao?: 'Técnico: Avaliar/Executar' | 'Vendedor: Registrar Pagamento' | 'Financeiro: Conferir Lançamento' | 'Gestor: Aprovar Peça' | 'Logística: Enviar Peça' | 'Concluído' | 'Técnico' | 'Gestor (Suprimentos)' | 'Técnico (Recebimento)' | 'Gestor/Vendedor' | 'Gestor (Conferência)' | 'Financeiro' | 'Atendente' | 'Gestor' | 'Gestor (Estoque)' | '-';
   valorCustoTecnico?: number;
   valorVendaTecnico?: number;
@@ -114,11 +77,9 @@ export interface OrdemServico {
   fotosEntrada?: string[];
   resumoConclusao?: string;
   observacaoOrigem?: string;
-  // Campos de recusa pelo técnico
   recusadaTecnico?: boolean;
   motivoRecusaTecnico?: string;
   conclusaoServico?: string;
-  // Campos para Lote de Revisão
   loteRevisaoId?: string;
   loteRevisaoItemId?: string;
   itensLoteRevisao?: {
@@ -131,9 +92,7 @@ export interface OrdemServico {
     custoReparo: number;
     statusReparo: 'Pendente' | 'Em Andamento' | 'Concluido';
   }[];
-  // Cronômetro de Produtividade
   cronometro?: CronometroOS;
-  // Evidências do serviço
   evidencias?: { nome: string; tipo: string; dataAnexo: string; usuario: string }[];
 }
 
@@ -147,396 +106,376 @@ export interface CronometroOS {
   tempoManualMs?: number;
 }
 
-// Mock data
-let ordensServico: OrdemServico[] = [
-  // 1. Aguardando Análise (entrada inicial - triagem)
-  {
-    id: 'OS-2025-0001',
-    dataHora: '2025-01-20T09:30:00',
-    clienteId: 'CLI-001',
-    setor: 'GARANTIA',
-    tecnicoId: 'df31dae3',
-    lojaId: '3cfbf69f',
-    status: 'Aguardando Análise',
-    proximaAtuacao: 'Técnico: Avaliar/Executar',
-    pecas: [],
-    pagamentos: [],
-    descricao: 'iPhone 14 Pro com tela trincada - aguardando triagem técnica',
-    timeline: [
-      { data: '2025-01-20T09:30:00', tipo: 'registro', descricao: 'OS registrada via balcão', responsavel: 'Fernando Lima' }
-    ],
-    valorTotal: 0,
-    custoTotal: 0,
-    modeloAparelho: 'iPhone 14 Pro',
-    imeiAparelho: '123456789012345',
-    origemOS: 'Balcão'
-  },
-  // 2. Em serviço (técnico trabalhando)
-  // 2. Em serviço (técnico trabalhando)
-  {
-    id: 'OS-2025-0002',
-    dataHora: '2025-01-18T10:00:00',
-    clienteId: 'CLI-002',
-    setor: 'ASSISTÊNCIA',
-    tecnicoId: 'be61a9df',
-    lojaId: '94dbe2b1',
-    status: 'Em serviço',
-    proximaAtuacao: 'Técnico',
-    pecas: [
-      { id: 'PC-002', peca: 'Troca de bateria', imei: '234567890123456', valor: 280, percentual: 0, valorTotal: 280, servicoTerceirizado: false, unidadeServico: '94dbe2b1', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Balcao', origemPeca: 'Estoque Thiago', valorCustoReal: 120 }
-    ],
-    pagamentos: [],
-    descricao: 'Substituição de bateria degradada - saúde 62%',
-    timeline: [
-      { data: '2025-01-18T10:00:00', tipo: 'registro', descricao: 'OS registrada', responsavel: 'Jeferson Sousa Cabral' },
-      { data: '2025-01-18T10:30:00', tipo: 'status', descricao: 'OS assumida pelo técnico', responsavel: 'Jeferson Sousa Cabral' }
-    ],
-    valorTotal: 280,
-    custoTotal: 120,
-    modeloAparelho: 'iPhone 13',
-    imeiAparelho: '234567890123456',
-    origemOS: 'Balcão'
-  },
-  // 3. Solicitação Enviada (aguardando aprovação do gestor para peça)
-  {
-    id: 'OS-2025-0003',
-    dataHora: '2025-01-17T11:30:00',
-    clienteId: 'CLI-003',
-    setor: 'ASSISTÊNCIA',
-    tecnicoId: '53a1a9ad',
-    lojaId: '3cfbf69f',
-    status: 'Solicitação de Peça',
-    proximaAtuacao: 'Gestor (Suprimentos)',
-    pecas: [
-      { id: 'PC-003', peca: 'Display OLED iPhone 15', imei: '345678901234567', valor: 1200, percentual: 0, valorTotal: 1200, servicoTerceirizado: false, unidadeServico: '3cfbf69f', pecaNoEstoque: false, pecaDeFornecedor: true, statusAprovacao: 'Aguardando Aprovação', origemServico: 'Garantia', origemPeca: 'Fornecedor', valorCustoReal: 650 }
-    ],
-    pagamentos: [],
-    descricao: 'Troca de display OLED com burn-in - peça solicitada à matriz',
-    timeline: [
-      { data: '2025-01-17T11:30:00', tipo: 'registro', descricao: 'OS registrada', responsavel: 'Julio Cesar da Silva' },
-      { data: '2025-01-17T12:00:00', tipo: 'status', descricao: 'Em serviço', responsavel: 'Julio Cesar da Silva' },
-      { data: '2025-01-17T14:00:00', tipo: 'peca', descricao: 'Solicitação de peça enviada para aprovação do gestor', responsavel: 'Julio Cesar da Silva' }
-    ],
-    valorTotal: 1200,
-    custoTotal: 650,
-    modeloAparelho: 'iPhone 15',
-    imeiAparelho: '345678901234567',
-    origemOS: 'Garantia'
-  },
-  // 4. Aguardando Peça (peça aprovada, aguardando chegada)
-  {
-    id: 'OS-2025-0004',
-    dataHora: '2025-01-15T14:00:00',
-    clienteId: 'CLI-004',
-    setor: 'GARANTIA',
-    tecnicoId: '3a4e96c7',
-    lojaId: 'ba1802b9',
-    status: 'Aguardando Peça',
-    proximaAtuacao: 'Logística: Enviar Peça',
-    pecas: [
-      { id: 'PC-004', peca: 'Conector de carga USB-C', imei: '456789012345678', valor: 180, percentual: 0, valorTotal: 180, servicoTerceirizado: false, unidadeServico: 'ba1802b9', pecaNoEstoque: false, pecaDeFornecedor: true, statusAprovacao: 'Aprovado', origemServico: 'Garantia', origemPeca: 'Fornecedor', valorCustoReal: 60 }
-    ],
-    pagamentos: [],
-    descricao: 'Troca de conector de carga - peça aprovada, aguardando entrega',
-    timeline: [
-      { data: '2025-01-15T14:00:00', tipo: 'registro', descricao: 'OS registrada', responsavel: 'Marcos Serra de Sousa' },
-      { data: '2025-01-15T15:00:00', tipo: 'status', descricao: 'Solicitação de peça enviada', responsavel: 'Marcos Serra de Sousa' },
-      { data: '2025-01-16T09:00:00', tipo: 'aprovacao', descricao: 'Peça aprovada pelo gestor', responsavel: 'João Gestor' },
-      { data: '2025-01-16T10:00:00', tipo: 'financeiro', descricao: 'Pagamento ao fornecedor realizado', responsavel: 'João Gestor' }
-    ],
-    valorTotal: 180,
-    custoTotal: 60,
-    modeloAparelho: 'Samsung S24',
-    imeiAparelho: '456789012345678',
-    origemOS: 'Garantia'
-  },
-  // 5. Técnico (Recebimento) - peça chegou, técnico precisa confirmar
-  {
-    id: 'OS-2025-0005',
-    dataHora: '2025-01-14T09:00:00',
-    clienteId: 'CLI-001',
-    setor: 'ASSISTÊNCIA',
-    tecnicoId: 'df31dae3',
-    lojaId: 'be961085',
-    status: 'Peça Recebida',
-    proximaAtuacao: 'Técnico (Recebimento)',
-    pecas: [
-      { id: 'PC-005', peca: 'Câmera traseira iPhone 14', imei: '567890123456789', valor: 350, percentual: 0, valorTotal: 350, servicoTerceirizado: false, unidadeServico: 'be961085', pecaNoEstoque: false, pecaDeFornecedor: true, statusAprovacao: 'Pagamento Finalizado', origemServico: 'Balcao', origemPeca: 'Fornecedor', valorCustoReal: 180 }
-    ],
-    pagamentos: [],
-    descricao: 'Câmera com defeito de foco - peça recebida, aguardando confirmação do técnico',
-    timeline: [
-      { data: '2025-01-14T09:00:00', tipo: 'registro', descricao: 'OS registrada', responsavel: 'Gabriel Soares Lima' },
-      { data: '2025-01-14T10:00:00', tipo: 'peca', descricao: 'Solicitação de peça enviada', responsavel: 'Gabriel Soares Lima' },
-      { data: '2025-01-15T09:00:00', tipo: 'aprovacao', descricao: 'Peça aprovada', responsavel: 'João Gestor' },
-      { data: '2025-01-16T14:00:00', tipo: 'peca', descricao: 'Peça recebida na loja', responsavel: 'Logística' }
-    ],
-    valorTotal: 350,
-    custoTotal: 180,
-    modeloAparelho: 'iPhone 14',
-    imeiAparelho: '567890123456789',
-    origemOS: 'Balcão'
-  },
-  // 6. Finalizado (técnico concluiu, aguardando pagamento do vendedor)
-  {
-    id: 'OS-2025-0006',
-    dataHora: '2025-01-12T15:30:00',
-    clienteId: 'CLI-002',
-    setor: 'ASSISTÊNCIA',
-    tecnicoId: 'be61a9df',
-    lojaId: '3cfbf69f',
-    status: 'Serviço concluído',
-    proximaAtuacao: 'Atendente',
-    resumoConclusao: 'Reparo concluído com sucesso. Placa lógica restaurada via micro solda.',
-    valorCustoTecnico: 450,
-    valorVendaTecnico: 880,
-    pecas: [
-      { id: 'PC-006', peca: 'Reparo placa lógica', imei: '678901234567890', valor: 800, percentual: 0, valorTotal: 800, servicoTerceirizado: true, descricaoTerceirizado: 'Micro solda especializada', fornecedorId: 'FORN-005', unidadeServico: '3cfbf69f', pecaNoEstoque: false, pecaDeFornecedor: true, origemServico: 'Balcao', origemPeca: 'Fornecedor', valorCustoReal: 380 },
-      { id: 'PC-007', peca: 'Limpeza interna', valor: 80, percentual: 0, valorTotal: 80, servicoTerceirizado: false, unidadeServico: '3cfbf69f', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Balcao', origemPeca: 'Estoque Thiago', valorCustoReal: 20 }
-    ],
-    pagamentos: [],
-    descricao: 'Reparo em placa lógica após queda com água',
-    timeline: [
-      { data: '2025-01-12T15:30:00', tipo: 'registro', descricao: 'OS registrada', responsavel: 'Jeferson Sousa Cabral' },
-      { data: '2025-01-12T16:00:00', tipo: 'status', descricao: 'Em serviço', responsavel: 'Jeferson Sousa Cabral' },
-      { data: '2025-01-13T10:00:00', tipo: 'peca', descricao: 'Peça enviada para terceirizado', responsavel: 'Jeferson Sousa Cabral' },
-      { data: '2025-01-15T10:00:00', tipo: 'peca', descricao: 'Peça retornou do terceirizado', responsavel: 'Jeferson Sousa Cabral' },
-      { data: '2025-01-15T17:00:00', tipo: 'conclusao_servico', descricao: 'OS finalizada pelo técnico. Custo: R$ 450,00, Venda: R$ 880,00', responsavel: 'Jeferson Sousa Cabral' }
-    ],
-    valorTotal: 880,
-    custoTotal: 450,
-    modeloAparelho: 'iPhone 13 Pro Max',
-    imeiAparelho: '678901234567890',
-    origemOS: 'Balcão'
-  },
-  // 7. Serviço concluído (pagamento registrado, aguardando conferência)
-  {
-    id: 'OS-2025-0007',
-    dataHora: '2025-01-10T08:00:00',
-    clienteId: 'CLI-004',
-    setor: 'GARANTIA',
-    tecnicoId: '53a1a9ad',
-    lojaId: '94dbe2b1',
-    status: 'Conferência do Gestor',
-    proximaAtuacao: 'Gestor',
-    resumoConclusao: 'Alto-falante e microfone substituídos com sucesso.',
-    valorCustoTecnico: 80,
-    valorVendaTecnico: 200,
-    pecas: [
-      { id: 'PC-008', peca: 'Alto-falante', imei: '789012345678901', valor: 150, percentual: 0, valorTotal: 150, servicoTerceirizado: false, unidadeServico: '94dbe2b1', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Garantia', origemPeca: 'Consignado', valorCustoReal: 45 },
-      { id: 'PC-009', peca: 'Microfone', valor: 50, percentual: 0, valorTotal: 50, servicoTerceirizado: false, unidadeServico: '94dbe2b1', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Garantia', origemPeca: 'Estoque Thiago', valorCustoReal: 15 }
-    ],
-    pagamentos: [
-      { id: 'PAG-007', meio: 'Pix', valor: 200 }
-    ],
-    descricao: 'Problemas de áudio - alto-falante e microfone substituídos',
-    timeline: [
-      { data: '2025-01-10T08:00:00', tipo: 'registro', descricao: 'OS registrada', responsavel: 'Julio Cesar da Silva' },
-      { data: '2025-01-10T09:00:00', tipo: 'status', descricao: 'Em serviço', responsavel: 'Julio Cesar da Silva' },
-      { data: '2025-01-10T16:00:00', tipo: 'conclusao_servico', descricao: 'OS finalizada pelo técnico', responsavel: 'Julio Cesar da Silva' },
-      { data: '2025-01-11T10:00:00', tipo: 'pagamento', descricao: 'Pagamento de R$ 200,00 via Pix registrado', responsavel: 'Fernando Lima' }
-    ],
-    valorTotal: 200,
-    custoTotal: 80,
-    modeloAparelho: 'Samsung S23',
-    imeiAparelho: '789012345678901',
-    origemOS: 'Garantia'
-  },
-  // 8. Concluído (conferência aprovada - finalizado)
-  {
-    id: 'OS-2025-0008',
-    dataHora: '2025-01-08T11:00:00',
-    clienteId: 'CLI-003',
-    setor: 'ASSISTÊNCIA',
-    tecnicoId: '3a4e96c7',
-    lojaId: 'ba1802b9',
-    status: 'Liquidado',
-    proximaAtuacao: '-',
-    resumoConclusao: 'Troca de tela realizada com sucesso. Aparelho testado e funcionando.',
-    valorCustoTecnico: 200,
-    valorVendaTecnico: 450,
-    pecas: [
-      { id: 'PC-010', peca: 'Troca de tela', imei: '890123456789012', valor: 450, percentual: 0, valorTotal: 450, servicoTerceirizado: false, unidadeServico: 'ba1802b9', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Balcao', origemPeca: 'Retirada de Pecas', valorCustoReal: 200 }
-    ],
-    pagamentos: [
-      { id: 'PAG-008', meio: 'Cartão Crédito', valor: 450, parcelas: 2 }
-    ],
-    descricao: 'Troca de tela iPhone 13 - fluxo completo concluído',
-    timeline: [
-      { data: '2025-01-08T11:00:00', tipo: 'registro', descricao: 'OS registrada', responsavel: 'Marcos Serra de Sousa' },
-      { data: '2025-01-08T12:00:00', tipo: 'status', descricao: 'Em serviço', responsavel: 'Marcos Serra de Sousa' },
-      { data: '2025-01-08T17:00:00', tipo: 'conclusao_servico', descricao: 'OS finalizada pelo técnico', responsavel: 'Marcos Serra de Sousa' },
-      { data: '2025-01-09T09:00:00', tipo: 'pagamento', descricao: 'Pagamento registrado pelo vendedor', responsavel: 'Fernando Lima' },
-      { data: '2025-01-09T14:00:00', tipo: 'validacao_financeiro', descricao: 'Conferência aprovada pelo gestor', responsavel: 'João Gestor' }
-    ],
-    valorTotal: 450,
-    custoTotal: 200,
-    modeloAparelho: 'iPhone 13',
-    imeiAparelho: '890123456789012',
-    origemOS: 'Balcão'
-  },
-  // 9. OS de Estoque - Validar Aparelho (teste de ciclo retrabalho)
-  {
-    id: 'OS-2025-0009',
-    dataHora: '2025-01-22T10:00:00',
-    clienteId: 'CLI-001',
-    setor: 'ASSISTÊNCIA',
-    tecnicoId: 'be61a9df',
-    lojaId: '94dbe2b1',
-    status: 'Serviço Concluído - Validar Aparelho' as any,
-    proximaAtuacao: 'Gestor (Estoque)',
-    pecas: [
-      { id: 'PC-009', peca: 'Troca de tela OLED', imei: '999888777666555', valor: 450, percentual: 0, valorTotal: 450, servicoTerceirizado: false, unidadeServico: '94dbe2b1', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Estoque', origemPeca: 'Estoque Thiago', valorCustoReal: 450 }
-    ],
-    pagamentos: [],
-    descricao: 'Aparelho do estoque com tela danificada - reparo concluído pelo técnico',
-    resumoConclusao: 'Tela OLED substituída com sucesso. Aparelho testado e funcionando normalmente.',
-    timeline: [
-      { data: '2025-01-22T10:00:00', tipo: 'registro', descricao: 'OS registrada - Aparelho do estoque para reparo', responsavel: 'João Gestor' },
-      { data: '2025-01-22T11:00:00', tipo: 'status', descricao: 'Técnico assumiu o reparo', responsavel: 'Jeferson Sousa Cabral' },
-      { data: '2025-01-22T16:00:00', tipo: 'conclusao_servico', descricao: 'Serviço concluído - Aparelho enviado para validação do Estoque', responsavel: 'Jeferson Sousa Cabral' }
-    ],
-    valorTotal: 0,
-    valorCustoTecnico: 450,
-    custoTotal: 450,
-    modeloAparelho: 'iPhone 15 Pro Max',
-    imeiAparelho: '999888777666555',
-    origemOS: 'Estoque'
-  },
-  // 10. Balcão + Consignado + Manual (Liquidado)
-  {
-    id: 'OS-2025-0010',
-    dataHora: '2025-01-25T09:00:00',
-    clienteId: 'CLI-002',
-    setor: 'ASSISTÊNCIA',
-    tecnicoId: 'df31dae3',
-    lojaId: '3cfbf69f',
-    status: 'Liquidado',
-    proximaAtuacao: '-',
-    resumoConclusao: 'Tela LCD substituída e película aplicada com sucesso.',
-    valorCustoTecnico: 295,
-    valorVendaTecnico: 550,
-    pecas: [
-      { id: 'PC-010a', peca: 'Tela LCD iPhone 12', imei: '101010101010101', valor: 500, percentual: 0, valorTotal: 500, servicoTerceirizado: false, unidadeServico: '3cfbf69f', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Balcao', origemPeca: 'Consignado', valorCustoReal: 280 },
-      { id: 'PC-010b', peca: 'Película Especial', valor: 50, percentual: 0, valorTotal: 50, servicoTerceirizado: false, unidadeServico: '3cfbf69f', pecaNoEstoque: false, pecaDeFornecedor: false, origemServico: 'Balcao', origemPeca: 'Estoque Thiago', valorCustoReal: 15 }
-    ],
-    pagamentos: [
-      { id: 'PAG-010', meio: 'Pix', valor: 550 }
-    ],
-    descricao: 'Troca de tela LCD iPhone 12 + película especial',
-    timeline: [
-      { data: '2025-01-25T09:00:00', tipo: 'registro', descricao: 'OS registrada via balcão', responsavel: 'Fernando Lima' },
-      { data: '2025-01-25T10:00:00', tipo: 'status', descricao: 'Em serviço', responsavel: 'Gabriel Soares Lima' },
-      { data: '2025-01-25T15:00:00', tipo: 'conclusao_servico', descricao: 'Serviço concluído pelo técnico', responsavel: 'Gabriel Soares Lima' },
-      { data: '2025-01-25T16:00:00', tipo: 'pagamento', descricao: 'Pagamento de R$ 550,00 via Pix', responsavel: 'Fernando Lima' },
-      { data: '2025-01-25T17:00:00', tipo: 'validacao_financeiro', descricao: 'Conferência aprovada', responsavel: 'João Gestor' }
-    ],
-    valorTotal: 550,
-    custoTotal: 295,
-    modeloAparelho: 'iPhone 12',
-    imeiAparelho: '101010101010101',
-    origemOS: 'Balcão'
-  },
-  // 11. Garantia + Retirada de Peças (Serviço concluído)
-  {
-    id: 'OS-2025-0011',
-    dataHora: '2025-01-26T08:30:00',
-    clienteId: 'CLI-004',
-    setor: 'GARANTIA',
-    tecnicoId: '53a1a9ad',
-    lojaId: '94dbe2b1',
-    status: 'Serviço concluído',
-    proximaAtuacao: 'Atendente',
-    resumoConclusao: 'Bateria e flex power substituídos. Aparelho carregando normalmente.',
-    valorCustoTecnico: 120,
-    valorVendaTecnico: 0,
-    pecas: [
-      { id: 'PC-011a', peca: 'Bateria iPhone 14 Pro', imei: '111111111111111', valor: 0, percentual: 0, valorTotal: 0, servicoTerceirizado: false, unidadeServico: '94dbe2b1', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Garantia', origemPeca: 'Retirada de Pecas', valorCustoReal: 95 },
-      { id: 'PC-011b', peca: 'Flex Power iPhone 14 Pro', valor: 0, percentual: 0, valorTotal: 0, servicoTerceirizado: false, unidadeServico: '94dbe2b1', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Garantia', origemPeca: 'Estoque Thiago', valorCustoReal: 25 }
-    ],
-    pagamentos: [],
-    descricao: 'Garantia - iPhone 14 Pro não carrega. Bateria retirada de aparelho desmontado.',
-    timeline: [
-      { data: '2025-01-26T08:30:00', tipo: 'registro', descricao: 'OS registrada via garantia', responsavel: 'Julio Cesar da Silva' },
-      { data: '2025-01-26T09:30:00', tipo: 'status', descricao: 'Em serviço', responsavel: 'Julio Cesar da Silva' },
-      { data: '2025-01-26T14:00:00', tipo: 'conclusao_servico', descricao: 'Serviço concluído - bateria e flex power trocados', responsavel: 'Julio Cesar da Silva' }
-    ],
-    valorTotal: 0,
-    custoTotal: 120,
-    modeloAparelho: 'iPhone 14 Pro',
-    imeiAparelho: '111111111111111',
-    origemOS: 'Garantia'
-  },
-  // 12. Estoque + Consignado + Retirada + Estoque Thiago (Em serviço)
-  {
-    id: 'OS-2025-0012',
-    dataHora: '2025-01-27T10:00:00',
-    clienteId: 'CLI-001',
-    setor: 'ASSISTÊNCIA',
-    tecnicoId: 'be61a9df',
-    lojaId: '3cfbf69f',
-    status: 'Em serviço',
-    proximaAtuacao: 'Técnico',
-    pecas: [
-      { id: 'PC-012a', peca: 'Display AMOLED Samsung S23', imei: '121212121212121', valor: 0, percentual: 0, valorTotal: 0, servicoTerceirizado: false, unidadeServico: '3cfbf69f', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Estoque', origemPeca: 'Consignado', valorCustoReal: 520 },
-      { id: 'PC-012b', peca: 'Aro lateral Samsung S23', valor: 0, percentual: 0, valorTotal: 0, servicoTerceirizado: false, unidadeServico: '3cfbf69f', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Estoque', origemPeca: 'Retirada de Pecas', valorCustoReal: 45 },
-      { id: 'PC-012c', peca: 'Tampa traseira Samsung S23', valor: 0, percentual: 0, valorTotal: 0, servicoTerceirizado: false, unidadeServico: '3cfbf69f', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Estoque', origemPeca: 'Estoque Thiago', valorCustoReal: 80 }
-    ],
-    pagamentos: [],
-    descricao: 'Aparelho do estoque Samsung S23 com display, aro e tampa danificados - reparo completo',
-    timeline: [
-      { data: '2025-01-27T10:00:00', tipo: 'registro', descricao: 'OS registrada - Aparelho do estoque para reparo completo', responsavel: 'João Gestor' },
-      { data: '2025-01-27T11:00:00', tipo: 'status', descricao: 'Técnico assumiu o reparo', responsavel: 'Jeferson Sousa Cabral' }
-    ],
-    valorTotal: 0,
-    custoTotal: 645,
-    modeloAparelho: 'Samsung S23',
-    imeiAparelho: '121212121212121',
-    origemOS: 'Estoque'
-  },
-  // 13. Balcão + Mix completo: Fornecedor + Consignado + Retirada (Conferência do Gestor)
-  {
-    id: 'OS-2025-0013',
-    dataHora: '2025-01-28T09:00:00',
-    clienteId: 'CLI-003',
-    setor: 'ASSISTÊNCIA',
-    tecnicoId: '3a4e96c7',
-    lojaId: 'ba1802b9',
-    status: 'Conferência do Gestor',
-    proximaAtuacao: 'Gestor (Conferência)',
-    resumoConclusao: 'Placa auxiliar, sensor e botão substituídos. Todas as funções testadas.',
-    valorCustoTecnico: 405,
-    valorVendaTecnico: 750,
-    pecas: [
-      { id: 'PC-013a', peca: 'Placa auxiliar iPhone 15', imei: '131313131313131', valor: 450, percentual: 0, valorTotal: 450, servicoTerceirizado: false, unidadeServico: 'ba1802b9', pecaNoEstoque: false, pecaDeFornecedor: true, statusAprovacao: 'Pagamento Finalizado', origemServico: 'Balcao', origemPeca: 'Fornecedor', valorCustoReal: 320 },
-      { id: 'PC-013b', peca: 'Sensor proximidade iPhone 15', valor: 200, percentual: 0, valorTotal: 200, servicoTerceirizado: false, unidadeServico: 'ba1802b9', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Balcao', origemPeca: 'Consignado', valorCustoReal: 55 },
-      { id: 'PC-013c', peca: 'Botão Home iPhone 15', valor: 100, percentual: 0, valorTotal: 100, servicoTerceirizado: false, unidadeServico: 'ba1802b9', pecaNoEstoque: true, pecaDeFornecedor: false, origemServico: 'Balcao', origemPeca: 'Retirada de Pecas', valorCustoReal: 30 }
-    ],
-    pagamentos: [
-      { id: 'PAG-013', meio: 'Cartão Débito', valor: 750 }
-    ],
-    descricao: 'iPhone 15 com múltiplos defeitos - placa auxiliar, sensor e botão home',
-    timeline: [
-      { data: '2025-01-28T09:00:00', tipo: 'registro', descricao: 'OS registrada via balcão', responsavel: 'Marcos Serra de Sousa' },
-      { data: '2025-01-28T10:00:00', tipo: 'status', descricao: 'Em serviço', responsavel: 'Marcos Serra de Sousa' },
-      { data: '2025-01-28T12:00:00', tipo: 'peca', descricao: 'Solicitação de placa auxiliar ao fornecedor', responsavel: 'Marcos Serra de Sousa' },
-      { data: '2025-01-29T09:00:00', tipo: 'aprovacao', descricao: 'Peça aprovada pelo gestor', responsavel: 'João Gestor' },
-      { data: '2025-01-30T10:00:00', tipo: 'peca', descricao: 'Placa auxiliar recebida', responsavel: 'Logística' },
-      { data: '2025-01-30T16:00:00', tipo: 'conclusao_servico', descricao: 'Serviço concluído - todos os componentes substituídos', responsavel: 'Marcos Serra de Sousa' },
-      { data: '2025-01-31T09:00:00', tipo: 'pagamento', descricao: 'Pagamento de R$ 750,00 via Cartão Débito', responsavel: 'Fernando Lima' }
-    ],
-    valorTotal: 750,
-    custoTotal: 405,
-    modeloAparelho: 'iPhone 15',
-    imeiAparelho: '131313131313131',
-    origemOS: 'Balcão'
+// ==================== CACHE ====================
+let _osCache: OrdemServico[] = [];
+let _osCacheInitialized = false;
+
+// ==================== MAPPERS ====================
+
+const mapPecaFromDB = (row: any): PecaServico => ({
+  id: row.id,
+  peca: row.peca || '',
+  pecaEstoqueId: row.peca_estoque_id || undefined,
+  imei: row.imei || undefined,
+  valor: Number(row.valor) || 0,
+  percentual: Number(row.percentual) || 0,
+  valorTotal: Number(row.valor_total) || 0,
+  servicoTerceirizado: row.servico_terceirizado || false,
+  descricaoTerceirizado: row.descricao_terceirizado || undefined,
+  fornecedorId: row.fornecedor_id || undefined,
+  unidadeServico: row.unidade_servico || '',
+  pecaNoEstoque: row.peca_no_estoque || false,
+  pecaDeFornecedor: row.peca_de_fornecedor || false,
+  statusAprovacao: row.status_aprovacao || undefined,
+  motivoRejeicao: row.motivo_rejeicao || undefined,
+  contaOrigemPagamento: row.conta_origem_pagamento || undefined,
+  dataPagamento: row.data_pagamento || undefined,
+  dataRecebimento: row.data_recebimento || undefined,
+  origemServico: row.origem_servico || undefined,
+  origemPeca: row.origem_peca || undefined,
+  valorCustoReal: row.valor_custo_real != null ? Number(row.valor_custo_real) : undefined,
+});
+
+const mapPagamentoFromDB = (row: any): Pagamento => ({
+  id: row.id,
+  meio: row.meio || '',
+  valor: Number(row.valor) || 0,
+  parcelas: row.parcelas || undefined,
+  comprovante: row.comprovante || undefined,
+  comprovanteNome: row.comprovante_nome || undefined,
+  contaDestino: row.conta_destino || undefined,
+});
+
+const mapOSFromDB = (row: any, pecas: PecaServico[], pagamentos: Pagamento[]): OrdemServico => ({
+  id: row.id,
+  dataHora: row.created_at || new Date().toISOString(),
+  clienteId: row.cliente_nome || '', // OS uses cliente_nome directly
+  setor: (row.setor || 'ASSISTÊNCIA') as any,
+  tecnicoId: row.tecnico_id || '',
+  lojaId: row.loja_id || '',
+  status: row.status || 'Em Aberto',
+  pecas,
+  pagamentos,
+  descricao: row.descricao || row.problema_relatado || '',
+  timeline: Array.isArray(row.timeline) ? row.timeline : [],
+  valorTotal: Number(row.valor_total) || 0,
+  custoTotal: Number(row.custo_total) || 0,
+  origemOS: row.origem_os || undefined,
+  vendaId: row.venda_id || undefined,
+  garantiaId: row.garantia_id || undefined,
+  produtoId: row.produto_id || undefined,
+  valorProdutoOrigem: row.valor_produto_origem != null ? Number(row.valor_produto_origem) : undefined,
+  modeloAparelho: row.modelo_aparelho || row.aparelho_modelo || undefined,
+  imeiAparelho: row.imei_aparelho || row.imei || undefined,
+  proximaAtuacao: row.proxima_atuacao || undefined,
+  valorCustoTecnico: row.valor_custo_tecnico != null ? Number(row.valor_custo_tecnico) : undefined,
+  valorVendaTecnico: row.valor_venda_tecnico != null ? Number(row.valor_venda_tecnico) : undefined,
+  valorServico: row.valor_servico != null ? Number(row.valor_servico) : undefined,
+  fotosEntrada: Array.isArray(row.fotos_entrada) ? row.fotos_entrada : [],
+  resumoConclusao: row.resumo_conclusao || undefined,
+  observacaoOrigem: row.observacao_origem || undefined,
+  recusadaTecnico: row.recusada_tecnico || false,
+  motivoRecusaTecnico: row.motivo_recusa_tecnico || undefined,
+  conclusaoServico: row.conclusao_servico || undefined,
+  cronometro: row.cronometro || undefined,
+  evidencias: Array.isArray(row.evidencias) ? row.evidencias : [],
+});
+
+// ==================== INIT CACHE ====================
+
+export const initAssistenciaCache = async (): Promise<void> => {
+  try {
+    const { data: osRows, error: osError } = await supabase
+      .from('ordens_servico')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (osError) throw osError;
+
+    if (!osRows || osRows.length === 0) {
+      _osCache = [];
+      _osCacheInitialized = true;
+      return;
+    }
+
+    const osIds = osRows.map(r => r.id);
+
+    // Fetch pecas and pagamentos in parallel
+    const [pecasResult, pagResult] = await Promise.all([
+      supabase.from('os_pecas').select('*').in('os_id', osIds),
+      supabase.from('os_pagamentos').select('*').in('os_id', osIds),
+    ]);
+
+    const pecasByOS = new Map<string, PecaServico[]>();
+    (pecasResult.data || []).forEach(row => {
+      const osId = row.os_id;
+      if (!osId) return;
+      if (!pecasByOS.has(osId)) pecasByOS.set(osId, []);
+      pecasByOS.get(osId)!.push(mapPecaFromDB(row));
+    });
+
+    const pagsByOS = new Map<string, Pagamento[]>();
+    (pagResult.data || []).forEach(row => {
+      const osId = row.os_id;
+      if (!osId) return;
+      if (!pagsByOS.has(osId)) pagsByOS.set(osId, []);
+      pagsByOS.get(osId)!.push(mapPagamentoFromDB(row));
+    });
+
+    _osCache = osRows.map(row => mapOSFromDB(
+      row,
+      pecasByOS.get(row.id) || [],
+      pagsByOS.get(row.id) || []
+    ));
+
+    _osCacheInitialized = true;
+    console.log(`[ASSISTÊNCIA] Cache inicializado: ${_osCache.length} OS`);
+  } catch (error) {
+    console.error('[ASSISTÊNCIA] Erro ao inicializar cache:', error);
+    _osCache = [];
+    _osCacheInitialized = true;
   }
-];
+};
 
-// Inicializar IDs existentes
-initializeOSIds(ordensServico.map(os => os.id));
+// Auto-init
+initAssistenciaCache();
 
-// Histórico de OS por cliente
+// ==================== ID MANAGEMENT ====================
+
+export const isOSIdRegistered = (id: string): boolean => {
+  return _osCache.some(os => os.id === id);
+};
+
+export const getNextOSNumber = (): { numero: number; id: string } => {
+  // Generate UUID-based ID - the DB will handle it
+  const id = crypto.randomUUID();
+  return { numero: _osCache.length + 1, id };
+};
+
+// ==================== CRUD ====================
+
+export const getOrdensServico = () => [..._osCache];
+
+export const getOrdemServicoById = (id: string) => _osCache.find(os => os.id === id);
+
+export const addOrdemServico = async (os: Omit<OrdemServico, 'id'>): Promise<OrdemServico> => {
+  const { data, error } = await supabase
+    .from('ordens_servico')
+    .insert({
+      cliente_nome: os.clienteId, // OS stores clienteId as cliente_nome
+      setor: os.setor,
+      tecnico_id: os.tecnicoId || null,
+      loja_id: os.lojaId || null,
+      status: os.status,
+      descricao: os.descricao,
+      problema_relatado: os.descricao,
+      timeline: os.timeline as any,
+      valor_total: os.valorTotal,
+      custo_total: os.custoTotal,
+      origem_os: os.origemOS || null,
+      venda_id: os.vendaId || null,
+      garantia_id: os.garantiaId || null,
+      produto_id: os.produtoId || null,
+      valor_produto_origem: os.valorProdutoOrigem || null,
+      modelo_aparelho: os.modeloAparelho || null,
+      aparelho_modelo: os.modeloAparelho || null,
+      imei_aparelho: os.imeiAparelho || null,
+      imei: os.imeiAparelho || null,
+      proxima_atuacao: os.proximaAtuacao || null,
+      valor_custo_tecnico: os.valorCustoTecnico || 0,
+      valor_venda_tecnico: os.valorVendaTecnico || 0,
+      valor_servico: os.valorServico || 0,
+      fotos_entrada: os.fotosEntrada as any || [],
+      resumo_conclusao: os.resumoConclusao || null,
+      observacao_origem: os.observacaoOrigem || null,
+      recusada_tecnico: os.recusadaTecnico || false,
+      motivo_recusa_tecnico: os.motivoRecusaTecnico || null,
+      conclusao_servico: os.conclusaoServico || null,
+      cronometro: os.cronometro as any || null,
+      evidencias: os.evidencias as any || [],
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  // Insert pecas
+  if (os.pecas.length > 0) {
+    await supabase.from('os_pecas').insert(
+      os.pecas.map(p => ({
+        os_id: data.id,
+        peca: p.peca,
+        peca_estoque_id: p.pecaEstoqueId || null,
+        imei: p.imei || null,
+        valor: p.valor,
+        percentual: p.percentual,
+        valor_total: p.valorTotal,
+        servico_terceirizado: p.servicoTerceirizado,
+        descricao_terceirizado: p.descricaoTerceirizado || null,
+        fornecedor_id: p.fornecedorId || null,
+        unidade_servico: p.unidadeServico,
+        peca_no_estoque: p.pecaNoEstoque,
+        peca_de_fornecedor: p.pecaDeFornecedor,
+        status_aprovacao: p.statusAprovacao || 'Pendente',
+        origem_servico: p.origemServico || null,
+        origem_peca: p.origemPeca || null,
+        valor_custo_real: p.valorCustoReal || 0,
+      }))
+    );
+  }
+
+  // Insert pagamentos
+  if (os.pagamentos.length > 0) {
+    await supabase.from('os_pagamentos').insert(
+      os.pagamentos.map(p => ({
+        os_id: data.id,
+        meio: p.meio,
+        valor: p.valor,
+        parcelas: p.parcelas || 1,
+        comprovante: p.comprovante || null,
+        comprovante_nome: p.comprovanteNome || null,
+        conta_destino: p.contaDestino || null,
+      }))
+    );
+  }
+
+  const newOS: OrdemServico = { ...os, id: data.id };
+  _osCache.unshift(newOS);
+  return newOS;
+};
+
+// Função para reduzir estoque de peças quando OS é concluída
+const reduzirEstoquePecas = async (pecas: PecaServico[]): Promise<void> => {
+  for (const peca of pecas) {
+    if (peca.pecaNoEstoque && !peca.servicoTerceirizado) {
+      let pecaEstoque = getPecaById(peca.id);
+      if (!pecaEstoque) {
+        pecaEstoque = getPecaByDescricao(peca.peca);
+      }
+      if (pecaEstoque && pecaEstoque.quantidade > 0) {
+        await updatePeca(pecaEstoque.id, {
+          quantidade: pecaEstoque.quantidade - 1,
+          status: pecaEstoque.quantidade - 1 === 0 ? 'Utilizada' : pecaEstoque.status
+        });
+        console.log(`[ASSISTÊNCIA] Peça ${peca.peca} reduzida do estoque`);
+      }
+    }
+  }
+};
+
+export const updateOrdemServico = async (id: string, updates: Partial<OrdemServico>): Promise<OrdemServico | null> => {
+  const index = _osCache.findIndex(os => os.id === id);
+  if (index === -1) return null;
+
+  const osAnterior = _osCache[index];
+
+  // Build DB update
+  const dbUpdates: any = {};
+  if (updates.status !== undefined) dbUpdates.status = updates.status;
+  if (updates.descricao !== undefined) dbUpdates.descricao = updates.descricao;
+  if (updates.timeline !== undefined) dbUpdates.timeline = updates.timeline;
+  if (updates.valorTotal !== undefined) dbUpdates.valor_total = updates.valorTotal;
+  if (updates.custoTotal !== undefined) dbUpdates.custo_total = updates.custoTotal;
+  if (updates.proximaAtuacao !== undefined) dbUpdates.proxima_atuacao = updates.proximaAtuacao;
+  if (updates.valorCustoTecnico !== undefined) dbUpdates.valor_custo_tecnico = updates.valorCustoTecnico;
+  if (updates.valorVendaTecnico !== undefined) dbUpdates.valor_venda_tecnico = updates.valorVendaTecnico;
+  if (updates.valorServico !== undefined) dbUpdates.valor_servico = updates.valorServico;
+  if (updates.resumoConclusao !== undefined) dbUpdates.resumo_conclusao = updates.resumoConclusao;
+  if (updates.observacaoOrigem !== undefined) dbUpdates.observacao_origem = updates.observacaoOrigem;
+  if (updates.recusadaTecnico !== undefined) dbUpdates.recusada_tecnico = updates.recusadaTecnico;
+  if (updates.motivoRecusaTecnico !== undefined) dbUpdates.motivo_recusa_tecnico = updates.motivoRecusaTecnico;
+  if (updates.conclusaoServico !== undefined) dbUpdates.conclusao_servico = updates.conclusaoServico;
+  if (updates.tecnicoId !== undefined) dbUpdates.tecnico_id = updates.tecnicoId;
+  if (updates.lojaId !== undefined) dbUpdates.loja_id = updates.lojaId;
+  if (updates.setor !== undefined) dbUpdates.setor = updates.setor;
+  if (updates.fotosEntrada !== undefined) dbUpdates.fotos_entrada = updates.fotosEntrada;
+  if (updates.cronometro !== undefined) dbUpdates.cronometro = updates.cronometro;
+  if (updates.evidencias !== undefined) dbUpdates.evidencias = updates.evidencias;
+  if (updates.modeloAparelho !== undefined) { dbUpdates.modelo_aparelho = updates.modeloAparelho; dbUpdates.aparelho_modelo = updates.modeloAparelho; }
+  if (updates.imeiAparelho !== undefined) { dbUpdates.imei_aparelho = updates.imeiAparelho; dbUpdates.imei = updates.imeiAparelho; }
+  if (updates.origemOS !== undefined) dbUpdates.origem_os = updates.origemOS;
+  if (updates.vendaId !== undefined) dbUpdates.venda_id = updates.vendaId;
+  if (updates.garantiaId !== undefined) dbUpdates.garantia_id = updates.garantiaId;
+  if (updates.produtoId !== undefined) dbUpdates.produto_id = updates.produtoId;
+  if (updates.valorProdutoOrigem !== undefined) dbUpdates.valor_produto_origem = updates.valorProdutoOrigem;
+  if ((updates as any).parecer !== undefined) dbUpdates.parecer_tecnico = (updates as any).parecer;
+
+  if (Object.keys(dbUpdates).length > 0) {
+    const { error } = await supabase.from('ordens_servico').update(dbUpdates).eq('id', id);
+    if (error) { console.error('[ASSISTÊNCIA] Erro ao atualizar OS:', error); throw error; }
+  }
+
+  // Update pecas if provided
+  if (updates.pecas) {
+    await supabase.from('os_pecas').delete().eq('os_id', id);
+    if (updates.pecas.length > 0) {
+      await supabase.from('os_pecas').insert(
+        updates.pecas.map(p => ({
+          id: p.id.startsWith('PC-') ? undefined : p.id, // let DB generate if legacy ID
+          os_id: id,
+          peca: p.peca,
+          peca_estoque_id: p.pecaEstoqueId || null,
+          imei: p.imei || null,
+          valor: p.valor,
+          percentual: p.percentual,
+          valor_total: p.valorTotal,
+          servico_terceirizado: p.servicoTerceirizado,
+          descricao_terceirizado: p.descricaoTerceirizado || null,
+          fornecedor_id: p.fornecedorId || null,
+          unidade_servico: p.unidadeServico,
+          peca_no_estoque: p.pecaNoEstoque,
+          peca_de_fornecedor: p.pecaDeFornecedor,
+          status_aprovacao: p.statusAprovacao || 'Pendente',
+          motivo_rejeicao: p.motivoRejeicao || null,
+          conta_origem_pagamento: p.contaOrigemPagamento || null,
+          data_pagamento: p.dataPagamento || null,
+          data_recebimento: p.dataRecebimento || null,
+          origem_servico: p.origemServico || null,
+          origem_peca: p.origemPeca || null,
+          valor_custo_real: p.valorCustoReal || 0,
+        }))
+      );
+    }
+  }
+
+  // Update pagamentos if provided
+  if (updates.pagamentos) {
+    await supabase.from('os_pagamentos').delete().eq('os_id', id);
+    if (updates.pagamentos.length > 0) {
+      await supabase.from('os_pagamentos').insert(
+        updates.pagamentos.map(p => ({
+          id: p.id.startsWith('PAG-') ? undefined : p.id,
+          os_id: id,
+          meio: p.meio,
+          valor: p.valor,
+          parcelas: p.parcelas || 1,
+          comprovante: p.comprovante || null,
+          comprovante_nome: p.comprovanteNome || null,
+          conta_destino: p.contaDestino || null,
+        }))
+      );
+    }
+  }
+
+  // Update cache
+  _osCache[index] = { ..._osCache[index], ...updates };
+
+  // Side effects
+  if (updates.status === 'Serviço concluído' && osAnterior.status !== 'Serviço concluído') {
+    await reduzirEstoquePecas(_osCache[index].pecas);
+    console.log(`[ASSISTÊNCIA] OS ${id} concluída - peças reduzidas do estoque`);
+  }
+
+  if (updates.status === 'Cancelada' && osAnterior.status !== 'Cancelada') {
+    marcarSolicitacoesOSCancelada(id);
+    console.log(`[ASSISTÊNCIA] OS ${id} cancelada`);
+  }
+
+  return _osCache[index];
+};
+
+// ==================== QUERIES ====================
+
 export interface HistoricoOSCliente {
   osId: string;
   data: string;
@@ -545,77 +484,8 @@ export interface HistoricoOSCliente {
   setor: string;
 }
 
-// API Functions
-export const getOrdensServico = () => [...ordensServico];
-
-export const getOrdemServicoById = (id: string) => ordensServico.find(os => os.id === id);
-
-export const getNextOSNumber = (): { numero: number; id: string } => {
-  const year = new Date().getFullYear();
-  const id = generateOSId();
-  const match = id.match(/OS-\d{4}-(\d+)/);
-  const numero = match ? parseInt(match[1]) : globalOSIdCounter;
-  return { numero, id };
-};
-
-export const addOrdemServico = (os: Omit<OrdemServico, 'id'>) => {
-  const id = generateOSId();
-  const newOS: OrdemServico = { ...os, id };
-  ordensServico.push(newOS);
-  return newOS;
-};
-
-// Função para reduzir estoque de peças quando OS é concluída
-const reduzirEstoquePecas = (pecas: PecaServico[]): void => {
-  pecas.forEach(peca => {
-    // Apenas reduz se a peça estava no estoque
-    if (peca.pecaNoEstoque && !peca.servicoTerceirizado) {
-      // Primeiro tenta buscar pelo ID, depois pelo nome/descrição
-      let pecaEstoque = getPecaById(peca.id);
-      
-      // Se não encontrou pelo ID, busca pela descrição (nome da peça)
-      if (!pecaEstoque) {
-        pecaEstoque = getPecaByDescricao(peca.peca);
-      }
-      
-      if (pecaEstoque && pecaEstoque.quantidade > 0) {
-        updatePeca(pecaEstoque.id, { 
-          quantidade: pecaEstoque.quantidade - 1,
-          status: pecaEstoque.quantidade - 1 === 0 ? 'Utilizada' : pecaEstoque.status
-        });
-        console.log(`[ASSISTÊNCIA] Peça ${peca.peca} (ID: ${pecaEstoque.id}) reduzida do estoque`);
-      } else {
-        console.warn(`[ASSISTÊNCIA] Peça "${peca.peca}" não encontrada no estoque ou sem quantidade disponível`);
-      }
-    }
-  });
-};
-
-export const updateOrdemServico = (id: string, updates: Partial<OrdemServico>) => {
-  const index = ordensServico.findIndex(os => os.id === id);
-  if (index !== -1) {
-    const osAnterior = ordensServico[index];
-    ordensServico[index] = { ...ordensServico[index], ...updates };
-    
-    // Se status mudou para 'Serviço concluído', reduzir estoque de peças
-    if (updates.status === 'Serviço concluído' && osAnterior.status !== 'Serviço concluído') {
-      reduzirEstoquePecas(ordensServico[index].pecas);
-      console.log(`[ASSISTÊNCIA] OS ${id} concluída - peças reduzidas do estoque`);
-    }
-    
-    // Se OS foi cancelada, marcar solicitações de peças ativas
-    if (updates.status === 'Cancelada' && osAnterior.status !== 'Cancelada') {
-      marcarSolicitacoesOSCancelada(id);
-      console.log(`[ASSISTÊNCIA] OS ${id} cancelada - solicitações de peças marcadas`);
-    }
-    
-    return ordensServico[index];
-  }
-  return null;
-};
-
 export const getHistoricoOSCliente = (clienteId: string): HistoricoOSCliente[] => {
-  return ordensServico
+  return _osCache
     .filter(os => os.clienteId === clienteId)
     .map(os => ({
       osId: os.id,
@@ -629,8 +499,8 @@ export const getHistoricoOSCliente = (clienteId: string): HistoricoOSCliente[] =
 };
 
 export const verificarIMEIEmOSAtiva = (imei: string): OrdemServico | null => {
-  return ordensServico.find(os => 
-    os.status !== 'Serviço concluído' && os.status !== 'Finalizado' && 
+  return _osCache.find(os =>
+    os.status !== 'Serviço concluído' && os.status !== 'Finalizado' &&
     os.pecas.some(p => p.imei === imei)
   ) || null;
 };
@@ -639,11 +509,9 @@ export const calcularSLADias = (dataHora: string): number => {
   const dataOS = new Date(dataHora);
   const hoje = new Date();
   const diffTime = Math.abs(hoje.getTime() - dataOS.getTime());
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays;
+  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 };
 
-// formatCurrency removido - usar import { formatCurrency } from '@/utils/formatUtils'
 export { formatCurrency } from '@/utils/formatUtils';
 
 export const exportOSToCSV = (data: OrdemServico[], filename: string) => {
@@ -655,7 +523,7 @@ export const exportOSToCSV = (data: OrdemServico[], filename: string) => {
     const cliente = clientes.find(c => c.id === os.clienteId);
     const loja = lojas.find(l => l.id === os.lojaId);
     const tecnico = tecnicos.find(t => t.id === os.tecnicoId);
-    
+
     return {
       'Nº OS': os.id,
       'Data/Hora': new Date(os.dataHora).toLocaleString('pt-BR'),

@@ -22,7 +22,11 @@ import {
   getCorBadgeStatus,
   exportFluxoToCSV,
   VendaComFluxo,
-  StatusVenda
+  StatusVenda,
+  getConferenciaFinanceiroData,
+  salvarConferenciaFinanceiroData,
+  getConferenciaGestorData,
+  ConferenciaFinanceiroData
 } from '@/utils/fluxoVendasApi';
 import { getOrdensServico, getOrdemServicoById, updateOrdemServico, formatCurrency as formatCurrencyOS } from '@/utils/assistenciaApi';
 import { formatCurrency } from '@/utils/formatUtils';
@@ -88,7 +92,7 @@ interface HistoricoConferencia {
 // Interface para validação de pagamentos
 interface ValidacaoPagamento {
   metodoPagamento: string;
-  validadoGestor: boolean;
+  validadoGestor?: boolean;
   validadoFinanceiro: boolean;
   dataValidacaoGestor?: string;
   dataValidacaoFinanceiro?: string;
@@ -167,8 +171,9 @@ export default function FinanceiroConferencia() {
   const getSituacaoConferencia = (venda: VendaComFluxo): SituacaoConferencia => {
     if (venda.statusFluxo === 'Finalizado') return 'Conferido';
     
-    const storedValidacoes = localStorage.getItem(`validacao_pagamentos_financeiro_${venda.id}`);
-    if (!storedValidacoes) {
+    const confData = getConferenciaFinanceiroData(venda.id);
+    const validacoes = confData.validacoesPagamento;
+    if (!validacoes || validacoes.length === 0) {
       const metodos = venda.pagamentos?.map(p => p.meioPagamento) || [];
       if (metodos.length > 0) {
         return `Pendente - ${metodos[0]}`;
@@ -176,8 +181,7 @@ export default function FinanceiroConferencia() {
       return 'Conferido';
     }
     
-    const validacoes = JSON.parse(storedValidacoes);
-    const naoValidados = validacoes.filter((v: ValidacaoPagamento) => !v.validadoFinanceiro);
+    const naoValidados = validacoes.filter((v: any) => !v.validadoFinanceiro);
     
     if (naoValidados.length === 0) return 'Conferido';
     return `Pendente - ${naoValidados[0].metodoPagamento}`;
@@ -195,8 +199,8 @@ export default function FinanceiroConferencia() {
     
     // Linhas de vendas
     vendas.forEach(venda => {
-      const storedValidacoes = localStorage.getItem(`validacao_pagamentos_financeiro_${venda.id}`);
-      const validacoesFinanceiro: ValidacaoPagamento[] = storedValidacoes ? JSON.parse(storedValidacoes) : [];
+      const confData = getConferenciaFinanceiroData(venda.id);
+      const validacoesFinanceiro: ValidacaoPagamento[] = confData.validacoesPagamento || [];
       const contaOrigem = getContaOrigem(venda);
       
       const dataEntradaFinanceiro = venda.timeline?.find(t => 
@@ -237,8 +241,8 @@ export default function FinanceiroConferencia() {
     const clientesAll = getClientes();
     
     osFinanceiro.forEach(os => {
-      const storedValidacoes = localStorage.getItem(`validacao_pagamentos_financeiro_${os.id}`);
-      const validacoesFinanceiro: ValidacaoPagamento[] = storedValidacoes ? JSON.parse(storedValidacoes) : [];
+      const osConfData = getConferenciaFinanceiroData(os.id);
+      const validacoesFinanceiro: ValidacaoPagamento[] = osConfData.validacoesPagamento || [];
       
       const dataEntradaFinanceiro = os.timeline?.find(t => 
         t.descricao?.includes('financeiro') || t.tipo === 'aprovacao'
@@ -417,19 +421,19 @@ export default function FinanceiroConferencia() {
   const handleSelecionarVenda = (venda: VendaComFluxo) => {
     setVendaSelecionada(venda);
     
-    // Carregar validações do gestor e do financeiro
-    const gestorValidacoes = localStorage.getItem(`validacao_pagamentos_${venda.id}`);
-    const financeiroValidacoes = localStorage.getItem(`validacao_pagamentos_financeiro_${venda.id}`);
+    // Carregar validações do gestor e do financeiro via helpers
+    const gestorConfData = getConferenciaGestorData(venda.id);
+    const finConfData = getConferenciaFinanceiroData(venda.id);
     
     const metodos = venda.pagamentos?.map(p => p.meioPagamento) || [];
     const metodosUnicos = [...new Set(metodos)];
     
-    const gestorData = gestorValidacoes ? JSON.parse(gestorValidacoes) : [];
-    const financeiroData: ValidacaoPagamento[] = financeiroValidacoes ? JSON.parse(financeiroValidacoes) : [];
+    const gestorValidacoes = gestorConfData.validacoesPagamento || [];
+    const financeiroValidacoes: ValidacaoPagamento[] = finConfData.validacoesPagamento || [];
     
     const validacoes = metodosUnicos.map(metodo => {
-      const gestor = gestorData.find((v: any) => v.metodoPagamento === metodo);
-      const financeiro = financeiroData.find(v => v.metodoPagamento === metodo);
+      const gestor = gestorValidacoes.find((v: any) => v.metodoPagamento === metodo);
+      const financeiro = financeiroValidacoes.find(v => v.metodoPagamento === metodo);
       const pagamentoMetodo = venda.pagamentos?.find(p => p.meioPagamento === metodo);
       return {
         metodoPagamento: metodo,
@@ -438,20 +442,21 @@ export default function FinanceiroConferencia() {
         dataValidacaoGestor: gestor?.dataValidacao,
         dataValidacaoFinanceiro: financeiro?.dataValidacaoFinanceiro,
         conferidoPor: financeiro?.conferidoPor,
-        // Importante para o Teto Bancário: se não existir validação salva ainda,
-        // usar o destino já definido no pagamento da venda (ex.: Pix -> CTA-002)
         contaDestinoId: financeiro?.contaDestinoId || pagamentoMetodo?.contaDestino
       };
     });
     
     setValidacoesPagamento(validacoes);
     
-    // Carregar aprovação do gestor
-    const storedAprovacao = localStorage.getItem(`aprovacao_gestor_${venda.id}`);
-    if (storedAprovacao) {
-      setAprovacaoGestor(JSON.parse(storedAprovacao));
+    // Carregar aprovação do gestor a partir do timeline ou aprovacaoGestor do fluxo
+    const vendaAprovacao = venda.aprovacaoGestor as any;
+    if (vendaAprovacao?.usuarioNome) {
+      setAprovacaoGestor({
+        aprovadoPor: vendaAprovacao.usuarioId || '',
+        nomeGestor: vendaAprovacao.usuarioNome || '',
+        dataAprovacao: vendaAprovacao.dataHora || ''
+      });
     } else {
-      // Tentar carregar do timeline
       const timelineEvento = venda.timeline?.find(t => t.tipo === 'aprovacao_gestor' || t.descricao?.includes('Gestor'));
       if (timelineEvento) {
         setAprovacaoGestor({
@@ -465,12 +470,12 @@ export default function FinanceiroConferencia() {
     }
     
     // Carregar histórico de conferências
-    const storedHistorico = localStorage.getItem(`historico_conferencias_${venda.id}`);
-    if (storedHistorico) {
-      setHistoricoConferencias(JSON.parse(storedHistorico));
+    const storedHistorico = finConfData.historicoConferencias;
+    if (storedHistorico && storedHistorico.length > 0) {
+      setHistoricoConferencias(storedHistorico);
     } else {
       // Construir histórico a partir das validações
-      const historico: HistoricoConferencia[] = financeiroData
+      const historico: HistoricoConferencia[] = financeiroValidacoes
         .filter(v => v.validadoFinanceiro)
         .map(v => {
           const contaDestino = contasFinanceiras.find(c => c.id === v.contaDestinoId);
@@ -487,9 +492,8 @@ export default function FinanceiroConferencia() {
     }
     
     // Carregar data de finalização
-    const storedFinalizacao = localStorage.getItem(`data_finalizacao_${venda.id}`);
-    if (storedFinalizacao) {
-      setDataFinalizacao(storedFinalizacao);
+    if (finConfData.dataFinalizacao) {
+      setDataFinalizacao(finConfData.dataFinalizacao);
     } else if (venda.statusFluxo === 'Finalizado') {
       const finalizacaoEvento = venda.timeline?.find(t => t.tipo === 'finalizacao');
       setDataFinalizacao(finalizacaoEvento?.dataHora || null);
@@ -497,29 +501,25 @@ export default function FinanceiroConferencia() {
       setDataFinalizacao(null);
     }
     
-    // Carregar observação do gestor (chave diferente para OS vs Vendas)
-    const isOS = venda.id.startsWith('OS-');
-    const obsKey = isOS ? `observacao_gestor_os_${venda.id}` : `observacao_gestor_${venda.id}`;
-    const storedObsGestor = localStorage.getItem(obsKey);
-    if (storedObsGestor) {
-      setObservacaoGestorCarregada(JSON.parse(storedObsGestor));
+    // Carregar observação do gestor
+    const obsGestor = gestorConfData.observacao;
+    if (obsGestor && obsGestor.texto?.trim()) {
+      setObservacaoGestorCarregada(obsGestor);
     } else {
       setObservacaoGestorCarregada(null);
     }
     
     // Carregar observação do financeiro
-    const storedObsFinanceiro = localStorage.getItem(`observacao_financeiro_${venda.id}`);
-    if (storedObsFinanceiro) {
-      const obs: Observacao = JSON.parse(storedObsFinanceiro);
-      setObservacaoFinanceiro(obs.texto);
+    const obsFinanceiro = finConfData.observacaoFinanceiro;
+    if (obsFinanceiro && obsFinanceiro.texto) {
+      setObservacaoFinanceiro(obsFinanceiro.texto);
     } else {
       setObservacaoFinanceiro('');
     }
     
     // Carregar conta de destino (default: conta de origem)
-    const storedContaDestino = localStorage.getItem(`conta_destino_${venda.id}`);
-    if (storedContaDestino) {
-      setContaDestinoId(storedContaDestino);
+    if (finConfData.contaDestinoId) {
+      setContaDestinoId(finConfData.contaDestinoId);
     } else {
       const contaOrigem = getContaOrigem(venda);
       setContaDestinoId(contaOrigem?.id || '');
@@ -578,14 +578,10 @@ export default function FinanceiroConferencia() {
     
     setValidacoesPagamento(novasValidacoes);
     
-    // Salvar no localStorage
+    // Salvar via helpers (DB para vendas, localStorage para OS)
     if (vendaSelecionada) {
-      localStorage.setItem(
-        `validacao_pagamentos_financeiro_${vendaSelecionada.id}`,
-        JSON.stringify(novasValidacoes)
-      );
+      let novoHistorico: HistoricoConferencia[];
       
-      // Atualizar histórico de conferências
       if (confirmar) {
         const contaDestino = contasFinanceiras.find(c => c.id === (contaDestinoIdParam || contaDestinoId));
         const pagamento = vendaSelecionada.pagamentos?.find(p => p.meioPagamento === metodo);
@@ -598,24 +594,25 @@ export default function FinanceiroConferencia() {
           dataHora: new Date().toISOString()
         };
         
-        const novoHistorico = [...historicoConferencias.filter(h => h.metodoPagamento !== metodo), novaConferencia];
-        setHistoricoConferencias(novoHistorico);
-        localStorage.setItem(`historico_conferencias_${vendaSelecionada.id}`, JSON.stringify(novoHistorico));
-        
+        novoHistorico = [...historicoConferencias.filter(h => h.metodoPagamento !== metodo), novaConferencia];
         toast.success(`Conferência de ${metodo} registrada com sucesso!`);
       } else {
-        const novoHistorico = historicoConferencias.filter(h => h.metodoPagamento !== metodo);
-        setHistoricoConferencias(novoHistorico);
-        localStorage.setItem(`historico_conferencias_${vendaSelecionada.id}`, JSON.stringify(novoHistorico));
+        novoHistorico = historicoConferencias.filter(h => h.metodoPagamento !== metodo);
       }
       
-      // Verificar se todos os métodos foram conferidos para registrar data de finalização
+      setHistoricoConferencias(novoHistorico);
+      
+      // Verificar se todos os métodos foram conferidos
       const todosConferidos = novasValidacoes.every(v => v.validadoFinanceiro);
-      if (todosConferidos && confirmar) {
-        const dataFinal = new Date().toISOString();
-        setDataFinalizacao(dataFinal);
-        localStorage.setItem(`data_finalizacao_${vendaSelecionada.id}`, dataFinal);
-      }
+      const dataFinal = todosConferidos && confirmar ? new Date().toISOString() : undefined;
+      if (dataFinal) setDataFinalizacao(dataFinal);
+      
+      // Persist via helper (async, fire-and-forget since cache is sync)
+      salvarConferenciaFinanceiroData(vendaSelecionada.id, {
+        validacoesPagamento: novasValidacoes,
+        historicoConferencias: novoHistorico,
+        ...(dataFinal ? { dataFinalizacao: dataFinal } : {})
+      });
     }
     
     recarregar();
@@ -624,30 +621,26 @@ export default function FinanceiroConferencia() {
   const handleSalvarSemFinalizar = () => {
     if (!vendaSelecionada) return;
     
-    // Salvar validações
-    localStorage.setItem(
-      `validacao_pagamentos_financeiro_${vendaSelecionada.id}`,
-      JSON.stringify(validacoesPagamento)
-    );
+    const updates: Partial<ConferenciaFinanceiroData> = {
+      validacoesPagamento: validacoesPagamento,
+    };
     
     // Salvar observação do financeiro
     if (observacaoFinanceiro.trim()) {
-      const obsFinanceiro: Observacao = {
+      updates.observacaoFinanceiro = {
         texto: observacaoFinanceiro.trim(),
         dataHora: new Date().toISOString(),
         usuarioId: usuarioLogado.id,
         usuarioNome: usuarioLogado.nome
       };
-      localStorage.setItem(
-        `observacao_financeiro_${vendaSelecionada.id}`,
-        JSON.stringify(obsFinanceiro)
-      );
     }
     
     // Salvar conta de destino
     if (contaDestinoId) {
-      localStorage.setItem(`conta_destino_${vendaSelecionada.id}`, contaDestinoId);
+      updates.contaDestinoId = contaDestinoId;
     }
+    
+    salvarConferenciaFinanceiroData(vendaSelecionada.id, updates);
     
     toast.success('Validações e observações salvas com sucesso!');
     recarregar();
@@ -676,40 +669,31 @@ export default function FinanceiroConferencia() {
 
     setValidacoesPagamento(validacoesNormalizadas);
 
-    // Salvar validações antes de finalizar
-    localStorage.setItem(
-      `validacao_pagamentos_financeiro_${vendaSelecionada.id}`,
-      JSON.stringify(validacoesNormalizadas)
-    );
+    // Registrar data de finalização
+    const dataFinal = new Date().toISOString();
 
-    // Salvar observação do financeiro
+    // Build updates object and persist via helper
+    const updates: Partial<ConferenciaFinanceiroData> = {
+      validacoesPagamento: validacoesNormalizadas,
+      dataFinalizacao: dataFinal,
+    };
+
     if (observacaoFinanceiro.trim()) {
-      const obsFinanceiro: Observacao = {
+      updates.observacaoFinanceiro = {
         texto: observacaoFinanceiro.trim(),
         dataHora: new Date().toISOString(),
         usuarioId: usuarioLogado.id,
         usuarioNome: usuarioLogado.nome
       };
-      localStorage.setItem(
-        `observacao_financeiro_${vendaSelecionada.id}`,
-        JSON.stringify(obsFinanceiro)
-      );
     }
 
-    // Registrar data de finalização
-    const dataFinal = new Date().toISOString();
-    localStorage.setItem(`data_finalizacao_${vendaSelecionada.id}`, dataFinal);
+    // Persist via helper (handles DB for vendas, localStorage for OS)
+    salvarConferenciaFinanceiroData(vendaSelecionada.id, updates);
 
     // Detectar se é OS de assistência (ID começa com "OS-")
     const isOS = vendaSelecionada.id.startsWith('OS-');
     
     if (isOS) {
-      // Persistir validações financeiras para OS (mesmo fluxo das vendas)
-      localStorage.setItem(
-        `validacao_pagamentos_financeiro_${vendaSelecionada.id}`,
-        JSON.stringify(validacoesNormalizadas)
-      );
-
       // Finalizar OS de assistência
       updateOrdemServico(vendaSelecionada.id, {
         status: 'Liquidado',
@@ -761,10 +745,7 @@ export default function FinanceiroConferencia() {
       usuarioId: usuarioLogado.id,
       usuarioNome: usuarioLogado.nome
     };
-    localStorage.setItem(
-      `rejeicao_financeiro_${vendaSelecionada.id}`,
-      JSON.stringify(rejeicaoFinanceiro)
-    );
+    salvarConferenciaFinanceiroData(vendaSelecionada.id, { rejeicao: rejeicaoFinanceiro });
 
     const isOS = vendaSelecionada.id.startsWith('OS-');
     

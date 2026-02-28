@@ -13,6 +13,9 @@ import { initValoresTrocaCache } from "@/utils/valoresRecomendadosTrocaApi";
 import { initTratativasComerciaisCache } from "@/utils/garantiaExtendidaApi";
 import { initMovimentacoesEntreContasCache } from "@/utils/movimentacoesEntreContasApi";
 import { initContatosAtivosCache, initRegistrosAnaliseCache } from "@/utils/garantiasApi";
+import { initAtividadesGestoresCache } from "@/utils/atividadesGestoresApi";
+import { initVendasDigitaisCache } from "@/utils/vendasDigitalApi";
+import { initGestaoAdministrativaCache } from "@/utils/gestaoAdministrativaApi";
 import Login from "./pages/Login";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -164,6 +167,9 @@ const AppInitializer = ({ children }: { children: React.ReactNode }) => {
         initMovimentacoesEntreContasCache(),
         initContatosAtivosCache(),
         initRegistrosAnaliseCache(),
+        initAtividadesGestoresCache(),
+        initVendasDigitaisCache(),
+        initGestaoAdministrativaCache(),
       ]).catch(err => console.error('Erro ao inicializar caches:', err));
     }
   }, [inicializado]);

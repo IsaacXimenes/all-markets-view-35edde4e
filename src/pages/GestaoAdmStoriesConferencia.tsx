@@ -117,7 +117,7 @@ export default function GestaoAdmStoriesConferencia() {
     ));
   };
 
-  const handleSalvar = () => {
+  const handleSalvar = async () => {
     // Merge temp anexos into vendas
     const vendasFinais = vendas.map(v => {
       const anexos = tempAnexos[v.id] || [];
@@ -125,7 +125,7 @@ export default function GestaoAdmStoriesConferencia() {
       return { ...v, anexos, statusAnexo };
     });
 
-    salvarConferenciaOperacional(
+    await salvarConferenciaOperacional(
       competencia,
       loteOriginal!.id,
       vendasFinais,

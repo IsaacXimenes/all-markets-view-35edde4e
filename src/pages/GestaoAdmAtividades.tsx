@@ -81,15 +81,15 @@ export default function GestaoAdmAtividades() {
     return calcularResumoExecucao(todasExecucoes);
   }, [execucoesPorLoja]);
 
-  const handleToggle = (atividadeId: string, lojaId: string) => {
+  const handleToggle = async (atividadeId: string, lojaId: string) => {
     if (!user?.colaborador) return;
-    toggleExecucao(dataStr, atividadeId, lojaId, user.colaborador.id, user.colaborador.nome);
+    await toggleExecucao(dataStr, atividadeId, lojaId, user.colaborador.id, user.colaborador.nome);
     setRefreshKey(k => k + 1);
   };
 
-  const handleDesignarColaborador = (atividadeId: string, lojaId: string, colaboradorId: string) => {
+  const handleDesignarColaborador = async (atividadeId: string, lojaId: string, colaboradorId: string) => {
     const colab = colaboradores.find(c => c.id === colaboradorId);
-    atualizarColaboradorExecucao(dataStr, atividadeId, lojaId, colaboradorId, colab?.nome || '');
+    await atualizarColaboradorExecucao(dataStr, atividadeId, lojaId, colaboradorId, colab?.nome || '');
     setRefreshKey(k => k + 1);
   };
 

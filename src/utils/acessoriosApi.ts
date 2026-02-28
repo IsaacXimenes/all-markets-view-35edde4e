@@ -107,7 +107,7 @@ export const addAcessorio = async (acessorio: Omit<Acessorio, 'id'>): Promise<Ac
 
 export const updateAcessorioQuantidade = async (id: string, novaQuantidade: number): Promise<Acessorio | null> => {
   const { error } = await supabase.from('acessorios').update({ quantidade: novaQuantidade }).eq('id', id);
-  if (error) { console.error(error); return null; }
+  if (error) { console.error(error); throw error; }
   const idx = acessoriosCache.findIndex(a => a.id === id);
   if (idx !== -1) { acessoriosCache[idx].quantidade = novaQuantidade; return acessoriosCache[idx]; }
   return null;
@@ -118,7 +118,7 @@ export const subtrairEstoqueAcessorio = async (id: string, quantidade: number): 
   if (!a || a.quantidade < quantidade) return false;
   const nova = a.quantidade - quantidade;
   const { error } = await supabase.from('acessorios').update({ quantidade: nova }).eq('id', id);
-  if (error) { console.error(error); return false; }
+  if (error) { console.error(error); throw error; }
   a.quantidade = nova;
   return true;
 };
@@ -129,7 +129,7 @@ export const adicionarEstoqueAcessorio = async (id: string, quantidade: number, 
   const updates: any = { quantidade: a.quantidade + quantidade };
   if (valorCusto !== undefined) updates.valor_custo = valorCusto;
   const { error } = await supabase.from('acessorios').update(updates).eq('id', id);
-  if (error) { console.error(error); return false; }
+  if (error) { console.error(error); throw error; }
   a.quantidade += quantidade;
   if (valorCusto !== undefined) a.valorCusto = valorCusto;
   return true;

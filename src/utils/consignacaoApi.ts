@@ -127,12 +127,12 @@ const itemToDb = (item: ItemConsignacao, loteId: string) => ({
 // Sync helpers
 const syncLoteToDb = async (lote: LoteConsignacao) => {
   const { error } = await supabase.from('lotes_consignacao').upsert(loteToDb(lote) as any);
-  if (error) console.error('[CONSIGNACAO] Erro sync lote:', error);
+  if (error) { console.error('[CONSIGNACAO] Erro sync lote:', error); throw error; }
 };
 
 const syncItemToDb = async (item: ItemConsignacao, loteId: string) => {
   const { error } = await supabase.from('itens_consignacao').upsert(itemToDb(item, loteId) as any);
-  if (error) console.error('[CONSIGNACAO] Erro sync item:', error);
+  if (error) { console.error('[CONSIGNACAO] Erro sync item:', error); throw error; }
 };
 
 // ============= INIT CACHE =============

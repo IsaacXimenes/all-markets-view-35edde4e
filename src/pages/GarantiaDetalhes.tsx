@@ -32,12 +32,14 @@ import { getProdutos, updateProduto, addMovimentacao, getProdutoById, getStatusA
 import { useCadastroStore } from '@/store/cadastroStore';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/store/authStore';
 
 export default function GarantiaDetalhes() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { obterNomeLoja, obterNomeColaborador } = useCadastroStore();
+  const user = useAuthStore(s => s.user);
   
   const garantia = id ? getGarantiaById(id) : null;
   const tratativas = id ? getTratativasByGarantiaId(id) : [];
@@ -118,8 +120,8 @@ export default function GarantiaDetalhes() {
       garantiaId: garantia.id,
       tipo: tipoTratativa as 'Direcionado Apple' | 'Encaminhado Assistência' | 'Assistência + Empréstimo' | 'Troca Direta',
       descricao: descricaoTratativa,
-      usuarioId: 'COL-001',
-      usuarioNome: 'Usuário Sistema',
+      usuarioId: user?.colaborador?.id || 'SISTEMA',
+      usuarioNome: user?.colaborador?.nome || 'Sistema',
       aparelhoSelecionado: aparelhoSelecionado,
     });
 
@@ -743,8 +745,8 @@ export default function GarantiaDetalhes() {
                 tipo: 'devolucao',
                 titulo: 'Aparelho Emprestado Devolvido',
                 descricao: `Aparelho ${tratativaEmprestimo.aparelhoEmprestadoModelo} (IMEI: ${tratativaEmprestimo.aparelhoEmprestadoImei}) devolvido e encaminhado para conferência`,
-                usuarioId: 'COL-001',
-                usuarioNome: 'Usuário Sistema'
+                usuarioId: user?.colaborador?.id || 'SISTEMA',
+                usuarioNome: user?.colaborador?.nome || 'Sistema'
               });
               
               toast.success('Devolução registrada! Aparelho encaminhado para conferência.');

@@ -40,6 +40,7 @@ import { addTimelineEntry } from '@/utils/timelineApi';
 import { PagamentoQuadro } from '@/components/vendas/PagamentoQuadro';
 import { ValoresRecomendadosTroca } from '@/components/vendas/ValoresRecomendadosTroca';
 import { displayIMEI, formatIMEI } from '@/utils/imeiMask';
+import { useAuthStore } from '@/store/authStore';
 
 const formatCurrency = formatarMoeda;
 
@@ -693,7 +694,7 @@ export default function VendasEditar() {
   const handleConfirmarSalvar = () => {
     if (!vendaOriginal || !id) return;
     
-    const usuarioLogado = { id: 'COL-001', nome: 'João Gestor' }; // Mock
+    const usuarioLogado = { id: useAuthStore.getState().user?.colaborador?.id || 'SISTEMA', nome: useAuthStore.getState().user?.colaborador?.nome || 'Sistema' };
     
     // Registrar edição na timeline existente
     registrarEdicaoVenda(id, usuarioLogado.id, usuarioLogado.nome, alteracoesDetectadas);

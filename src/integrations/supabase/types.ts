@@ -3212,6 +3212,48 @@ export type Database = {
         }
         Relationships: []
       }
+      rodizios_colaboradores: {
+        Row: {
+          ativo: boolean
+          colaborador_id: string
+          created_at: string
+          criado_por_id: string | null
+          criado_por_nome: string | null
+          data_fim: string
+          data_inicio: string
+          id: string
+          loja_destino_id: string
+          loja_origem_id: string
+          observacao: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          colaborador_id: string
+          created_at?: string
+          criado_por_id?: string | null
+          criado_por_nome?: string | null
+          data_fim: string
+          data_inicio: string
+          id?: string
+          loja_destino_id: string
+          loja_origem_id: string
+          observacao?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          colaborador_id?: string
+          created_at?: string
+          criado_por_id?: string | null
+          criado_por_nome?: string | null
+          data_fim?: string
+          data_inicio?: string
+          id?: string
+          loja_destino_id?: string
+          loja_origem_id?: string
+          observacao?: string | null
+        }
+        Relationships: []
+      }
       salarios_colaboradores: {
         Row: {
           ajuda_custo: number | null

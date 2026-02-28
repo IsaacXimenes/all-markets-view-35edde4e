@@ -353,7 +353,7 @@ export default function FinanceiroExtratoContas() {
       valor: movForm.valor,
       dataHora: new Date(movForm.dataHora).toISOString(),
       observacao: movForm.observacao,
-      usuarioId: user?.colaborador?.id || 'USR-SISTEMA',
+      usuarioId: user?.colaborador?.id || 'SISTEMA',
       usuarioNome: user?.colaborador?.nome || user?.username || 'Sistema',
     });
 

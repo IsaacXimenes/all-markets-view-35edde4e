@@ -3,8 +3,6 @@ import { LojaMockada, ColaboradorMockado, TipoLoja, RodizioColaborador } from '.
 import { registrarInicioRodizio, registrarEncerramentoRodizio, getTimelineByEntidade, TimelineEntry } from '../utils/timelineApi';
 import { supabase } from '@/integrations/supabase/client';
 
-const RODIZIOS_KEY = 'cadastro_rodizios';
-
 interface CadastroStore {
   lojas: LojaMockada[];
   colaboradores: ColaboradorMockado[];
@@ -13,8 +11,7 @@ interface CadastroStore {
   carregando: boolean;
   
   // Ações
-  inicializarDadosMockados: () => void;
-  carregarDoLocalStorage: () => void;
+  inicializarDados: () => void;
   
   // Lojas
   obterLojas: () => LojaMockada[];
@@ -51,14 +48,14 @@ interface CadastroStore {
   obterContagemColaboradoresPorLoja: () => Record<string, number>;
   
   // Rodízio
-  adicionarRodizio: (rodizio: Omit<RodizioColaborador, 'id' | 'data_criacao'>) => RodizioColaborador;
-  encerrarRodizio: (id: string, usuarioId: string, usuarioNome: string) => void;
+  adicionarRodizio: (rodizio: Omit<RodizioColaborador, 'id' | 'data_criacao'>) => Promise<RodizioColaborador>;
+  encerrarRodizio: (id: string, usuarioId: string, usuarioNome: string) => Promise<void>;
   obterRodizioAtivoDoColaborador: (colaboradorId: string) => RodizioColaborador | undefined;
   obterRodiziosPorLojaDestino: (lojaId: string) => RodizioColaborador[];
   obterHistoricoRodiziosColaborador: (colaboradorId: string) => RodizioColaborador[];
   obterTimelineColaborador: (colaboradorId: string) => TimelineEntry[];
   colaboradorEmRodizio: (colaboradorId: string) => boolean;
-  verificarExpiracaoRodizios: () => void;
+  verificarExpiracaoRodizios: () => Promise<void>;
 }
 
 // Mappers: Supabase row <-> LojaMockada
@@ -81,7 +78,6 @@ const mapLojaToSupabase = (loja: Partial<LojaMockada>) => {
   if (loja.telefone !== undefined) mapped.telefone = loja.telefone;
   if (loja.email !== undefined) mapped.email = loja.email;
   if (loja.ativa !== undefined) mapped.ativa = loja.ativa;
-  // comissao_percentual: Online 6%, demais 10%
   if (loja.nome && loja.nome.toLowerCase().includes('online')) {
     mapped.comissao_percentual = 6;
   } else if (loja.nome) {
@@ -129,6 +125,21 @@ const mapColaboradorToSupabase = (col: Partial<ColaboradorMockado>) => {
   return mapped;
 };
 
+// Mapper: Supabase row <-> RodizioColaborador
+const mapSupabaseRodizio = (row: any): RodizioColaborador => ({
+  id: row.id,
+  colaborador_id: row.colaborador_id,
+  loja_origem_id: row.loja_origem_id,
+  loja_destino_id: row.loja_destino_id,
+  data_inicio: row.data_inicio,
+  data_fim: row.data_fim,
+  observacao: row.observacao || '',
+  ativo: row.ativo ?? true,
+  criado_por_id: row.criado_por_id || '',
+  criado_por_nome: row.criado_por_nome || '',
+  data_criacao: row.created_at || new Date().toISOString(),
+});
+
 export const useCadastroStore = create<CadastroStore>((set, get) => ({
   lojas: [],
   colaboradores: [],
@@ -136,21 +147,17 @@ export const useCadastroStore = create<CadastroStore>((set, get) => ({
   inicializado: false,
   carregando: false,
   
-  inicializarDadosMockados: () => {
+  inicializarDados: () => {
     const state = get();
     if (state.inicializado || state.carregando) return;
     
     set({ carregando: true });
     
-    // Carregar rodízios do localStorage (não migrados ainda)
-    const rodiziosStorage = localStorage.getItem(RODIZIOS_KEY);
-    const rodizios = rodiziosStorage ? JSON.parse(rodiziosStorage) as RodizioColaborador[] : [];
-    
-    // Carregar lojas e colaboradores do Supabase
     Promise.all([
       supabase.from('lojas').select('*').order('nome'),
       supabase.from('colaboradores').select('*').order('nome'),
-    ]).then(([lojasRes, colaboradoresRes]) => {
+      supabase.from('rodizios_colaboradores').select('*').order('created_at', { ascending: false }),
+    ]).then(([lojasRes, colaboradoresRes, rodiziosRes]) => {
       if (lojasRes.error) {
         console.error('Erro ao carregar lojas do Supabase:', lojasRes.error);
         set({ carregando: false });
@@ -161,13 +168,16 @@ export const useCadastroStore = create<CadastroStore>((set, get) => ({
         set({ carregando: false });
         return;
       }
+      if (rodiziosRes.error) {
+        console.error('Erro ao carregar rodízios do Supabase:', rodiziosRes.error);
+      }
       
       const lojas = (lojasRes.data || []).map(mapSupabaseLoja);
       const colaboradores = (colaboradoresRes.data || []).map(mapSupabaseColaborador);
+      const rodizios = (rodiziosRes.data || []).map(mapSupabaseRodizio);
       
       set({ lojas, colaboradores, rodizios, inicializado: true, carregando: false });
       
-      // Verificar rodízios expirados
       setTimeout(() => get().verificarExpiracaoRodizios(), 100);
     }).catch(err => {
       console.error('Erro ao inicializar dados do Supabase:', err);
@@ -175,51 +185,22 @@ export const useCadastroStore = create<CadastroStore>((set, get) => ({
     });
   },
   
-  carregarDoLocalStorage: () => {
-    // Agora redireciona para inicializar do Supabase
-    get().inicializarDadosMockados();
-  },
-  
   // Lojas
   obterLojas: () => get().lojas,
-  
-  obterLojasPorTipo: (tipo: TipoLoja) => {
-    return get().lojas.filter(loja => loja.tipo === tipo);
-  },
-  
-  obterLojasAtivas: () => {
-    return get().lojas.filter(loja => loja.ativa);
-  },
-  
-  obterLojasTipoLoja: () => {
-    return get().lojas.filter(loja => loja.tipo === 'Loja' && loja.ativa);
-  },
-  
-  obterLojaMatriz: () => {
-    return get().lojas.find(loja => loja.nome.toLowerCase().includes('matriz') && loja.tipo === 'Loja');
-  },
-  
-  obterLojaOnline: () => {
-    return get().lojas.find(loja => loja.nome.toLowerCase().includes('online') && loja.tipo === 'Loja');
-  },
-  
-  obterLojaById: (id: string) => {
-    return get().lojas.find(loja => loja.id === id);
-  },
+  obterLojasPorTipo: (tipo: TipoLoja) => get().lojas.filter(loja => loja.tipo === tipo),
+  obterLojasAtivas: () => get().lojas.filter(loja => loja.ativa),
+  obterLojasTipoLoja: () => get().lojas.filter(loja => loja.tipo === 'Loja' && loja.ativa),
+  obterLojaMatriz: () => get().lojas.find(loja => loja.nome.toLowerCase().includes('matriz') && loja.tipo === 'Loja'),
+  obterLojaOnline: () => get().lojas.find(loja => loja.nome.toLowerCase().includes('online') && loja.tipo === 'Loja'),
+  obterLojaById: (id: string) => get().lojas.find(loja => loja.id === id),
   
   adicionarLoja: async (loja) => {
     const supabaseData = {
       ...mapLojaToSupabase(loja),
       comissao_percentual: loja.nome?.toLowerCase().includes('online') ? 6 : 10,
     };
-    
     const { data, error } = await supabase.from('lojas').insert(supabaseData).select().single();
-    
-    if (error) {
-      console.error('Erro ao adicionar loja:', error);
-      throw error;
-    }
-    
+    if (error) throw error;
     const novaLoja = mapSupabaseLoja(data);
     set(state => ({ lojas: [...state.lojas, novaLoja] }));
     return novaLoja;
@@ -227,116 +208,47 @@ export const useCadastroStore = create<CadastroStore>((set, get) => ({
   
   atualizarLoja: async (id, updates) => {
     const supabaseData = mapLojaToSupabase(updates);
-    
     const { error } = await supabase.from('lojas').update(supabaseData).eq('id', id);
-    
-    if (error) {
-      console.error('Erro ao atualizar loja:', error);
-      throw error;
-    }
-    
-    set(state => ({
-      lojas: state.lojas.map(loja => 
-        loja.id === id ? { ...loja, ...updates } : loja
-      )
-    }));
+    if (error) throw error;
+    set(state => ({ lojas: state.lojas.map(loja => loja.id === id ? { ...loja, ...updates } : loja) }));
   },
   
   deletarLoja: async (id) => {
     const { error } = await supabase.from('lojas').delete().eq('id', id);
-    
-    if (error) {
-      console.error('Erro ao deletar loja:', error);
-      throw error;
-    }
-    
-    set(state => ({
-      lojas: state.lojas.filter(loja => loja.id !== id)
-    }));
+    if (error) throw error;
+    set(state => ({ lojas: state.lojas.filter(loja => loja.id !== id) }));
   },
   
   // Colaboradores
   obterColaboradores: () => get().colaboradores,
-  
-  obterColaboradoresPorLoja: (lojaId: string) => {
-    return get().colaboradores.filter(col => col.loja_id === lojaId);
-  },
-  
-  obterColaboradoresPorCargo: (cargo: string) => {
-    return get().colaboradores.filter(col => 
-      col.cargo.toLowerCase().includes(cargo.toLowerCase())
-    );
-  },
-  
-  obterColaboradoresAtivos: () => {
-    return get().colaboradores.filter(col => col.ativo);
-  },
-  
-  obterColaboradorById: (id: string) => {
-    return get().colaboradores.find(col => col.id === id);
-  },
-  
-  obterGestores: () => {
-    return get().colaboradores.filter(col => col.eh_gestor && col.ativo);
-  },
-  
-  obterVendedores: () => {
-    return get().colaboradores.filter(col => col.eh_vendedor && col.ativo);
-  },
-  
-  obterEstoquistas: () => {
-    return get().colaboradores.filter(col => col.eh_estoquista && col.ativo);
-  },
-  
-  obterTecnicos: () => {
-    return get().colaboradores.filter(col => 
-      col.cargo.toLowerCase().includes('técnico') && col.ativo
-    );
-  },
-  
-  obterMotoboys: () => {
-    return get().colaboradores.filter(col => 
-      col.cargo.toLowerCase().includes('motoboy') && col.ativo
-    );
-  },
-  
-  obterFinanceiros: () => {
-    return get().colaboradores.filter(col => 
-      (col.cargo.toLowerCase().includes('financeiro') || 
-       col.cargo.toLowerCase().includes('assistente administrativo') || 
-       col.cargo.toLowerCase().includes('gestor')) && col.ativo
-    );
-  },
+  obterColaboradoresPorLoja: (lojaId: string) => get().colaboradores.filter(col => col.loja_id === lojaId),
+  obterColaboradoresPorCargo: (cargo: string) => get().colaboradores.filter(col => col.cargo.toLowerCase().includes(cargo.toLowerCase())),
+  obterColaboradoresAtivos: () => get().colaboradores.filter(col => col.ativo),
+  obterColaboradorById: (id: string) => get().colaboradores.find(col => col.id === id),
+  obterGestores: () => get().colaboradores.filter(col => col.eh_gestor && col.ativo),
+  obterVendedores: () => get().colaboradores.filter(col => col.eh_vendedor && col.ativo),
+  obterEstoquistas: () => get().colaboradores.filter(col => col.eh_estoquista && col.ativo),
+  obterTecnicos: () => get().colaboradores.filter(col => col.cargo.toLowerCase().includes('técnico') && col.ativo),
+  obterMotoboys: () => get().colaboradores.filter(col => col.cargo.toLowerCase().includes('motoboy') && col.ativo),
+  obterFinanceiros: () => get().colaboradores.filter(col => (col.cargo.toLowerCase().includes('financeiro') || col.cargo.toLowerCase().includes('assistente administrativo') || col.cargo.toLowerCase().includes('gestor')) && col.ativo),
   
   obterAniversariantesDaSemana: () => {
     const hoje = new Date();
     const umaSemana = new Date(hoje);
     umaSemana.setDate(hoje.getDate() + 7);
-    
     return get().colaboradores.filter(col => {
       if (!col.ativo) return false;
-      
       const [, mesNasc, diaNasc] = col.data_admissao.split('-').map(Number);
       const aniversarioEsteAno = new Date(hoje.getFullYear(), mesNasc - 1, diaNasc);
-      
-      if (aniversarioEsteAno < hoje) {
-        aniversarioEsteAno.setFullYear(hoje.getFullYear() + 1);
-      }
-      
+      if (aniversarioEsteAno < hoje) aniversarioEsteAno.setFullYear(hoje.getFullYear() + 1);
       return aniversarioEsteAno >= hoje && aniversarioEsteAno <= umaSemana;
     });
   },
   
   adicionarColaborador: async (colaborador) => {
     const supabaseData = mapColaboradorToSupabase(colaborador);
-    
     const { data, error } = await supabase.from('colaboradores').insert(supabaseData).select().single();
-    
-    if (error) {
-      console.error('Erro ao adicionar colaborador:', error);
-      throw error;
-    }
-    
+    if (error) throw error;
     const novoColaborador = mapSupabaseColaborador(data);
     set(state => ({ colaboradores: [...state.colaboradores, novoColaborador] }));
     return novoColaborador;
@@ -344,47 +256,24 @@ export const useCadastroStore = create<CadastroStore>((set, get) => ({
   
   atualizarColaborador: async (id, updates) => {
     const supabaseData = mapColaboradorToSupabase(updates);
-    
     const { error } = await supabase.from('colaboradores').update(supabaseData).eq('id', id);
-    
-    if (error) {
-      console.error('Erro ao atualizar colaborador:', error);
-      throw error;
-    }
-    
-    set(state => ({
-      colaboradores: state.colaboradores.map(col => 
-        col.id === id ? { ...col, ...updates } : col
-      )
-    }));
+    if (error) throw error;
+    set(state => ({ colaboradores: state.colaboradores.map(col => col.id === id ? { ...col, ...updates } : col) }));
   },
   
   deletarColaborador: async (id) => {
     const { error } = await supabase.from('colaboradores').delete().eq('id', id);
-    
-    if (error) {
-      console.error('Erro ao deletar colaborador:', error);
-      throw error;
-    }
-    
-    set(state => ({
-      colaboradores: state.colaboradores.filter(col => col.id !== id)
-    }));
+    if (error) throw error;
+    set(state => ({ colaboradores: state.colaboradores.filter(col => col.id !== id) }));
   },
   
   // Lookup helpers
   obterNomeLoja: (lojaId: string) => {
     if (lojaId === 'geral-dinheiro') return 'Geral - Dinheiro';
     if (lojaId === 'geral-assistencia') return 'Geral - Assistência';
-    const loja = get().lojas.find(l => l.id === lojaId);
-    return loja?.nome || lojaId;
+    return get().lojas.find(l => l.id === lojaId)?.nome || lojaId;
   },
-  
-  obterNomeColaborador: (colaboradorId: string) => {
-    const colaborador = get().colaboradores.find(c => c.id === colaboradorId);
-    return colaborador?.nome || colaboradorId;
-  },
-  
+  obterNomeColaborador: (colaboradorId: string) => get().colaboradores.find(c => c.id === colaboradorId)?.nome || colaboradorId,
   obterContagemColaboradoresPorLoja: () => {
     const contagem: Record<string, number> = {};
     get().colaboradores.filter(c => c.ativo).forEach(col => {
@@ -393,25 +282,30 @@ export const useCadastroStore = create<CadastroStore>((set, get) => ({
     return contagem;
   },
   
-  // ===== RODÍZIO (ainda em localStorage) =====
+  // ===== RODÍZIO (Supabase) =====
   
-  adicionarRodizio: (rodizio) => {
+  adicionarRodizio: async (rodizio) => {
     const state = get();
     const colaborador = state.obterColaboradorById(rodizio.colaborador_id);
     const lojaOrigem = state.obterNomeLoja(rodizio.loja_origem_id);
     const lojaDestino = state.obterNomeLoja(rodizio.loja_destino_id);
     
-    const novoRodizio: RodizioColaborador = {
-      ...rodizio,
-      id: `ROD-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      data_criacao: new Date().toISOString()
-    };
+    const { data, error } = await supabase.from('rodizios_colaboradores').insert({
+      colaborador_id: rodizio.colaborador_id,
+      loja_origem_id: rodizio.loja_origem_id,
+      loja_destino_id: rodizio.loja_destino_id,
+      data_inicio: rodizio.data_inicio,
+      data_fim: rodizio.data_fim,
+      observacao: rodizio.observacao || '',
+      ativo: rodizio.ativo ?? true,
+      criado_por_id: rodizio.criado_por_id || '',
+      criado_por_nome: rodizio.criado_por_nome || '',
+    }).select().single();
     
-    set(state => {
-      const novosRodizios = [...state.rodizios, novoRodizio];
-      localStorage.setItem(RODIZIOS_KEY, JSON.stringify(novosRodizios));
-      return { rodizios: novosRodizios };
-    });
+    if (error) throw error;
+    
+    const novoRodizio = mapSupabaseRodizio(data);
+    set(state => ({ rodizios: [novoRodizio, ...state.rodizios] }));
     
     const dataInicioFormatada = new Date(rodizio.data_inicio).toLocaleDateString('pt-BR');
     const dataFimFormatada = new Date(rodizio.data_fim).toLocaleDateString('pt-BR');
@@ -431,18 +325,17 @@ export const useCadastroStore = create<CadastroStore>((set, get) => ({
     return novoRodizio;
   },
   
-  encerrarRodizio: (id, usuarioId, usuarioNome) => {
+  encerrarRodizio: async (id, usuarioId, usuarioNome) => {
     const state = get();
     const rodizio = state.rodizios.find(r => r.id === id);
     if (!rodizio) return;
     
-    set(state => {
-      const novosRodizios = state.rodizios.map(r => 
-        r.id === id ? { ...r, ativo: false } : r
-      );
-      localStorage.setItem(RODIZIOS_KEY, JSON.stringify(novosRodizios));
-      return { rodizios: novosRodizios };
-    });
+    const { error } = await supabase.from('rodizios_colaboradores').update({ ativo: false }).eq('id', id);
+    if (error) throw error;
+    
+    set(state => ({
+      rodizios: state.rodizios.map(r => r.id === id ? { ...r, ativo: false } : r)
+    }));
     
     registrarEncerramentoRodizio(
       rodizio.colaborador_id,
@@ -454,22 +347,12 @@ export const useCadastroStore = create<CadastroStore>((set, get) => ({
   
   obterRodizioAtivoDoColaborador: (colaboradorId) => {
     const hoje = new Date().toISOString().split('T')[0];
-    return get().rodizios.find(r => 
-      r.colaborador_id === colaboradorId && 
-      r.ativo && 
-      r.data_inicio <= hoje && 
-      r.data_fim >= hoje
-    );
+    return get().rodizios.find(r => r.colaborador_id === colaboradorId && r.ativo && r.data_inicio <= hoje && r.data_fim >= hoje);
   },
   
   obterRodiziosPorLojaDestino: (lojaId) => {
     const hoje = new Date().toISOString().split('T')[0];
-    return get().rodizios.filter(r => 
-      r.loja_destino_id === lojaId && 
-      r.ativo && 
-      r.data_inicio <= hoje && 
-      r.data_fim >= hoje
-    );
+    return get().rodizios.filter(r => r.loja_destino_id === lojaId && r.ativo && r.data_inicio <= hoje && r.data_fim >= hoje);
   },
   
   obterHistoricoRodiziosColaborador: (colaboradorId) => {
@@ -478,23 +361,20 @@ export const useCadastroStore = create<CadastroStore>((set, get) => ({
       .sort((a, b) => new Date(b.data_criacao).getTime() - new Date(a.data_criacao).getTime());
   },
   
-  obterTimelineColaborador: (colaboradorId) => {
-    return getTimelineByEntidade(colaboradorId);
-  },
+  obterTimelineColaborador: (colaboradorId) => getTimelineByEntidade(colaboradorId),
+  colaboradorEmRodizio: (colaboradorId) => !!get().obterRodizioAtivoDoColaborador(colaboradorId),
   
-  colaboradorEmRodizio: (colaboradorId) => {
-    return !!get().obterRodizioAtivoDoColaborador(colaboradorId);
-  },
-  
-  verificarExpiracaoRodizios: () => {
+  verificarExpiracaoRodizios: async () => {
     const hoje = new Date().toISOString().split('T')[0];
     const state = get();
     
-    const rodiziosExpirados = state.rodizios.filter(r => 
-      r.ativo && r.data_fim < hoje
-    );
+    const rodiziosExpirados = state.rodizios.filter(r => r.ativo && r.data_fim < hoje);
     
     if (rodiziosExpirados.length > 0) {
+      // Update all expired in DB
+      const ids = rodiziosExpirados.map(r => r.id);
+      await supabase.from('rodizios_colaboradores').update({ ativo: false }).in('id', ids);
+      
       rodiziosExpirados.forEach(r => {
         registrarEncerramentoRodizio(
           r.colaborador_id,
@@ -504,13 +384,9 @@ export const useCadastroStore = create<CadastroStore>((set, get) => ({
         );
       });
       
-      set(state => {
-        const novosRodizios = state.rodizios.map(r => 
-          r.ativo && r.data_fim < hoje ? { ...r, ativo: false } : r
-        );
-        localStorage.setItem(RODIZIOS_KEY, JSON.stringify(novosRodizios));
-        return { rodizios: novosRodizios };
-      });
+      set(state => ({
+        rodizios: state.rodizios.map(r => r.ativo && r.data_fim < hoje ? { ...r, ativo: false } : r)
+      }));
     }
   }
 }));

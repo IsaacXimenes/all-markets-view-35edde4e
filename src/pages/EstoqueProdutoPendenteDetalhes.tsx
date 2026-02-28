@@ -78,8 +78,8 @@ export default function EstoqueProdutoPendenteDetalhes() {
   // Usuário logado via authStore
   const user = useAuthStore((s) => s.user);
   const usuarioLogado = { 
-    id: user?.colaborador?.id || 'COL-003', 
-    nome: user?.colaborador?.nome || 'Carlos Estoque' 
+    id: user?.colaborador?.id || 'SISTEMA', 
+    nome: user?.colaborador?.nome || 'Sistema' 
   };
 
   // Form state

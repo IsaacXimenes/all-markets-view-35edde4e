@@ -157,13 +157,13 @@ import DadosAntigo2023 from "./pages/DadosAntigo2023";
 const queryClient = new QueryClient();
 
 const AppInitializer = ({ children }: { children: React.ReactNode }) => {
-  const { inicializarDadosMockados, inicializado } = useCadastroStore();
+  const { inicializarDados, inicializado } = useCadastroStore();
   
   useEffect(() => {
     if (!inicializado) {
-      inicializarDadosMockados();
+      inicializarDados();
     }
-  }, [inicializarDadosMockados, inicializado]);
+  }, [inicializarDados, inicializado]);
 
   // Inicializar caches de APIs migradas para Supabase
   useEffect(() => {

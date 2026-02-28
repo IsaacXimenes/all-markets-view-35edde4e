@@ -134,8 +134,8 @@ export default function GarantiaExtendidaDetalhes() {
       vendaId: garantia.vendaId,
       tipo: 'Contato Realizado',
       dataHora: new Date().toISOString(),
-      usuarioId: 'COL-001',
-      usuarioNome: 'Usuário Sistema',
+      usuarioId: user?.colaborador?.id || 'SISTEMA',
+      usuarioNome: user?.colaborador?.nome || 'Sistema',
       descricao,
       resultadoContato
     });
@@ -146,8 +146,8 @@ export default function GarantiaExtendidaDetalhes() {
       tipo: 'tratativa',
       titulo: `Contato comercial: ${resultadoContato}`,
       descricao: descricao || 'Contato realizado com cliente',
-      usuarioId: 'COL-001',
-      usuarioNome: 'Usuário Sistema'
+      usuarioId: user?.colaborador?.id || 'SISTEMA',
+      usuarioNome: user?.colaborador?.nome || 'Sistema'
     });
     
     toast.success('Contato registrado com sucesso!');

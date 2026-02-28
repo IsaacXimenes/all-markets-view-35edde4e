@@ -1,34 +1,16 @@
-// Vendas API - Mock Data
-import { generateProductId, registerProductId } from './idManager';
-import { addProdutoPendente } from './osApi';
+// Vendas API - Supabase
+import { supabase } from '@/integrations/supabase/client';
+import { generateProductId } from './idManager';
 import { getProdutos, updateProduto, addMovimentacao } from './estoqueApi';
 import { subtrairEstoqueAcessorio, VendaAcessorio } from './acessoriosApi';
 import { criarPagamentosDeVenda } from './financeApi';
 import { addDemandaMotoboy } from './motoboyApi';
 import { getColaboradorById } from './cadastrosApi';
 
-// ==================== HELPERS localStorage ====================
-const loadFromStorage = <T>(key: string, defaultData: T): T => {
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved) return JSON.parse(saved);
-  } catch (e) {
-    console.warn(`[VENDAS] Erro ao carregar ${key} do localStorage:`, e);
-  }
-  return defaultData;
-};
-
-const saveVendasToStorage = (): void => {
-  try {
-    localStorage.setItem('vendas_data', JSON.stringify(vendas));
-    localStorage.setItem('venda_counter', JSON.stringify(vendaCounter));
-  } catch (e) {
-    console.warn(`[VENDAS] Erro ao salvar vendas no localStorage:`, e);
-  }
-};
+// ==================== INTERFACES ====================
 export interface ItemVenda {
   id: string;
-  produtoId: string; // PROD-XXXX - ID único e persistente do produto
+  produtoId: string;
   produto: string;
   imei: string;
   categoria: string;
@@ -39,7 +21,6 @@ export interface ItemVenda {
   loja: string;
 }
 
-// Tipo para anexos temporários no trade-in
 export interface AnexoTradeIn {
   id: string;
   nome: string;
@@ -50,14 +31,13 @@ export interface AnexoTradeIn {
 
 export interface ItemTradeIn {
   id: string;
-  produtoId?: string; // PROD-XXXX - ID único gerado para o produto de trade-in
+  produtoId?: string;
   modelo: string;
   descricao: string;
   imei: string;
-  valorCompraUsado: number; // Renomeado de valorAbatimento para clareza
+  valorCompraUsado: number;
   imeiValidado: boolean;
   condicao: 'Novo' | 'Semi-novo';
-  // Novos campos para Trade-In Inteligente
   tipoEntrega?: 'Entregue no Ato' | 'Com o Cliente';
   termoResponsabilidade?: AnexoTradeIn;
   fotosAparelho?: AnexoTradeIn[];
@@ -71,22 +51,19 @@ export interface Pagamento {
   meioPagamento: string;
   valor: number;
   contaDestino: string;
-  parcelas?: number;        // Número de parcelas (1-18, obrigatório para cartão crédito)
-  valorParcela?: number;    // Valor por parcela (valor / parcelas)
-  descricao?: string;       // Campo livre opcional
-  // Campos específicos para Fiado
+  parcelas?: number;
+  valorParcela?: number;
+  descricao?: string;
   isFiado?: boolean;
-  fiadoDataBase?: number;   // Dia do mês para vencimento (1-31) - usado para recorrência Mensal
-  fiadoNumeroParcelas?: number; // Número de parcelas do fiado (1-10)
-  fiadoTipoRecorrencia?: 'Mensal' | 'Semanal'; // Tipo de recorrência do fiado
-  fiadoIntervaloDias?: number; // Intervalo em dias para recorrência Semanal (7, 14, 15, 21)
-  // Campos para taxas de cartão
-  taxaCartao?: number;      // Valor da taxa calculada
-  valorComTaxa?: number;    // Valor total com taxa incluída
-  maquinaId?: string;       // ID da máquina de cartão utilizada
-  // Comprovante de pagamento (Base64 temporário)
-  comprovante?: string;       // Base64 ou URL do comprovante
-  comprovanteNome?: string;   // Nome do arquivo anexado
+  fiadoDataBase?: number;
+  fiadoNumeroParcelas?: number;
+  fiadoTipoRecorrencia?: 'Mensal' | 'Semanal';
+  fiadoIntervaloDias?: number;
+  taxaCartao?: number;
+  valorComTaxa?: number;
+  maquinaId?: string;
+  comprovante?: string;
+  comprovanteNome?: string;
 }
 
 export interface TimelineEdicaoVenda {
@@ -103,7 +80,6 @@ export interface TimelineEdicaoVenda {
   descricao: string;
 }
 
-// Novo tipo para status do fluxo de vendas
 export type StatusVenda = 
   | 'Aguardando Conferência'
   | 'Conferência Gestor'
@@ -113,7 +89,6 @@ export type StatusVenda =
   | 'Finalizado'
   | 'Cancelada';
 
-// Interface de aprovação
 export interface RegistroAprovacao {
   usuarioId: string;
   usuarioNome: string;
@@ -121,7 +96,6 @@ export interface RegistroAprovacao {
   motivo?: string;
 }
 
-// Interface de timeline do fluxo
 export interface TimelineVenda {
   id: string;
   dataHora: string;
@@ -168,8 +142,6 @@ export interface Venda {
   motivoCancelamento?: string;
   comissaoVendedor?: number;
   timelineEdicoes?: TimelineEdicaoVenda[];
-  
-  // Campos do novo fluxo de vendas
   statusAtual?: StatusVenda;
   aprovacaoLancamento?: RegistroAprovacao;
   aprovacaoGestor?: RegistroAprovacao;
@@ -178,14 +150,10 @@ export interface Venda {
   aprovacaoFinanceiro?: RegistroAprovacao;
   timeline?: TimelineVenda[];
   bloqueadoParaEdicao?: boolean;
-  
-  // Campos específicos para Sinal
   valorSinal?: number;
   valorPendenteSinal?: number;
   dataSinal?: string;
   observacaoSinal?: string;
-  
-  // Garantia Extendida
   garantiaExtendida?: {
     planoId: string;
     planoNome: string;
@@ -204,739 +172,355 @@ export interface HistoricoCompraCliente {
   valor: number;
 }
 
-// IDs reais das lojas e colaboradores do useCadastroStore (JSON mockado)
-const LOJAS_VENDA = {
-  JK_SHOPPING: 'db894e7d',
-  MATRIZ: '3ac7e00c', 
-  ONLINE: 'fcc78c1a',
-  SHOPPING_SUL: '5b9446d5',
-  AGUAS_LINDAS: '0d06e7db',
-};
+// ==================== CACHE + SUPABASE ====================
+let _vendasCache: Venda[] = [];
+let _cacheLoaded = false;
 
-const VENDEDORES = {
-  CAUA_VICTOR: '6dcbc817',      // Vendedor - JK Shopping
-  ANTONIO_SOUSA: '143ac0c2',    // Vendedor - Online  
-  ERICK_GUTHEMBERG: 'b106080f', // Vendedor - Águas Lindas
-  ELIDA_FRANCA: '4bfe3508',     // Vendedor - Assistência SIA
-};
+// Mapping DB -> App
+const mapVendaFromDB = (row: any): Venda => ({
+  id: row.id,
+  numero: row.numero || 0,
+  dataHora: row.data_venda || row.created_at || '',
+  lojaVenda: row.loja_id || '',
+  vendedor: row.vendedor_id || '',
+  clienteId: row.cliente_id || '',
+  clienteNome: row.cliente_nome || '',
+  clienteCpf: row.cliente_cpf || '',
+  clienteTelefone: row.cliente_telefone || '',
+  clienteEmail: row.cliente_email || '',
+  clienteCidade: row.cliente_cidade || '',
+  origemVenda: row.origem_venda || '',
+  localRetirada: row.local_retirada || '',
+  tipoRetirada: row.tipo_retirada || 'Retirada Balcão',
+  taxaEntrega: Number(row.taxa_entrega) || 0,
+  motoboyId: row.motoboy_id || undefined,
+  itens: [], // loaded separately from venda_itens
+  tradeIns: [], // loaded separately from venda_trade_ins
+  pagamentos: [], // loaded separately from venda_pagamentos
+  subtotal: Number(row.subtotal) || 0,
+  totalTradeIn: Number(row.total_trade_in) || 0,
+  total: Number(row.valor_total) || 0,
+  lucro: Number(row.lucro) || 0,
+  margem: Number(row.margem) || 0,
+  observacoes: row.observacoes || '',
+  status: row.status_atual === 'Cancelada' ? 'Cancelada' : 'Concluída',
+  motivoCancelamento: row.motivo_cancelamento || undefined,
+  comissaoVendedor: Number(row.comissao_vendedor) || 0,
+  timelineEdicoes: (row.timeline_edicoes as any[]) || [],
+  statusAtual: row.status_atual || 'Finalizado',
+  timeline: (row.timeline as any[]) || [],
+  bloqueadoParaEdicao: row.bloqueado_para_edicao || false,
+  valorSinal: Number(row.valor_sinal) || 0,
+  valorPendenteSinal: Number(row.valor_pendente_sinal) || 0,
+  dataSinal: row.data_sinal || undefined,
+  observacaoSinal: row.observacao_sinal || undefined,
+  garantiaExtendida: (row.garantia_extendida as any) || null,
+});
 
-// Dados mockados default
-const defaultVendas: Venda[] = [
-  // VENDA DE TESTE - CONFERÊNCIA FINANCEIRO (para testar Teto Bancário)
-  {
-    id: 'VEN-2025-TEST-FINANCEIRO',
-    numero: 999,
-    dataHora: '2025-01-22T10:00:00',
-    lojaVenda: LOJAS_VENDA.MATRIZ,
-    vendedor: VENDEDORES.ANTONIO_SOUSA,
-    clienteId: 'CLI-001',
-    clienteNome: 'João Silva - Teste Teto Bancário',
-    clienteCpf: '123.456.789-00',
-    clienteTelefone: '(11) 99999-1111',
-    clienteEmail: 'joao@email.com',
-    clienteCidade: 'São Paulo',
-    origemVenda: 'Loja Física',
-    localRetirada: LOJAS_VENDA.MATRIZ,
-    tipoRetirada: 'Retirada Balcão',
-    taxaEntrega: 0,
-    itens: [
-      {
-        id: 'ITEM-TEST-001',
-        produtoId: 'PROD-TEST-001',
-        produto: 'iPhone 15 Pro Max 256GB - TESTE',
-        imei: '999888777666551',
-        categoria: 'iPhone',
-        quantidade: 1,
-        valorRecomendado: 15500.00,
-        valorVenda: 15000.00,
-        valorCusto: 7500.00,
-        loja: LOJAS_VENDA.MATRIZ
-      }
-    ],
-    tradeIns: [],
-    pagamentos: [
-      { 
-        id: 'PAG-TEST-001', 
-        meioPagamento: 'Pix', 
-        valor: 15000.00, 
-        contaDestino: 'CTA-002' // Bradesco Thiago Eduardo
-      }
-    ],
-    subtotal: 15000.00,
-    totalTradeIn: 0,
-    total: 15000.00,
-    lucro: 7500.00,
-    margem: 100.0,
-    observacoes: 'Venda teste para validar Teto Bancário - Pix para Bradesco Thiago Eduardo',
-    status: 'Concluída',
-    statusAtual: 'Conferência Financeiro',
-    timeline: [
-      {
-        id: 'TL-TEST-001',
-        dataHora: '2025-01-22T10:00:00',
-        tipo: 'criacao',
-        usuarioId: VENDEDORES.ANTONIO_SOUSA,
-        usuarioNome: 'Antonio Sousa',
-        descricao: 'Venda criada para teste de Teto Bancário.'
-      },
-      {
-        id: 'TL-TEST-002',
-        dataHora: '2025-01-22T10:05:00',
-        tipo: 'aprovacao_lancamento',
-        usuarioId: 'COL-001',
-        usuarioNome: 'Lucas Mendes',
-        descricao: 'Lançamento aprovado.'
-      },
-      {
-        id: 'TL-TEST-003',
-        dataHora: '2025-01-22T10:10:00',
-        tipo: 'aprovacao_gestor',
-        usuarioId: 'COL-001',
-        usuarioNome: 'Lucas Mendes',
-        descricao: 'Aprovado pelo gestor. Enviado para conferência financeira.'
-      }
-    ],
-    bloqueadoParaEdicao: false
-  } as Venda,
-  {
-    id: 'VEN-2025-0001',
-    numero: 1,
-    dataHora: '2025-01-15T10:30:00',
-    lojaVenda: LOJAS_VENDA.JK_SHOPPING,
-    vendedor: VENDEDORES.CAUA_VICTOR,
-    clienteId: 'CLI-001',
-    clienteNome: 'João Silva',
-    clienteCpf: '123.456.789-00',
-    clienteTelefone: '(11) 99999-1111',
-    clienteEmail: 'joao@email.com',
-    clienteCidade: 'São Paulo',
-    origemVenda: 'Loja Física',
-    localRetirada: LOJAS_VENDA.JK_SHOPPING,
-    tipoRetirada: 'Retirada Balcão',
-    taxaEntrega: 0,
-    itens: [
-      {
-        id: 'ITEM-001',
-        produtoId: 'PROD-0010',
-        produto: 'iPhone 15 Pro Max',
-        imei: '352123456789012',
-        categoria: 'iPhone',
-        quantidade: 1,
-        valorRecomendado: 15120.00,
-        valorVenda: 14500.00,
-        valorCusto: 7200.00,
-        loja: LOJAS_VENDA.JK_SHOPPING
-      }
-    ],
-    tradeIns: [],
-    pagamentos: [
-      { id: 'PAG-001', meioPagamento: 'Pix', valor: 14500.00, contaDestino: 'CTA-005' } // JK Shopping - Santander
-    ],
-    subtotal: 14500.00,
-    totalTradeIn: 0,
-    total: 14500.00,
-    lucro: 7300.00,
-    margem: 101.39,
-    observacoes: '',
-    status: 'Concluída'
-  },
-  {
-    id: 'VEN-2025-0002',
-    numero: 2,
-    dataHora: '2025-01-16T14:15:00',
-    lojaVenda: LOJAS_VENDA.MATRIZ,
-    vendedor: VENDEDORES.ANTONIO_SOUSA,
-    clienteId: 'CLI-002',
-    clienteNome: 'Maria Santos',
-    clienteCpf: '234.567.890-11',
-    clienteTelefone: '(11) 99999-2222',
-    clienteEmail: 'maria@email.com',
-    clienteCidade: 'São Paulo',
-    origemVenda: 'WhatsApp',
-    localRetirada: LOJAS_VENDA.MATRIZ,
-    tipoRetirada: 'Entrega',
-    taxaEntrega: 50.00,
-    itens: [
-      {
-        id: 'ITEM-002',
-        produtoId: 'PROD-0011',
-        produto: 'iPhone 15 Pro',
-        imei: '352123456789013',
-        categoria: 'iPhone',
-        quantidade: 1,
-        valorRecomendado: 13440.00,
-        valorVenda: 12800.00,
-        valorCusto: 6400.00,
-        loja: LOJAS_VENDA.MATRIZ
-      }
-    ],
-    tradeIns: [
-      {
-        id: 'TRADE-001',
-        produtoId: 'PROD-0006',
-        modelo: 'iPhone 12',
-        descricao: 'Tela em ótimo estado, bateria 75%',
-        imei: '999888777666555',
-        valorCompraUsado: 1500.00,
-        imeiValidado: true,
-        condicao: 'Semi-novo'
-      }
-    ],
-    pagamentos: [
-      { id: 'PAG-002', meioPagamento: 'Cartão Crédito', valor: 8000.00, contaDestino: 'CTA-001' }, // Matriz - Santander
-      { id: 'PAG-003', meioPagamento: 'Pix', valor: 3350.00, contaDestino: 'CTA-002' } // Matriz - Bradesco
-    ],
-    subtotal: 12800.00,
-    totalTradeIn: 1500.00,
-    total: 11350.00,
-    lucro: 4950.00,
-    margem: 77.34,
-    observacoes: 'Cliente VIP - desconto especial aplicado',
-    status: 'Concluída'
-  },
-  {
-    id: 'VEN-2025-0003',
-    numero: 3,
-    dataHora: '2025-01-17T09:45:00',
-    lojaVenda: LOJAS_VENDA.SHOPPING_SUL,
-    vendedor: VENDEDORES.ERICK_GUTHEMBERG,
-    clienteId: 'CLI-003',
-    clienteNome: 'Pedro Oliveira',
-    clienteCpf: '345.678.901-22',
-    clienteTelefone: '(11) 99999-3333',
-    clienteEmail: 'pedro@email.com',
-    clienteCidade: 'São Paulo',
-    origemVenda: 'Mercado Livre',
-    localRetirada: LOJAS_VENDA.JK_SHOPPING,
-    tipoRetirada: 'Retirada em Outra Loja',
-    taxaEntrega: 0,
-    itens: [
-      {
-        id: 'ITEM-003',
-        produtoId: 'PROD-0012',
-        produto: 'iPhone 14 Pro',
-        imei: '352123456789014',
-        categoria: 'iPhone',
-        quantidade: 1,
-        valorRecomendado: 6840.00,
-        valorVenda: 6500.00,
-        valorCusto: 3800.00,
-        loja: LOJAS_VENDA.SHOPPING_SUL
-      }
-    ],
-    tradeIns: [],
-    pagamentos: [
-      { id: 'PAG-004', meioPagamento: 'Transferência', valor: 6500.00, contaDestino: 'CTA-009' } // Shopping Sul - Santander
-    ],
-    subtotal: 6500.00,
-    totalTradeIn: 0,
-    total: 6500.00,
-    lucro: 2700.00,
-    margem: 41.54,
-    observacoes: 'Venda via Mercado Livre',
-    status: 'Concluída'
-  },
-  {
-    id: 'VEN-2025-0004',
-    numero: 4,
-    dataHora: '2025-01-18T16:20:00',
-    lojaVenda: LOJAS_VENDA.ONLINE,
-    vendedor: VENDEDORES.ANTONIO_SOUSA,
-    clienteId: 'CLI-004',
-    clienteNome: 'Ana Costa',
-    clienteCpf: '456.789.012-33',
-    clienteTelefone: '(11) 99999-4444',
-    clienteEmail: 'ana@email.com',
-    clienteCidade: 'São Paulo',
-    origemVenda: 'Online',
-    localRetirada: LOJAS_VENDA.ONLINE,
-    tipoRetirada: 'Retirada Balcão',
-    taxaEntrega: 0,
-    itens: [
-      {
-        id: 'ITEM-004',
-        produtoId: 'PROD-0014',
-        produto: 'iPhone 15',
-        imei: '352123456789016',
-        categoria: 'iPhone',
-        quantidade: 1,
-        valorRecomendado: 10920.00,
-        valorVenda: 10500.00,
-        valorCusto: 5200.00,
-        loja: LOJAS_VENDA.ONLINE
-      }
-    ],
-    tradeIns: [],
-    pagamentos: [
-      { id: 'PAG-005', meioPagamento: 'Cartão Débito', valor: 10500.00, contaDestino: 'CTA-003' } // Online - Santander
-    ],
-    subtotal: 10500.00,
-    totalTradeIn: 0,
-    total: 10500.00,
-    lucro: 5300.00,
-    margem: 50.48,
-    observacoes: '',
-    status: 'Concluída'
-  },
-  {
-    id: 'VEN-2025-0005',
-    numero: 5,
-    dataHora: '2025-01-19T11:00:00',
-    lojaVenda: LOJAS_VENDA.AGUAS_LINDAS,
-    vendedor: VENDEDORES.ERICK_GUTHEMBERG,
-    clienteId: 'CLI-001',
-    clienteNome: 'João Silva',
-    clienteCpf: '123.456.789-00',
-    clienteTelefone: '(11) 99999-1111',
-    clienteEmail: 'joao@email.com',
-    clienteCidade: 'São Paulo',
-    origemVenda: 'Indicação',
-    localRetirada: LOJAS_VENDA.AGUAS_LINDAS,
-    tipoRetirada: 'Retirada Balcão',
-    taxaEntrega: 0,
-    itens: [
-      {
-        id: 'ITEM-005',
-        produtoId: 'PROD-0016',
-        produto: 'iPhone 14 Plus',
-        imei: '352123456789018',
-        categoria: 'iPhone',
-        quantidade: 1,
-        valorRecomendado: 12180.00,
-        valorVenda: 11500.00,
-        valorCusto: 5800.00,
-        loja: LOJAS_VENDA.AGUAS_LINDAS
-      }
-    ],
-    tradeIns: [
-      {
-        id: 'TRADE-002',
-        produtoId: 'PROD-0007',
-        modelo: 'iPhone 11',
-        descricao: 'Seminovo, funcionando perfeitamente',
-        imei: '888777666555444',
-        valorCompraUsado: 1200.00,
-        imeiValidado: true,
-        condicao: 'Semi-novo'
-      }
-    ],
-    pagamentos: [
-      { id: 'PAG-006', meioPagamento: 'Dinheiro', valor: 10300.00, contaDestino: 'CTA-007' } // Águas Lindas - Santander
-    ],
-    subtotal: 11500.00,
-    totalTradeIn: 1200.00,
-    total: 10300.00,
-    lucro: 4500.00,
-    margem: 77.59,
-    observacoes: 'Cliente retorno - segunda compra este mês',
-    status: 'Concluída'
-  },
-  // Vendas com PREJUÍZO
-  {
-    id: 'VEN-2025-0006',
-    numero: 6,
-    dataHora: '2025-01-20T14:00:00',
-    lojaVenda: LOJAS_VENDA.MATRIZ,
-    vendedor: VENDEDORES.CAUA_VICTOR,
-    clienteId: 'CLI-003',
-    clienteNome: 'Pedro Oliveira',
-    clienteCpf: '345.678.901-22',
-    clienteTelefone: '(11) 99999-3333',
-    clienteEmail: 'pedro@email.com',
-    clienteCidade: 'São Paulo',
-    origemVenda: 'WhatsApp',
-    localRetirada: LOJAS_VENDA.MATRIZ,
-    tipoRetirada: 'Retirada Balcão',
-    taxaEntrega: 0,
-    itens: [
-      {
-        id: 'ITEM-006',
-        produtoId: 'PROD-0020',
-        produto: 'iPhone 14 Pro Max',
-        imei: '352123456789022',
-        categoria: 'iPhone',
-        quantidade: 1,
-        valorRecomendado: 8500.00,
-        valorVenda: 5800.00,
-        valorCusto: 6200.00,
-        loja: LOJAS_VENDA.MATRIZ
-      }
-    ],
-    tradeIns: [],
-    pagamentos: [
-      { id: 'PAG-007', meioPagamento: 'Pix', valor: 5800.00, contaDestino: 'CTA-002' }
-    ],
-    subtotal: 5800.00,
-    totalTradeIn: 0,
-    total: 5800.00,
-    lucro: -400.00,
-    margem: -6.45,
-    observacoes: 'Venda promocional - cliente exigiu desconto alto',
-    status: 'Concluída'
-  },
-  {
-    id: 'VEN-2025-0007',
-    numero: 7,
-    dataHora: '2025-01-21T09:15:00',
-    lojaVenda: LOJAS_VENDA.ONLINE,
-    vendedor: VENDEDORES.ANTONIO_SOUSA,
-    clienteId: 'CLI-004',
-    clienteNome: 'Ana Costa',
-    clienteCpf: '456.789.012-33',
-    clienteTelefone: '(11) 99999-4444',
-    clienteEmail: 'ana@email.com',
-    clienteCidade: 'São Paulo',
-    origemVenda: 'Mercado Livre',
-    localRetirada: LOJAS_VENDA.ONLINE,
-    tipoRetirada: 'Entrega',
-    taxaEntrega: 50.00,
-    itens: [
-      {
-        id: 'ITEM-007',
-        produtoId: 'PROD-0021',
-        produto: 'iPhone 13',
-        imei: '352123456789023',
-        categoria: 'iPhone',
-        quantidade: 1,
-        valorRecomendado: 5200.00,
-        valorVenda: 3900.00,
-        valorCusto: 4100.00,
-        loja: LOJAS_VENDA.ONLINE
-      }
-    ],
-    tradeIns: [],
-    pagamentos: [
-      { id: 'PAG-008', meioPagamento: 'Cartão Crédito', valor: 3950.00, contaDestino: 'CTA-003' }
-    ],
-    subtotal: 3900.00,
-    totalTradeIn: 0,
-    total: 3950.00,
-    lucro: -150.00,
-    margem: -3.66,
-    observacoes: 'Venda ML com taxa alta - prejuízo calculado',
-    status: 'Concluída'
-  },
-  // ========== VENDAS FIADO ==========
-  {
-    id: 'VEN-2025-0050',
-    numero: 50,
-    dataHora: '2024-12-01T14:30:00',
-    lojaVenda: LOJAS_VENDA.JK_SHOPPING,
-    vendedor: VENDEDORES.CAUA_VICTOR,
-    clienteId: 'CLI-001',
-    clienteNome: 'João Silva',
-    clienteCpf: '123.456.789-00',
-    clienteTelefone: '(11) 99999-1111',
-    clienteEmail: 'joao@email.com',
-    clienteCidade: 'São Paulo',
-    origemVenda: 'Loja Física',
-    localRetirada: LOJAS_VENDA.JK_SHOPPING,
-    tipoRetirada: 'Retirada Balcão',
-    taxaEntrega: 0,
-    itens: [
-      {
-        id: 'ITEM-050',
-        produtoId: 'PROD-0050',
-        produto: 'iPhone 14',
-        imei: '352123456789050',
-        categoria: 'iPhone',
-        quantidade: 1,
-        valorRecomendado: 5500.00,
-        valorVenda: 5000.00,
-        valorCusto: 2800.00,
-        loja: LOJAS_VENDA.JK_SHOPPING
-      }
-    ],
-    tradeIns: [],
-    pagamentos: [
-      { 
-        id: 'PAG-050', 
-        meioPagamento: 'Fiado', 
-        valor: 1500.00, 
-        contaDestino: 'Caixa Principal',
-        isFiado: true,
-        fiadoDataBase: 5,
-        fiadoNumeroParcelas: 3
-      }
-    ],
-    subtotal: 5000.00,
-    totalTradeIn: 0,
-    total: 1500.00,
-    lucro: 2200.00,
-    margem: 78.57,
-    observacoes: 'Venda parcelada no Fiado - 3x de R$ 500,00',
-    status: 'Concluída'
-  },
-  {
-    id: 'VEN-2025-0055',
-    numero: 55,
-    dataHora: '2024-12-15T10:00:00',
-    lojaVenda: LOJAS_VENDA.MATRIZ,
-    vendedor: VENDEDORES.ANTONIO_SOUSA,
-    clienteId: 'CLI-005',
-    clienteNome: 'Carlos Oliveira',
-    clienteCpf: '567.890.123-44',
-    clienteTelefone: '(11) 99999-5555',
-    clienteEmail: 'carlos@email.com',
-    clienteCidade: 'São Paulo',
-    origemVenda: 'WhatsApp',
-    localRetirada: LOJAS_VENDA.MATRIZ,
-    tipoRetirada: 'Retirada Balcão',
-    taxaEntrega: 0,
-    itens: [
-      {
-        id: 'ITEM-055',
-        produtoId: 'PROD-0055',
-        produto: 'iPhone 15',
-        imei: '352123456789055',
-        categoria: 'iPhone',
-        quantidade: 1,
-        valorRecomendado: 7500.00,
-        valorVenda: 7000.00,
-        valorCusto: 4200.00,
-        loja: LOJAS_VENDA.MATRIZ
-      }
-    ],
-    tradeIns: [],
-    pagamentos: [
-      { 
-        id: 'PAG-055', 
-        meioPagamento: 'Fiado', 
-        valor: 2000.00, 
-        contaDestino: 'Caixa Loja Norte',
-        isFiado: true,
-        fiadoDataBase: 10,
-        fiadoNumeroParcelas: 5
-      }
-    ],
-    subtotal: 7000.00,
-    totalTradeIn: 0,
-    total: 2000.00,
-    lucro: 2800.00,
-    margem: 66.67,
-    observacoes: 'Venda parcelada no Fiado - 5x de R$ 400,00',
-    status: 'Concluída'
-  },
-  {
-    id: 'VEN-2025-0060',
-    numero: 60,
-    dataHora: '2025-01-02T16:45:00',
-    lojaVenda: LOJAS_VENDA.ONLINE,
-    vendedor: VENDEDORES.ANTONIO_SOUSA,
-    clienteId: 'CLI-006',
-    clienteNome: 'Ana Paula Ferreira',
-    clienteCpf: '678.901.234-55',
-    clienteTelefone: '(11) 99999-6666',
-    clienteEmail: 'anapaula@email.com',
-    clienteCidade: 'São Paulo',
-    origemVenda: 'Indicação',
-    localRetirada: LOJAS_VENDA.ONLINE,
-    tipoRetirada: 'Retirada Balcão',
-    taxaEntrega: 0,
-    itens: [
-      {
-        id: 'ITEM-060',
-        produtoId: 'PROD-0060',
-        produto: 'iPhone 13 Pro',
-        imei: '352123456789060',
-        categoria: 'iPhone',
-        quantidade: 1,
-        valorRecomendado: 5200.00,
-        valorVenda: 4800.00,
-        valorCusto: 2600.00,
-        loja: LOJAS_VENDA.ONLINE
-      }
-    ],
-    tradeIns: [],
-    pagamentos: [
-      { 
-        id: 'PAG-060', 
-        meioPagamento: 'Fiado', 
-        valor: 1500.00, 
-        contaDestino: 'Caixa Loja Sul',
-        isFiado: true,
-        fiadoDataBase: 8,
-        fiadoNumeroParcelas: 2
-      }
-    ],
-    subtotal: 4800.00,
-    totalTradeIn: 0,
-    total: 1500.00,
-    lucro: 2200.00,
-    margem: 84.62,
-    observacoes: 'Venda parcelada no Fiado - 2x de R$ 750,00',
-    status: 'Concluída'
-  },
-  {
-    id: 'VEN-2025-0062',
-    numero: 62,
-    dataHora: '2025-01-05T11:20:00',
-    lojaVenda: LOJAS_VENDA.JK_SHOPPING,
-    vendedor: VENDEDORES.CAUA_VICTOR,
-    clienteId: 'CLI-007',
-    clienteNome: 'Roberto Mendes',
-    clienteCpf: '789.012.345-66',
-    clienteTelefone: '(11) 99999-7777',
-    clienteEmail: 'roberto@email.com',
-    clienteCidade: 'São Paulo',
-    origemVenda: 'Loja Física',
-    localRetirada: LOJAS_VENDA.JK_SHOPPING,
-    tipoRetirada: 'Retirada Balcão',
-    taxaEntrega: 0,
-    itens: [
-      {
-        id: 'ITEM-062',
-        produtoId: 'PROD-0062',
-        produto: 'iPhone 12 Pro Max',
-        imei: '352123456789062',
-        categoria: 'iPhone',
-        quantidade: 1,
-        valorRecomendado: 4500.00,
-        valorVenda: 4200.00,
-        valorCusto: 2100.00,
-        loja: LOJAS_VENDA.JK_SHOPPING
-      }
-    ],
-    tradeIns: [],
-    pagamentos: [
-      { 
-        id: 'PAG-062', 
-        meioPagamento: 'Fiado', 
-        valor: 1300.00, 
-        contaDestino: 'Caixa Principal',
-        isFiado: true,
-        fiadoDataBase: 11,
-        fiadoNumeroParcelas: 4
-      }
-    ],
-    subtotal: 4200.00,
-    totalTradeIn: 0,
-    total: 1300.00,
-    lucro: 2100.00,
-    margem: 100.00,
-    observacoes: 'Venda parcelada no Fiado - 4x de R$ 325,00',
-    status: 'Concluída'
+const mapItemFromDB = (row: any): ItemVenda => ({
+  id: row.id,
+  produtoId: row.produto_id || '',
+  produto: row.produto_nome || '',
+  imei: row.imei || '',
+  categoria: row.categoria || '',
+  quantidade: row.quantidade || 1,
+  valorRecomendado: Number(row.valor_recomendado) || 0,
+  valorVenda: Number(row.valor_venda) || 0,
+  valorCusto: Number(row.valor_custo) || 0,
+  loja: row.loja_id || '',
+});
+
+const mapTradeInFromDB = (row: any): ItemTradeIn => ({
+  id: row.id,
+  produtoId: row.produto_id || undefined,
+  modelo: row.modelo || '',
+  descricao: row.descricao || '',
+  imei: row.imei || '',
+  valorCompraUsado: Number(row.valor_compra_usado) || 0,
+  imeiValidado: row.imei_validado || false,
+  condicao: row.condicao || 'Semi-novo',
+  tipoEntrega: row.tipo_entrega || undefined,
+  dataRegistro: row.data_registro || undefined,
+  anexoConsultaIMEI: undefined,
+  anexoConsultaIMEINome: undefined,
+});
+
+const mapPagamentoFromDB = (row: any): Pagamento => ({
+  id: row.id,
+  meioPagamento: row.meio_pagamento || '',
+  valor: Number(row.valor) || 0,
+  contaDestino: row.conta_destino || '',
+  parcelas: row.parcelas || 1,
+  valorParcela: Number(row.valor_parcela) || 0,
+  descricao: row.descricao || undefined,
+  isFiado: row.is_fiado || false,
+  fiadoDataBase: row.fiado_data_base ? new Date(row.fiado_data_base).getDate() : undefined,
+  fiadoNumeroParcelas: row.fiado_numero_parcelas || undefined,
+  fiadoTipoRecorrencia: row.fiado_tipo_recorrencia || undefined,
+  fiadoIntervaloDias: row.fiado_intervalo_dias || undefined,
+  taxaCartao: Number(row.taxa_cartao) || 0,
+  valorComTaxa: Number(row.valor_com_taxa) || 0,
+  maquinaId: row.maquina_id || undefined,
+  comprovante: row.comprovante || undefined,
+  comprovanteNome: row.comprovante_nome || undefined,
+});
+
+export const initVendasCache = async (): Promise<void> => {
+  try {
+    // Load vendas
+    const { data: vendasRows, error: vendasErr } = await supabase
+      .from('vendas')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (vendasErr) throw vendasErr;
+
+    const vendaIds = (vendasRows || []).map(v => v.id);
+
+    // Load related data in parallel
+    const [itensRes, tradeInsRes, pagamentosRes] = await Promise.all([
+      vendaIds.length > 0 
+        ? supabase.from('venda_itens').select('*').in('venda_id', vendaIds)
+        : Promise.resolve({ data: [], error: null }),
+      vendaIds.length > 0
+        ? supabase.from('venda_trade_ins').select('*').in('venda_id', vendaIds)
+        : Promise.resolve({ data: [], error: null }),
+      vendaIds.length > 0
+        ? supabase.from('venda_pagamentos').select('*').in('venda_id', vendaIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    const itensMap = new Map<string, ItemVenda[]>();
+    (itensRes.data || []).forEach(row => {
+      const vendaId = row.venda_id;
+      if (!vendaId) return;
+      if (!itensMap.has(vendaId)) itensMap.set(vendaId, []);
+      itensMap.get(vendaId)!.push(mapItemFromDB(row));
+    });
+
+    const tradeInsMap = new Map<string, ItemTradeIn[]>();
+    (tradeInsRes.data || []).forEach(row => {
+      const vendaId = row.venda_id;
+      if (!vendaId) return;
+      if (!tradeInsMap.has(vendaId)) tradeInsMap.set(vendaId, []);
+      tradeInsMap.get(vendaId)!.push(mapTradeInFromDB(row));
+    });
+
+    const pagamentosMap = new Map<string, Pagamento[]>();
+    (pagamentosRes.data || []).forEach(row => {
+      const vendaId = row.venda_id;
+      if (!vendaId) return;
+      if (!pagamentosMap.has(vendaId)) pagamentosMap.set(vendaId, []);
+      pagamentosMap.get(vendaId)!.push(mapPagamentoFromDB(row));
+    });
+
+    _vendasCache = (vendasRows || []).map(row => {
+      const venda = mapVendaFromDB(row);
+      venda.itens = itensMap.get(row.id) || [];
+      venda.tradeIns = tradeInsMap.get(row.id) || [];
+      venda.pagamentos = pagamentosMap.get(row.id) || [];
+      return venda;
+    });
+
+    _cacheLoaded = true;
+    console.log(`[VENDAS] Cache carregado: ${_vendasCache.length} vendas`);
+  } catch (err) {
+    console.error('[VENDAS] Erro ao carregar cache:', err);
+    _vendasCache = [];
+    _cacheLoaded = true;
   }
-];
-
-// ==================== INICIALIZAÇÃO COM localStorage ====================
-let vendas: Venda[] = loadFromStorage('vendas_data', defaultVendas);
-
-// Histórico de compras por cliente (mockado)
-const historicoComprasCliente: Record<string, HistoricoCompraCliente[]> = {
-  'CLI-001': [
-    { id: 'HC-001', data: '2024-12-15', produto: 'AirPods Pro 2', valor: 2499.00 },
-    { id: 'HC-002', data: '2024-11-20', produto: 'Capa iPhone 15', valor: 299.00 },
-    { id: 'HC-003', data: '2024-10-05', produto: 'iPhone 14', valor: 5990.00 }
-  ],
-  'CLI-002': [
-    { id: 'HC-004', data: '2024-11-10', produto: 'Apple Watch Series 9', valor: 4799.00 },
-    { id: 'HC-005', data: '2024-09-25', produto: 'MacBook Air M2', valor: 11999.00 },
-    { id: 'HC-006', data: '2024-08-12', produto: 'iPad Pro 11"', valor: 8999.00 }
-  ],
-  'CLI-003': [
-    { id: 'HC-007', data: '2024-10-30', produto: 'AirPods 3', valor: 1699.00 },
-    { id: 'HC-008', data: '2024-07-18', produto: 'MagSafe Charger', valor: 399.00 }
-  ],
-  'CLI-004': [
-    { id: 'HC-009', data: '2024-12-01', produto: 'iPhone 13 Mini', valor: 4299.00 }
-  ],
-  'CLI-005': []
 };
 
-let vendaCounter: number = loadFromStorage('venda_counter', vendas.length);
-
-// Funções de API
+// ==================== GETTERS (síncronos via cache) ====================
 export const getVendas = (): Venda[] => {
-  return [...vendas];
+  return [..._vendasCache];
 };
 
 export const getVendaById = (id: string): Venda | null => {
-  return vendas.find(v => v.id === id) || null;
+  return _vendasCache.find(v => v.id === id) || null;
 };
 
-// Extrai marca do modelo para produtos de Trade-In
+export const getHistoricoComprasCliente = (clienteId: string): HistoricoCompraCliente[] => {
+  // Build from vendas cache
+  return _vendasCache
+    .filter(v => v.clienteId === clienteId && v.status === 'Concluída')
+    .flatMap(v => v.itens.map(i => ({
+      id: i.id,
+      data: v.dataHora,
+      produto: i.produto,
+      valor: i.valorVenda
+    })));
+};
+
+export const getNextVendaNumber = (): { id: string; numero: number } => {
+  const maxNumero = _vendasCache.reduce((max, v) => Math.max(max, v.numero || 0), 0);
+  const nextNum = maxNumero + 1;
+  const year = new Date().getFullYear();
+  return {
+    id: `VEN-${year}-${String(nextNum).padStart(4, '0')}`,
+    numero: nextNum
+  };
+};
+
+// ==================== MUTAÇÕES (async) ====================
+
 const extrairMarca = (modelo: string): string => {
   const modeloLower = modelo.toLowerCase();
   if (modeloLower.includes('iphone') || modeloLower.includes('apple')) return 'Apple';
   if (modeloLower.includes('samsung') || modeloLower.includes('galaxy')) return 'Samsung';
   if (modeloLower.includes('motorola') || modeloLower.includes('moto')) return 'Motorola';
   if (modeloLower.includes('xiaomi') || modeloLower.includes('redmi') || modeloLower.includes('poco')) return 'Xiaomi';
-  if (modeloLower.includes('huawei')) return 'Huawei';
-  if (modeloLower.includes('lg')) return 'LG';
   return 'Outra';
 };
 
-export const addVenda = (venda: Omit<Venda, 'id' | 'numero'>): Venda => {
-  vendaCounter++;
-  const year = new Date().getFullYear();
-  const newId = `VEN-${year}-${String(vendaCounter).padStart(4, '0')}`;
-  
+export const addVenda = async (venda: Omit<Venda, 'id' | 'numero'>): Promise<Venda> => {
+  const { id: newId, numero: newNumero } = getNextVendaNumber();
+
   // Gerar IDs para trade-ins que ainda não têm
   const tradeInsComIds = venda.tradeIns.map(ti => {
-    if (!ti.produtoId) {
-      ti.produtoId = generateProductId();
-    }
+    if (!ti.produtoId) ti.produtoId = generateProductId();
     return ti;
   });
-  
+
+  // Insert venda principal
+  const { data: vendaRow, error: vendaErr } = await supabase.from('vendas').insert({
+    numero: newNumero,
+    data_venda: venda.dataHora || new Date().toISOString(),
+    loja_id: venda.lojaVenda || null,
+    vendedor_id: venda.vendedor || null,
+    vendedor_nome: (venda as any).vendedorNome || '',
+    cliente_id: venda.clienteId || null,
+    cliente_nome: venda.clienteNome || null,
+    cliente_cpf: venda.clienteCpf || null,
+    cliente_telefone: venda.clienteTelefone || null,
+    cliente_email: venda.clienteEmail || null,
+    cliente_cidade: venda.clienteCidade || null,
+    origem_venda: venda.origemVenda || null,
+    local_retirada: venda.localRetirada || null,
+    tipo_retirada: venda.tipoRetirada || null,
+    taxa_entrega: venda.taxaEntrega || 0,
+    motoboy_id: venda.motoboyId || null,
+    subtotal: venda.subtotal || 0,
+    total_trade_in: venda.totalTradeIn || 0,
+    valor_total: venda.total || 0,
+    lucro: venda.lucro || 0,
+    margem: venda.margem || 0,
+    observacoes: venda.observacoes || null,
+    status_atual: venda.statusAtual || 'Aguardando Conferência',
+    comissao_vendedor: venda.comissaoVendedor || 0,
+    timeline: (venda.timeline as any) || [],
+    timeline_edicoes: (venda.timelineEdicoes as any) || [],
+    bloqueado_para_edicao: false,
+    valor_sinal: venda.valorSinal || 0,
+    valor_pendente_sinal: venda.valorPendenteSinal || 0,
+    data_sinal: venda.dataSinal || null,
+    observacao_sinal: venda.observacaoSinal || null,
+    garantia_extendida: (venda.garantiaExtendida as any) || null,
+    hora_venda: (venda as any).horaVenda || null,
+    status_pagamento: 'Pendente',
+  }).select().single();
+
+  if (vendaErr || !vendaRow) throw vendaErr || new Error('Falha ao inserir venda');
+
+  const vendaId = vendaRow.id;
+
+  // Insert itens, trade-ins, pagamentos in parallel
+  const insertItens = venda.itens.length > 0
+    ? supabase.from('venda_itens').insert(venda.itens.map(i => ({
+        venda_id: vendaId,
+        produto_id: i.produtoId || null,
+        produto_nome: i.produto,
+        imei: i.imei || null,
+        categoria: i.categoria || null,
+        quantidade: i.quantidade || 1,
+        valor_recomendado: i.valorRecomendado || 0,
+        valor_venda: i.valorVenda || 0,
+        valor_custo: i.valorCusto || 0,
+        loja_id: i.loja || null,
+      })))
+    : Promise.resolve({ error: null });
+
+  const insertTradeIns = tradeInsComIds.length > 0
+    ? supabase.from('venda_trade_ins').insert(tradeInsComIds.map(t => ({
+        venda_id: vendaId,
+        produto_id: t.produtoId || null,
+        modelo: t.modelo || null,
+        descricao: t.descricao || null,
+        imei: t.imei || null,
+        valor_compra_usado: t.valorCompraUsado || 0,
+        imei_validado: t.imeiValidado || false,
+        condicao: t.condicao || null,
+        tipo_entrega: t.tipoEntrega || null,
+        anexos: [] as any,
+      })))
+    : Promise.resolve({ error: null });
+
+  const insertPagamentos = venda.pagamentos.length > 0
+    ? supabase.from('venda_pagamentos').insert(venda.pagamentos.map(p => ({
+        venda_id: vendaId,
+        meio_pagamento: p.meioPagamento || null,
+        valor: p.valor || 0,
+        conta_destino: p.contaDestino || null,
+        parcelas: p.parcelas || 1,
+        valor_parcela: p.valorParcela || 0,
+        descricao: p.descricao || null,
+        is_fiado: p.isFiado || false,
+        fiado_data_base: p.fiadoDataBase ? `2026-01-${String(p.fiadoDataBase).padStart(2, '0')}` : null,
+        fiado_numero_parcelas: p.fiadoNumeroParcelas || null,
+        fiado_tipo_recorrencia: p.fiadoTipoRecorrencia || null,
+        fiado_intervalo_dias: p.fiadoIntervaloDias || null,
+        taxa_cartao: p.taxaCartao || 0,
+        valor_com_taxa: p.valorComTaxa || 0,
+        maquina_id: p.maquinaId || null,
+        comprovante: p.comprovante || null,
+        comprovante_nome: p.comprovanteNome || null,
+      })))
+    : Promise.resolve({ error: null });
+
+  await Promise.all([insertItens, insertTradeIns, insertPagamentos]);
+
+  // Build local venda object
   const newVenda: Venda = {
     ...venda,
-    id: newId,
-    numero: vendaCounter,
-    tradeIns: tradeInsComIds
+    id: vendaId,
+    numero: newNumero,
+    tradeIns: tradeInsComIds,
   };
-  vendas.push(newVenda);
-  saveVendasToStorage();
-  
+
+  _vendasCache.unshift(newVenda);
+
   // ========== INTEGRAÇÃO: Redução de Estoque de Aparelhos ==========
-  // Para cada item vendido, marcar produto como "Vendido" e registrar movimentação
-  venda.itens.forEach(item => {
+  for (const item of venda.itens) {
     const produto = getProdutos().find(p => p.id === item.produtoId);
     if (produto) {
-      // Marcar produto como vendido (status diferente ou remover do estoque ativo)
-      updateProduto(item.produtoId, { 
+      await updateProduto(item.produtoId, { 
         statusNota: 'Concluído',
-        quantidade: 0 // Marca como sem estoque
+        quantidade: 0
       });
-      
-      // Registrar movimentação de saída
-      const destinoMovimentacao = venda.origemVenda === 'Troca Garantia' ? 'Troca Direta - Garantia' : 'Vendido';
-      addMovimentacao({
+      await addMovimentacao({
         data: new Date().toISOString().split('T')[0],
         produto: produto.modelo,
         imei: produto.imei,
         quantidade: 1,
         origem: produto.loja,
-        destino: destinoMovimentacao,
+        destino: venda.origemVenda === 'Troca Garantia' ? 'Troca Direta - Garantia' : 'Vendido',
         responsavel: 'Sistema de Vendas',
-        motivo: `Venda ${newId} - Cliente: ${venda.clienteNome}`
+        motivo: `Venda ${vendaId} - Cliente: ${venda.clienteNome}`
       });
     }
-  });
-  
+  }
+
   // ========== INTEGRAÇÃO: Redução de Estoque de Acessórios ==========
   if (venda.acessorios && venda.acessorios.length > 0) {
     venda.acessorios.forEach(acessorio => {
       subtrairEstoqueAcessorio(acessorio.acessorioId, acessorio.quantidade);
     });
   }
-  
-  // ========== INTEGRAÇÃO: Trade-In - Migração Após Finalização Financeira ==========
-  // IMPORTANTE: Trade-ins NÃO são criados aqui como produtos pendentes.
-  // A migração para "Aparelhos Pendentes - Estoque" ocorre APENAS após a 
-  // aprovação financeira, através da função migrarTradeInsParaPendentes() 
-  // chamada em fluxoVendasApi.ts → finalizarVenda()
-  // Isso evita duplicação e garante que só entram no estoque após confirmação de pagamento.
-  if (tradeInsComIds.length > 0) {
-    console.log(`[VENDAS] ${tradeInsComIds.length} trade-in(s) serão migrados para pendentes após aprovação financeira.`);
-  }
-  
+
   // ========== INTEGRAÇÃO: Criar Pagamentos no Financeiro ==========
   if (venda.pagamentos && venda.pagamentos.length > 0) {
     try {
       criarPagamentosDeVenda({
-        id: newId,
+        id: vendaId,
         clienteNome: venda.clienteNome,
         valorTotal: venda.total,
         lojaVenda: venda.lojaVenda,
@@ -946,7 +530,6 @@ export const addVenda = (venda: Omit<Venda, 'id' | 'numero'>): Venda => {
           contaId: p.contaDestino
         }))
       });
-      console.log(`[VENDAS] Pagamentos registrados no financeiro para venda ${newId}`);
     } catch (error) {
       console.error(`[VENDAS] Erro ao registrar pagamentos no financeiro:`, error);
     }
@@ -963,40 +546,31 @@ export const addVenda = (venda: Omit<Venda, 'id' | 'numero'>): Venda => {
         motoboyNome,
         data: venda.dataHora ? venda.dataHora.split('T')[0] : new Date().toISOString().split('T')[0],
         tipo: 'Entrega',
-        descricao: `Entrega Venda #${newId} - Cliente ${venda.clienteNome}`,
+        descricao: `Entrega Venda #${vendaId} - Cliente ${venda.clienteNome}`,
         lojaOrigem: venda.lojaVenda,
         lojaDestino: localEntrega,
         status: 'Pendente',
         valorDemanda: venda.taxaEntrega || 0,
-        vendaId: newId
+        vendaId: vendaId
       });
-      console.log(`[VENDAS] Demanda de entrega registrada para motoboy ${motoboyNome}`);
     } catch (error) {
       console.error(`[VENDAS] Erro ao registrar demanda de motoboy:`, error);
     }
   }
-  
+
   return newVenda;
 };
 
-// Função para cancelar uma venda
-export const cancelarVenda = (id: string, motivo: string): Venda | null => {
-  const venda = vendas.find(v => v.id === id);
-  if (!venda) return null;
-  
-  if (venda.status === 'Cancelada') {
-    console.warn(`Venda ${id} já está cancelada`);
-    return venda;
-  }
-  
-  // Reverter estoque dos produtos vendidos
-  venda.itens.forEach(item => {
+export const cancelarVenda = async (id: string, motivo: string): Promise<Venda | null> => {
+  const venda = _vendasCache.find(v => v.id === id);
+  if (!venda || venda.status === 'Cancelada') return venda || null;
+
+  // Reverter estoque
+  for (const item of venda.itens) {
     const produto = getProdutos().find(p => p.id === item.produtoId);
     if (produto) {
-      updateProduto(item.produtoId, { quantidade: 1 });
-      
-      // Registrar movimentação de retorno
-      addMovimentacao({
+      await updateProduto(item.produtoId, { quantidade: 1 });
+      await addMovimentacao({
         data: new Date().toISOString().split('T')[0],
         produto: produto.modelo,
         imei: produto.imei,
@@ -1007,39 +581,29 @@ export const cancelarVenda = (id: string, motivo: string): Venda | null => {
         motivo: `Cancelamento da venda ${id}: ${motivo}`
       });
     }
-  });
-  
-  // Atualizar status da venda
+  }
+
+  await supabase.from('vendas').update({
+    status_atual: 'Cancelada',
+    motivo_cancelamento: motivo,
+  }).eq('id', id);
+
   venda.status = 'Cancelada';
+  venda.statusAtual = 'Cancelada';
   venda.motivoCancelamento = motivo;
-  
+
   return venda;
 };
 
-export const getHistoricoComprasCliente = (clienteId: string): HistoricoCompraCliente[] => {
-  return historicoComprasCliente[clienteId] || [];
-};
-
-export const getNextVendaNumber = (): { id: string; numero: number } => {
-  const year = new Date().getFullYear();
-  const nextNum = vendaCounter + 1;
-  return {
-    id: `VEN-${year}-${String(nextNum).padStart(4, '0')}`,
-    numero: nextNum
-  };
-};
-
-// Registrar edição de venda pelo gestor
 export const registrarEdicaoVenda = (
   vendaId: string,
   usuarioId: string,
   usuarioNome: string,
   alteracoes: { campo: string; valorAnterior: any; valorNovo: any }[]
 ): void => {
-  const venda = vendas.find(v => v.id === vendaId);
+  const venda = _vendasCache.find(v => v.id === vendaId);
   if (!venda) return;
 
-  // Gerar descrição legível
   const descricao = alteracoes.map(a => {
     const valorAnt = typeof a.valorAnterior === 'number' 
       ? `R$ ${a.valorAnterior.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
@@ -1060,27 +624,50 @@ export const registrarEdicaoVenda = (
     descricao
   };
 
-  if (!venda.timelineEdicoes) {
-    venda.timelineEdicoes = [];
-  }
+  if (!venda.timelineEdicoes) venda.timelineEdicoes = [];
   venda.timelineEdicoes.push(novaEdicao);
+
+  // Persist async
+  supabase.from('vendas').update({
+    timeline_edicoes: venda.timelineEdicoes as any,
+  }).eq('id', vendaId).then(() => {});
 };
 
-// Atualizar venda (para edição pelo gestor)
-export const updateVenda = (vendaId: string, updates: Partial<Venda>): Venda | null => {
-  const index = vendas.findIndex(v => v.id === vendaId);
+export const updateVenda = async (vendaId: string, updates: Partial<Venda>): Promise<Venda | null> => {
+  const index = _vendasCache.findIndex(v => v.id === vendaId);
   if (index === -1) return null;
-  
-  vendas[index] = { ...vendas[index], ...updates };
-  return vendas[index];
+
+  _vendasCache[index] = { ..._vendasCache[index], ...updates };
+
+  // Map to DB fields
+  const db: any = {};
+  if (updates.statusAtual !== undefined) db.status_atual = updates.statusAtual;
+  if (updates.bloqueadoParaEdicao !== undefined) db.bloqueado_para_edicao = updates.bloqueadoParaEdicao;
+  if (updates.timeline !== undefined) db.timeline = updates.timeline as any;
+  if (updates.timelineEdicoes !== undefined) db.timeline_edicoes = updates.timelineEdicoes as any;
+  if (updates.observacoes !== undefined) db.observacoes = updates.observacoes;
+  if (updates.lucro !== undefined) db.lucro = updates.lucro;
+  if (updates.margem !== undefined) db.margem = updates.margem;
+  if (updates.total !== undefined) db.valor_total = updates.total;
+  if (updates.subtotal !== undefined) db.subtotal = updates.subtotal;
+  if (updates.totalTradeIn !== undefined) db.total_trade_in = updates.totalTradeIn;
+  if (updates.comissaoVendedor !== undefined) db.comissao_vendedor = updates.comissaoVendedor;
+  if (updates.motivoCancelamento !== undefined) db.motivo_cancelamento = updates.motivoCancelamento;
+  if (updates.valorSinal !== undefined) db.valor_sinal = updates.valorSinal;
+  if (updates.valorPendenteSinal !== undefined) db.valor_pendente_sinal = updates.valorPendenteSinal;
+  if (updates.garantiaExtendida !== undefined) db.garantia_extendida = updates.garantiaExtendida as any;
+
+  if (Object.keys(db).length > 0) {
+    await supabase.from('vendas').update(db).eq('id', vendaId);
+  }
+
+  return _vendasCache[index];
 };
 
-// formatCurrency removido - usar import { formatCurrency } from '@/utils/formatUtils'
 export { formatCurrency } from '@/utils/formatUtils';
 
 export const exportVendasToCSV = (data: Venda[], filename: string) => {
   if (data.length === 0) return;
-  
   const csvData = data.map(v => ({
     'ID': v.id,
     'Data/Hora': new Date(v.dataHora).toLocaleString('pt-BR'),
@@ -1096,19 +683,16 @@ export const exportVendasToCSV = (data: Venda[], filename: string) => {
     'Margem %': v.margem.toFixed(2),
     'Status': v.status
   }));
-  
   const headers = Object.keys(csvData[0]).join(',');
   const rows = csvData.map(item => 
     Object.values(item).map(value => 
       typeof value === 'string' && value.includes(',') ? `"${value}"` : value
     ).join(',')
   );
-  
   const csv = [headers, ...rows].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
-  
   link.setAttribute('href', url);
   link.setAttribute('download', filename);
   link.style.visibility = 'hidden';
@@ -1117,20 +701,15 @@ export const exportVendasToCSV = (data: Venda[], filename: string) => {
   document.body.removeChild(link);
 };
 
-// ============= BUSCA DE VENDA POR IMEI =============
-// Buscar venda concluída que contenha um item com o IMEI especificado
 export const buscarVendaPorImei = (imei: string): { venda: Venda; item: ItemVenda; } | null => {
   const imeiLimpo = imei.replace(/\D/g, '');
-  
-  for (const venda of vendas) {
-    // Apenas vendas concluídas
+  for (const venda of _vendasCache) {
     if (venda.status !== 'Concluída') continue;
-    
     const item = venda.itens.find(i => i.imei === imeiLimpo);
-    if (item) {
-      return { venda, item };
-    }
+    if (item) return { venda, item };
   }
-  
   return null;
 };
+
+// Auto-init
+initVendasCache().catch(e => console.error('Erro ao inicializar cache vendas:', e));

@@ -847,7 +847,7 @@ export default function VendasNova() {
   };
 
   // Salvar com sinal (pré-cadastro)
-  const handleSalvarComSinal = () => {
+  const handleSalvarComSinal = async () => {
     if (!canSubmitSinal) return;
     
     // Obter nome do vendedor
@@ -864,7 +864,7 @@ export default function VendasNova() {
     }];
 
     // Registrar venda com status "Feito Sinal"
-    const venda = addVenda({
+    const venda = await addVenda({
       dataHora: new Date().toISOString(),
       lojaVenda,
       vendedor,
@@ -918,7 +918,7 @@ export default function VendasNova() {
   };
 
   // Confirmar venda
-  const handleConfirmarVenda = () => {
+  const handleConfirmarVenda = async () => {
     // Subtrair produtos do estoque
     itens.forEach(item => {
       const produto = produtosEstoque.find(p => p.id === item.produtoId);
@@ -986,7 +986,7 @@ export default function VendasNova() {
       garantiaItens: garantiaItens.length > 0 ? garantiaItens : undefined
     };
     
-    const venda = addVenda(vendaData);
+    const venda = await addVenda(vendaData);
 
     // CONFERÊNCIA AUTOMÁTICA: Para cada item com movimentacaoId, conferir automaticamente
     itens.forEach(item => {

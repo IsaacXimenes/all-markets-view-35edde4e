@@ -533,7 +533,7 @@ export default function FinanceiroTetoBancario() {
     setSheetConfirmacaoAberto(true);
   };
 
-  const confirmarEmissaoNota = useCallback(() => {
+  const confirmarEmissaoNota = useCallback(async () => {
     if (!vendaSelecionada || !checkboxConfirmado) return;
     
     // 1. Marcar venda como nota emitida no DB

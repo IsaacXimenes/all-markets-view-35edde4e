@@ -1,7 +1,7 @@
 // ============= API para Fluxo de Notas de Entrada de Produtos =============
-// Esta API implementa a máquina de estados completa para o fluxo de notas
-// CONCEITO: Lançamento Inicial (nota sem produtos) → Atuação Atual governa o fluxo
+// Migrado para Supabase: tabela notas_entrada + creditos_fornecedor
 
+import { supabase } from '@/integrations/supabase/client';
 import { addNotification } from './notificationsApi';
 import { migrarAparelhoNovoParaEstoque, ProdutoNota, ESTOQUE_SIA_LOJA_ID } from './estoqueApi';
 import { migrarProdutosNotaParaPendentes } from './osApi';
@@ -157,10 +157,153 @@ export interface NotaEntrada {
   dataEnvioDiretoFinanceiro?: string;
 }
 
-// ============= ARMAZENAMENTO =============
+// ============= CACHE LAYER (SUPABASE) =============
 
 let notasEntrada: NotaEntrada[] = [];
-let proximoSequencial = 1; // Contador único para auto-incremento
+let cacheNotasLoaded = false;
+let proximoSequencial = 1;
+
+// ── Mapeamento DB ↔ TS ──
+const mapRowNota = (r: any): NotaEntrada => ({
+  id: r.id,
+  numeroNota: r.numero_nota || '',
+  data: r.data || '',
+  fornecedor: r.fornecedor || '',
+  status: r.status || 'Criada',
+  atuacaoAtual: r.atuacao_atual || 'Estoque',
+  tipoPagamento: r.tipo_pagamento || 'Pagamento Pos',
+  tipoPagamentoBloqueado: r.tipo_pagamento_bloqueado || false,
+  qtdInformada: Number(r.qtd_informada) || 0,
+  qtdCadastrada: Number(r.qtd_cadastrada) || 0,
+  qtdConferida: Number(r.qtd_conferida) || 0,
+  valorTotal: Number(r.valor_total) || 0,
+  valorPago: Number(r.valor_pago) || 0,
+  valorPendente: Number(r.valor_pendente) || 0,
+  valorConferido: Number(r.valor_conferido) || 0,
+  produtos: (r.produtos as ProdutoNotaEntrada[]) || [],
+  timeline: (r.timeline as TimelineNotaEntrada[]) || [],
+  alertas: (r.alertas as AlertaNota[]) || [],
+  pagamentos: r.pagamentos || [],
+  dataCriacao: r.data_criacao || '',
+  dataFinalizacao: r.data_finalizacao || undefined,
+  responsavelCriacao: r.responsavel_criacao || '',
+  responsavelFinalizacao: r.responsavel_finalizacao || undefined,
+  observacoes: r.observacoes || undefined,
+  formaPagamento: r.forma_pagamento || undefined,
+  pixBanco: r.pix_banco || undefined,
+  pixRecebedor: r.pix_recebedor || undefined,
+  pixChave: r.pix_chave || undefined,
+  urgente: r.urgente || false,
+  rejeitada: r.rejeitada || false,
+  motivoRejeicao: r.motivo_rejeicao || undefined,
+  loteRevisaoId: r.lote_revisao_id || undefined,
+  valorAbatimento: Number(r.valor_abatimento) || 0,
+  enviadoDiretoFinanceiro: r.enviado_direto_financeiro || false,
+  dataEnvioDiretoFinanceiro: r.data_envio_direto_financeiro || undefined,
+});
+
+const toDbRowNota = (n: NotaEntrada): any => ({
+  id: n.id,
+  numero_nota: n.numeroNota,
+  data: n.data,
+  fornecedor: n.fornecedor,
+  status: n.status,
+  atuacao_atual: n.atuacaoAtual,
+  tipo_pagamento: n.tipoPagamento,
+  tipo_pagamento_bloqueado: n.tipoPagamentoBloqueado,
+  qtd_informada: n.qtdInformada,
+  qtd_cadastrada: n.qtdCadastrada,
+  qtd_conferida: n.qtdConferida,
+  valor_total: n.valorTotal,
+  valor_pago: n.valorPago,
+  valor_pendente: n.valorPendente,
+  valor_conferido: n.valorConferido,
+  produtos: n.produtos as any,
+  timeline: n.timeline as any,
+  alertas: n.alertas as any,
+  pagamentos: n.pagamentos as any,
+  data_criacao: n.dataCriacao,
+  data_finalizacao: n.dataFinalizacao || null,
+  responsavel_criacao: n.responsavelCriacao,
+  responsavel_finalizacao: n.responsavelFinalizacao || null,
+  observacoes: n.observacoes || null,
+  forma_pagamento: n.formaPagamento || null,
+  pix_banco: n.pixBanco || null,
+  pix_recebedor: n.pixRecebedor || null,
+  pix_chave: n.pixChave || null,
+  urgente: n.urgente || false,
+  rejeitada: n.rejeitada || false,
+  motivo_rejeicao: n.motivoRejeicao || null,
+  lote_revisao_id: n.loteRevisaoId || null,
+  valor_abatimento: n.valorAbatimento || 0,
+  enviado_direto_financeiro: n.enviadoDiretoFinanceiro || false,
+  data_envio_direto_financeiro: n.dataEnvioDiretoFinanceiro || null,
+});
+
+const syncNotaToDb = async (nota: NotaEntrada) => {
+  const row = toDbRowNota(nota);
+  const { error } = await supabase.from('notas_entrada').upsert(row, { onConflict: 'id' });
+  if (error) console.error('[NOTAS_ENTRADA] sync error', error);
+};
+
+export const initNotasEntradaCache = async () => {
+  const { data, error } = await supabase.from('notas_entrada').select('*').order('data_criacao', { ascending: false });
+  if (error) { console.error('[NOTAS_ENTRADA] init error', error); return; }
+  if (data && data.length > 0) {
+    notasEntrada = data.map(mapRowNota);
+    // Atualizar sequencial
+    const seqs = notasEntrada.map(n => {
+      const match = n.id.match(/NE-\d+-(\d+)/);
+      return match ? parseInt(match[1]) : 0;
+    });
+    proximoSequencial = seqs.length > 0 ? Math.max(...seqs) + 1 : 1;
+  }
+  // Também carregar créditos de fornecedor
+  await initCreditosFornecedorCache();
+  cacheNotasLoaded = true;
+};
+
+// ── Créditos Fornecedor Cache ──
+let creditosFornecedorLoaded = false;
+
+const mapRowCredito = (r: any): CreditoFornecedor => ({
+  id: r.id,
+  fornecedor: r.fornecedor || '',
+  valor: Number(r.valor) || 0,
+  origem: r.nota_id || '',
+  dataGeracao: r.data_criacao || '',
+  utilizado: r.utilizado || false,
+  dataUtilizacao: r.data_utilizacao || undefined,
+  descricao: r.descricao || '',
+});
+
+const syncCreditoToDb = async (c: CreditoFornecedor) => {
+  const { error } = await supabase.from('creditos_fornecedor').upsert({
+    id: c.id,
+    fornecedor: c.fornecedor,
+    valor: c.valor,
+    nota_id: c.origem,
+    data_criacao: c.dataGeracao,
+    utilizado: c.utilizado,
+    data_utilizacao: c.dataUtilizacao || null,
+    descricao: c.descricao,
+  }, { onConflict: 'id' });
+  if (error) console.error('[CREDITOS_FORNECEDOR] sync error', error);
+};
+
+const initCreditosFornecedorCache = async () => {
+  const { data, error } = await supabase.from('creditos_fornecedor').select('*');
+  if (error) { console.error('[CREDITOS_FORNECEDOR] init error', error); return; }
+  if (data && data.length > 0) {
+    creditosFornecedor = data.map(mapRowCredito);
+    const seqs = creditosFornecedor.map(c => {
+      const match = c.id.match(/CRED-(\d+)/);
+      return match ? parseInt(match[1]) : 0;
+    });
+    proximoCreditoId = seqs.length > 0 ? Math.max(...seqs) + 1 : 1;
+  }
+  creditosFornecedorLoaded = true;
+};
 
 // Função para gerar número de nota auto-incremental
 export const gerarNumeroNotaAutoIncremental = (): string => {
@@ -450,6 +593,7 @@ export const criarNotaEntrada = (dados: {
   );
   
   notasEntrada.push(novaNota);
+  syncNotaToDb(novaNota).catch(console.error);
   
   // Notificar módulos relevantes baseado na atuação
   if (atuacaoInicial === 'Estoque') {
@@ -519,6 +663,7 @@ export const alterarAtuacao = (
     });
   }
   
+  syncNotaToDb(nota).catch(console.error);
   return nota;
 };
 
@@ -560,6 +705,7 @@ export const rejeitarNota = (
     targetUsers: ['estoque']
   });
   
+  syncNotaToDb(nota).catch(console.error);
   return nota;
 };
 
@@ -621,6 +767,7 @@ export const transicionarStatus = (
     });
   }
   
+  syncNotaToDb(nota).catch(console.error);
   return nota;
 };
 
@@ -724,6 +871,7 @@ export const registrarPagamento = (
     }
   }
   
+  syncNotaToDb(nota).catch(console.error);
   return nota;
 };
 
@@ -795,6 +943,7 @@ export const cadastrarProdutosNota = (
     `Total cadastrado: ${nota.qtdCadastrada}/${nota.qtdInformada}`
   );
   
+  syncNotaToDb(nota).catch(console.error);
   return nota;
 };
 
@@ -915,6 +1064,7 @@ export const conferirProduto = (
   // Verificar e atualizar alertas
   nota.alertas = [...nota.alertas.filter(a => !a.resolvido), ...verificarAlertasNota(nota)];
   
+  syncNotaToDb(nota).catch(console.error);
   return nota;
 };
 
@@ -1008,6 +1158,7 @@ export const conferirProdutoSimples = (
   notaOriginal.alertas = [...notaOriginal.alertas.filter(a => !a.resolvido), ...verificarAlertasNota(notaOriginal)];
   
   // Retornar cópia profunda para forçar re-render do React
+  syncNotaToDb(notaOriginal).catch(console.error);
   return JSON.parse(JSON.stringify(notaOriginal));
 };
 
@@ -1104,6 +1255,7 @@ export const finalizarConferencia = (
   notaOriginal.alertas = [...notaOriginal.alertas.filter(a => !a.resolvido), ...verificarAlertasNota(notaOriginal)];
   
   // Retornar cópia profunda para forçar re-render do React
+  syncNotaToDb(notaOriginal).catch(console.error);
   return JSON.parse(JSON.stringify(notaOriginal));
 };
 
@@ -1145,6 +1297,7 @@ export const explodirProdutoNota = (
     `Item "${produto.modelo}" explodido em ${produto.quantidade} unidades`,
     nota.status);
 
+  syncNotaToDb(nota).catch(console.error);
   return JSON.parse(JSON.stringify(nota));
 };
 
@@ -1194,6 +1347,7 @@ export const recolherProdutoNota = (
     `Item "${primeiro.modelo}" recolhido de ${itensExplodidos.length} unidades para 1 linha (Qtd: ${totalQtd})`,
     nota.status);
 
+  syncNotaToDb(nota).catch(console.error);
   return JSON.parse(JSON.stringify(nota));
 };
 
@@ -1354,6 +1508,7 @@ export const finalizarNota = (
     targetUsers: ['estoque', 'financeiro']
   });
   
+  syncNotaToDb(nota).catch(console.error);
   return nota;
 };
 
@@ -1746,6 +1901,7 @@ export const gerarCreditoFornecedor = (
     descricao: descricao || `Vale-Crédito originado da nota ${notaOrigem}`
   };
   creditosFornecedor.push(credito);
+  syncCreditoToDb(credito).catch(console.error);
   return credito;
 };
 
@@ -1774,6 +1930,7 @@ export const atualizarAbatimentoNota = (
     nota.valorPendente = Math.max(0, nota.valorTotal - nota.valorPago - valorAbatimento);
   }
 
+  syncNotaToDb(nota).catch(console.error);
   return nota;
 };
 
@@ -1783,6 +1940,7 @@ export const utilizarCredito = (creditoId: string, notaDestino: string): Credito
   credito.utilizado = true;
   credito.dataUtilizacao = new Date().toISOString();
   credito.notaUtilizacao = notaDestino;
+  syncCreditoToDb(credito).catch(console.error);
   return credito;
 };
 
@@ -1895,6 +2053,7 @@ export const enviarDiretoAoFinanceiro = (
     targetUsers: ['financeiro']
   });
   
+  syncNotaToDb(nota).catch(console.error);
   return nota;
 };
 
@@ -2057,8 +2216,9 @@ export const processarTriagemIndividualizada = async (
     });
   }
 
+  syncNotaToDb(nota).catch(console.error);
   return resultado;
 };
 
-// Inicializar ao carregar módulo
-inicializarNotasEntradaMock();
+// Cache init é chamada por initNotasEntradaCache() no App.tsx
+// Mock data só é usado se cache estiver vazio (veja inicializarNotasEntradaMock)

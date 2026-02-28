@@ -85,7 +85,7 @@ export default function FinanceiroContas() {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.nome || !form.tipo || !form.lojaVinculada) {
       toast.error('Preencha os campos obrigatórios');
       return;

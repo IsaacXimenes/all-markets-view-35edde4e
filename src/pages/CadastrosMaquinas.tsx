@@ -108,7 +108,7 @@ export default function CadastrosMaquinas() {
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.nome || !form.cnpjVinculado || !form.contaOrigem) {
       toast.error('Preencha os campos obrigatórios');
       return;

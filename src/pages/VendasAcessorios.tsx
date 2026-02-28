@@ -275,7 +275,7 @@ export default function VendasAcessorios() {
     }
   };
 
-  const handleAddCliente = () => {
+  const handleAddCliente = async () => {
     if (!novoCliente.nome || !novoCliente.cpf) {
       toast({ title: "Erro", description: "Nome e CPF/CNPJ são obrigatórios", variant: "destructive" });
       return;
@@ -289,7 +289,7 @@ export default function VendasAcessorios() {
       return;
     }
     
-    const cliente = addCliente({
+    const cliente = await addCliente({
       nome: novoCliente.nome,
       cpf: novoCliente.cpf,
       telefone: novoCliente.telefone || '',

@@ -530,7 +530,7 @@ export default function VendasFinalizarDigital() {
     }
   };
 
-  const handleAddCliente = () => {
+  const handleAddCliente = async () => {
     if (!novoCliente.nome || !novoCliente.cpf) {
       toast.error('Nome e CPF/CNPJ são obrigatórios');
       return;
@@ -549,7 +549,7 @@ export default function VendasFinalizarDigital() {
       }
     }
     
-    const cliente = addCliente({
+    const cliente = await addCliente({
       nome: novoCliente.nome,
       cpf: novoCliente.cpf,
       telefone: novoCliente.telefone || '',

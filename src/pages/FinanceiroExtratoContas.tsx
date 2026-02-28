@@ -344,7 +344,7 @@ export default function FinanceiroExtratoContas() {
 
   const contasAtivas = contasFinanceiras.filter(c => c.status === 'Ativo');
 
-  const handleConfirmarMovimentacao = () => {
+  const handleConfirmarMovimentacao = async () => {
     if (!movForm.contaOrigemId || !movForm.contaDestinoId || movForm.valor <= 0) {
       toast.error('Preencha todos os campos obrigatórios (Conta de Origem, Destino e Valor > 0).');
       return;

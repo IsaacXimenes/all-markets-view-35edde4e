@@ -141,7 +141,7 @@ export default function EstoqueMovimentacoesAcessorios() {
   };
 
   // Confirmar recebimento
-  const handleConfirmarRecebimento = () => {
+  const handleConfirmarRecebimento = async () => {
     if (!movimentacaoParaConfirmar || !responsavelConfirmacao) {
       toast({
         title: 'Campo obrigatório',
@@ -158,7 +158,7 @@ export default function EstoqueMovimentacoesAcessorios() {
       const mov = movimentacoes[movIndex];
       
       // Somar estoque no destino
-      const recebido = receberAcessorioDestino(mov.acessorioId, mov.quantidade, mov.destino);
+      const recebido = await receberAcessorioDestino(mov.acessorioId, mov.quantidade, mov.destino);
       if (!recebido) {
         toast({
           title: 'Erro ao receber',
@@ -261,7 +261,7 @@ export default function EstoqueMovimentacoesAcessorios() {
     return getAcessoriosByLoja(formOrigem).filter(a => a.quantidade > 0);
   }, [acessorios, formOrigem]);
 
-  const handleRegistrarMovimentacao = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleRegistrarMovimentacao = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
@@ -293,7 +293,7 @@ export default function EstoqueMovimentacoesAcessorios() {
     }
 
     // Validar estoque suficiente e subtrair da origem
-    const sucesso = transferirAcessorioOrigem(acessorioId, quantidade, formOrigem);
+    const sucesso = await transferirAcessorioOrigem(acessorioId, quantidade, formOrigem);
     if (!sucesso) {
       toast({
         title: 'Estoque insuficiente',

@@ -1,4 +1,5 @@
-// API de Metas Mensais por Loja - localStorage
+// API de Metas Mensais por Loja - Migrada para Supabase
+import { supabase } from '@/integrations/supabase/client';
 
 export interface MetaLoja {
   id: string;
@@ -13,114 +14,90 @@ export interface MetaLoja {
   ultimaAtualizacao: string;
 }
 
-const STORAGE_KEY = 'metas_lojas_data';
-const COUNTER_KEY = 'metas_counter';
+// ==================== CACHE ====================
 
-const now = new Date();
-const mesAtual = now.getMonth() + 1;
-const anoAtual = now.getFullYear();
+let metasCache: MetaLoja[] = [];
+let cacheInitialized = false;
 
-const defaultMetas: MetaLoja[] = [
-  {
-    id: 'META-0001',
-    lojaId: 'LOJA-001',
-    mes: mesAtual,
-    ano: anoAtual,
-    metaFaturamento: 150000,
-    metaAcessorios: 5000,
-    metaGarantia: 12000,
-    metaAssistencia: 10000,
-    dataCriacao: '2026-02-01T00:00:00.000Z',
-    ultimaAtualizacao: '2026-02-01T00:00:00.000Z',
-  },
-  {
-    id: 'META-0002',
-    lojaId: 'LOJA-002',
-    mes: mesAtual,
-    ano: anoAtual,
-    metaFaturamento: 120000,
-    metaAcessorios: 3500,
-    metaGarantia: 8000,
-    metaAssistencia: 7000,
-    dataCriacao: '2026-02-01T00:00:00.000Z',
-    ultimaAtualizacao: '2026-02-01T00:00:00.000Z',
-  },
-  {
-    id: 'META-0003',
-    lojaId: 'LOJA-ONLINE',
-    mes: mesAtual,
-    ano: anoAtual,
-    metaFaturamento: 200000,
-    metaAcessorios: 8000,
-    metaGarantia: 15000,
-    metaAssistencia: 12000,
-    dataCriacao: '2026-02-01T00:00:00.000Z',
-    ultimaAtualizacao: '2026-02-01T00:00:00.000Z',
-  },
-];
+const mapFromDB = (row: any): MetaLoja => ({
+  id: row.id,
+  lojaId: row.loja_id || '',
+  mes: row.mes || 1,
+  ano: row.ano || new Date().getFullYear(),
+  metaFaturamento: Number(row.meta_faturamento) || 0,
+  metaAcessorios: Number(row.meta_acessorios) || 0,
+  metaGarantia: Number(row.meta_garantia) || 0,
+  metaAssistencia: Number(row.meta_assistencia) || 0,
+  dataCriacao: row.created_at || new Date().toISOString(),
+  ultimaAtualizacao: row.ultima_atualizacao || row.created_at || new Date().toISOString(),
+});
 
-const loadFromStorage = <T>(key: string, defaultData: T): T => {
-  const saved = localStorage.getItem(key);
-  if (saved) return JSON.parse(saved);
-  // Seed default data on first load
-  saveToStorage(key, defaultData);
-  return defaultData;
+export const initMetasCache = async () => {
+  if (cacheInitialized) return;
+  const { data, error } = await supabase.from('metas_lojas').select('*');
+  if (error) { console.error('[METAS] init error:', error); return; }
+  metasCache = (data || []).map(mapFromDB);
+  cacheInitialized = true;
 };
 
-const saveToStorage = (key: string, data: any) => {
-  localStorage.setItem(key, JSON.stringify(data));
-};
+// Auto-init
+initMetasCache();
 
-let metas: MetaLoja[] = loadFromStorage(STORAGE_KEY, defaultMetas);
-let counter = loadFromStorage(COUNTER_KEY, 4);
+// ==================== GET (síncrono) ====================
 
-const gerarId = (): string => {
-  const id = `META-${String(counter).padStart(4, '0')}`;
-  counter++;
-  saveToStorage(COUNTER_KEY, counter);
-  return id;
-};
-
-export const getMetas = (): MetaLoja[] => [...metas];
+export const getMetas = (): MetaLoja[] => [...metasCache];
 
 export const getMetaByLojaEMes = (lojaId: string, mes: number, ano: number): MetaLoja | null => {
-  return metas.find(m => m.lojaId === lojaId && m.mes === mes && m.ano === ano) || null;
+  return metasCache.find(m => m.lojaId === lojaId && m.mes === mes && m.ano === ano) || null;
 };
 
-export const addMeta = (data: Omit<MetaLoja, 'id' | 'dataCriacao' | 'ultimaAtualizacao'>): MetaLoja => {
+// ==================== MUTAÇÕES (async) ====================
+
+export const addMeta = async (data: Omit<MetaLoja, 'id' | 'dataCriacao' | 'ultimaAtualizacao'>): Promise<MetaLoja> => {
   const existente = getMetaByLojaEMes(data.lojaId, data.mes, data.ano);
   if (existente) {
-    return updateMeta(existente.id, data)!;
+    return (await updateMeta(existente.id, data))!;
   }
 
-  const nova: MetaLoja = {
-    ...data,
-    id: gerarId(),
-    dataCriacao: new Date().toISOString(),
-    ultimaAtualizacao: new Date().toISOString(),
-  };
-  metas.push(nova);
-  saveToStorage(STORAGE_KEY, metas);
+  const { data: row, error } = await supabase.from('metas_lojas').insert({
+    loja_id: data.lojaId || null,
+    mes: data.mes,
+    ano: data.ano,
+    meta_faturamento: data.metaFaturamento,
+    meta_acessorios: data.metaAcessorios,
+    meta_garantia: data.metaGarantia,
+    meta_assistencia: data.metaAssistencia,
+  }).select().single();
+  if (error) throw error;
+  const nova = mapFromDB(row);
+  metasCache.push(nova);
   return nova;
 };
 
-export const updateMeta = (id: string, data: Partial<Omit<MetaLoja, 'id' | 'dataCriacao'>>): MetaLoja | null => {
-  const idx = metas.findIndex(m => m.id === id);
-  if (idx === -1) return null;
+export const updateMeta = async (id: string, data: Partial<Omit<MetaLoja, 'id' | 'dataCriacao'>>): Promise<MetaLoja | null> => {
+  const updates: any = { ultima_atualizacao: new Date().toISOString() };
+  if (data.metaFaturamento !== undefined) updates.meta_faturamento = data.metaFaturamento;
+  if (data.metaAcessorios !== undefined) updates.meta_acessorios = data.metaAcessorios;
+  if (data.metaGarantia !== undefined) updates.meta_garantia = data.metaGarantia;
+  if (data.metaAssistencia !== undefined) updates.meta_assistencia = data.metaAssistencia;
+  if (data.lojaId !== undefined) updates.loja_id = data.lojaId;
+  if (data.mes !== undefined) updates.mes = data.mes;
+  if (data.ano !== undefined) updates.ano = data.ano;
 
-  metas[idx] = {
-    ...metas[idx],
-    ...data,
-    ultimaAtualizacao: new Date().toISOString(),
-  };
-  saveToStorage(STORAGE_KEY, metas);
-  return metas[idx];
+  const { error } = await supabase.from('metas_lojas').update(updates).eq('id', id);
+  if (error) { console.error(error); return null; }
+
+  const idx = metasCache.findIndex(m => m.id === id);
+  if (idx !== -1) {
+    metasCache[idx] = { ...metasCache[idx], ...data, ultimaAtualizacao: updates.ultima_atualizacao };
+    return metasCache[idx];
+  }
+  return null;
 };
 
-export const deleteMeta = (id: string): boolean => {
-  const idx = metas.findIndex(m => m.id === id);
-  if (idx === -1) return false;
-  metas.splice(idx, 1);
-  saveToStorage(STORAGE_KEY, metas);
+export const deleteMeta = async (id: string): Promise<boolean> => {
+  const { error } = await supabase.from('metas_lojas').delete().eq('id', id);
+  if (error) { console.error(error); return false; }
+  metasCache = metasCache.filter(m => m.id !== id);
   return true;
 };

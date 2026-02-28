@@ -511,9 +511,9 @@ export const addVenda = async (venda: Omit<Venda, 'id' | 'numero'>): Promise<Ven
 
   // ========== INTEGRAÇÃO: Redução de Estoque de Acessórios ==========
   if (venda.acessorios && venda.acessorios.length > 0) {
-    venda.acessorios.forEach(acessorio => {
-      subtrairEstoqueAcessorio(acessorio.acessorioId, acessorio.quantidade);
-    });
+    for (const acessorio of venda.acessorios) {
+      await subtrairEstoqueAcessorio(acessorio.acessorioId, acessorio.quantidade);
+    }
   }
 
   // ========== INTEGRAÇÃO: Criar Pagamentos no Financeiro ==========

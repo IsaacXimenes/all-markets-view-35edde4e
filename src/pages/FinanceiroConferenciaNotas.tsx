@@ -279,14 +279,14 @@ export default function FinanceiroConferenciaNotas() {
       const acessorios = notaFinalizada.produtos.filter(p => p.tipoProduto === 'Acessório');
       let qtdAcessoriosAdicionados = 0;
       for (const acessorio of acessorios) {
-        const acessorioExistente = getOrCreateAcessorio(
+        const acessorioExistente = await getOrCreateAcessorio(
           `${acessorio.marca} ${acessorio.modelo}`, // descrição
           acessorio.marca, // categoria
           acessorio.quantidade, // quantidade
           acessorio.valorUnitario, // valorCusto
           lojaDestino // loja
         );
-        adicionarEstoqueAcessorio(acessorioExistente.id, acessorio.quantidade, acessorio.valorUnitario);
+        await adicionarEstoqueAcessorio(acessorioExistente.id, acessorio.quantidade, acessorio.valorUnitario);
         qtdAcessoriosAdicionados += acessorio.quantidade;
         console.log(`[FINANCEIRO] Acessório ${acessorio.marca} ${acessorio.modelo} adicionado ao estoque`);
       }

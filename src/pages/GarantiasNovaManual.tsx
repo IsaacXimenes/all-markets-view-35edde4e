@@ -32,9 +32,11 @@ import { formatIMEI, unformatIMEI, displayIMEI } from '@/utils/imeiMask';
 import { BarcodeScanner } from '@/components/ui/barcode-scanner';
 import { FileUploadComprovante } from '@/components/estoque/FileUploadComprovante';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/store/authStore';
 
 export default function GarantiasNovaManual() {
   const navigate = useNavigate();
+  const user = useAuthStore(s => s.user);
   const { obterLojasTipoLoja, obterLojaById } = useCadastroStore();
   const lojas = obterLojasTipoLoja(); // Apenas lojas tipo 'Loja' sincronizadas com Cadastros
   const produtos = getProdutosCadastro();
@@ -356,8 +358,8 @@ export default function GarantiasNovaManual() {
       tipo: 'registro_venda',
       titulo: 'Garantia Registrada Manualmente',
       descricao: `${formData.observacoes || 'Garantia registrada manualmente sem vínculo com venda'}. Condição: ${formData.condicao}. ${planoInfo}`,
-      usuarioId: 'COL-001',
-      usuarioNome: 'Usuário Sistema'
+      usuarioId: user?.colaborador?.id || 'SISTEMA',
+      usuarioNome: user?.colaborador?.nome || 'Sistema'
     });
 
     // Se tiver tratativa, usar o orquestrador atômico (mesmo fluxo da página de detalhes)
@@ -366,8 +368,8 @@ export default function GarantiasNovaManual() {
         garantiaId: novaGarantia.id,
         tipo: tipoTratativa as 'Direcionado Apple' | 'Encaminhado Assistência' | 'Assistência + Empréstimo' | 'Troca Direta',
         descricao: descricaoTratativa,
-        usuarioId: 'COL-001',
-        usuarioNome: 'Usuário Sistema',
+        usuarioId: user?.colaborador?.id || 'SISTEMA',
+        usuarioNome: user?.colaborador?.nome || 'Sistema',
         aparelhoSelecionado: aparelhoSelecionado,
       });
 

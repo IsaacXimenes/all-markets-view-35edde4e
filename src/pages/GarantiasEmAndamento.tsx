@@ -27,10 +27,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { getClientes, getLojas } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { format, differenceInDays } from 'date-fns';
+import { useAuthStore } from '@/store/authStore';
 
 export default function GarantiasEmAndamento() {
   const navigate = useNavigate();
   const { obterNomeLoja, obterNomeColaborador } = useCadastroStore();
+  const user = useAuthStore(s => s.user);
   
   // Dados
   const garantiasEmAndamento = getGarantiasEmAndamento();
@@ -200,8 +202,8 @@ export default function GarantiasEmAndamento() {
       tipo: 'devolucao',
       titulo: 'Aparelho devolvido',
       descricao: `Aparelho emprestado ${tratativaSelecionada.aparelhoEmprestadoModelo} (IMEI: ${tratativaSelecionada.aparelhoEmprestadoImei}) devolvido. Fotos do estado registradas.`,
-      usuarioId: 'COL-001',
-      usuarioNome: 'Usuário Sistema'
+      usuarioId: user?.colaborador?.id || 'SISTEMA',
+      usuarioNome: user?.colaborador?.nome || 'Sistema'
     });
     
     addTimelineEntry({
@@ -210,8 +212,8 @@ export default function GarantiasEmAndamento() {
       tipo: 'conclusao',
       titulo: 'Garantia concluída',
       descricao: 'Tratativa finalizada com sucesso',
-      usuarioId: 'COL-001',
-      usuarioNome: 'Usuário Sistema'
+      usuarioId: user?.colaborador?.id || 'SISTEMA',
+      usuarioNome: user?.colaborador?.nome || 'Sistema'
     });
     
     toast.success('Devolução registrada com sucesso!');
@@ -469,7 +471,7 @@ export default function GarantiasEmAndamento() {
                                     vendaGarantia = await addVenda({
                                       dataHora: new Date().toISOString(),
                                       lojaVenda: garantia.lojaVenda,
-                                      vendedor: 'COL-001',
+                                      vendedor: user?.colaborador?.id || 'SISTEMA',
                                       clienteId: garantia.clienteId,
                                       clienteNome: garantia.clienteNome,
                                       clienteCpf: '',

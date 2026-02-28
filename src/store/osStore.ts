@@ -45,8 +45,7 @@ export const useOSStore = create<OSState>()(
       })),
       
       syncFromLocalStorage: () => {
-        // Legacy: localStorage sync removido - dados agora persistidos no Supabase
-        console.log('[OSStore] syncFromLocalStorage é legado - dados vêm do Supabase');
+        // Legado removido - dados vêm do Supabase
       }
     }),
     {

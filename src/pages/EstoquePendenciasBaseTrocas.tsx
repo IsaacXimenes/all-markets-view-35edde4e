@@ -179,7 +179,7 @@ export default function EstoquePendenciasBaseTrocas() {
     try {
       const resultado = registrarRecebimento(tradeInSelecionado.id, {
         fotosRecebimento,
-        responsavelRecebimentoId: user?.colaborador?.id || 'COL-001',
+        responsavelRecebimentoId: user?.colaborador?.id || 'SISTEMA',
         responsavelRecebimentoNome: user?.colaborador?.nome || 'Sistema',
         observacoesRecebimento
       });

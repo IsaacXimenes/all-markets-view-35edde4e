@@ -320,8 +320,8 @@ export default function FinanceiroFiado() {
                           onClick={() => {
                             const resultado = finalizarVendaFiado(
                               venda.id,
-                              user?.colaborador?.id || 'USR-001',
-                              user?.colaborador?.nome || 'Usuário'
+                              user?.colaborador?.id || 'SISTEMA',
+                              user?.colaborador?.nome || 'Sistema'
                             );
                             if (resultado) {
                               toast.success(`Venda ${venda.id} finalizada! Dívida criada automaticamente.`);

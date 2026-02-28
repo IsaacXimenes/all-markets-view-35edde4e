@@ -38,7 +38,7 @@ export default function CadastrosColaboradores() {
   const { 
     colaboradores,
     lojas,
-    inicializarDadosMockados, 
+    inicializarDados, 
     adicionarColaborador, 
     atualizarColaborador, 
     deletarColaborador,
@@ -98,8 +98,8 @@ export default function CadastrosColaboradores() {
 
   // Inicializar dados ao carregar
   useEffect(() => {
-    inicializarDadosMockados();
-  }, [inicializarDadosMockados]);
+    inicializarDados();
+  }, [inicializarDados]);
 
   const resetForm = () => {
     setForm({

@@ -77,17 +77,21 @@ export const initVendasDigitaisCache = async () => {
 // Auto-init
 initVendasDigitaisCache();
 
-// Mock de colaboradores com permissão Digital (static reference data)
-export const colaboradoresDigital = [
-  { id: '143ac0c2', nome: 'Antonio Sousa Silva Filho', cargo: 'Vendedor (a)', permissao: 'Digital' },
-  { id: '1b9137c8', nome: 'Evelyn Cordeiro de Oliveira', cargo: 'Vendedor (a)', permissao: 'Digital' },
-  { id: '62312809', nome: 'Izaquiel Costa Santos', cargo: 'Vendedor (a)', permissao: 'Digital' },
-];
+// Colaboradores com permissão Digital - carregados dinamicamente do Supabase
+let _colaboradoresDigital: { id: string; nome: string; cargo: string; permissao: string }[] = [];
+let _colaboradoresFinalizador: { id: string; nome: string; cargo: string; permissao: string }[] = [];
 
-export const colaboradoresFinalizador = [
-  { id: '143ac0c2', nome: 'Antonio Sousa Silva Filho', cargo: 'Vendedor (a)', permissao: 'Finalizador Digital' },
-  { id: '1b9137c8', nome: 'Evelyn Cordeiro de Oliveira', cargo: 'Vendedor (a)', permissao: 'Finalizador Digital' },
-];
+const carregarColaboradoresDigital = async () => {
+  const { data } = await supabase.from('colaboradores').select('id, nome, cargo').eq('ativo', true).eq('eh_vendedor', true);
+  if (data) {
+    _colaboradoresDigital = data.map(c => ({ id: c.id, nome: c.nome, cargo: c.cargo || '', permissao: 'Digital' }));
+    _colaboradoresFinalizador = data.map(c => ({ id: c.id, nome: c.nome, cargo: c.cargo || '', permissao: 'Finalizador Digital' }));
+  }
+};
+carregarColaboradoresDigital();
+
+export const colaboradoresDigital = _colaboradoresDigital;
+export const colaboradoresFinalizador = _colaboradoresFinalizador;
 
 export const calcularSLA = (dataHora: string): number => {
   const data = new Date(dataHora);
@@ -228,8 +232,8 @@ export const finalizarVendaDigital = async (
   return mapped;
 };
 
-export const getColaboradoresDigital = () => [...colaboradoresDigital];
-export const getColaboradoresFinalizador = () => [...colaboradoresFinalizador];
+export const getColaboradoresDigital = () => [..._colaboradoresDigital];
+export const getColaboradoresFinalizador = () => [..._colaboradoresFinalizador];
 
 export { formatCurrency } from '@/utils/formatUtils';
 

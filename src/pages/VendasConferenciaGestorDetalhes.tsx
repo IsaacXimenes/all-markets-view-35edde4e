@@ -32,10 +32,7 @@ export default function VendasConferenciaGestorDetalhes() {
       const data = getVendaConferenciaById(id);
       setVenda(data);
       const gestoresList = getGestores();
-      setGestores(gestoresList.length > 0 ? gestoresList.map(g => ({ id: g.id, nome: g.nome })) : [
-        { id: 'COL-001', nome: 'Lucas Mendes' },
-        { id: 'COL-002', nome: 'Fernanda Lima' }
-      ]);
+      setGestores(gestoresList.map(g => ({ id: g.id, nome: g.nome })));
     }
   }, [id]);
 

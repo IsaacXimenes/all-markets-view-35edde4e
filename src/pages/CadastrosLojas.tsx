@@ -19,7 +19,7 @@ export default function CadastrosLojas() {
   const { toast } = useToast();
   const { 
     lojas, 
-    inicializarDadosMockados, 
+    inicializarDados, 
     adicionarLoja, 
     atualizarLoja, 
     deletarLoja,
@@ -42,8 +42,8 @@ export default function CadastrosLojas() {
 
   // Inicializar dados ao carregar
   useEffect(() => {
-    inicializarDadosMockados();
-  }, [inicializarDadosMockados]);
+    inicializarDados();
+  }, [inicializarDados]);
 
   const resetForm = () => {
     setForm({

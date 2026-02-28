@@ -17,11 +17,13 @@ import {
 import { format, addMonths } from 'date-fns';
 import { formatIMEI, displayIMEI } from '@/utils/imeiMask';
 import { exportToCSV } from '@/utils/formatUtils';
+import { useAuthStore } from '@/store/authStore';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 
 export default function GarantiasNova() {
   const navigate = useNavigate();
+  const user = useAuthStore(s => s.user);
   const vendas = getVendas();
   
   // Store centralizado
@@ -143,8 +145,8 @@ export default function GarantiasNova() {
         tipo: 'registro_venda',
         titulo: 'Garantia Registrada',
         descricao: `Garantia registrada a partir da venda ${venda.id}`,
-        usuarioId: 'COL-001',
-        usuarioNome: 'Usuário Sistema'
+        usuarioId: user?.colaborador?.id || 'SISTEMA',
+        usuarioNome: user?.colaborador?.nome || 'Sistema'
       });
       
       toast.success('Garantia registrada com sucesso!');

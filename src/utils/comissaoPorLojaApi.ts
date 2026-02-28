@@ -1,13 +1,12 @@
-// Comissão por Loja API - Mock Data
-// TODO: Integrar com Supabase - substituir mock por query real
-
+// Comissão por Loja API - Supabase Integration
+import { supabase } from '@/integrations/supabase/client';
 import { getLojaById, getCargoNome } from './cadastrosApi';
 
 export interface ComissaoPorLoja {
   id: string;
   lojaId: string;
   cargoId: string;
-  percentualComissao: number; // 0-100 com até 2 casas decimais
+  percentualComissao: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -23,210 +22,154 @@ export interface HistoricoComissaoPorLoja {
   createdAt: string;
 }
 
-const STORAGE_KEY = 'thiago_imports_comissao_por_loja';
-const HISTORICO_KEY = 'thiago_imports_historico_comissao_por_loja';
+// ── Cache layer ──
+let comissoesPorLojaCache: ComissaoPorLoja[] = [];
+let historicoCache: HistoricoComissaoPorLoja[] = [];
 
-// Inicializar dados mockados
-// Mapeamento de IDs - UUIDs reais do useCadastroStore:
-// Lojas: db894e7d (JK Shopping), 3ac7e00c (Matriz), 5b9446d5 (Shopping Sul), fcc78c1a (Online)
-const inicializarComissoesPorLoja = (): ComissaoPorLoja[] => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    const parsed = JSON.parse(stored) as ComissaoPorLoja[];
-    // Detectar dados legados com IDs tipo "LOJA-001" e forçar re-inicialização
-    const temIdLegado = parsed.some(c => c.lojaId.startsWith('LOJA-'));
-    if (!temIdLegado) {
-      return parsed;
-    }
-  }
-  
-  // Dados iniciais mockados com UUIDs reais
-  const comissoesIniciais: ComissaoPorLoja[] = [
-    { 
-      id: 'CPL-001', 
-      lojaId: 'db894e7d', // Loja - JK Shopping
-      cargoId: 'CARGO-001', // Gerente
-      percentualComissao: 3.5, 
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    { 
-      id: 'CPL-002', 
-      lojaId: '3ac7e00c', // Loja - Matriz
-      cargoId: 'CARGO-001', 
-      percentualComissao: 3.0, 
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    { 
-      id: 'CPL-003', 
-      lojaId: 'db894e7d', // Loja - JK Shopping
-      cargoId: 'CARGO-002', // Supervisor
-      percentualComissao: 2.0, 
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-  ];
-  
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(comissoesIniciais));
-  return comissoesIniciais;
+const mapRow = (r: any): ComissaoPorLoja => ({
+  id: r.id,
+  lojaId: r.loja_id || '',
+  cargoId: r.cargo_id || '',
+  percentualComissao: Number(r.percentual_comissao) || 0,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+const mapHistRow = (r: any): HistoricoComissaoPorLoja => ({
+  id: r.id,
+  comissaoId: r.comissao_id || '',
+  usuarioId: r.usuario_id || '',
+  usuarioNome: r.usuario_nome || '',
+  percentualAnterior: r.percentual_anterior,
+  percentualNovo: Number(r.percentual_novo) || 0,
+  tipoAcao: r.tipo_acao || 'Edição',
+  createdAt: r.created_at,
+});
+
+export const initComissaoPorLojaCache = async () => {
+  const [cRes, hRes] = await Promise.all([
+    supabase.from('comissao_por_loja').select('*'),
+    supabase.from('historico_comissao_por_loja').select('*').order('created_at', { ascending: false }),
+  ]);
+  if (cRes.data) comissoesPorLojaCache = cRes.data.map(mapRow);
+  if (hRes.data) historicoCache = hRes.data.map(mapHistRow);
 };
 
-let comissoesPorLoja: ComissaoPorLoja[] = inicializarComissoesPorLoja();
-
-// Inicializar histórico
-let historicoComissoes: HistoricoComissaoPorLoja[] = (() => {
-  const stored = localStorage.getItem(HISTORICO_KEY);
-  return stored ? JSON.parse(stored) : [];
-})();
-
-const persistirDados = () => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(comissoesPorLoja));
-  localStorage.setItem(HISTORICO_KEY, JSON.stringify(historicoComissoes));
-};
+// Auto-init
+initComissaoPorLojaCache();
 
 // CRUD Operations
-export const getComissoesPorLoja = (): ComissaoPorLoja[] => {
-  return [...comissoesPorLoja];
-};
+export const getComissoesPorLoja = (): ComissaoPorLoja[] => [...comissoesPorLojaCache];
 
-export const getComissaoPorLojaById = (id: string): ComissaoPorLoja | undefined => {
-  return comissoesPorLoja.find(c => c.id === id);
-};
+export const getComissaoPorLojaById = (id: string): ComissaoPorLoja | undefined =>
+  comissoesPorLojaCache.find(c => c.id === id);
 
-export const getComissaoPorLojaECargo = (lojaId: string, cargoId: string): ComissaoPorLoja | undefined => {
-  return comissoesPorLoja.find(c => c.lojaId === lojaId && c.cargoId === cargoId);
-};
+export const getComissaoPorLojaECargo = (lojaId: string, cargoId: string): ComissaoPorLoja | undefined =>
+  comissoesPorLojaCache.find(c => c.lojaId === lojaId && c.cargoId === cargoId);
 
-export const addComissaoPorLoja = (
-  lojaId: string, 
-  cargoId: string, 
+export const addComissaoPorLoja = async (
+  lojaId: string,
+  cargoId: string,
   percentualComissao: number,
   usuarioId: string = 'SISTEMA',
   usuarioNome: string = 'Sistema'
-): ComissaoPorLoja => {
-  // Verificar duplicata
+): Promise<ComissaoPorLoja> => {
   const existente = getComissaoPorLojaECargo(lojaId, cargoId);
-  if (existente) {
-    throw new Error('Já existe uma comissão configurada para esta loja e cargo');
-  }
+  if (existente) throw new Error('Já existe uma comissão configurada para esta loja e cargo');
 
-  const newId = `CPL-${String(comissoesPorLoja.length + 1).padStart(3, '0')}`;
-  const now = new Date().toISOString();
-  
-  const novaComissao: ComissaoPorLoja = {
-    id: newId,
-    lojaId,
-    cargoId,
-    percentualComissao,
-    createdAt: now,
-    updatedAt: now
-  };
-  
-  comissoesPorLoja.push(novaComissao);
-  
-  // Registrar histórico
-  const historico: HistoricoComissaoPorLoja = {
-    id: `HCPL-${Date.now()}`,
-    comissaoId: newId,
-    usuarioId,
-    usuarioNome,
-    percentualAnterior: null,
-    percentualNovo: percentualComissao,
-    tipoAcao: 'Criação',
-    createdAt: now
-  };
-  historicoComissoes.push(historico);
-  
-  persistirDados();
-  return novaComissao;
+  const { data, error } = await supabase.from('comissao_por_loja').insert({
+    loja_id: lojaId,
+    cargo_id: cargoId,
+    percentual_comissao: percentualComissao,
+  }).select().single();
+  if (error) throw error;
+  const mapped = mapRow(data);
+  comissoesPorLojaCache.push(mapped);
+
+  // Histórico
+  const { data: hData } = await supabase.from('historico_comissao_por_loja').insert({
+    comissao_id: mapped.id,
+    usuario_id: usuarioId,
+    usuario_nome: usuarioNome,
+    percentual_anterior: null,
+    percentual_novo: percentualComissao,
+    tipo_acao: 'Criação',
+  }).select().single();
+  if (hData) historicoCache.unshift(mapHistRow(hData));
+
+  return mapped;
 };
 
-export const updateComissaoPorLoja = (
-  id: string, 
+export const updateComissaoPorLoja = async (
+  id: string,
   percentualComissao: number,
   usuarioId: string = 'SISTEMA',
   usuarioNome: string = 'Sistema'
-): ComissaoPorLoja | null => {
-  const index = comissoesPorLoja.findIndex(c => c.id === id);
-  if (index === -1) return null;
-  
-  const comissaoAnterior = comissoesPorLoja[index].percentualComissao;
-  const now = new Date().toISOString();
-  
-  comissoesPorLoja[index] = {
-    ...comissoesPorLoja[index],
-    percentualComissao,
-    updatedAt: now
-  };
-  
-  // Registrar histórico
-  const historico: HistoricoComissaoPorLoja = {
-    id: `HCPL-${Date.now()}`,
-    comissaoId: id,
-    usuarioId,
-    usuarioNome,
-    percentualAnterior: comissaoAnterior,
-    percentualNovo: percentualComissao,
-    tipoAcao: 'Edição',
-    createdAt: now
-  };
-  historicoComissoes.push(historico);
-  
-  persistirDados();
-  return comissoesPorLoja[index];
+): Promise<ComissaoPorLoja | null> => {
+  const comissaoAtual = comissoesPorLojaCache.find(c => c.id === id);
+  if (!comissaoAtual) return null;
+
+  const { data, error } = await supabase.from('comissao_por_loja').update({
+    percentual_comissao: percentualComissao,
+    updated_at: new Date().toISOString(),
+  }).eq('id', id).select().single();
+  if (error || !data) return null;
+  const mapped = mapRow(data);
+  const idx = comissoesPorLojaCache.findIndex(c => c.id === id);
+  if (idx >= 0) comissoesPorLojaCache[idx] = mapped;
+
+  // Histórico
+  const { data: hData } = await supabase.from('historico_comissao_por_loja').insert({
+    comissao_id: id,
+    usuario_id: usuarioId,
+    usuario_nome: usuarioNome,
+    percentual_anterior: comissaoAtual.percentualComissao,
+    percentual_novo: percentualComissao,
+    tipo_acao: 'Edição',
+  }).select().single();
+  if (hData) historicoCache.unshift(mapHistRow(hData));
+
+  return mapped;
 };
 
-export const deleteComissaoPorLoja = (
+export const deleteComissaoPorLoja = async (
   id: string,
   usuarioId: string = 'SISTEMA',
   usuarioNome: string = 'Sistema'
-): boolean => {
-  const comissao = comissoesPorLoja.find(c => c.id === id);
+): Promise<boolean> => {
+  const comissao = comissoesPorLojaCache.find(c => c.id === id);
   if (!comissao) return false;
-  
-  // Registrar histórico antes de deletar
-  const historico: HistoricoComissaoPorLoja = {
-    id: `HCPL-${Date.now()}`,
-    comissaoId: id,
-    usuarioId,
-    usuarioNome,
-    percentualAnterior: comissao.percentualComissao,
-    percentualNovo: 0,
-    tipoAcao: 'Deleção',
-    createdAt: new Date().toISOString()
-  };
-  historicoComissoes.push(historico);
-  
-  comissoesPorLoja = comissoesPorLoja.filter(c => c.id !== id);
-  
-  persistirDados();
+
+  // Histórico antes de deletar
+  await supabase.from('historico_comissao_por_loja').insert({
+    comissao_id: id,
+    usuario_id: usuarioId,
+    usuario_nome: usuarioNome,
+    percentual_anterior: comissao.percentualComissao,
+    percentual_novo: 0,
+    tipo_acao: 'Deleção',
+  });
+
+  const { error } = await supabase.from('comissao_por_loja').delete().eq('id', id);
+  if (error) return false;
+  comissoesPorLojaCache = comissoesPorLojaCache.filter(c => c.id !== id);
   return true;
 };
 
 // Histórico
-export const getHistoricoComissaoPorLoja = (comissaoId: string): HistoricoComissaoPorLoja[] => {
-  return historicoComissoes
-    .filter(h => h.comissaoId === comissaoId)
+export const getHistoricoComissaoPorLoja = (comissaoId: string): HistoricoComissaoPorLoja[] =>
+  historicoCache.filter(h => h.comissaoId === comissaoId)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-};
 
-export const getAllHistoricoComissoes = (): HistoricoComissaoPorLoja[] => {
-  return [...historicoComissoes].sort((a, b) => 
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-};
+export const getAllHistoricoComissoes = (): HistoricoComissaoPorLoja[] =>
+  [...historicoCache].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
 // Helpers para exibição
 export const getComissaoPorLojaComDetalhes = () => {
-  return comissoesPorLoja.map(c => {
+  return comissoesPorLojaCache.map(c => {
     const loja = getLojaById(c.lojaId);
     const cargoNome = getCargoNome(c.cargoId);
-    return {
-      ...c,
-      lojaNome: loja?.nome || c.lojaId,
-      cargoNome
-    };
+    return { ...c, lojaNome: loja?.nome || c.lojaId, cargoNome };
   });
 };
 

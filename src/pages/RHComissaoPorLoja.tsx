@@ -79,7 +79,7 @@ export default function RHComissaoPorLoja() {
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Validações
     if (!form.lojaId) {
       toast.error('Selecione uma loja');
@@ -98,10 +98,10 @@ export default function RHComissaoPorLoja() {
 
     try {
       if (editingId) {
-        updateComissaoPorLoja(editingId, percentual, 'GESTOR-001', 'Gestor RH');
+        await updateComissaoPorLoja(editingId, percentual, 'GESTOR-001', 'Gestor RH');
         toast.success('Comissão atualizada com sucesso');
       } else {
-        addComissaoPorLoja(form.lojaId, form.cargoId, percentual, 'GESTOR-001', 'Gestor RH');
+        await addComissaoPorLoja(form.lojaId, form.cargoId, percentual, 'GESTOR-001', 'Gestor RH');
         toast.success('Comissão cadastrada com sucesso');
       }
       
@@ -115,9 +115,9 @@ export default function RHComissaoPorLoja() {
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir esta comissão?')) {
-      deleteComissaoPorLoja(id, 'GESTOR-001', 'Gestor RH');
+      await deleteComissaoPorLoja(id, 'GESTOR-001', 'Gestor RH');
       toast.success('Comissão excluída com sucesso');
       carregarDados();
     }

@@ -1,5 +1,5 @@
-// Comissões API - Mock Data
-
+// Comissões API - Supabase Integration
+import { supabase } from '@/integrations/supabase/client';
 import { getColaboradores } from './cadastrosApi';
 import { LOJA_ONLINE_ID } from './calculoComissaoVenda';
 
@@ -20,101 +20,101 @@ export interface HistoricoComissao {
   comissaoNova: number;
 }
 
-const COMISSOES_KEY = 'thiago_imports_comissoes';
-const HISTORICO_KEY = 'thiago_imports_historico_comissoes';
+// ── Cache layer ──
+let comissoesCache: ComissaoColaborador[] = [];
+let historicoCache: HistoricoComissao[] = [];
+let cacheInitialized = false;
 
-// Inicializar dados mockados
-const inicializarComissoes = (): ComissaoColaborador[] => {
-  const stored = localStorage.getItem(COMISSOES_KEY);
-  if (stored) {
-    return JSON.parse(stored);
-  }
-  
-  // Dados iniciais - percentual fixo 10% (padrão lojas físicas)
+export const initComissoesCache = async () => {
+  // Comissões vêm direto dos colaboradores (salario_fixo + comissao)
   const colaboradores = getColaboradores();
-  const comissoesIniciais: ComissaoColaborador[] = colaboradores.map(col => ({
+  comissoesCache = colaboradores.map(col => ({
     colaboradorId: col.id,
     salarioFixo: col.salario || 0,
-    percentualComissao: 10 // Fixo 10% para lojas físicas
+    percentualComissao: 10 // Fixo 10% lojas físicas
   }));
-  
-  localStorage.setItem(COMISSOES_KEY, JSON.stringify(comissoesIniciais));
-  return comissoesIniciais;
+
+  // Histórico do Supabase
+  const { data } = await supabase.from('comissoes_historico').select('*').order('data_alteracao', { ascending: false });
+  if (data) {
+    historicoCache = data.map((r: any) => ({
+      id: r.id,
+      colaboradorId: r.colaborador_id || '',
+      dataAlteracao: r.data_alteracao,
+      usuarioAlterou: r.usuario_alterou || '',
+      fixoAnterior: Number(r.fixo_anterior) || 0,
+      fixoNovo: Number(r.fixo_novo) || 0,
+      comissaoAnterior: Number(r.comissao_anterior) || 0,
+      comissaoNova: Number(r.comissao_nova) || 0,
+    }));
+  }
+  cacheInitialized = true;
 };
 
-let comissoes: ComissaoColaborador[] = inicializarComissoes();
+// Auto-init
+initComissoesCache();
 
 // Buscar comissão de um colaborador
 export const getComissaoColaborador = (colaboradorId: string): { fixo: number; comissao: number } => {
-  const comissao = comissoes.find(c => c.colaboradorId === colaboradorId);
-  return {
-    fixo: comissao?.salarioFixo || 0,
-    comissao: comissao?.percentualComissao || 0
-  };
+  const comissao = comissoesCache.find(c => c.colaboradorId === colaboradorId);
+  return { fixo: comissao?.salarioFixo || 0, comissao: comissao?.percentualComissao || 0 };
 };
 
-// Buscar todas as comissões
-export const getAllComissoes = (): ComissaoColaborador[] => {
-  return comissoes;
-};
+export const getAllComissoes = (): ComissaoColaborador[] => comissoesCache;
 
 // Atualizar comissão
-export const updateComissaoColaborador = (
-  colaboradorId: string, 
-  fixo: number, 
+export const updateComissaoColaborador = async (
+  colaboradorId: string,
+  fixo: number,
   percentualComissao: number,
   usuarioAlterou: string = 'Sistema'
-): void => {
-  const existente = comissoes.find(c => c.colaboradorId === colaboradorId);
-  
-  // Registrar histórico
+): Promise<void> => {
+  const existente = comissoesCache.find(c => c.colaboradorId === colaboradorId);
+
+  // Registrar histórico no Supabase
   if (existente) {
-    addHistoricoComissao({
-      id: `HIST-${Date.now()}`,
-      colaboradorId,
-      dataAlteracao: new Date().toISOString(),
-      usuarioAlterou,
-      fixoAnterior: existente.salarioFixo,
-      fixoNovo: fixo,
-      comissaoAnterior: existente.percentualComissao,
-      comissaoNova: percentualComissao
+    const { data } = await supabase.from('comissoes_historico').insert({
+      colaborador_id: colaboradorId,
+      data_alteracao: new Date().toISOString(),
+      usuario_alterou: usuarioAlterou,
+      fixo_anterior: existente.salarioFixo,
+      fixo_novo: fixo,
+      comissao_anterior: existente.percentualComissao,
+      comissao_nova: percentualComissao,
+    }).select().single();
+    if (data) historicoCache.unshift({
+      id: data.id,
+      colaboradorId: data.colaborador_id || '',
+      dataAlteracao: data.data_alteracao,
+      usuarioAlterou: data.usuario_alterou || '',
+      fixoAnterior: Number(data.fixo_anterior) || 0,
+      fixoNovo: Number(data.fixo_novo) || 0,
+      comissaoAnterior: Number(data.comissao_anterior) || 0,
+      comissaoNova: Number(data.comissao_nova) || 0,
     });
   }
-  
-  // Atualizar ou adicionar
-  const index = comissoes.findIndex(c => c.colaboradorId === colaboradorId);
+
+  // Atualizar cache
+  const index = comissoesCache.findIndex(c => c.colaboradorId === colaboradorId);
   if (index >= 0) {
-    comissoes[index] = { colaboradorId, salarioFixo: fixo, percentualComissao };
+    comissoesCache[index] = { colaboradorId, salarioFixo: fixo, percentualComissao };
   } else {
-    comissoes.push({ colaboradorId, salarioFixo: fixo, percentualComissao });
+    comissoesCache.push({ colaboradorId, salarioFixo: fixo, percentualComissao });
   }
-  
-  // Persistir
-  localStorage.setItem(COMISSOES_KEY, JSON.stringify(comissoes));
 };
 
-// Calcular comissão de uma venda - usa regra fixa: 10% lojas físicas, 6% Online
+// Calcular comissão de uma venda
 export const calcularComissaoVenda = (vendedorId: string, lucroVenda: number, lojaVendaId?: string): number => {
-  if (lucroVenda <= 0) return 0; // Não há comissão em caso de prejuízo
+  if (lucroVenda <= 0) return 0;
   const percentual = lojaVendaId === LOJA_ONLINE_ID ? 6 : 10;
   return lucroVenda * (percentual / 100);
 };
 
-// Histórico de alterações de comissão
-let historicoComissoes: HistoricoComissao[] = (() => {
-  const stored = localStorage.getItem(HISTORICO_KEY);
-  return stored ? JSON.parse(stored) : [];
-})();
-
 export const addHistoricoComissao = (registro: HistoricoComissao): void => {
-  historicoComissoes.push(registro);
-  localStorage.setItem(HISTORICO_KEY, JSON.stringify(historicoComissoes));
+  historicoCache.unshift(registro);
 };
 
-export const getHistoricoComissao = (colaboradorId: string): HistoricoComissao[] => {
-  return historicoComissoes.filter(h => h.colaboradorId === colaboradorId);
-};
+export const getHistoricoComissao = (colaboradorId: string): HistoricoComissao[] =>
+  historicoCache.filter(h => h.colaboradorId === colaboradorId);
 
-export const getAllHistoricoComissoes = (): HistoricoComissao[] => {
-  return historicoComissoes;
-};
+export const getAllHistoricoComissoes = (): HistoricoComissao[] => historicoCache;

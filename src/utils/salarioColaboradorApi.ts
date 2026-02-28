@@ -1,6 +1,5 @@
-// Salário Colaborador API - Mock Data
-// TODO: Integrar com Supabase - substituir mock por query real
-
+// Salário Colaborador API - Supabase Integration
+import { supabase } from '@/integrations/supabase/client';
 import { getColaboradores, Colaborador } from './cadastrosApi';
 import { getComissaoColaboradorPorLoja } from './comissaoPorLojaApi';
 
@@ -9,7 +8,7 @@ export interface SalarioColaborador {
   colaboradorId: string;
   salarioFixo: number;
   ajudaCusto: number;
-  percentualComissao: number; // 0-100 com até 2 casas decimais
+  percentualComissao: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,200 +26,159 @@ export interface HistoricoSalario {
   createdAt: string;
 }
 
-const STORAGE_KEY = 'thiago_imports_salarios_colaboradores';
-const HISTORICO_KEY = 'thiago_imports_historico_salarios';
+// ── Cache layer ──
+let salariosCache: SalarioColaborador[] = [];
+let historicoCache: HistoricoSalario[] = [];
 
-// Inicializar dados mockados
-const inicializarSalarios = (): SalarioColaborador[] => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    return JSON.parse(stored);
-  }
-  
-  // Criar salários iniciais baseados nos colaboradores existentes
-  const colaboradores = getColaboradores();
-  const salariosIniciais: SalarioColaborador[] = colaboradores.map((col, index) => ({
-    id: `SAL-${String(index + 1).padStart(3, '0')}`,
-    colaboradorId: col.id,
-    salarioFixo: col.salario || 2500,
-    ajudaCusto: Math.floor(Math.random() * 500), // 0-500
-    percentualComissao: Math.floor(Math.random() * 10) + 3, // 3-13%
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  }));
-  
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(salariosIniciais));
-  return salariosIniciais;
+const mapSalarioRow = (r: any): SalarioColaborador => ({
+  id: r.id,
+  colaboradorId: r.colaborador_id,
+  salarioFixo: Number(r.salario_fixo) || 0,
+  ajudaCusto: Number(r.ajuda_custo) || 0,
+  percentualComissao: Number(r.percentual_comissao) || 0,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+const mapHistoricoRow = (r: any): HistoricoSalario => ({
+  id: r.id,
+  salarioId: r.salario_id || '',
+  colaboradorId: r.colaborador_id || '',
+  usuarioId: r.usuario_id || '',
+  usuarioNome: r.usuario_nome || '',
+  campoAlterado: r.campo_alterado || 'Salário Fixo',
+  valorAnterior: r.valor_anterior,
+  valorNovo: r.valor_novo || '',
+  tipoAcao: r.tipo_acao || 'Edição',
+  createdAt: r.created_at,
+});
+
+export const initSalariosCache = async () => {
+  const [salRes, histRes] = await Promise.all([
+    supabase.from('salarios_colaboradores').select('*'),
+    supabase.from('historico_salarios').select('*').order('created_at', { ascending: false }),
+  ]);
+  if (salRes.data) salariosCache = salRes.data.map(mapSalarioRow);
+  if (histRes.data) historicoCache = histRes.data.map(mapHistoricoRow);
 };
 
-let salarios: SalarioColaborador[] = inicializarSalarios();
-
-// Inicializar histórico
-let historicoSalarios: HistoricoSalario[] = (() => {
-  const stored = localStorage.getItem(HISTORICO_KEY);
-  return stored ? JSON.parse(stored) : [];
-})();
-
-const persistirDados = () => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(salarios));
-  localStorage.setItem(HISTORICO_KEY, JSON.stringify(historicoSalarios));
-};
+// Auto-init
+initSalariosCache();
 
 // CRUD Operations
-export const getSalarios = (): SalarioColaborador[] => {
-  return [...salarios];
-};
+export const getSalarios = (): SalarioColaborador[] => [...salariosCache];
 
-export const getSalarioById = (id: string): SalarioColaborador | undefined => {
-  return salarios.find(s => s.id === id);
-};
+export const getSalarioById = (id: string): SalarioColaborador | undefined =>
+  salariosCache.find(s => s.id === id);
 
-export const getSalarioByColaboradorId = (colaboradorId: string): SalarioColaborador | undefined => {
-  return salarios.find(s => s.colaboradorId === colaboradorId);
-};
+export const getSalarioByColaboradorId = (colaboradorId: string): SalarioColaborador | undefined =>
+  salariosCache.find(s => s.colaboradorId === colaboradorId);
 
-export const addSalario = (
+export const addSalario = async (
   colaboradorId: string,
   salarioFixo: number,
   ajudaCusto: number,
   percentualComissao: number,
   usuarioId: string = 'SISTEMA',
   usuarioNome: string = 'Sistema'
-): SalarioColaborador => {
-  // Verificar se já existe
+): Promise<SalarioColaborador> => {
   const existente = getSalarioByColaboradorId(colaboradorId);
-  if (existente) {
-    throw new Error('Já existe um salário configurado para este colaborador');
-  }
+  if (existente) throw new Error('Já existe um salário configurado para este colaborador');
 
-  const newId = `SAL-${String(salarios.length + 1).padStart(3, '0')}`;
-  const now = new Date().toISOString();
-  
-  const novoSalario: SalarioColaborador = {
-    id: newId,
-    colaboradorId,
-    salarioFixo,
-    ajudaCusto,
-    percentualComissao,
-    createdAt: now,
-    updatedAt: now
-  };
-  
-  salarios.push(novoSalario);
-  
-  // Registrar histórico para cada campo
-  const camposHistorico: Array<{ campo: 'Salário Fixo' | 'Ajuda de Custo' | 'Comissão'; valor: string }> = [
+  const { data, error } = await supabase.from('salarios_colaboradores').insert({
+    colaborador_id: colaboradorId,
+    salario_fixo: salarioFixo,
+    ajuda_custo: ajudaCusto,
+    percentual_comissao: percentualComissao,
+  }).select().single();
+  if (error) throw error;
+  const mapped = mapSalarioRow(data);
+  salariosCache.push(mapped);
+
+  // Registrar histórico
+  const camposHistorico = [
     { campo: 'Salário Fixo', valor: `R$ ${salarioFixo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
     { campo: 'Ajuda de Custo', valor: `R$ ${ajudaCusto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
     { campo: 'Comissão', valor: `${percentualComissao}%` }
   ];
-  
-  camposHistorico.forEach(({ campo, valor }) => {
-    historicoSalarios.push({
-      id: `HSAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      salarioId: newId,
-      colaboradorId,
-      usuarioId,
-      usuarioNome,
-      campoAlterado: campo,
-      valorAnterior: null,
-      valorNovo: valor,
-      tipoAcao: 'Criação',
-      createdAt: now
-    });
-  });
-  
-  persistirDados();
-  return novoSalario;
+  for (const { campo, valor } of camposHistorico) {
+    const { data: hData } = await supabase.from('historico_salarios').insert({
+      salario_id: mapped.id,
+      colaborador_id: colaboradorId,
+      usuario_id: usuarioId,
+      usuario_nome: usuarioNome,
+      campo_alterado: campo,
+      valor_anterior: null,
+      valor_novo: valor,
+      tipo_acao: 'Criação',
+    }).select().single();
+    if (hData) historicoCache.unshift(mapHistoricoRow(hData));
+  }
+
+  return mapped;
 };
 
-export const updateSalario = (
+export const updateSalario = async (
   colaboradorId: string,
   updates: Partial<Pick<SalarioColaborador, 'salarioFixo' | 'ajudaCusto' | 'percentualComissao'>>,
   usuarioId: string = 'SISTEMA',
   usuarioNome: string = 'Sistema'
-): SalarioColaborador | null => {
-  const index = salarios.findIndex(s => s.colaboradorId === colaboradorId);
-  if (index === -1) return null;
-  
-  const salarioAtual = salarios[index];
-  const now = new Date().toISOString();
-  
-  // Registrar histórico para campos alterados
-  if (updates.salarioFixo !== undefined && updates.salarioFixo !== salarioAtual.salarioFixo) {
-    historicoSalarios.push({
-      id: `HSAL-${Date.now()}-sf`,
-      salarioId: salarioAtual.id,
-      colaboradorId,
-      usuarioId,
-      usuarioNome,
-      campoAlterado: 'Salário Fixo',
-      valorAnterior: `R$ ${salarioAtual.salarioFixo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-      valorNovo: `R$ ${updates.salarioFixo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-      tipoAcao: 'Edição',
-      createdAt: now
-    });
+): Promise<SalarioColaborador | null> => {
+  const salarioAtual = salariosCache.find(s => s.colaboradorId === colaboradorId);
+  if (!salarioAtual) return null;
+
+  const dbUpdates: any = {};
+  if (updates.salarioFixo !== undefined) dbUpdates.salario_fixo = updates.salarioFixo;
+  if (updates.ajudaCusto !== undefined) dbUpdates.ajuda_custo = updates.ajudaCusto;
+  if (updates.percentualComissao !== undefined) dbUpdates.percentual_comissao = updates.percentualComissao;
+  dbUpdates.updated_at = new Date().toISOString();
+
+  const { data, error } = await supabase.from('salarios_colaboradores').update(dbUpdates).eq('colaborador_id', colaboradorId).select().single();
+  if (error || !data) return null;
+  const mapped = mapSalarioRow(data);
+  const idx = salariosCache.findIndex(s => s.colaboradorId === colaboradorId);
+  if (idx >= 0) salariosCache[idx] = mapped;
+
+  // Registrar histórico
+  const changes: Array<{ campo: string; anterior: string; novo: string }> = [];
+  if (updates.salarioFixo !== undefined && updates.salarioFixo !== salarioAtual.salarioFixo)
+    changes.push({ campo: 'Salário Fixo', anterior: `R$ ${salarioAtual.salarioFixo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, novo: `R$ ${updates.salarioFixo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` });
+  if (updates.ajudaCusto !== undefined && updates.ajudaCusto !== salarioAtual.ajudaCusto)
+    changes.push({ campo: 'Ajuda de Custo', anterior: `R$ ${salarioAtual.ajudaCusto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, novo: `R$ ${updates.ajudaCusto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` });
+  if (updates.percentualComissao !== undefined && updates.percentualComissao !== salarioAtual.percentualComissao)
+    changes.push({ campo: 'Comissão', anterior: `${salarioAtual.percentualComissao}%`, novo: `${updates.percentualComissao}%` });
+
+  for (const c of changes) {
+    const { data: hData } = await supabase.from('historico_salarios').insert({
+      salario_id: salarioAtual.id,
+      colaborador_id: colaboradorId,
+      usuario_id: usuarioId,
+      usuario_nome: usuarioNome,
+      campo_alterado: c.campo,
+      valor_anterior: c.anterior,
+      valor_novo: c.novo,
+      tipo_acao: 'Edição',
+    }).select().single();
+    if (hData) historicoCache.unshift(mapHistoricoRow(hData));
   }
-  
-  if (updates.ajudaCusto !== undefined && updates.ajudaCusto !== salarioAtual.ajudaCusto) {
-    historicoSalarios.push({
-      id: `HSAL-${Date.now()}-ac`,
-      salarioId: salarioAtual.id,
-      colaboradorId,
-      usuarioId,
-      usuarioNome,
-      campoAlterado: 'Ajuda de Custo',
-      valorAnterior: `R$ ${salarioAtual.ajudaCusto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-      valorNovo: `R$ ${updates.ajudaCusto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-      tipoAcao: 'Edição',
-      createdAt: now
-    });
-  }
-  
-  if (updates.percentualComissao !== undefined && updates.percentualComissao !== salarioAtual.percentualComissao) {
-    historicoSalarios.push({
-      id: `HSAL-${Date.now()}-pc`,
-      salarioId: salarioAtual.id,
-      colaboradorId,
-      usuarioId,
-      usuarioNome,
-      campoAlterado: 'Comissão',
-      valorAnterior: `${salarioAtual.percentualComissao}%`,
-      valorNovo: `${updates.percentualComissao}%`,
-      tipoAcao: 'Edição',
-      createdAt: now
-    });
-  }
-  
-  salarios[index] = {
-    ...salarioAtual,
-    ...updates,
-    updatedAt: now
-  };
-  
-  persistirDados();
-  return salarios[index];
+
+  return mapped;
 };
 
-export const deleteSalario = (colaboradorId: string): boolean => {
-  const initialLength = salarios.length;
-  salarios = salarios.filter(s => s.colaboradorId !== colaboradorId);
-  persistirDados();
-  return salarios.length < initialLength;
+export const deleteSalario = async (colaboradorId: string): Promise<boolean> => {
+  const { error } = await supabase.from('salarios_colaboradores').delete().eq('colaborador_id', colaboradorId);
+  if (error) return false;
+  salariosCache = salariosCache.filter(s => s.colaboradorId !== colaboradorId);
+  return true;
 };
 
 // Histórico
-export const getHistoricoSalario = (colaboradorId: string): HistoricoSalario[] => {
-  return historicoSalarios
-    .filter(h => h.colaboradorId === colaboradorId)
+export const getHistoricoSalario = (colaboradorId: string): HistoricoSalario[] =>
+  historicoCache.filter(h => h.colaboradorId === colaboradorId)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-};
 
-export const getAllHistoricoSalarios = (): HistoricoSalario[] => {
-  return [...historicoSalarios].sort((a, b) => 
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-};
+export const getAllHistoricoSalarios = (): HistoricoSalario[] =>
+  [...historicoCache].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
 // Helper para obter salário com dados do colaborador
 export interface SalarioComColaborador extends SalarioColaborador {
@@ -231,20 +189,15 @@ export interface SalarioComColaborador extends SalarioColaborador {
 export const getSalariosComColaboradores = (): SalarioComColaborador[] => {
   const colaboradores = getColaboradores();
   const result: SalarioComColaborador[] = [];
-  
-  for (const s of salarios) {
+  for (const s of salariosCache) {
     const colaborador = colaboradores.find(c => c.id === s.colaboradorId);
     if (!colaborador) continue;
-    
-    // Buscar comissão por loja se aplicável (ex: gerente)
     const comissaoPorLoja = getComissaoColaboradorPorLoja(colaborador.loja, colaborador.cargo);
-    
     result.push({
       ...s,
       colaborador,
       comissaoPorLoja: comissaoPorLoja > 0 ? comissaoPorLoja : undefined
     });
   }
-  
   return result;
 };

@@ -598,3 +598,132 @@ export const exportFluxoToCSV = (data: VendaComFluxo[], filename: string) => {
   link.click();
   document.body.removeChild(link);
 };
+
+// ============= CONFERENCE DATA HELPERS (replacing localStorage) =============
+
+export interface ConferenciaFinanceiroData {
+  validacoesPagamento?: Array<{
+    metodoPagamento: string;
+    validadoGestor?: boolean;
+    validadoFinanceiro: boolean;
+    dataValidacaoGestor?: string;
+    dataValidacaoFinanceiro?: string;
+    conferidoPor?: string;
+    contaDestinoId?: string;
+  }>;
+  observacaoFinanceiro?: {
+    texto: string;
+    dataHora: string;
+    usuarioId: string;
+    usuarioNome: string;
+  };
+  historicoConferencias?: Array<{
+    metodoPagamento: string;
+    contaDestino: string;
+    valor: number;
+    conferidoPor: string;
+    dataHora: string;
+  }>;
+  dataFinalizacao?: string;
+  contaDestinoId?: string;
+  rejeicao?: {
+    motivo: string;
+    dataHora: string;
+    usuarioId: string;
+    usuarioNome: string;
+  };
+  notaEmitida?: boolean;
+  dataEmissaoNota?: string;
+}
+
+export interface ConferenciaGestorData {
+  validacoesPagamento?: Array<{
+    metodoPagamento: string;
+    validadoGestor: boolean;
+    dataValidacao?: string;
+  }>;
+  observacao?: {
+    texto: string;
+    dataHora: string;
+    usuarioId: string;
+    usuarioNome: string;
+  };
+}
+
+/** Get financial conference data from fluxo_vendas.aprovacao_financeiro JSONB */
+export const getConferenciaFinanceiroData = (vendaId: string): ConferenciaFinanceiroData => {
+  const dados = fluxoCache[vendaId];
+  const af = dados?.aprovacaoFinanceiro as any;
+  if (!af) return {};
+  return {
+    validacoesPagamento: af.validacoesPagamento,
+    observacaoFinanceiro: af.observacaoFinanceiro,
+    historicoConferencias: af.historicoConferencias,
+    dataFinalizacao: af.dataFinalizacao,
+    contaDestinoId: af.contaDestinoId,
+    rejeicao: af.rejeicao,
+    notaEmitida: af.notaEmitida,
+    dataEmissaoNota: af.dataEmissaoNota,
+  };
+};
+
+/** Save financial conference data to fluxo_vendas.aprovacao_financeiro JSONB */
+export const salvarConferenciaFinanceiroData = async (vendaId: string, conferencia: Partial<ConferenciaFinanceiroData>) => {
+  const dados = fluxoCache[vendaId] || {};
+  const existingAf = (dados.aprovacaoFinanceiro || {}) as any;
+  const updatedAf = { ...existingAf, ...conferencia };
+  const updated = { ...dados, aprovacaoFinanceiro: updatedAf };
+  fluxoCache[vendaId] = updated;
+  await saveFluxoToSupabase(vendaId, updated);
+};
+
+/** Get gestor conference data from fluxo_vendas.aprovacao_gestor JSONB */
+export const getConferenciaGestorData = (vendaId: string): ConferenciaGestorData => {
+  const dados = fluxoCache[vendaId];
+  const ag = dados?.aprovacaoGestor as any;
+  if (!ag) return {};
+  return {
+    validacoesPagamento: ag.validacoesPagamento,
+    observacao: ag.observacao,
+  };
+};
+
+/** Save gestor conference data to fluxo_vendas.aprovacao_gestor JSONB */
+export const salvarConferenciaGestorData = async (vendaId: string, conferencia: Partial<ConferenciaGestorData>) => {
+  const dados = fluxoCache[vendaId] || {};
+  const existingAg = (dados.aprovacaoGestor || {}) as any;
+  const updatedAg = { ...existingAg, ...conferencia };
+  const updated = { ...dados, aprovacaoGestor: updatedAg };
+  fluxoCache[vendaId] = updated;
+  await saveFluxoToSupabase(vendaId, updated);
+};
+
+/** Check if NFE was issued for a sale (from JSONB) */
+export const isNotaEmitidaFromDB = (vendaId: string): boolean => {
+  return getConferenciaFinanceiroData(vendaId).notaEmitida || false;
+};
+
+/** Get NFE issue date (from JSONB) */
+export const getDataEmissaoNotaFromDB = (vendaId: string): string | undefined => {
+  return getConferenciaFinanceiroData(vendaId).dataEmissaoNota;
+};
+
+/** Get total NFE value emitted per account for a period */
+export const getNotasEmitidasPorContaFromDB = (mes: number, ano: number): Record<string, number> => {
+  const result: Record<string, number> = {};
+  const todasVendas = getVendasComFluxo().filter(v => v.statusFluxo === 'Finalizado');
+  todasVendas.forEach(v => {
+    const af = (v.aprovacaoFinanceiro as any) || {};
+    if (!af.notaEmitida || !af.dataEmissaoNota) return;
+    const d = new Date(af.dataEmissaoNota);
+    if (d.getMonth() !== mes || d.getFullYear() !== ano) return;
+    const validacoes = af.validacoesPagamento || [];
+    validacoes.forEach((val: any) => {
+      if (val.contaDestinoId && val.validadoFinanceiro) {
+        const pag = v.pagamentos?.find((p: any) => p.meioPagamento === val.metodoPagamento);
+        result[val.contaDestinoId] = (result[val.contaDestinoId] || 0) + (pag?.valor || 0);
+      }
+    });
+  });
+  return result;
+};

@@ -109,6 +109,107 @@ export type Database = {
         }
         Relationships: []
       }
+      anotacoes_fiado: {
+        Row: {
+          created_at: string | null
+          data_hora: string | null
+          divida_id: string | null
+          id: string
+          importante: boolean | null
+          observacao: string | null
+          usuario: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_hora?: string | null
+          divida_id?: string | null
+          id?: string
+          importante?: boolean | null
+          observacao?: string | null
+          usuario?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_hora?: string | null
+          divida_id?: string | null
+          id?: string
+          importante?: boolean | null
+          observacao?: string | null
+          usuario?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anotacoes_fiado_divida_id_fkey"
+            columns: ["divida_id"]
+            isOneToOne: false
+            referencedRelation: "dividas_fiado"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      anotacoes_gestao: {
+        Row: {
+          chave_contexto: string
+          created_at: string | null
+          data_hora: string | null
+          id: string
+          importante: boolean | null
+          observacao: string | null
+          usuario: string | null
+        }
+        Insert: {
+          chave_contexto: string
+          created_at?: string | null
+          data_hora?: string | null
+          id?: string
+          importante?: boolean | null
+          observacao?: string | null
+          usuario?: string | null
+        }
+        Update: {
+          chave_contexto?: string
+          created_at?: string | null
+          data_hora?: string | null
+          id?: string
+          importante?: boolean | null
+          observacao?: string | null
+          usuario?: string | null
+        }
+        Relationships: []
+      }
+      atividades_gestores: {
+        Row: {
+          ativa: boolean | null
+          created_at: string | null
+          horario_previsto: string | null
+          id: string
+          lojas_atribuidas: Json | null
+          nome: string
+          pontuacao_base: number | null
+          tipo_horario: string | null
+        }
+        Insert: {
+          ativa?: boolean | null
+          created_at?: string | null
+          horario_previsto?: string | null
+          id?: string
+          lojas_atribuidas?: Json | null
+          nome: string
+          pontuacao_base?: number | null
+          tipo_horario?: string | null
+        }
+        Update: {
+          ativa?: boolean | null
+          created_at?: string | null
+          horario_previsto?: string | null
+          id?: string
+          lojas_atribuidas?: Json | null
+          nome?: string
+          pontuacao_base?: number | null
+          tipo_horario?: string | null
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           bairro: string | null
@@ -318,6 +419,39 @@ export type Database = {
         }
         Relationships: []
       }
+      conferencias_gestao: {
+        Row: {
+          ajustes: Json | null
+          competencia: string
+          created_at: string | null
+          data: string
+          id: string
+          loja_id: string
+          totais_por_metodo: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          ajustes?: Json | null
+          competencia: string
+          created_at?: string | null
+          data: string
+          id?: string
+          loja_id: string
+          totais_por_metodo?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          ajustes?: Json | null
+          competencia?: string
+          created_at?: string | null
+          data?: string
+          id?: string
+          loja_id?: string
+          totais_por_metodo?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       contas_financeiras: {
         Row: {
           agencia: string | null
@@ -375,6 +509,108 @@ export type Database = {
           status_maquina?: string | null
           tipo?: string | null
           ultimo_movimento?: string | null
+        }
+        Relationships: []
+      }
+      contatos_ativos_garantia: {
+        Row: {
+          aparelho: Json | null
+          auto_gerado: boolean | null
+          cliente: Json | null
+          created_at: string | null
+          data_lancamento: string | null
+          garantia_estendida: Json | null
+          garantia_id: string | null
+          id: string
+          logistica: Json | null
+          status: string | null
+          timeline: Json | null
+        }
+        Insert: {
+          aparelho?: Json | null
+          auto_gerado?: boolean | null
+          cliente?: Json | null
+          created_at?: string | null
+          data_lancamento?: string | null
+          garantia_estendida?: Json | null
+          garantia_id?: string | null
+          id?: string
+          logistica?: Json | null
+          status?: string | null
+          timeline?: Json | null
+        }
+        Update: {
+          aparelho?: Json | null
+          auto_gerado?: boolean | null
+          cliente?: Json | null
+          created_at?: string | null
+          data_lancamento?: string | null
+          garantia_estendida?: Json | null
+          garantia_id?: string | null
+          id?: string
+          logistica?: Json | null
+          status?: string | null
+          timeline?: Json | null
+        }
+        Relationships: []
+      }
+      cores_aparelho: {
+        Row: {
+          created_at: string | null
+          hexadecimal: string | null
+          id: string
+          nome: string
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          hexadecimal?: string | null
+          id?: string
+          nome: string
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          hexadecimal?: string | null
+          id?: string
+          nome?: string
+          status?: string | null
+        }
+        Relationships: []
+      }
+      creditos_fornecedor: {
+        Row: {
+          created_at: string | null
+          data_criacao: string | null
+          data_utilizacao: string | null
+          descricao: string | null
+          fornecedor: string | null
+          id: string
+          nota_id: string | null
+          utilizado: boolean | null
+          valor: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_criacao?: string | null
+          data_utilizacao?: string | null
+          descricao?: string | null
+          fornecedor?: string | null
+          id?: string
+          nota_id?: string | null
+          utilizado?: boolean | null
+          valor?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          data_criacao?: string | null
+          data_utilizacao?: string | null
+          descricao?: string | null
+          fornecedor?: string | null
+          id?: string
+          nota_id?: string | null
+          utilizado?: boolean | null
+          valor?: number | null
         }
         Relationships: []
       }
@@ -497,6 +733,111 @@ export type Database = {
           },
         ]
       }
+      dividas_fiado: {
+        Row: {
+          cliente_id: string | null
+          cliente_nome: string | null
+          created_at: string | null
+          id: string
+          inicio_competencia: string | null
+          loja_id: string | null
+          loja_nome: string | null
+          qtd_vezes: number
+          situacao: string | null
+          tem_anotacao_importante: boolean | null
+          tipo_recorrencia: string | null
+          valor_final: number
+          venda_id: string | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          id?: string
+          inicio_competencia?: string | null
+          loja_id?: string | null
+          loja_nome?: string | null
+          qtd_vezes?: number
+          situacao?: string | null
+          tem_anotacao_importante?: boolean | null
+          tipo_recorrencia?: string | null
+          valor_final?: number
+          venda_id?: string | null
+        }
+        Update: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          id?: string
+          inicio_competencia?: string | null
+          loja_id?: string | null
+          loja_nome?: string | null
+          qtd_vezes?: number
+          situacao?: string | null
+          tem_anotacao_importante?: boolean | null
+          tipo_recorrencia?: string | null
+          valor_final?: number
+          venda_id?: string | null
+        }
+        Relationships: []
+      }
+      execucoes_atividades: {
+        Row: {
+          atividade_id: string
+          atividade_nome: string | null
+          colaborador_designado_id: string | null
+          colaborador_designado_nome: string | null
+          created_at: string | null
+          data: string
+          executado: boolean | null
+          gestor_id: string | null
+          gestor_nome: string | null
+          horario_executado: string | null
+          horario_previsto: string | null
+          id: string
+          loja_id: string | null
+          pontuacao: number | null
+          status: string | null
+          tipo_horario: string | null
+        }
+        Insert: {
+          atividade_id: string
+          atividade_nome?: string | null
+          colaborador_designado_id?: string | null
+          colaborador_designado_nome?: string | null
+          created_at?: string | null
+          data: string
+          executado?: boolean | null
+          gestor_id?: string | null
+          gestor_nome?: string | null
+          horario_executado?: string | null
+          horario_previsto?: string | null
+          id?: string
+          loja_id?: string | null
+          pontuacao?: number | null
+          status?: string | null
+          tipo_horario?: string | null
+        }
+        Update: {
+          atividade_id?: string
+          atividade_nome?: string | null
+          colaborador_designado_id?: string | null
+          colaborador_designado_nome?: string | null
+          created_at?: string | null
+          data?: string
+          executado?: boolean | null
+          gestor_id?: string | null
+          gestor_nome?: string | null
+          horario_executado?: string | null
+          horario_previsto?: string | null
+          id?: string
+          loja_id?: string | null
+          pontuacao?: number | null
+          status?: string | null
+          tipo_horario?: string | null
+        }
+        Relationships: []
+      }
       feedbacks: {
         Row: {
           arquivo: Json | null
@@ -586,6 +927,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      fluxo_vendas: {
+        Row: {
+          aprovacao_financeiro: Json | null
+          aprovacao_gestor: Json | null
+          aprovacao_lancamento: Json | null
+          bloqueado_para_edicao: boolean | null
+          chave_pix: string | null
+          conta_origem_downgrade: string | null
+          created_at: string | null
+          devolucao_financeiro: Json | null
+          id: string
+          pagamento_downgrade: Json | null
+          recebimento_gestor: Json | null
+          recusa_gestor: Json | null
+          saldo_devolver: number | null
+          status_fluxo: string | null
+          timeline_fluxo: Json | null
+          tipo_operacao: string | null
+          updated_at: string | null
+          venda_id: string
+        }
+        Insert: {
+          aprovacao_financeiro?: Json | null
+          aprovacao_gestor?: Json | null
+          aprovacao_lancamento?: Json | null
+          bloqueado_para_edicao?: boolean | null
+          chave_pix?: string | null
+          conta_origem_downgrade?: string | null
+          created_at?: string | null
+          devolucao_financeiro?: Json | null
+          id?: string
+          pagamento_downgrade?: Json | null
+          recebimento_gestor?: Json | null
+          recusa_gestor?: Json | null
+          saldo_devolver?: number | null
+          status_fluxo?: string | null
+          timeline_fluxo?: Json | null
+          tipo_operacao?: string | null
+          updated_at?: string | null
+          venda_id: string
+        }
+        Update: {
+          aprovacao_financeiro?: Json | null
+          aprovacao_gestor?: Json | null
+          aprovacao_lancamento?: Json | null
+          bloqueado_para_edicao?: boolean | null
+          chave_pix?: string | null
+          conta_origem_downgrade?: string | null
+          created_at?: string | null
+          devolucao_financeiro?: Json | null
+          id?: string
+          pagamento_downgrade?: Json | null
+          recebimento_gestor?: Json | null
+          recusa_gestor?: Json | null
+          saldo_devolver?: number | null
+          status_fluxo?: string | null
+          timeline_fluxo?: Json | null
+          tipo_operacao?: string | null
+          updated_at?: string | null
+          venda_id?: string
+        }
+        Relationships: []
       }
       fornecedores: {
         Row: {
@@ -796,6 +1200,233 @@ export type Database = {
         }
         Relationships: []
       }
+      itens_consignacao: {
+        Row: {
+          created_at: string | null
+          data_consumo: string | null
+          data_devolucao: string | null
+          descricao: string | null
+          devolvido_por: string | null
+          id: string
+          loja_atual_id: string | null
+          lote_id: string | null
+          modelo: string | null
+          os_vinculada: string | null
+          peca_id: string | null
+          quantidade: number | null
+          quantidade_original: number | null
+          status: string | null
+          tecnico_consumo: string | null
+          valor_custo: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_consumo?: string | null
+          data_devolucao?: string | null
+          descricao?: string | null
+          devolvido_por?: string | null
+          id?: string
+          loja_atual_id?: string | null
+          lote_id?: string | null
+          modelo?: string | null
+          os_vinculada?: string | null
+          peca_id?: string | null
+          quantidade?: number | null
+          quantidade_original?: number | null
+          status?: string | null
+          tecnico_consumo?: string | null
+          valor_custo?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          data_consumo?: string | null
+          data_devolucao?: string | null
+          descricao?: string | null
+          devolvido_por?: string | null
+          id?: string
+          loja_atual_id?: string | null
+          lote_id?: string | null
+          modelo?: string | null
+          os_vinculada?: string | null
+          peca_id?: string | null
+          quantidade?: number | null
+          quantidade_original?: number | null
+          status?: string | null
+          tecnico_consumo?: string | null
+          valor_custo?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "itens_consignacao_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lotes_consignacao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logs_atividades: {
+        Row: {
+          acao: string | null
+          atividade_id: string | null
+          atividade_nome: string | null
+          created_at: string | null
+          data: string | null
+          data_hora: string | null
+          detalhes: string | null
+          gestor_id: string | null
+          gestor_nome: string | null
+          id: string
+          modulo: string | null
+          pontuacao: number | null
+        }
+        Insert: {
+          acao?: string | null
+          atividade_id?: string | null
+          atividade_nome?: string | null
+          created_at?: string | null
+          data?: string | null
+          data_hora?: string | null
+          detalhes?: string | null
+          gestor_id?: string | null
+          gestor_nome?: string | null
+          id?: string
+          modulo?: string | null
+          pontuacao?: number | null
+        }
+        Update: {
+          acao?: string | null
+          atividade_id?: string | null
+          atividade_nome?: string | null
+          created_at?: string | null
+          data?: string | null
+          data_hora?: string | null
+          detalhes?: string | null
+          gestor_id?: string | null
+          gestor_nome?: string | null
+          id?: string
+          modulo?: string | null
+          pontuacao?: number | null
+        }
+        Relationships: []
+      }
+      logs_conferencia_gestao: {
+        Row: {
+          acao: string | null
+          conferencia_id: string | null
+          created_at: string | null
+          data: string | null
+          data_hora: string | null
+          detalhes: string | null
+          id: string
+          loja_id: string | null
+          metodo_pagamento: string | null
+          usuario_id: string | null
+          usuario_nome: string | null
+        }
+        Insert: {
+          acao?: string | null
+          conferencia_id?: string | null
+          created_at?: string | null
+          data?: string | null
+          data_hora?: string | null
+          detalhes?: string | null
+          id?: string
+          loja_id?: string | null
+          metodo_pagamento?: string | null
+          usuario_id?: string | null
+          usuario_nome?: string | null
+        }
+        Update: {
+          acao?: string | null
+          conferencia_id?: string | null
+          created_at?: string | null
+          data?: string | null
+          data_hora?: string | null
+          detalhes?: string | null
+          id?: string
+          loja_id?: string | null
+          metodo_pagamento?: string | null
+          usuario_id?: string | null
+          usuario_nome?: string | null
+        }
+        Relationships: []
+      }
+      logs_movimentacoes_contas: {
+        Row: {
+          conta_destino_id: string | null
+          conta_origem_id: string | null
+          created_at: string | null
+          data_hora: string | null
+          id: string
+          movimentacao_id: string | null
+          observacao: string | null
+          transacao_id: string | null
+          usuario_id: string | null
+          usuario_nome: string | null
+          valor: number | null
+        }
+        Insert: {
+          conta_destino_id?: string | null
+          conta_origem_id?: string | null
+          created_at?: string | null
+          data_hora?: string | null
+          id?: string
+          movimentacao_id?: string | null
+          observacao?: string | null
+          transacao_id?: string | null
+          usuario_id?: string | null
+          usuario_nome?: string | null
+          valor?: number | null
+        }
+        Update: {
+          conta_destino_id?: string | null
+          conta_origem_id?: string | null
+          created_at?: string | null
+          data_hora?: string | null
+          id?: string
+          movimentacao_id?: string | null
+          observacao?: string | null
+          transacao_id?: string | null
+          usuario_id?: string | null
+          usuario_nome?: string | null
+          valor?: number | null
+        }
+        Relationships: []
+      }
+      logs_valor_troca: {
+        Row: {
+          created_at: string | null
+          data_hora: string | null
+          detalhes: string | null
+          id: string
+          modelo: string | null
+          tipo: string | null
+          usuario: string | null
+          valor_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_hora?: string | null
+          detalhes?: string | null
+          id?: string
+          modelo?: string | null
+          tipo?: string | null
+          usuario?: string | null
+          valor_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_hora?: string | null
+          detalhes?: string | null
+          id?: string
+          modelo?: string | null
+          tipo?: string | null
+          usuario?: string | null
+          valor_id?: string | null
+        }
+        Relationships: []
+      }
       lojas: {
         Row: {
           ativa: boolean | null
@@ -850,6 +1481,90 @@ export type Database = {
           status?: string | null
           telefone?: string | null
           tipo?: string | null
+        }
+        Relationships: []
+      }
+      lotes_consignacao: {
+        Row: {
+          created_at: string | null
+          data_criacao: string | null
+          fornecedor_id: string | null
+          id: string
+          pagamentos_parciais: Json | null
+          responsavel_cadastro: string | null
+          status: string | null
+          timeline: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_criacao?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          pagamentos_parciais?: Json | null
+          responsavel_cadastro?: string | null
+          status?: string | null
+          timeline?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          data_criacao?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          pagamentos_parciais?: Json | null
+          responsavel_cadastro?: string | null
+          status?: string | null
+          timeline?: Json | null
+        }
+        Relationships: []
+      }
+      lotes_revisao: {
+        Row: {
+          created_at: string | null
+          custo_total_reparos: number | null
+          data_criacao: string | null
+          data_finalizacao: string | null
+          fornecedor: string | null
+          id: string
+          itens: Json | null
+          nota_entrada_id: string | null
+          numero_nota: string | null
+          os_ids: Json | null
+          responsavel_criacao: string | null
+          status: string | null
+          valor_liquido_sugerido: number | null
+          valor_original_nota: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          custo_total_reparos?: number | null
+          data_criacao?: string | null
+          data_finalizacao?: string | null
+          fornecedor?: string | null
+          id?: string
+          itens?: Json | null
+          nota_entrada_id?: string | null
+          numero_nota?: string | null
+          os_ids?: Json | null
+          responsavel_criacao?: string | null
+          status?: string | null
+          valor_liquido_sugerido?: number | null
+          valor_original_nota?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          custo_total_reparos?: number | null
+          data_criacao?: string | null
+          data_finalizacao?: string | null
+          fornecedor?: string | null
+          id?: string
+          itens?: Json | null
+          nota_entrada_id?: string | null
+          numero_nota?: string | null
+          os_ids?: Json | null
+          responsavel_criacao?: string | null
+          status?: string | null
+          valor_liquido_sugerido?: number | null
+          valor_original_nota?: number | null
         }
         Relationships: []
       }
@@ -935,6 +1650,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      movimentacoes_entre_contas: {
+        Row: {
+          conta_destino_id: string | null
+          conta_origem_id: string | null
+          created_at: string | null
+          data_hora: string | null
+          id: string
+          observacao: string | null
+          transacao_id: string | null
+          usuario_id: string | null
+          usuario_nome: string | null
+          valor: number | null
+        }
+        Insert: {
+          conta_destino_id?: string | null
+          conta_origem_id?: string | null
+          created_at?: string | null
+          data_hora?: string | null
+          id?: string
+          observacao?: string | null
+          transacao_id?: string | null
+          usuario_id?: string | null
+          usuario_nome?: string | null
+          valor?: number | null
+        }
+        Update: {
+          conta_destino_id?: string | null
+          conta_origem_id?: string | null
+          created_at?: string | null
+          data_hora?: string | null
+          id?: string
+          observacao?: string | null
+          transacao_id?: string | null
+          usuario_id?: string | null
+          usuario_nome?: string | null
+          valor?: number | null
+        }
+        Relationships: []
       }
       movimentacoes_estoque: {
         Row: {
@@ -1093,6 +1847,123 @@ export type Database = {
           status?: string | null
           status_urgencia?: string | null
           timeline?: Json | null
+          valor_total?: number | null
+        }
+        Relationships: []
+      }
+      notas_entrada: {
+        Row: {
+          alertas: Json | null
+          atuacao_atual: string | null
+          created_at: string | null
+          data: string | null
+          data_criacao: string | null
+          data_envio_direto_financeiro: string | null
+          data_finalizacao: string | null
+          enviado_direto_financeiro: boolean | null
+          forma_pagamento: string | null
+          fornecedor: string | null
+          id: string
+          lote_revisao_id: string | null
+          motivo_rejeicao: string | null
+          numero_nota: string | null
+          observacoes: string | null
+          pagamentos: Json | null
+          pix_banco: string | null
+          pix_chave: string | null
+          pix_recebedor: string | null
+          produtos: Json | null
+          qtd_cadastrada: number | null
+          qtd_conferida: number | null
+          qtd_informada: number | null
+          rejeitada: boolean | null
+          responsavel_criacao: string | null
+          responsavel_finalizacao: string | null
+          status: string | null
+          timeline: Json | null
+          tipo_pagamento: string | null
+          tipo_pagamento_bloqueado: boolean | null
+          urgente: boolean | null
+          valor_abatimento: number | null
+          valor_conferido: number | null
+          valor_pago: number | null
+          valor_pendente: number | null
+          valor_total: number | null
+        }
+        Insert: {
+          alertas?: Json | null
+          atuacao_atual?: string | null
+          created_at?: string | null
+          data?: string | null
+          data_criacao?: string | null
+          data_envio_direto_financeiro?: string | null
+          data_finalizacao?: string | null
+          enviado_direto_financeiro?: boolean | null
+          forma_pagamento?: string | null
+          fornecedor?: string | null
+          id?: string
+          lote_revisao_id?: string | null
+          motivo_rejeicao?: string | null
+          numero_nota?: string | null
+          observacoes?: string | null
+          pagamentos?: Json | null
+          pix_banco?: string | null
+          pix_chave?: string | null
+          pix_recebedor?: string | null
+          produtos?: Json | null
+          qtd_cadastrada?: number | null
+          qtd_conferida?: number | null
+          qtd_informada?: number | null
+          rejeitada?: boolean | null
+          responsavel_criacao?: string | null
+          responsavel_finalizacao?: string | null
+          status?: string | null
+          timeline?: Json | null
+          tipo_pagamento?: string | null
+          tipo_pagamento_bloqueado?: boolean | null
+          urgente?: boolean | null
+          valor_abatimento?: number | null
+          valor_conferido?: number | null
+          valor_pago?: number | null
+          valor_pendente?: number | null
+          valor_total?: number | null
+        }
+        Update: {
+          alertas?: Json | null
+          atuacao_atual?: string | null
+          created_at?: string | null
+          data?: string | null
+          data_criacao?: string | null
+          data_envio_direto_financeiro?: string | null
+          data_finalizacao?: string | null
+          enviado_direto_financeiro?: boolean | null
+          forma_pagamento?: string | null
+          fornecedor?: string | null
+          id?: string
+          lote_revisao_id?: string | null
+          motivo_rejeicao?: string | null
+          numero_nota?: string | null
+          observacoes?: string | null
+          pagamentos?: Json | null
+          pix_banco?: string | null
+          pix_chave?: string | null
+          pix_recebedor?: string | null
+          produtos?: Json | null
+          qtd_cadastrada?: number | null
+          qtd_conferida?: number | null
+          qtd_informada?: number | null
+          rejeitada?: boolean | null
+          responsavel_criacao?: string | null
+          responsavel_finalizacao?: string | null
+          status?: string | null
+          timeline?: Json | null
+          tipo_pagamento?: string | null
+          tipo_pagamento_bloqueado?: boolean | null
+          urgente?: boolean | null
+          valor_abatimento?: number | null
+          valor_conferido?: number | null
+          valor_pago?: number | null
+          valor_pendente?: number | null
           valor_total?: number | null
         }
         Relationships: []
@@ -1377,6 +2248,47 @@ export type Database = {
           },
         ]
       }
+      pagamentos_fiado: {
+        Row: {
+          comprovante: string | null
+          comprovante_nome: string | null
+          created_at: string | null
+          data_pagamento: string | null
+          divida_id: string | null
+          id: string
+          responsavel: string | null
+          valor: number
+        }
+        Insert: {
+          comprovante?: string | null
+          comprovante_nome?: string | null
+          created_at?: string | null
+          data_pagamento?: string | null
+          divida_id?: string | null
+          id?: string
+          responsavel?: string | null
+          valor?: number
+        }
+        Update: {
+          comprovante?: string | null
+          comprovante_nome?: string | null
+          created_at?: string | null
+          data_pagamento?: string | null
+          divida_id?: string | null
+          id?: string
+          responsavel?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagamentos_fiado_divida_id_fkey"
+            columns: ["divida_id"]
+            isOneToOne: false
+            referencedRelation: "dividas_fiado"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pagamentos_financeiros: {
         Row: {
           conta: string | null
@@ -1477,6 +2389,126 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pendencias_financeiras: {
+        Row: {
+          acao_recomendada: string | null
+          aparelhos_conferidos: number | null
+          aparelhos_total: number | null
+          created_at: string | null
+          data_conferencia_completa: string | null
+          data_criacao: string | null
+          data_pagamento: string | null
+          data_vencimento: string | null
+          dias_decorridos: number | null
+          discrepancia: boolean | null
+          fornecedor: string | null
+          id: string
+          motivo_discrepancia: string | null
+          nota_id: string | null
+          origem: string | null
+          percentual_conferencia: number | null
+          sla_alerta: boolean | null
+          sla_status: string | null
+          status_conferencia: string | null
+          status_pagamento: string | null
+          timeline: Json | null
+          valor_conferido: number | null
+          valor_pendente: number | null
+          valor_total: number | null
+        }
+        Insert: {
+          acao_recomendada?: string | null
+          aparelhos_conferidos?: number | null
+          aparelhos_total?: number | null
+          created_at?: string | null
+          data_conferencia_completa?: string | null
+          data_criacao?: string | null
+          data_pagamento?: string | null
+          data_vencimento?: string | null
+          dias_decorridos?: number | null
+          discrepancia?: boolean | null
+          fornecedor?: string | null
+          id?: string
+          motivo_discrepancia?: string | null
+          nota_id?: string | null
+          origem?: string | null
+          percentual_conferencia?: number | null
+          sla_alerta?: boolean | null
+          sla_status?: string | null
+          status_conferencia?: string | null
+          status_pagamento?: string | null
+          timeline?: Json | null
+          valor_conferido?: number | null
+          valor_pendente?: number | null
+          valor_total?: number | null
+        }
+        Update: {
+          acao_recomendada?: string | null
+          aparelhos_conferidos?: number | null
+          aparelhos_total?: number | null
+          created_at?: string | null
+          data_conferencia_completa?: string | null
+          data_criacao?: string | null
+          data_pagamento?: string | null
+          data_vencimento?: string | null
+          dias_decorridos?: number | null
+          discrepancia?: boolean | null
+          fornecedor?: string | null
+          id?: string
+          motivo_discrepancia?: string | null
+          nota_id?: string | null
+          origem?: string | null
+          percentual_conferencia?: number | null
+          sla_alerta?: boolean | null
+          sla_status?: string | null
+          status_conferencia?: string | null
+          status_pagamento?: string | null
+          timeline?: Json | null
+          valor_conferido?: number | null
+          valor_pendente?: number | null
+          valor_total?: number | null
+        }
+        Relationships: []
+      }
+      planos_garantia: {
+        Row: {
+          condicao: string | null
+          created_at: string | null
+          descricao: string | null
+          id: string
+          meses: number | null
+          modelos: Json | null
+          nome: string
+          status: string | null
+          tipo: string | null
+          valor: number | null
+        }
+        Insert: {
+          condicao?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          meses?: number | null
+          modelos?: Json | null
+          nome: string
+          status?: string | null
+          tipo?: string | null
+          valor?: number | null
+        }
+        Update: {
+          condicao?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          meses?: number | null
+          modelos?: Json | null
+          nome?: string
+          status?: string | null
+          tipo?: string | null
+          valor?: number | null
+        }
+        Relationships: []
       }
       produtos: {
         Row: {
@@ -1625,6 +2657,60 @@ export type Database = {
           },
         ]
       }
+      registros_analise_garantia: {
+        Row: {
+          cliente_descricao: string | null
+          created_at: string | null
+          data_aprovacao: string | null
+          data_chegada: string | null
+          data_recusa: string | null
+          id: string
+          metadata: Json | null
+          motivo_recusa: string | null
+          observacao: string | null
+          origem: string | null
+          origem_id: string | null
+          status: string | null
+          tecnico_id: string | null
+          tecnico_nome: string | null
+          usuario_aprovacao: string | null
+        }
+        Insert: {
+          cliente_descricao?: string | null
+          created_at?: string | null
+          data_aprovacao?: string | null
+          data_chegada?: string | null
+          data_recusa?: string | null
+          id?: string
+          metadata?: Json | null
+          motivo_recusa?: string | null
+          observacao?: string | null
+          origem?: string | null
+          origem_id?: string | null
+          status?: string | null
+          tecnico_id?: string | null
+          tecnico_nome?: string | null
+          usuario_aprovacao?: string | null
+        }
+        Update: {
+          cliente_descricao?: string | null
+          created_at?: string | null
+          data_aprovacao?: string | null
+          data_chegada?: string | null
+          data_recusa?: string | null
+          id?: string
+          metadata?: Json | null
+          motivo_recusa?: string | null
+          observacao?: string | null
+          origem?: string | null
+          origem_id?: string | null
+          status?: string | null
+          tecnico_id?: string | null
+          tecnico_nome?: string | null
+          usuario_aprovacao?: string | null
+        }
+        Relationships: []
+      }
       remuneracoes_motoboy: {
         Row: {
           competencia: string | null
@@ -1685,6 +2771,69 @@ export type Database = {
         }
         Relationships: []
       }
+      retiradas_pecas: {
+        Row: {
+          aparelho_id: string | null
+          cor_original: string | null
+          created_at: string | null
+          data_conclusao: string | null
+          data_inicio_desmonte: string | null
+          data_solicitacao: string | null
+          id: string
+          imei_original: string | null
+          logs_auditoria: Json | null
+          loja_id: string | null
+          modelo_original: string | null
+          motivo: string | null
+          pecas_retiradas: Json | null
+          responsavel_solicitacao: string | null
+          status: string | null
+          tecnico_responsavel: string | null
+          timeline: Json | null
+          valor_custo_aparelho: number | null
+        }
+        Insert: {
+          aparelho_id?: string | null
+          cor_original?: string | null
+          created_at?: string | null
+          data_conclusao?: string | null
+          data_inicio_desmonte?: string | null
+          data_solicitacao?: string | null
+          id?: string
+          imei_original?: string | null
+          logs_auditoria?: Json | null
+          loja_id?: string | null
+          modelo_original?: string | null
+          motivo?: string | null
+          pecas_retiradas?: Json | null
+          responsavel_solicitacao?: string | null
+          status?: string | null
+          tecnico_responsavel?: string | null
+          timeline?: Json | null
+          valor_custo_aparelho?: number | null
+        }
+        Update: {
+          aparelho_id?: string | null
+          cor_original?: string | null
+          created_at?: string | null
+          data_conclusao?: string | null
+          data_inicio_desmonte?: string | null
+          data_solicitacao?: string | null
+          id?: string
+          imei_original?: string | null
+          logs_auditoria?: Json | null
+          loja_id?: string | null
+          modelo_original?: string | null
+          motivo?: string | null
+          pecas_retiradas?: Json | null
+          responsavel_solicitacao?: string | null
+          status?: string | null
+          tecnico_responsavel?: string | null
+          timeline?: Json | null
+          valor_custo_aparelho?: number | null
+        }
+        Relationships: []
+      }
       salarios_colaboradores: {
         Row: {
           ajuda_custo: number | null
@@ -1712,6 +2861,75 @@ export type Database = {
           percentual_comissao?: number | null
           salario_fixo?: number | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      tratativas_comerciais: {
+        Row: {
+          confirmacao1: Json | null
+          confirmacao2: Json | null
+          created_at: string | null
+          data_hora: string | null
+          descricao: string | null
+          garantia_id: string | null
+          id: string
+          meses_plano: number | null
+          nova_data_fim_garantia: string | null
+          pagamento: Json | null
+          plano_id: string | null
+          plano_nome: string | null
+          resultado_contato: string | null
+          status_adesao: string | null
+          tipo: string | null
+          usuario_id: string | null
+          usuario_nome: string | null
+          valor_plano: number | null
+          venda_conferencia_id: string | null
+          venda_id: string | null
+        }
+        Insert: {
+          confirmacao1?: Json | null
+          confirmacao2?: Json | null
+          created_at?: string | null
+          data_hora?: string | null
+          descricao?: string | null
+          garantia_id?: string | null
+          id?: string
+          meses_plano?: number | null
+          nova_data_fim_garantia?: string | null
+          pagamento?: Json | null
+          plano_id?: string | null
+          plano_nome?: string | null
+          resultado_contato?: string | null
+          status_adesao?: string | null
+          tipo?: string | null
+          usuario_id?: string | null
+          usuario_nome?: string | null
+          valor_plano?: number | null
+          venda_conferencia_id?: string | null
+          venda_id?: string | null
+        }
+        Update: {
+          confirmacao1?: Json | null
+          confirmacao2?: Json | null
+          created_at?: string | null
+          data_hora?: string | null
+          descricao?: string | null
+          garantia_id?: string | null
+          id?: string
+          meses_plano?: number | null
+          nova_data_fim_garantia?: string | null
+          pagamento?: Json | null
+          plano_id?: string | null
+          plano_nome?: string | null
+          resultado_contato?: string | null
+          status_adesao?: string | null
+          tipo?: string | null
+          usuario_id?: string | null
+          usuario_nome?: string | null
+          valor_plano?: number | null
+          venda_conferencia_id?: string | null
+          venda_id?: string | null
         }
         Relationships: []
       }
@@ -1757,6 +2975,36 @@ export type Database = {
           observacao?: string | null
           quantidade_vezes?: number
           valor_final?: number
+        }
+        Relationships: []
+      }
+      valores_recomendados_troca: {
+        Row: {
+          condicao: string | null
+          created_at: string | null
+          id: string
+          marca: string | null
+          modelo: string
+          ultima_atualizacao: string | null
+          valor_sugerido: number | null
+        }
+        Insert: {
+          condicao?: string | null
+          created_at?: string | null
+          id?: string
+          marca?: string | null
+          modelo: string
+          ultima_atualizacao?: string | null
+          valor_sugerido?: number | null
+        }
+        Update: {
+          condicao?: string | null
+          created_at?: string | null
+          id?: string
+          marca?: string | null
+          modelo?: string
+          ultima_atualizacao?: string | null
+          valor_sugerido?: number | null
         }
         Relationships: []
       }
@@ -2098,6 +3346,141 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vendas_conferencia: {
+        Row: {
+          cliente_nome: string | null
+          conta_destino: string | null
+          created_at: string | null
+          dados_venda: Json | null
+          data_conferencia: string | null
+          data_finalizacao: string | null
+          data_registro: string | null
+          financeiro_nome: string | null
+          financeiro_responsavel: string | null
+          gestor_conferencia: string | null
+          gestor_nome: string | null
+          id: string
+          loja_id: string | null
+          loja_nome: string | null
+          observacao_gestor: string | null
+          sla_dias: number | null
+          status: string | null
+          timeline: Json | null
+          tipo_venda: string | null
+          valor_total: number | null
+          venda_id: string | null
+          vendedor_id: string | null
+          vendedor_nome: string | null
+        }
+        Insert: {
+          cliente_nome?: string | null
+          conta_destino?: string | null
+          created_at?: string | null
+          dados_venda?: Json | null
+          data_conferencia?: string | null
+          data_finalizacao?: string | null
+          data_registro?: string | null
+          financeiro_nome?: string | null
+          financeiro_responsavel?: string | null
+          gestor_conferencia?: string | null
+          gestor_nome?: string | null
+          id?: string
+          loja_id?: string | null
+          loja_nome?: string | null
+          observacao_gestor?: string | null
+          sla_dias?: number | null
+          status?: string | null
+          timeline?: Json | null
+          tipo_venda?: string | null
+          valor_total?: number | null
+          venda_id?: string | null
+          vendedor_id?: string | null
+          vendedor_nome?: string | null
+        }
+        Update: {
+          cliente_nome?: string | null
+          conta_destino?: string | null
+          created_at?: string | null
+          dados_venda?: Json | null
+          data_conferencia?: string | null
+          data_finalizacao?: string | null
+          data_registro?: string | null
+          financeiro_nome?: string | null
+          financeiro_responsavel?: string | null
+          gestor_conferencia?: string | null
+          gestor_nome?: string | null
+          id?: string
+          loja_id?: string | null
+          loja_nome?: string | null
+          observacao_gestor?: string | null
+          sla_dias?: number | null
+          status?: string | null
+          timeline?: Json | null
+          tipo_venda?: string | null
+          valor_total?: number | null
+          venda_id?: string | null
+          vendedor_id?: string | null
+          vendedor_nome?: string | null
+        }
+        Relationships: []
+      }
+      vendas_digitais: {
+        Row: {
+          cliente_id: string | null
+          cliente_nome: string | null
+          created_at: string | null
+          dados_completos: Json | null
+          data_finalizacao: string | null
+          data_hora: string | null
+          finalizador_id: string | null
+          finalizador_nome: string | null
+          id: string
+          motivo_ajuste: string | null
+          numero: number
+          responsavel_venda_id: string | null
+          responsavel_venda_nome: string | null
+          status: string | null
+          timeline: Json | null
+          valor_total: number
+        }
+        Insert: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          dados_completos?: Json | null
+          data_finalizacao?: string | null
+          data_hora?: string | null
+          finalizador_id?: string | null
+          finalizador_nome?: string | null
+          id?: string
+          motivo_ajuste?: string | null
+          numero?: number
+          responsavel_venda_id?: string | null
+          responsavel_venda_nome?: string | null
+          status?: string | null
+          timeline?: Json | null
+          valor_total?: number
+        }
+        Update: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          dados_completos?: Json | null
+          data_finalizacao?: string | null
+          data_hora?: string | null
+          finalizador_id?: string | null
+          finalizador_nome?: string | null
+          id?: string
+          motivo_ajuste?: string | null
+          numero?: number
+          responsavel_venda_id?: string | null
+          responsavel_venda_nome?: string | null
+          status?: string | null
+          timeline?: Json | null
+          valor_total?: number
+        }
+        Relationships: []
       }
     }
     Views: {

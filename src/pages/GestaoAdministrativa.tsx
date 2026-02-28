@@ -167,11 +167,11 @@ export default function GestaoAdministrativa() {
     });
   };
   
-  const handleConfirmarCheck = () => {
+  const handleConfirmarCheck = async () => {
     const { conf, metodo, acao } = modalConfirmacaoCheck;
     if (!conf) return;
     
-    toggleConferencia(
+    await toggleConferencia(
       competencia,
       conf.data,
       conf.lojaId,
@@ -210,7 +210,7 @@ export default function GestaoAdministrativa() {
     setModalAjusteOpen(true);
   };
   
-  const handleSalvarAjuste = () => {
+  const handleSalvarAjuste = async () => {
     if (!ajusteMetodo || !ajusteValor || !ajusteJustificativa.trim()) {
       toast.error('Preencha todos os campos');
       return;
@@ -222,7 +222,7 @@ export default function GestaoAdministrativa() {
       return;
     }
     
-    registrarAjuste(
+    await registrarAjuste(
       competencia,
       conferenciaSelecionada!.data,
       conferenciaSelecionada!.lojaId,

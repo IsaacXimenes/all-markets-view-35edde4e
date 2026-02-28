@@ -73,13 +73,13 @@ export default function GestaoAdmStoriesValidacao() {
     ));
   };
 
-  const handleSalvarValidacao = () => {
+  const handleSalvarValidacao = async () => {
     if (bloqueado) {
       toast.error('O validador não pode ser o mesmo que realizou a conferência operacional.');
       return;
     }
 
-    salvarValidacao(
+    await salvarValidacao(
       competencia,
       loteOriginal!.id,
       vendas,

@@ -53,7 +53,7 @@ export default function CadastrosAtividades() {
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.nome) {
       toast.error('Preencha o nome da atividade');
       return;
@@ -64,7 +64,7 @@ export default function CadastrosAtividades() {
     }
 
     if (editing) {
-      updateAtividade(editing.id, {
+      await updateAtividade(editing.id, {
         nome: form.nome,
         tipoHorario: form.tipoHorario,
         horarioPrevisto: form.tipoHorario === 'fixo' ? form.horarioPrevisto : undefined,
@@ -74,7 +74,7 @@ export default function CadastrosAtividades() {
       });
       toast.success('Atividade atualizada!');
     } else {
-      addAtividade({
+      await addAtividade({
         nome: form.nome,
         tipoHorario: form.tipoHorario,
         horarioPrevisto: form.tipoHorario === 'fixo' ? form.horarioPrevisto : undefined,
@@ -90,9 +90,9 @@ export default function CadastrosAtividades() {
     resetForm();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir esta atividade?')) {
-      deleteAtividade(id);
+      await deleteAtividade(id);
       setAtividades(getAtividades());
       toast.success('Atividade excluída!');
     }

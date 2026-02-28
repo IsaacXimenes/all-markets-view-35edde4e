@@ -103,7 +103,7 @@ export default function GarantiasNova() {
   }, [vendasComItens, buscaImei, buscaCliente, buscaLoja, buscaVendedor, dataInicio, dataFim]);
   
   // Ver detalhes - navegar para página de garantia
-  const handleVerDetalhes = (venda: Venda, item: any) => {
+  const handleVerDetalhes = async (venda: Venda, item: any) => {
     // Buscar garantia existente para este IMEI
     const garantias = getGarantiasByVendaId(venda.id);
     const garantiaExistente = garantias.find(g => g.imei === item.imei);

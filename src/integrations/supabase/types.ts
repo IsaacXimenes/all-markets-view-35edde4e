@@ -132,37 +132,73 @@ export type Database = {
       }
       garantias: {
         Row: {
+          cliente_email: string | null
+          cliente_id: string | null
+          cliente_nome: string | null
+          cliente_telefone: string | null
           created_at: string | null
           data_fim: string | null
           data_inicio: string | null
           id: string
           imei: string | null
+          item_venda_id: string | null
+          loja_venda: string | null
+          meses_garantia: number | null
           modelo: string | null
           produto_id: string | null
           status: string | null
+          timeline_garantia: Json | null
+          tipo_garantia: string | null
+          tratativas: Json | null
           venda_id: string | null
+          venda_id_ref: string | null
+          vendedor_id: string | null
         }
         Insert: {
+          cliente_email?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          cliente_telefone?: string | null
           created_at?: string | null
           data_fim?: string | null
           data_inicio?: string | null
           id?: string
           imei?: string | null
+          item_venda_id?: string | null
+          loja_venda?: string | null
+          meses_garantia?: number | null
           modelo?: string | null
           produto_id?: string | null
           status?: string | null
+          timeline_garantia?: Json | null
+          tipo_garantia?: string | null
+          tratativas?: Json | null
           venda_id?: string | null
+          venda_id_ref?: string | null
+          vendedor_id?: string | null
         }
         Update: {
+          cliente_email?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          cliente_telefone?: string | null
           created_at?: string | null
           data_fim?: string | null
           data_inicio?: string | null
           id?: string
           imei?: string | null
+          item_venda_id?: string | null
+          loja_venda?: string | null
+          meses_garantia?: number | null
           modelo?: string | null
           produto_id?: string | null
           status?: string | null
+          timeline_garantia?: Json | null
+          tipo_garantia?: string | null
+          tratativas?: Json | null
           venda_id?: string | null
+          venda_id_ref?: string | null
+          vendedor_id?: string | null
         }
         Relationships: [
           {
@@ -177,6 +213,20 @@ export type Database = {
             columns: ["venda_id"]
             isOneToOne: false
             referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "garantias_venda_id_ref_fkey"
+            columns: ["venda_id_ref"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "garantias_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
             referencedColumns: ["id"]
           },
         ]
@@ -304,43 +354,122 @@ export type Database = {
         Row: {
           aparelho_modelo: string | null
           cliente_nome: string
+          conclusao_servico: string | null
           created_at: string | null
+          cronometro: Json | null
+          custo_total: number | null
+          descricao: string | null
+          evidencias: Json | null
+          fotos_entrada: Json | null
+          garantia_id: string | null
           id: string
           imei: string | null
+          imei_aparelho: string | null
           loja_id: string | null
+          modelo_aparelho: string | null
+          motivo_recusa_tecnico: string | null
+          observacao_origem: string | null
+          origem_os: string | null
           parecer_tecnico: string | null
           problema_relatado: string | null
+          produto_id: string | null
+          proxima_atuacao: string | null
+          recusada_tecnico: boolean | null
+          resumo_conclusao: string | null
+          setor: string | null
           status: string | null
           tecnico_id: string | null
+          timeline: Json | null
+          valor_custo_tecnico: number | null
           valor_orcamento: number | null
+          valor_produto_origem: number | null
+          valor_servico: number | null
+          valor_total: number | null
+          valor_venda_tecnico: number | null
+          venda_id: string | null
         }
         Insert: {
           aparelho_modelo?: string | null
           cliente_nome: string
+          conclusao_servico?: string | null
           created_at?: string | null
+          cronometro?: Json | null
+          custo_total?: number | null
+          descricao?: string | null
+          evidencias?: Json | null
+          fotos_entrada?: Json | null
+          garantia_id?: string | null
           id?: string
           imei?: string | null
+          imei_aparelho?: string | null
           loja_id?: string | null
+          modelo_aparelho?: string | null
+          motivo_recusa_tecnico?: string | null
+          observacao_origem?: string | null
+          origem_os?: string | null
           parecer_tecnico?: string | null
           problema_relatado?: string | null
+          produto_id?: string | null
+          proxima_atuacao?: string | null
+          recusada_tecnico?: boolean | null
+          resumo_conclusao?: string | null
+          setor?: string | null
           status?: string | null
           tecnico_id?: string | null
+          timeline?: Json | null
+          valor_custo_tecnico?: number | null
           valor_orcamento?: number | null
+          valor_produto_origem?: number | null
+          valor_servico?: number | null
+          valor_total?: number | null
+          valor_venda_tecnico?: number | null
+          venda_id?: string | null
         }
         Update: {
           aparelho_modelo?: string | null
           cliente_nome?: string
+          conclusao_servico?: string | null
           created_at?: string | null
+          cronometro?: Json | null
+          custo_total?: number | null
+          descricao?: string | null
+          evidencias?: Json | null
+          fotos_entrada?: Json | null
+          garantia_id?: string | null
           id?: string
           imei?: string | null
+          imei_aparelho?: string | null
           loja_id?: string | null
+          modelo_aparelho?: string | null
+          motivo_recusa_tecnico?: string | null
+          observacao_origem?: string | null
+          origem_os?: string | null
           parecer_tecnico?: string | null
           problema_relatado?: string | null
+          produto_id?: string | null
+          proxima_atuacao?: string | null
+          recusada_tecnico?: boolean | null
+          resumo_conclusao?: string | null
+          setor?: string | null
           status?: string | null
           tecnico_id?: string | null
+          timeline?: Json | null
+          valor_custo_tecnico?: number | null
           valor_orcamento?: number | null
+          valor_produto_origem?: number | null
+          valor_servico?: number | null
+          valor_total?: number | null
+          valor_venda_tecnico?: number | null
+          venda_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ordens_servico_garantia_id_fkey"
+            columns: ["garantia_id"]
+            isOneToOne: false
+            referencedRelation: "garantias"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ordens_servico_loja_id_fkey"
             columns: ["loja_id"]
@@ -349,10 +478,154 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ordens_servico_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ordens_servico_tecnico_id_fkey"
             columns: ["tecnico_id"]
             isOneToOne: false
             referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      os_pagamentos: {
+        Row: {
+          comprovante: string | null
+          comprovante_nome: string | null
+          conta_destino: string | null
+          created_at: string | null
+          id: string
+          meio: string | null
+          os_id: string | null
+          parcelas: number | null
+          valor: number | null
+        }
+        Insert: {
+          comprovante?: string | null
+          comprovante_nome?: string | null
+          conta_destino?: string | null
+          created_at?: string | null
+          id?: string
+          meio?: string | null
+          os_id?: string | null
+          parcelas?: number | null
+          valor?: number | null
+        }
+        Update: {
+          comprovante?: string | null
+          comprovante_nome?: string | null
+          conta_destino?: string | null
+          created_at?: string | null
+          id?: string
+          meio?: string | null
+          os_id?: string | null
+          parcelas?: number | null
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_pagamentos_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      os_pecas: {
+        Row: {
+          conta_origem_pagamento: string | null
+          created_at: string | null
+          data_pagamento: string | null
+          data_recebimento: string | null
+          descricao_terceirizado: string | null
+          fornecedor_id: string | null
+          id: string
+          imei: string | null
+          motivo_rejeicao: string | null
+          origem_peca: string | null
+          origem_servico: string | null
+          os_id: string | null
+          peca: string | null
+          peca_de_fornecedor: boolean | null
+          peca_estoque_id: string | null
+          peca_no_estoque: boolean | null
+          percentual: number | null
+          servico_terceirizado: boolean | null
+          status_aprovacao: string | null
+          unidade_servico: string | null
+          valor: number | null
+          valor_custo_real: number | null
+          valor_total: number | null
+        }
+        Insert: {
+          conta_origem_pagamento?: string | null
+          created_at?: string | null
+          data_pagamento?: string | null
+          data_recebimento?: string | null
+          descricao_terceirizado?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          imei?: string | null
+          motivo_rejeicao?: string | null
+          origem_peca?: string | null
+          origem_servico?: string | null
+          os_id?: string | null
+          peca?: string | null
+          peca_de_fornecedor?: boolean | null
+          peca_estoque_id?: string | null
+          peca_no_estoque?: boolean | null
+          percentual?: number | null
+          servico_terceirizado?: boolean | null
+          status_aprovacao?: string | null
+          unidade_servico?: string | null
+          valor?: number | null
+          valor_custo_real?: number | null
+          valor_total?: number | null
+        }
+        Update: {
+          conta_origem_pagamento?: string | null
+          created_at?: string | null
+          data_pagamento?: string | null
+          data_recebimento?: string | null
+          descricao_terceirizado?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          imei?: string | null
+          motivo_rejeicao?: string | null
+          origem_peca?: string | null
+          origem_servico?: string | null
+          os_id?: string | null
+          peca?: string | null
+          peca_de_fornecedor?: boolean | null
+          peca_estoque_id?: string | null
+          peca_no_estoque?: boolean | null
+          percentual?: number | null
+          servico_terceirizado?: boolean | null
+          status_aprovacao?: string | null
+          unidade_servico?: string | null
+          valor?: number | null
+          valor_custo_real?: number | null
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_pecas_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
             referencedColumns: ["id"]
           },
         ]
@@ -504,35 +777,326 @@ export type Database = {
           },
         ]
       }
+      venda_itens: {
+        Row: {
+          categoria: string | null
+          created_at: string | null
+          id: string
+          imei: string | null
+          loja_id: string | null
+          produto_id: string | null
+          produto_nome: string | null
+          quantidade: number | null
+          valor_custo: number | null
+          valor_recomendado: number | null
+          valor_venda: number | null
+          venda_id: string | null
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string | null
+          id?: string
+          imei?: string | null
+          loja_id?: string | null
+          produto_id?: string | null
+          produto_nome?: string | null
+          quantidade?: number | null
+          valor_custo?: number | null
+          valor_recomendado?: number | null
+          valor_venda?: number | null
+          venda_id?: string | null
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string | null
+          id?: string
+          imei?: string | null
+          loja_id?: string | null
+          produto_id?: string | null
+          produto_nome?: string | null
+          quantidade?: number | null
+          valor_custo?: number | null
+          valor_recomendado?: number | null
+          valor_venda?: number | null
+          venda_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venda_itens_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venda_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venda_itens_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venda_pagamentos: {
+        Row: {
+          comprovante: string | null
+          comprovante_nome: string | null
+          conta_destino: string | null
+          created_at: string | null
+          descricao: string | null
+          fiado_data_base: string | null
+          fiado_intervalo_dias: number | null
+          fiado_numero_parcelas: number | null
+          fiado_tipo_recorrencia: string | null
+          id: string
+          is_fiado: boolean | null
+          maquina_id: string | null
+          meio_pagamento: string | null
+          parcelas: number | null
+          taxa_cartao: number | null
+          valor: number | null
+          valor_com_taxa: number | null
+          valor_parcela: number | null
+          venda_id: string | null
+        }
+        Insert: {
+          comprovante?: string | null
+          comprovante_nome?: string | null
+          conta_destino?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          fiado_data_base?: string | null
+          fiado_intervalo_dias?: number | null
+          fiado_numero_parcelas?: number | null
+          fiado_tipo_recorrencia?: string | null
+          id?: string
+          is_fiado?: boolean | null
+          maquina_id?: string | null
+          meio_pagamento?: string | null
+          parcelas?: number | null
+          taxa_cartao?: number | null
+          valor?: number | null
+          valor_com_taxa?: number | null
+          valor_parcela?: number | null
+          venda_id?: string | null
+        }
+        Update: {
+          comprovante?: string | null
+          comprovante_nome?: string | null
+          conta_destino?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          fiado_data_base?: string | null
+          fiado_intervalo_dias?: number | null
+          fiado_numero_parcelas?: number | null
+          fiado_tipo_recorrencia?: string | null
+          id?: string
+          is_fiado?: boolean | null
+          maquina_id?: string | null
+          meio_pagamento?: string | null
+          parcelas?: number | null
+          taxa_cartao?: number | null
+          valor?: number | null
+          valor_com_taxa?: number | null
+          valor_parcela?: number | null
+          venda_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venda_pagamentos_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venda_trade_ins: {
+        Row: {
+          anexos: Json | null
+          condicao: string | null
+          created_at: string | null
+          data_registro: string | null
+          descricao: string | null
+          id: string
+          imei: string | null
+          imei_validado: boolean | null
+          modelo: string | null
+          produto_id: string | null
+          tipo_entrega: string | null
+          valor_compra_usado: number | null
+          venda_id: string | null
+        }
+        Insert: {
+          anexos?: Json | null
+          condicao?: string | null
+          created_at?: string | null
+          data_registro?: string | null
+          descricao?: string | null
+          id?: string
+          imei?: string | null
+          imei_validado?: boolean | null
+          modelo?: string | null
+          produto_id?: string | null
+          tipo_entrega?: string | null
+          valor_compra_usado?: number | null
+          venda_id?: string | null
+        }
+        Update: {
+          anexos?: Json | null
+          condicao?: string | null
+          created_at?: string | null
+          data_registro?: string | null
+          descricao?: string | null
+          id?: string
+          imei?: string | null
+          imei_validado?: boolean | null
+          modelo?: string | null
+          produto_id?: string | null
+          tipo_entrega?: string | null
+          valor_compra_usado?: number | null
+          venda_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venda_trade_ins_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venda_trade_ins_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendas: {
         Row: {
+          bloqueado_para_edicao: boolean | null
+          cliente_cidade: string | null
+          cliente_cpf: string | null
+          cliente_email: string | null
+          cliente_id: string | null
           cliente_nome: string | null
+          cliente_telefone: string | null
+          comissao_vendedor: number | null
           created_at: string | null
+          data_sinal: string | null
           data_venda: string | null
+          garantia_extendida: Json | null
+          hora_venda: string | null
           id: string
+          local_retirada: string | null
           loja_id: string | null
+          lucro: number | null
+          margem: number | null
+          motivo_cancelamento: string | null
+          motoboy_id: string | null
+          numero: number | null
+          observacao_sinal: string | null
+          observacoes: string | null
+          origem_venda: string | null
+          status_atual: string | null
           status_pagamento: string | null
+          subtotal: number | null
+          taxa_entrega: number | null
+          timeline: Json | null
+          timeline_edicoes: Json | null
+          tipo_retirada: string | null
+          total_trade_in: number | null
+          valor_pendente_sinal: number | null
+          valor_sinal: number | null
           valor_total: number
+          vendedor_id: string | null
           vendedor_nome: string | null
         }
         Insert: {
+          bloqueado_para_edicao?: boolean | null
+          cliente_cidade?: string | null
+          cliente_cpf?: string | null
+          cliente_email?: string | null
+          cliente_id?: string | null
           cliente_nome?: string | null
+          cliente_telefone?: string | null
+          comissao_vendedor?: number | null
           created_at?: string | null
+          data_sinal?: string | null
           data_venda?: string | null
+          garantia_extendida?: Json | null
+          hora_venda?: string | null
           id?: string
+          local_retirada?: string | null
           loja_id?: string | null
+          lucro?: number | null
+          margem?: number | null
+          motivo_cancelamento?: string | null
+          motoboy_id?: string | null
+          numero?: number | null
+          observacao_sinal?: string | null
+          observacoes?: string | null
+          origem_venda?: string | null
+          status_atual?: string | null
           status_pagamento?: string | null
+          subtotal?: number | null
+          taxa_entrega?: number | null
+          timeline?: Json | null
+          timeline_edicoes?: Json | null
+          tipo_retirada?: string | null
+          total_trade_in?: number | null
+          valor_pendente_sinal?: number | null
+          valor_sinal?: number | null
           valor_total: number
+          vendedor_id?: string | null
           vendedor_nome?: string | null
         }
         Update: {
+          bloqueado_para_edicao?: boolean | null
+          cliente_cidade?: string | null
+          cliente_cpf?: string | null
+          cliente_email?: string | null
+          cliente_id?: string | null
           cliente_nome?: string | null
+          cliente_telefone?: string | null
+          comissao_vendedor?: number | null
           created_at?: string | null
+          data_sinal?: string | null
           data_venda?: string | null
+          garantia_extendida?: Json | null
+          hora_venda?: string | null
           id?: string
+          local_retirada?: string | null
           loja_id?: string | null
+          lucro?: number | null
+          margem?: number | null
+          motivo_cancelamento?: string | null
+          motoboy_id?: string | null
+          numero?: number | null
+          observacao_sinal?: string | null
+          observacoes?: string | null
+          origem_venda?: string | null
+          status_atual?: string | null
           status_pagamento?: string | null
+          subtotal?: number | null
+          taxa_entrega?: number | null
+          timeline?: Json | null
+          timeline_edicoes?: Json | null
+          tipo_retirada?: string | null
+          total_trade_in?: number | null
+          valor_pendente_sinal?: number | null
+          valor_sinal?: number | null
           valor_total?: number
+          vendedor_id?: string | null
           vendedor_nome?: string | null
         }
         Relationships: [
@@ -541,6 +1105,13 @@ export type Database = {
             columns: ["loja_id"]
             isOneToOne: false
             referencedRelation: "lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendas_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
             referencedColumns: ["id"]
           },
         ]

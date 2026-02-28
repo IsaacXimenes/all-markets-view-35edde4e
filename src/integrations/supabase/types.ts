@@ -3035,6 +3035,56 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          cargo: string | null
+          colaborador_id: string | null
+          created_at: string | null
+          eh_estoquista: boolean | null
+          eh_gestor: boolean | null
+          eh_vendedor: boolean | null
+          first_login: boolean | null
+          id: string
+          nome_completo: string
+          updated_at: string | null
+          username: string
+        }
+        Insert: {
+          cargo?: string | null
+          colaborador_id?: string | null
+          created_at?: string | null
+          eh_estoquista?: boolean | null
+          eh_gestor?: boolean | null
+          eh_vendedor?: boolean | null
+          first_login?: boolean | null
+          id: string
+          nome_completo?: string
+          updated_at?: string | null
+          username: string
+        }
+        Update: {
+          cargo?: string | null
+          colaborador_id?: string | null
+          created_at?: string | null
+          eh_estoquista?: boolean | null
+          eh_gestor?: boolean | null
+          eh_vendedor?: boolean | null
+          first_login?: boolean | null
+          id?: string
+          nome_completo?: string
+          updated_at?: string | null
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registros_analise_garantia: {
         Row: {
           cliente_descricao: string | null

@@ -210,10 +210,10 @@ export default function OSConsignacao() {
     setViewMode('detalhamento');
   };
 
-  const handleGerarPagamentoParcial = () => {
+  const handleGerarPagamentoParcial = async () => {
     if (!loteSelecionado || itensSelecionadosPagamento.length === 0 || !pagFormaPagamento) return;
 
-    const result = gerarPagamentoParcial(
+    const result = await gerarPagamentoParcial(
       loteSelecionado.id,
       itensSelecionadosPagamento,
       {
@@ -243,19 +243,19 @@ export default function OSConsignacao() {
   const [comprovanteFile, setComprovanteFile] = useState<string | null>(null);
   const [comprovanteExpandido, setComprovanteExpandido] = useState<string | null>(null);
 
-  const handleConfirmarPagamento = (pagamentoId: string) => {
+  const handleConfirmarPagamento = async (pagamentoId: string) => {
     if (!loteSelecionado) return;
-    confirmarPagamentoParcial(loteSelecionado.id, pagamentoId, user?.colaborador?.nome || 'Sistema', comprovanteFile || undefined);
+    await confirmarPagamentoParcial(loteSelecionado.id, pagamentoId, user?.colaborador?.nome || 'Sistema', comprovanteFile || undefined);
     setLoteSelecionado(getLoteById(loteSelecionado.id) || null);
     refreshLotes();
     setComprovanteFile(null);
     toast({ title: 'Pagamento confirmado', description: 'Status atualizado para Pago.' });
   };
 
-  const handleFinalizarLote = () => {
+  const handleFinalizarLote = async () => {
     if (!loteSelecionado) return;
 
-    const result = finalizarLote(
+    const result = await finalizarLote(
       loteSelecionado.id,
       user?.colaborador?.nome || 'Sistema',
       {
@@ -284,9 +284,9 @@ export default function OSConsignacao() {
   const [devolucaoLoteId, setDevolucaoLoteId] = useState<string | null>(null);
   const [showDevolucaoDialog, setShowDevolucaoDialog] = useState(false);
 
-  const handleConfirmarDevolucao = () => {
+  const handleConfirmarDevolucao = async () => {
     if (!devolucaoLoteId || !devolucaoItemId) return;
-    confirmarDevolucaoItem(devolucaoLoteId, devolucaoItemId, user?.colaborador?.nome || 'Sistema');
+    await confirmarDevolucaoItem(devolucaoLoteId, devolucaoItemId, user?.colaborador?.nome || 'Sistema');
     setLoteSelecionado(getLoteById(devolucaoLoteId) || null);
     refreshLotes();
     setShowDevolucaoDialog(false);

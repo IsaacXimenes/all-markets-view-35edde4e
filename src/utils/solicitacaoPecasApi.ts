@@ -608,7 +608,7 @@ export const finalizarNotaAssistencia = async (notaId: string, dados: {
   });
 
   if (nota.tipoConsignacao && nota.solicitacaoId) {
-    confirmarPagamentoPorNotaId(nota.solicitacaoId, nota.id, dados.responsavelFinanceiro, (dados as any).comprovante || undefined);
+    await confirmarPagamentoPorNotaId(nota.solicitacaoId, nota.id, dados.responsavelFinanceiro, (dados as any).comprovante || undefined);
   }
   
   return notasAssistencia[notaIndex];

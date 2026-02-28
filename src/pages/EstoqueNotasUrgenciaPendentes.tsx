@@ -27,7 +27,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { getNotasCompra, NotaCompra, ESTOQUE_SIA_LOJA_ID } from '@/utils/estoqueApi';
+import { getNotasCompra, NotaCompra, ESTOQUE_SIA_LOJA_ID, updateNota } from '@/utils/estoqueApi';
 import { migrarProdutosNotaParaPendentes } from '@/utils/osApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { useAuthStore } from '@/store/authStore';
@@ -68,14 +68,11 @@ export default function EstoqueNotasUrgenciaPendentes() {
     return notasBase
       .filter(nota => nota.origem === 'Urgência')
       .map(nota => {
-        const statusUrgencia = localStorage.getItem(`nota_statusUrgencia_${nota.id}`);
-        const dataPagamento = localStorage.getItem(`nota_dataPagamentoFinanceiro_${nota.id}`);
-        const lojaDestino = localStorage.getItem(`nota_lojaDestino_${nota.id}`);
         return {
           ...nota,
-          statusUrgencia: statusUrgencia || 'Aguardando Financeiro',
-          dataPagamentoFinanceiro: dataPagamento || undefined,
-          lojaDestino: lojaDestino || undefined
+          statusUrgencia: nota.statusUrgencia || 'Aguardando Financeiro',
+          dataPagamentoFinanceiro: nota.dataPagamentoFinanceiro || undefined,
+          lojaDestino: nota.lojaDestino || undefined
         };
       })
       .filter(nota => nota.statusUrgencia === 'Pago - Aguardando Produtos');
@@ -250,22 +247,21 @@ export default function EstoqueNotasUrgenciaPendentes() {
       'NEGOCIADO' // NOVA ORIGEM!
     );
 
-    // Atualizar status da nota
-    localStorage.setItem(`nota_statusUrgencia_${notaSelecionada.id}`, 'Concluído');
-    localStorage.setItem(`nota_status_${notaSelecionada.id}`, 'Concluído');
-    
-    // Adicionar timeline
-    const storedTimeline = localStorage.getItem(`nota_timeline_${notaSelecionada.id}`);
-    const timeline = storedTimeline ? JSON.parse(storedTimeline) : [];
+    // Atualizar status da nota no DB
+    const timelineAtual = notaSelecionada.timeline || [];
     const newEntry = {
-      id: `TL-${notaSelecionada.id}-${String(timeline.length + 1).padStart(3, '0')}`,
+      id: `TL-${notaSelecionada.id}-${String(timelineAtual.length + 1).padStart(3, '0')}`,
       dataHora: new Date().toISOString(),
-      usuarioId: 'EST-001',
+      usuarioId: user?.colaborador?.id || 'EST-001',
       usuarioNome: responsavelEstoque,
       tipoEvento: 'produtos_inseridos_urgencia',
       observacoes: `${produtosInseridos.length} produto(s) inserido(s) e enviado(s) para triagem. Total: ${formatCurrency(totalProdutosInseridos)}`
     };
-    localStorage.setItem(`nota_timeline_${notaSelecionada.id}`, JSON.stringify([newEntry, ...timeline]));
+    await updateNota(notaSelecionada.id, {
+      statusUrgencia: 'Concluído',
+      status: 'Concluído',
+      timeline: [newEntry, ...timelineAtual] as any,
+    });
 
     setDialogOpen(false);
     

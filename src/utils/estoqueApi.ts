@@ -116,7 +116,7 @@ export interface NotaCompra {
   numeroNota: string;
   fornecedor: string;
   valorTotal: number;
-  status: 'Pendente' | 'Concluído';
+  status: 'Pendente' | 'Concluído' | 'Enviado para Financeiro' | 'Pago - Aguardando Produtos';
   origem?: 'Normal' | 'Urgência';
   statusUrgencia?: 'Aguardando Financeiro' | 'Pago - Aguardando Produtos' | 'Produtos Inseridos' | 'Concluído';
   dataPagamentoFinanceiro?: string;
@@ -130,6 +130,7 @@ export interface NotaCompra {
     contaPagamento?: string;
   };
   responsavelFinanceiro?: string;
+  lojaDestino?: string;
   valorConferido?: number;
   valorPendente?: number;
   tipoPagamento?: 'Parcial' | '100% Antecipado' | 'Pós-Conferência';
@@ -288,6 +289,7 @@ const mapNotaFromDB = (row: any): NotaCompra => ({
   produtos: (row.produtos as any[]) || [],
   pagamento: (row.pagamento as any) || undefined,
   responsavelFinanceiro: (row.dados_extras as any)?.responsavelFinanceiro || undefined,
+  lojaDestino: (row.dados_extras as any)?.lojaDestino || undefined,
   valorConferido: (row.dados_extras as any)?.valorConferido,
   valorPendente: (row.dados_extras as any)?.valorPendente,
   tipoPagamento: (row.dados_extras as any)?.tipoPagamento,
@@ -333,6 +335,7 @@ const mapNotaToDB = (nota: Partial<NotaCompra> & { produtos?: any; pagamento?: a
   if (nota.acaoRecomendada !== undefined) extras.acaoRecomendada = nota.acaoRecomendada;
   if (nota.fotoComprovante !== undefined) extras.fotoComprovante = nota.fotoComprovante;
   if (nota.dataPagamentoFinanceiro !== undefined) extras.dataPagamentoFinanceiro = nota.dataPagamentoFinanceiro;
+  if (nota.lojaDestino !== undefined) extras.lojaDestino = nota.lojaDestino;
   if (Object.keys(extras).length > 0) db.dados_extras = extras;
   return db;
 };

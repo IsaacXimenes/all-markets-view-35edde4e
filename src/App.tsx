@@ -24,6 +24,7 @@ import { initProdutosPendentesCache } from "@/utils/osApi";
 import { initConsignacaoCache } from "@/utils/consignacaoApi";
 import { initLotesRevisaoCache } from "@/utils/loteRevisaoApi";
 import { initNotasEntradaCache } from "@/utils/notaEntradaFluxoApi";
+import { initConfigWhatsAppCache } from "@/utils/whatsappNotificacaoApi";
 import Login from "./pages/Login";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -188,6 +189,7 @@ const AppInitializer = ({ children }: { children: React.ReactNode }) => {
         initConsignacaoCache(),
         initLotesRevisaoCache(),
         initNotasEntradaCache(),
+        initConfigWhatsAppCache(),
       ]).catch(err => console.error('Erro ao inicializar caches:', err));
     }
   }, [inicializado]);

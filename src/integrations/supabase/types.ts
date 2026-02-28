@@ -61,6 +61,54 @@ export type Database = {
           },
         ]
       }
+      adiantamentos: {
+        Row: {
+          colaborador_id: string | null
+          conta_saida_id: string | null
+          created_at: string | null
+          data_lancamento: string
+          historico: Json | null
+          id: string
+          inicio_competencia: string | null
+          lancado_por: string | null
+          lancado_por_nome: string | null
+          loja_id: string | null
+          observacao: string | null
+          quantidade_vezes: number
+          valor_final: number
+        }
+        Insert: {
+          colaborador_id?: string | null
+          conta_saida_id?: string | null
+          created_at?: string | null
+          data_lancamento?: string
+          historico?: Json | null
+          id?: string
+          inicio_competencia?: string | null
+          lancado_por?: string | null
+          lancado_por_nome?: string | null
+          loja_id?: string | null
+          observacao?: string | null
+          quantidade_vezes?: number
+          valor_final?: number
+        }
+        Update: {
+          colaborador_id?: string | null
+          conta_saida_id?: string | null
+          created_at?: string | null
+          data_lancamento?: string
+          historico?: Json | null
+          id?: string
+          inicio_competencia?: string | null
+          lancado_por?: string | null
+          lancado_por_nome?: string | null
+          loja_id?: string | null
+          observacao?: string | null
+          quantidade_vezes?: number
+          valor_final?: number
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           bairro: string | null
@@ -207,6 +255,69 @@ export type Database = {
           },
         ]
       }
+      comissao_por_loja: {
+        Row: {
+          cargo_id: string | null
+          created_at: string | null
+          id: string
+          loja_id: string | null
+          percentual_comissao: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cargo_id?: string | null
+          created_at?: string | null
+          id?: string
+          loja_id?: string | null
+          percentual_comissao?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cargo_id?: string | null
+          created_at?: string | null
+          id?: string
+          loja_id?: string | null
+          percentual_comissao?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      comissoes_historico: {
+        Row: {
+          colaborador_id: string | null
+          comissao_anterior: number | null
+          comissao_nova: number | null
+          created_at: string | null
+          data_alteracao: string | null
+          fixo_anterior: number | null
+          fixo_novo: number | null
+          id: string
+          usuario_alterou: string | null
+        }
+        Insert: {
+          colaborador_id?: string | null
+          comissao_anterior?: number | null
+          comissao_nova?: number | null
+          created_at?: string | null
+          data_alteracao?: string | null
+          fixo_anterior?: number | null
+          fixo_novo?: number | null
+          id?: string
+          usuario_alterou?: string | null
+        }
+        Update: {
+          colaborador_id?: string | null
+          comissao_anterior?: number | null
+          comissao_nova?: number | null
+          created_at?: string | null
+          data_alteracao?: string | null
+          fixo_anterior?: number | null
+          fixo_novo?: number | null
+          id?: string
+          usuario_alterou?: string | null
+        }
+        Relationships: []
+      }
       contas_financeiras: {
         Row: {
           agencia: string | null
@@ -264,6 +375,51 @@ export type Database = {
           status_maquina?: string | null
           tipo?: string | null
           ultimo_movimento?: string | null
+        }
+        Relationships: []
+      }
+      demandas_motoboy: {
+        Row: {
+          created_at: string | null
+          data: string | null
+          descricao: string | null
+          id: string
+          loja_destino: string | null
+          loja_origem: string | null
+          motoboy_id: string | null
+          motoboy_nome: string | null
+          status: string | null
+          tipo: string | null
+          valor_demanda: number | null
+          venda_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data?: string | null
+          descricao?: string | null
+          id?: string
+          loja_destino?: string | null
+          loja_origem?: string | null
+          motoboy_id?: string | null
+          motoboy_nome?: string | null
+          status?: string | null
+          tipo?: string | null
+          valor_demanda?: number | null
+          venda_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data?: string | null
+          descricao?: string | null
+          id?: string
+          loja_destino?: string | null
+          loja_origem?: string | null
+          motoboy_id?: string | null
+          motoboy_nome?: string | null
+          status?: string | null
+          tipo?: string | null
+          valor_demanda?: number | null
+          venda_id?: string | null
         }
         Relationships: []
       }
@@ -340,6 +496,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      feedbacks: {
+        Row: {
+          arquivo: Json | null
+          colaborador_id: string | null
+          created_at: string | null
+          data_hora: string
+          gestor_id: string | null
+          gestor_nome: string | null
+          id: string
+          referencia_anterior: string | null
+          texto: string | null
+          tipo: string | null
+        }
+        Insert: {
+          arquivo?: Json | null
+          colaborador_id?: string | null
+          created_at?: string | null
+          data_hora?: string
+          gestor_id?: string | null
+          gestor_nome?: string | null
+          id?: string
+          referencia_anterior?: string | null
+          texto?: string | null
+          tipo?: string | null
+        }
+        Update: {
+          arquivo?: Json | null
+          colaborador_id?: string | null
+          created_at?: string | null
+          data_hora?: string
+          gestor_id?: string | null
+          gestor_nome?: string | null
+          id?: string
+          referencia_anterior?: string | null
+          texto?: string | null
+          tipo?: string | null
+        }
+        Relationships: []
       }
       financeiro: {
         Row: {
@@ -528,6 +723,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      historico_comissao_por_loja: {
+        Row: {
+          comissao_id: string | null
+          created_at: string | null
+          id: string
+          percentual_anterior: number | null
+          percentual_novo: number | null
+          tipo_acao: string | null
+          usuario_id: string | null
+          usuario_nome: string | null
+        }
+        Insert: {
+          comissao_id?: string | null
+          created_at?: string | null
+          id?: string
+          percentual_anterior?: number | null
+          percentual_novo?: number | null
+          tipo_acao?: string | null
+          usuario_id?: string | null
+          usuario_nome?: string | null
+        }
+        Update: {
+          comissao_id?: string | null
+          created_at?: string | null
+          id?: string
+          percentual_anterior?: number | null
+          percentual_novo?: number | null
+          tipo_acao?: string | null
+          usuario_id?: string | null
+          usuario_nome?: string | null
+        }
+        Relationships: []
+      }
+      historico_salarios: {
+        Row: {
+          campo_alterado: string | null
+          colaborador_id: string | null
+          created_at: string | null
+          id: string
+          salario_id: string | null
+          tipo_acao: string | null
+          usuario_id: string | null
+          usuario_nome: string | null
+          valor_anterior: string | null
+          valor_novo: string | null
+        }
+        Insert: {
+          campo_alterado?: string | null
+          colaborador_id?: string | null
+          created_at?: string | null
+          id?: string
+          salario_id?: string | null
+          tipo_acao?: string | null
+          usuario_id?: string | null
+          usuario_nome?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Update: {
+          campo_alterado?: string | null
+          colaborador_id?: string | null
+          created_at?: string | null
+          id?: string
+          salario_id?: string | null
+          tipo_acao?: string | null
+          usuario_id?: string | null
+          usuario_nome?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Relationships: []
       }
       lojas: {
         Row: {
@@ -1357,6 +1624,141 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      remuneracoes_motoboy: {
+        Row: {
+          competencia: string | null
+          comprovante: string | null
+          comprovante_nome: string | null
+          conta_id: string | null
+          conta_nome: string | null
+          created_at: string | null
+          data_pagamento: string | null
+          id: string
+          motoboy_id: string | null
+          motoboy_nome: string | null
+          observacoes_pagamento: string | null
+          pago_por: string | null
+          periodo_fim: string | null
+          periodo_inicio: string | null
+          qtd_demandas: number | null
+          status: string | null
+          valor_total: number | null
+        }
+        Insert: {
+          competencia?: string | null
+          comprovante?: string | null
+          comprovante_nome?: string | null
+          conta_id?: string | null
+          conta_nome?: string | null
+          created_at?: string | null
+          data_pagamento?: string | null
+          id?: string
+          motoboy_id?: string | null
+          motoboy_nome?: string | null
+          observacoes_pagamento?: string | null
+          pago_por?: string | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          qtd_demandas?: number | null
+          status?: string | null
+          valor_total?: number | null
+        }
+        Update: {
+          competencia?: string | null
+          comprovante?: string | null
+          comprovante_nome?: string | null
+          conta_id?: string | null
+          conta_nome?: string | null
+          created_at?: string | null
+          data_pagamento?: string | null
+          id?: string
+          motoboy_id?: string | null
+          motoboy_nome?: string | null
+          observacoes_pagamento?: string | null
+          pago_por?: string | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          qtd_demandas?: number | null
+          status?: string | null
+          valor_total?: number | null
+        }
+        Relationships: []
+      }
+      salarios_colaboradores: {
+        Row: {
+          ajuda_custo: number | null
+          colaborador_id: string
+          created_at: string | null
+          id: string
+          percentual_comissao: number | null
+          salario_fixo: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          ajuda_custo?: number | null
+          colaborador_id: string
+          created_at?: string | null
+          id?: string
+          percentual_comissao?: number | null
+          salario_fixo?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          ajuda_custo?: number | null
+          colaborador_id?: string
+          created_at?: string | null
+          id?: string
+          percentual_comissao?: number | null
+          salario_fixo?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      vales: {
+        Row: {
+          colaborador_id: string | null
+          created_at: string | null
+          data_lancamento: string
+          historico: Json | null
+          id: string
+          inicio_competencia: string | null
+          lancado_por: string | null
+          lancado_por_nome: string | null
+          loja_id: string | null
+          observacao: string | null
+          quantidade_vezes: number
+          valor_final: number
+        }
+        Insert: {
+          colaborador_id?: string | null
+          created_at?: string | null
+          data_lancamento?: string
+          historico?: Json | null
+          id?: string
+          inicio_competencia?: string | null
+          lancado_por?: string | null
+          lancado_por_nome?: string | null
+          loja_id?: string | null
+          observacao?: string | null
+          quantidade_vezes?: number
+          valor_final?: number
+        }
+        Update: {
+          colaborador_id?: string | null
+          created_at?: string | null
+          data_lancamento?: string
+          historico?: Json | null
+          id?: string
+          inicio_competencia?: string | null
+          lancado_por?: string | null
+          lancado_por_nome?: string | null
+          loja_id?: string | null
+          observacao?: string | null
+          quantidade_vezes?: number
+          valor_final?: number
+        }
+        Relationships: []
       }
       venda_itens: {
         Row: {

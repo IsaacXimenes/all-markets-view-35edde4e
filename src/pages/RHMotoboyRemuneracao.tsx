@@ -73,13 +73,13 @@ export default function RHMotoboyRemuneracao() {
     setModalPagamentoOpen(true);
   };
 
-  const handleConfirmarPagamento = () => {
+  const handleConfirmarPagamento = async () => {
     if (!remuneracaoPagamento || !contaSelecionada || !comprovante) return;
     
     const conta = contasHabilitadas.find(c => c.id === contaSelecionada);
     if (!conta) return;
 
-    const sucesso = registrarPagamentoRemuneracao(remuneracaoPagamento.id, {
+    const sucesso = await registrarPagamentoRemuneracao(remuneracaoPagamento.id, {
       contaId: contaSelecionada,
       contaNome: conta.nome,
       comprovante,

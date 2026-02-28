@@ -1,4 +1,5 @@
-// Adiantamentos API - Mock Data
+// Adiantamentos API - Supabase Integration
+import { supabase } from '@/integrations/supabase/client';
 
 export interface HistoricoAlteracao {
   dataHora: string;
@@ -20,122 +21,91 @@ export interface Adiantamento {
   observacao: string;
   valorFinal: number;
   quantidadeVezes: number;
-  inicioCompetencia: string; // Formato: "Jan-2026"
+  inicioCompetencia: string;
   contaSaidaId: string;
   historico: HistoricoAlteracao[];
 }
 
-// Mock Data - UUIDs reais do useCadastroStore
-// Mapeamento de IDs:
-// Lojas: db894e7d (JK Shopping), 3ac7e00c (Matriz), 5b9446d5 (Shopping Sul), fcc78c1a (Online)
-// Colaboradores: b467c728 (Anna Beatriz), 143ac0c2 (Antonio Sousa), 428d37c2 (Bruno Alves), 6dcbc817 (Caua Victor)
+// ── Cache layer ──
+let cache: Adiantamento[] = [];
 
-let adiantamentos: Adiantamento[] = [
-  {
-    id: 'ADT-001',
-    dataLancamento: '2026-01-12T11:00:00',
-    lancadoPor: 'b467c728', // Anna Beatriz Borges
-    lancadoPorNome: 'Anna Beatriz Borges',
-    lojaId: 'db894e7d', // Loja - JK Shopping
-    colaboradorId: '143ac0c2', // Antonio Sousa Silva
-    observacao: 'Adiantamento para reforma residencial',
-    valorFinal: 1500,
-    quantidadeVezes: 5,
-    inicioCompetencia: 'Fev-2026',
-    contaSaidaId: 'CTA-015',
-    historico: [
-      {
-        dataHora: '2026-01-12T11:00:00',
-        usuarioId: 'b467c728',
-        usuarioNome: 'Anna Beatriz Borges',
-        campoAlterado: '-',
-        valorAnterior: '-',
-        valorNovo: '-',
-        tipoAcao: 'Criação'
-      }
-    ]
-  },
-  {
-    id: 'ADT-002',
-    dataLancamento: '2026-01-05T16:30:00',
-    lancadoPor: '428d37c2', // Bruno Alves Peres
-    lancadoPorNome: 'Bruno Alves Peres',
-    lojaId: '3ac7e00c', // Loja - Matriz
-    colaboradorId: '6dcbc817', // Caua Victor Costa dos Santos
-    observacao: 'Adiantamento salarial - 50%',
-    valorFinal: 1100,
-    quantidadeVezes: 1,
-    inicioCompetencia: 'Jan-2026',
-    contaSaidaId: 'CTA-019',
-    historico: [
-      {
-        dataHora: '2026-01-05T16:30:00',
-        usuarioId: '428d37c2',
-        usuarioNome: 'Bruno Alves Peres',
-        campoAlterado: '-',
-        valorAnterior: '-',
-        valorNovo: '-',
-        tipoAcao: 'Criação'
-      }
-    ]
-  },
-  {
-    id: 'ADT-003',
-    dataLancamento: '2025-12-20T08:20:00',
-    lancadoPor: 'b467c728', // Anna Beatriz Borges
-    lancadoPorNome: 'Anna Beatriz Borges',
-    lojaId: '5b9446d5', // Loja - Shopping Sul
-    colaboradorId: '9812948d', // Gustavo de Souza dos Santos
-    observacao: 'Adiantamento para compra de veículo',
-    valorFinal: 3000,
-    quantidadeVezes: 10,
-    inicioCompetencia: 'Jan-2026',
-    contaSaidaId: 'CTA-016',
-    historico: [
-      {
-        dataHora: '2025-12-20T08:20:00',
-        usuarioId: 'b467c728',
-        usuarioNome: 'Anna Beatriz Borges',
-        campoAlterado: '-',
-        valorAnterior: '-',
-        valorNovo: '-',
-        tipoAcao: 'Criação'
-      }
-    ]
-  },
-];
+const mapRow = (r: any): Adiantamento => ({
+  id: r.id,
+  dataLancamento: r.data_lancamento,
+  lancadoPor: r.lancado_por || '',
+  lancadoPorNome: r.lancado_por_nome || '',
+  lojaId: r.loja_id || '',
+  colaboradorId: r.colaborador_id || '',
+  observacao: r.observacao || '',
+  valorFinal: Number(r.valor_final) || 0,
+  quantidadeVezes: r.quantidade_vezes || 1,
+  inicioCompetencia: r.inicio_competencia || '',
+  contaSaidaId: r.conta_saida_id || '',
+  historico: (r.historico as HistoricoAlteracao[]) || [],
+});
 
-// API Functions
+export const initAdiantamentosCache = async () => {
+  const { data, error } = await supabase.from('adiantamentos').select('*').order('data_lancamento', { ascending: false });
+  if (error) { console.error('[ADIANTAMENTOS] init error', error); return; }
+  cache = (data || []).map(mapRow);
+};
+
+// Auto-init
+initAdiantamentosCache();
+
 export const getAdiantamentos = (): Adiantamento[] => {
-  return [...adiantamentos].sort((a, b) => 
+  return [...cache].sort((a, b) =>
     new Date(b.dataLancamento).getTime() - new Date(a.dataLancamento).getTime()
   );
 };
 
 export const getAdiantamentoById = (id: string): Adiantamento | undefined => {
-  return adiantamentos.find(a => a.id === id);
+  return cache.find(a => a.id === id);
 };
 
-export const addAdiantamento = (adiantamento: Omit<Adiantamento, 'id'>): Adiantamento => {
-  const id = `ADT-${String(adiantamentos.length + 1).padStart(3, '0')}`;
-  const newAdiantamento: Adiantamento = { ...adiantamento, id };
-  adiantamentos.push(newAdiantamento);
-  return newAdiantamento;
+export const addAdiantamento = async (adiantamento: Omit<Adiantamento, 'id'>): Promise<Adiantamento> => {
+  const { data, error } = await supabase.from('adiantamentos').insert({
+    data_lancamento: adiantamento.dataLancamento,
+    lancado_por: adiantamento.lancadoPor || null,
+    lancado_por_nome: adiantamento.lancadoPorNome,
+    loja_id: adiantamento.lojaId || null,
+    colaborador_id: adiantamento.colaboradorId || null,
+    observacao: adiantamento.observacao,
+    valor_final: adiantamento.valorFinal,
+    quantidade_vezes: adiantamento.quantidadeVezes,
+    inicio_competencia: adiantamento.inicioCompetencia,
+    conta_saida_id: adiantamento.contaSaidaId,
+    historico: adiantamento.historico as any,
+  }).select().single();
+  if (error) throw error;
+  const mapped = mapRow(data);
+  cache.push(mapped);
+  return mapped;
 };
 
-export const updateAdiantamento = (id: string, updates: Partial<Adiantamento>): Adiantamento | undefined => {
-  const index = adiantamentos.findIndex(a => a.id === id);
-  if (index === -1) return undefined;
-  
-  adiantamentos[index] = { ...adiantamentos[index], ...updates };
-  return adiantamentos[index];
+export const updateAdiantamento = async (id: string, updates: Partial<Adiantamento>): Promise<Adiantamento | undefined> => {
+  const dbUpdates: any = {};
+  if (updates.observacao !== undefined) dbUpdates.observacao = updates.observacao;
+  if (updates.valorFinal !== undefined) dbUpdates.valor_final = updates.valorFinal;
+  if (updates.quantidadeVezes !== undefined) dbUpdates.quantidade_vezes = updates.quantidadeVezes;
+  if (updates.inicioCompetencia !== undefined) dbUpdates.inicio_competencia = updates.inicioCompetencia;
+  if (updates.contaSaidaId !== undefined) dbUpdates.conta_saida_id = updates.contaSaidaId;
+  if (updates.historico !== undefined) dbUpdates.historico = updates.historico as any;
+  if (updates.lojaId !== undefined) dbUpdates.loja_id = updates.lojaId;
+  if (updates.colaboradorId !== undefined) dbUpdates.colaborador_id = updates.colaboradorId;
+
+  const { data, error } = await supabase.from('adiantamentos').update(dbUpdates).eq('id', id).select().single();
+  if (error || !data) return undefined;
+  const mapped = mapRow(data);
+  const idx = cache.findIndex(a => a.id === id);
+  if (idx >= 0) cache[idx] = mapped;
+  return mapped;
 };
 
-export const deleteAdiantamento = (id: string): boolean => {
-  const index = adiantamentos.findIndex(a => a.id === id);
-  if (index === -1) return false;
-  
-  adiantamentos.splice(index, 1);
+export const deleteAdiantamento = async (id: string): Promise<boolean> => {
+  const { error } = await supabase.from('adiantamentos').delete().eq('id', id);
+  if (error) return false;
+  cache = cache.filter(a => a.id !== id);
   return true;
 };
 
@@ -150,50 +120,34 @@ export const getProximosMeses = (): string[] => {
   const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const hoje = new Date();
   const resultado: string[] = [];
-  
   for (let i = 0; i < 24; i++) {
     const data = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
     const mes = meses[data.getMonth()];
     const ano = data.getFullYear();
     resultado.push(`${mes}-${ano}`);
   }
-  
   return resultado;
 };
 
 // Helper para calcular situação das parcelas
 export const calcularSituacaoParcelas = (inicioCompetencia: string, quantidadeVezes: number): { pagas: number; total: number; percentual: number } => {
   const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  
-  // Parse início competência (ex: "Jan-2026")
   const [mesStr, anoStr] = inicioCompetencia.split('-');
   const mesIndex = meses.indexOf(mesStr);
   const ano = parseInt(anoStr);
-  
   if (mesIndex === -1 || isNaN(ano)) {
     return { pagas: 0, total: quantidadeVezes, percentual: 0 };
   }
-  
   const dataInicio = new Date(ano, mesIndex, 1);
   const hoje = new Date();
   const mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-  
-  // Calcular quantas parcelas já venceram (mês atual conta como pago)
   let parcelasPagas = 0;
   for (let i = 0; i < quantidadeVezes; i++) {
     const mesParcela = new Date(dataInicio.getFullYear(), dataInicio.getMonth() + i, 1);
-    if (mesParcela <= mesAtual) {
-      parcelasPagas++;
-    }
+    if (mesParcela <= mesAtual) parcelasPagas++;
   }
-  
   const percentual = (parcelasPagas / quantidadeVezes) * 100;
-  
-  return { 
-    pagas: parcelasPagas, 
-    total: quantidadeVezes, 
-    percentual 
-  };
+  return { pagas: parcelasPagas, total: quantidadeVezes, percentual };
 };
 
 // Helper para converter competência em data para filtro
@@ -202,8 +156,6 @@ export const competenciaParaData = (competencia: string): Date | null => {
   const [mesStr, anoStr] = competencia.split('-');
   const mesIndex = meses.indexOf(mesStr);
   const ano = parseInt(anoStr);
-  
   if (mesIndex === -1 || isNaN(ano)) return null;
-  
   return new Date(ano, mesIndex, 1);
 };

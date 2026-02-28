@@ -60,11 +60,11 @@ export default function RHSalarioColaborador() {
     );
   };
 
-  const handleSalvar = (colaboradorId: string) => {
+  const handleSalvar = async (colaboradorId: string) => {
     const salario = salarios.find(s => s.colaboradorId === colaboradorId);
     if (!salario) return;
 
-    updateSalario(
+    await updateSalario(
       colaboradorId,
       {
         salarioFixo: salario.novoSalarioFixo,

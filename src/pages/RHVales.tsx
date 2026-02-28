@@ -163,7 +163,7 @@ const RHVales: React.FC = () => {
     setIsDialogOpen(true);
   };
   
-  const handleSave = () => {
+  const handleSave = async () => {
     // Validações
     if (!formData.lojaId || !formData.colaboradorId || !formData.valorFinal || !formData.quantidadeVezes || !formData.inicioCompetencia) {
       toast({
@@ -226,7 +226,7 @@ const RHVales: React.FC = () => {
         }
       });
       
-      updateVale(editingVale.id, {
+      await updateVale(editingVale.id, {
         lojaId: formData.lojaId,
         colaboradorId: formData.colaboradorId,
         observacao: formData.observacao,
@@ -263,7 +263,7 @@ const RHVales: React.FC = () => {
         }]
       };
       
-      addVale(novoVale);
+      await addVale(novoVale);
       
       toast({
         title: "Sucesso",
@@ -276,10 +276,10 @@ const RHVales: React.FC = () => {
     resetForm();
   };
   
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!valeToDelete) return;
     
-    deleteVale(valeToDelete.id);
+    await deleteVale(valeToDelete.id);
     setVales(getVales());
     setIsDeleteDialogOpen(false);
     setValeToDelete(null);

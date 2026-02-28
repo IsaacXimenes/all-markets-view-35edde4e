@@ -162,7 +162,7 @@ const RHAdiantamentos: React.FC = () => {
     setIsDialogOpen(true);
   };
   
-  const handleSave = () => {
+  const handleSave = async () => {
     // Validações
     if (!formData.lojaId || !formData.colaboradorId || !formData.valorFinal || !formData.quantidadeVezes || !formData.inicioCompetencia || !formData.contaSaidaId) {
       toast({
@@ -226,7 +226,7 @@ const RHAdiantamentos: React.FC = () => {
         }
       });
       
-      updateAdiantamento(editingAdiantamento.id, {
+      await updateAdiantamento(editingAdiantamento.id, {
         lojaId: formData.lojaId,
         colaboradorId: formData.colaboradorId,
         observacao: formData.observacao,
@@ -265,7 +265,7 @@ const RHAdiantamentos: React.FC = () => {
         }]
       };
       
-      addAdiantamento(novoAdiantamento);
+      await addAdiantamento(novoAdiantamento);
       
       toast({
         title: "Sucesso",
@@ -278,10 +278,10 @@ const RHAdiantamentos: React.FC = () => {
     resetForm();
   };
   
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!adiantamentoToDelete) return;
     
-    deleteAdiantamento(adiantamentoToDelete.id);
+    await deleteAdiantamento(adiantamentoToDelete.id);
     setAdiantamentos(getAdiantamentos());
     setIsDeleteDialogOpen(false);
     setAdiantamentoToDelete(null);

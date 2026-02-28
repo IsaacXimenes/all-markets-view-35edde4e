@@ -67,11 +67,11 @@ export default function RHComissoes() {
     );
   };
 
-  const handleSalvar = (colaboradorId: string) => {
+  const handleSalvar = async (colaboradorId: string) => {
     const col = colaboradoresComissao.find(c => c.id === colaboradorId);
     if (!col) return;
 
-    updateComissaoColaborador(
+    await updateComissaoColaborador(
       colaboradorId,
       col.novoFixo,
       col.novaComissao,

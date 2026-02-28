@@ -132,7 +132,7 @@ export default function RHFeedback() {
   };
 
   // Salvar feedback
-  const handleSalvarFeedback = () => {
+  const handleSalvarFeedback = async () => {
     if (!selectedColaborador || !feedbackForm.tipo || !feedbackForm.texto.trim()) {
       toast({ title: 'Erro', description: 'Preencha todos os campos obrigatórios', variant: 'destructive' });
       return;
@@ -148,7 +148,7 @@ export default function RHFeedback() {
       url: arquivoFeedback
     } : undefined;
 
-    addFeedback({
+    await addFeedback({
       colaboradorId: selectedColaborador.id,
       tipo: feedbackForm.tipo,
       texto: feedbackForm.texto,

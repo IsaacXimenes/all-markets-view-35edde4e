@@ -1,4 +1,5 @@
-// Cadastros API - Mock Data
+// Cadastros API - Supabase-backed + legacy in-memory data
+import { supabase } from '@/integrations/supabase/client';
 
 export interface Loja {
   id: string;
@@ -504,24 +505,60 @@ let maquinasCartao: MaquinaCartao[] = [
   },
 ];
 
-// API Functions
-export const getLojas = () => [...lojas];
-export const addLoja = (loja: Omit<Loja, 'id'>) => {
-  const newId = `LOJA-${String(lojas.length + 1).padStart(3, '0')}`;
-  const newLoja = { ...loja, id: newId };
-  lojas.push(newLoja);
-  return newLoja;
+// API Functions - Lojas (Supabase-backed with sync fallback)
+// Sync version: returns in-memory cache (for legacy callers)
+export const getLojas = (): Loja[] => [...lojas];
+
+// Async version: fetches from Supabase
+export const getLojasAsync = async (): Promise<Loja[]> => {
+  const { data, error } = await supabase.from('lojas').select('*').order('nome');
+  if (error) { console.error('Erro ao buscar lojas:', error); return [...lojas]; }
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    nome: row.nome,
+    cnpj: row.cnpj || '',
+    endereco: row.endereco || '',
+    telefone: row.telefone || '',
+    cep: row.cep || '',
+    cidade: row.cidade || '',
+    estado: row.estado || '',
+    responsavel: row.responsavel || '',
+    horarioFuncionamento: row.horario_funcionamento || '',
+    status: row.ativa === false ? 'Inativo' : 'Ativo',
+  }));
 };
-export const updateLoja = (id: string, updates: Partial<Loja>) => {
-  const index = lojas.findIndex(l => l.id === id);
-  if (index !== -1) {
-    lojas[index] = { ...lojas[index], ...updates };
-    return lojas[index];
-  }
-  return null;
+
+export const addLoja = async (loja: Omit<Loja, 'id'>): Promise<Loja> => {
+  const { data, error } = await supabase.from('lojas').insert({
+    nome: loja.nome, cnpj: loja.cnpj, endereco: loja.endereco, telefone: loja.telefone,
+    cep: loja.cep, cidade: loja.cidade, estado: loja.estado, responsavel: loja.responsavel,
+    horario_funcionamento: loja.horarioFuncionamento, ativa: loja.status === 'Ativo',
+    comissao_percentual: loja.nome.toLowerCase().includes('online') ? 6 : 10,
+  }).select().single();
+  if (error) throw error;
+  return { ...loja, id: data.id };
 };
-export const deleteLoja = (id: string) => {
-  lojas = lojas.filter(l => l.id !== id);
+
+export const updateLoja = async (id: string, updates: Partial<Loja>): Promise<Loja | null> => {
+  const mapped: any = {};
+  if (updates.nome !== undefined) mapped.nome = updates.nome;
+  if (updates.cnpj !== undefined) mapped.cnpj = updates.cnpj;
+  if (updates.endereco !== undefined) mapped.endereco = updates.endereco;
+  if (updates.telefone !== undefined) mapped.telefone = updates.telefone;
+  if (updates.cep !== undefined) mapped.cep = updates.cep;
+  if (updates.cidade !== undefined) mapped.cidade = updates.cidade;
+  if (updates.estado !== undefined) mapped.estado = updates.estado;
+  if (updates.responsavel !== undefined) mapped.responsavel = updates.responsavel;
+  if (updates.horarioFuncionamento !== undefined) mapped.horario_funcionamento = updates.horarioFuncionamento;
+  if (updates.status !== undefined) mapped.ativa = updates.status === 'Ativo';
+  const { error } = await supabase.from('lojas').update(mapped).eq('id', id);
+  if (error) { console.error('Erro ao atualizar loja:', error); return null; }
+  return { id, ...updates } as Loja;
+};
+
+export const deleteLoja = async (id: string): Promise<void> => {
+  const { error } = await supabase.from('lojas').delete().eq('id', id);
+  if (error) console.error('Erro ao deletar loja:', error);
 };
 
 export const getClientes = () => [...clientes];
@@ -614,22 +651,46 @@ export const getCargoNome = (cargoId: string) => {
   return cargo?.funcao || cargoId;
 };
 
+// Sync versions kept for legacy callers
 export const addColaborador = (colaborador: Omit<Colaborador, 'id'>) => {
   const newId = `COL-${String(colaboradores.length + 1).padStart(3, '0')}`;
   const newColaborador = { ...colaborador, id: newId };
   colaboradores.push(newColaborador);
+  // Also persist to Supabase in background
+  supabase.from('colaboradores').insert({
+    nome: colaborador.nome, cpf: colaborador.cpf, email: colaborador.email,
+    telefone: colaborador.telefone, loja_id: colaborador.loja || null,
+    cargo: colaborador.cargo, data_admissao: colaborador.dataAdmissao || null,
+    salario: colaborador.salario, status: colaborador.status,
+  }).then(({ error }) => { if (error) console.error('Erro ao persistir colaborador:', error); });
   return newColaborador;
 };
 export const updateColaborador = (id: string, updates: Partial<Colaborador>) => {
   const index = colaboradores.findIndex(c => c.id === id);
   if (index !== -1) {
     colaboradores[index] = { ...colaboradores[index], ...updates };
+    // Persist to Supabase
+    const mapped: any = {};
+    if (updates.nome !== undefined) mapped.nome = updates.nome;
+    if (updates.cpf !== undefined) mapped.cpf = updates.cpf;
+    if (updates.email !== undefined) mapped.email = updates.email;
+    if (updates.telefone !== undefined) mapped.telefone = updates.telefone;
+    if (updates.cargo !== undefined) mapped.cargo = updates.cargo;
+    if (updates.status !== undefined) { mapped.ativo = updates.status === 'Ativo'; mapped.status = updates.status; }
+    if (Object.keys(mapped).length > 0) {
+      supabase.from('colaboradores').update(mapped).eq('id', id).then(({ error }) => {
+        if (error) console.error('Erro ao atualizar colaborador:', error);
+      });
+    }
     return colaboradores[index];
   }
   return null;
 };
 export const deleteColaborador = (id: string) => {
   colaboradores = colaboradores.filter(c => c.id !== id);
+  supabase.from('colaboradores').delete().eq('id', id).then(({ error }) => {
+    if (error) console.error('Erro ao deletar colaborador:', error);
+  });
 };
 
 export const getFornecedores = () => [...fornecedores];

@@ -74,25 +74,28 @@ export default function CadastrosLojas() {
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.nome) {
       toast({ title: 'Erro', description: 'Nome é obrigatório', variant: 'destructive' });
       return;
     }
 
-    if (editingLoja) {
-      atualizarLoja(editingLoja.id, form);
-      toast({ title: 'Sucesso', description: 'Loja atualizada com sucesso' });
-    } else {
-      adicionarLoja(form);
-      toast({ title: 'Sucesso', description: 'Loja cadastrada com sucesso' });
+    try {
+      if (editingLoja) {
+        await atualizarLoja(editingLoja.id, form);
+        toast({ title: 'Sucesso', description: 'Loja atualizada com sucesso' });
+      } else {
+        await adicionarLoja(form);
+        toast({ title: 'Sucesso', description: 'Loja cadastrada com sucesso' });
+      }
+      setIsDialogOpen(false);
+      resetForm();
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Falha ao salvar loja', variant: 'destructive' });
     }
-
-    setIsDialogOpen(false);
-    resetForm();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const colaboradores = obterColaboradoresPorLoja(id);
     if (colaboradores.length > 0) {
       toast({ 
@@ -103,8 +106,12 @@ export default function CadastrosLojas() {
       return;
     }
     
-    deletarLoja(id);
-    toast({ title: 'Sucesso', description: 'Loja removida com sucesso' });
+    try {
+      await deletarLoja(id);
+      toast({ title: 'Sucesso', description: 'Loja removida com sucesso' });
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Falha ao remover loja', variant: 'destructive' });
+    }
   };
 
   const handleExport = () => {

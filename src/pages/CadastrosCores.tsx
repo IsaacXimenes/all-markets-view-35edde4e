@@ -43,7 +43,7 @@ export default function CadastrosCores() {
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.nome || !form.hexadecimal) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
@@ -54,24 +54,32 @@ export default function CadastrosCores() {
       return;
     }
 
-    if (editingCor) {
-      updateCor(editingCor.id, { nome: form.nome, hexadecimal: form.hexadecimal });
-      toast.success('Cor atualizada com sucesso!');
-    } else {
-      const novaCor = addCor({ nome: form.nome, hexadecimal: form.hexadecimal, status: 'Ativo' });
-      toast.success(`Cor criada: ${novaCor.id}`);
-    }
+    try {
+      if (editingCor) {
+        await updateCor(editingCor.id, { nome: form.nome, hexadecimal: form.hexadecimal });
+        toast.success('Cor atualizada com sucesso!');
+      } else {
+        const novaCor = await addCor({ nome: form.nome, hexadecimal: form.hexadecimal, status: 'Ativo' });
+        toast.success(`Cor criada: ${novaCor.id}`);
+      }
 
-    setCores(getCores());
-    setIsDialogOpen(false);
-    resetForm();
+      setCores(getCores());
+      setIsDialogOpen(false);
+      resetForm();
+    } catch (err) {
+      toast.error('Erro ao salvar cor');
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir esta cor?')) {
-      deleteCor(id);
-      setCores(getCores());
-      toast.success('Cor excluída com sucesso!');
+      try {
+        await deleteCor(id);
+        setCores(getCores());
+        toast.success('Cor excluída com sucesso!');
+      } catch (err) {
+        toast.error('Erro ao excluir cor');
+      }
     }
   };
 

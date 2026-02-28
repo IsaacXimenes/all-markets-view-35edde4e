@@ -521,6 +521,84 @@ export type Database = {
         }
         Relationships: []
       }
+      conferencias_gestor: {
+        Row: {
+          cliente_nome: string | null
+          conta_destino: string | null
+          created_at: string | null
+          dados_venda: Json | null
+          data_conferencia: string | null
+          data_finalizacao: string | null
+          data_registro: string | null
+          financeiro_nome: string | null
+          financeiro_resp: string | null
+          gestor_conferencia: string | null
+          gestor_nome: string | null
+          id: string
+          loja_id: string | null
+          loja_nome: string | null
+          observacao_gestor: string | null
+          sla_dias: number | null
+          status: string | null
+          timeline: Json | null
+          tipo_venda: string | null
+          valor_total: number | null
+          venda_id: string
+          vendedor_id: string | null
+          vendedor_nome: string | null
+        }
+        Insert: {
+          cliente_nome?: string | null
+          conta_destino?: string | null
+          created_at?: string | null
+          dados_venda?: Json | null
+          data_conferencia?: string | null
+          data_finalizacao?: string | null
+          data_registro?: string | null
+          financeiro_nome?: string | null
+          financeiro_resp?: string | null
+          gestor_conferencia?: string | null
+          gestor_nome?: string | null
+          id?: string
+          loja_id?: string | null
+          loja_nome?: string | null
+          observacao_gestor?: string | null
+          sla_dias?: number | null
+          status?: string | null
+          timeline?: Json | null
+          tipo_venda?: string | null
+          valor_total?: number | null
+          venda_id: string
+          vendedor_id?: string | null
+          vendedor_nome?: string | null
+        }
+        Update: {
+          cliente_nome?: string | null
+          conta_destino?: string | null
+          created_at?: string | null
+          dados_venda?: Json | null
+          data_conferencia?: string | null
+          data_finalizacao?: string | null
+          data_registro?: string | null
+          financeiro_nome?: string | null
+          financeiro_resp?: string | null
+          gestor_conferencia?: string | null
+          gestor_nome?: string | null
+          id?: string
+          loja_id?: string | null
+          loja_nome?: string | null
+          observacao_gestor?: string | null
+          sla_dias?: number | null
+          status?: string | null
+          timeline?: Json | null
+          tipo_venda?: string | null
+          valor_total?: number | null
+          venda_id?: string
+          vendedor_id?: string | null
+          vendedor_nome?: string | null
+        }
+        Relationships: []
+      }
       contas_financeiras: {
         Row: {
           agencia: string | null
@@ -1586,6 +1664,48 @@ export type Database = {
         }
         Relationships: []
       }
+      lotes_pagamento_pecas: {
+        Row: {
+          conta_pagamento: string | null
+          created_at: string | null
+          data_conferencia: string | null
+          data_criacao: string | null
+          forma_pagamento: string | null
+          fornecedor_id: string | null
+          id: string
+          resp_financeiro: string | null
+          solicitacao_ids: Json | null
+          status: string | null
+          valor_total: number | null
+        }
+        Insert: {
+          conta_pagamento?: string | null
+          created_at?: string | null
+          data_conferencia?: string | null
+          data_criacao?: string | null
+          forma_pagamento?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          resp_financeiro?: string | null
+          solicitacao_ids?: Json | null
+          status?: string | null
+          valor_total?: number | null
+        }
+        Update: {
+          conta_pagamento?: string | null
+          created_at?: string | null
+          data_conferencia?: string | null
+          data_criacao?: string | null
+          forma_pagamento?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          resp_financeiro?: string | null
+          solicitacao_ids?: Json | null
+          status?: string | null
+          valor_total?: number | null
+        }
+        Relationships: []
+      }
       lotes_revisao: {
         Row: {
           created_at: string | null
@@ -1871,6 +1991,81 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notas_assistencia: {
+        Row: {
+          chave_pix_enc: string | null
+          conta_bancaria_enc: string | null
+          conta_pagamento: string | null
+          created_at: string | null
+          data_conferencia: string | null
+          data_criacao: string | null
+          forma_pag_enc: string | null
+          forma_pagamento: string | null
+          fornecedor: string | null
+          id: string
+          itens: Json | null
+          loja_solicitante: string | null
+          lote_id: string | null
+          nome_recebedor: string | null
+          observacao_enc: string | null
+          os_id: string | null
+          resp_financeiro: string | null
+          solicitacao_id: string | null
+          solicitacao_ids: Json | null
+          status: string | null
+          tipo_consignacao: boolean | null
+          valor_total: number | null
+        }
+        Insert: {
+          chave_pix_enc?: string | null
+          conta_bancaria_enc?: string | null
+          conta_pagamento?: string | null
+          created_at?: string | null
+          data_conferencia?: string | null
+          data_criacao?: string | null
+          forma_pag_enc?: string | null
+          forma_pagamento?: string | null
+          fornecedor?: string | null
+          id?: string
+          itens?: Json | null
+          loja_solicitante?: string | null
+          lote_id?: string | null
+          nome_recebedor?: string | null
+          observacao_enc?: string | null
+          os_id?: string | null
+          resp_financeiro?: string | null
+          solicitacao_id?: string | null
+          solicitacao_ids?: Json | null
+          status?: string | null
+          tipo_consignacao?: boolean | null
+          valor_total?: number | null
+        }
+        Update: {
+          chave_pix_enc?: string | null
+          conta_bancaria_enc?: string | null
+          conta_pagamento?: string | null
+          created_at?: string | null
+          data_conferencia?: string | null
+          data_criacao?: string | null
+          forma_pag_enc?: string | null
+          forma_pagamento?: string | null
+          fornecedor?: string | null
+          id?: string
+          itens?: Json | null
+          loja_solicitante?: string | null
+          lote_id?: string | null
+          nome_recebedor?: string | null
+          observacao_enc?: string | null
+          os_id?: string | null
+          resp_financeiro?: string | null
+          solicitacao_id?: string | null
+          solicitacao_ids?: Json | null
+          status?: string | null
+          tipo_consignacao?: boolean | null
+          valor_total?: number | null
+        }
+        Relationships: []
       }
       notas_compra: {
         Row: {
@@ -2726,6 +2921,87 @@ export type Database = {
           },
         ]
       }
+      produtos_pendentes_os: {
+        Row: {
+          condicao: string | null
+          contador_encaminhamentos: number | null
+          cor: string | null
+          created_at: string | null
+          custo_assistencia: number | null
+          data_entrada: string | null
+          fornecedor: string | null
+          id: string
+          imagem: string | null
+          imei: string | null
+          loja: string | null
+          marca: string | null
+          modelo: string | null
+          nota_ou_venda_id: string | null
+          origem_entrada: string | null
+          parecer_assistencia: Json | null
+          parecer_estoque: Json | null
+          saude_bateria: number | null
+          status_geral: string | null
+          timeline: Json | null
+          tipo: string | null
+          valor_custo: number | null
+          valor_custo_original: number | null
+          valor_origem: number | null
+        }
+        Insert: {
+          condicao?: string | null
+          contador_encaminhamentos?: number | null
+          cor?: string | null
+          created_at?: string | null
+          custo_assistencia?: number | null
+          data_entrada?: string | null
+          fornecedor?: string | null
+          id?: string
+          imagem?: string | null
+          imei?: string | null
+          loja?: string | null
+          marca?: string | null
+          modelo?: string | null
+          nota_ou_venda_id?: string | null
+          origem_entrada?: string | null
+          parecer_assistencia?: Json | null
+          parecer_estoque?: Json | null
+          saude_bateria?: number | null
+          status_geral?: string | null
+          timeline?: Json | null
+          tipo?: string | null
+          valor_custo?: number | null
+          valor_custo_original?: number | null
+          valor_origem?: number | null
+        }
+        Update: {
+          condicao?: string | null
+          contador_encaminhamentos?: number | null
+          cor?: string | null
+          created_at?: string | null
+          custo_assistencia?: number | null
+          data_entrada?: string | null
+          fornecedor?: string | null
+          id?: string
+          imagem?: string | null
+          imei?: string | null
+          loja?: string | null
+          marca?: string | null
+          modelo?: string | null
+          nota_ou_venda_id?: string | null
+          origem_entrada?: string | null
+          parecer_assistencia?: Json | null
+          parecer_estoque?: Json | null
+          saude_bateria?: number | null
+          status_geral?: string | null
+          timeline?: Json | null
+          tipo?: string | null
+          valor_custo?: number | null
+          valor_custo_original?: number | null
+          valor_origem?: number | null
+        }
+        Relationships: []
+      }
       registros_analise_garantia: {
         Row: {
           cliente_descricao: string | null
@@ -2930,6 +3206,96 @@ export type Database = {
           percentual_comissao?: number | null
           salario_fixo?: number | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      solicitacoes_pecas: {
+        Row: {
+          banco_destinatario: string | null
+          chave_pix: string | null
+          conta_origem_pag: string | null
+          created_at: string | null
+          data_envio: string | null
+          data_pagamento: string | null
+          data_recebimento: string | null
+          data_solicitacao: string | null
+          forma_pagamento: string | null
+          fornecedor_id: string | null
+          id: string
+          justificativa: string | null
+          loja_solicitante: string | null
+          modelo_imei: string | null
+          motivo_rejeicao: string | null
+          motivo_tratamento: string | null
+          observacao: string | null
+          origem_entrada: string | null
+          origem_peca: string | null
+          os_cancelada: boolean | null
+          os_id: string | null
+          peca: string | null
+          quantidade: number | null
+          responsavel_compra: string | null
+          status: string | null
+          tratada_por: string | null
+          valor_peca: number | null
+        }
+        Insert: {
+          banco_destinatario?: string | null
+          chave_pix?: string | null
+          conta_origem_pag?: string | null
+          created_at?: string | null
+          data_envio?: string | null
+          data_pagamento?: string | null
+          data_recebimento?: string | null
+          data_solicitacao?: string | null
+          forma_pagamento?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          justificativa?: string | null
+          loja_solicitante?: string | null
+          modelo_imei?: string | null
+          motivo_rejeicao?: string | null
+          motivo_tratamento?: string | null
+          observacao?: string | null
+          origem_entrada?: string | null
+          origem_peca?: string | null
+          os_cancelada?: boolean | null
+          os_id?: string | null
+          peca?: string | null
+          quantidade?: number | null
+          responsavel_compra?: string | null
+          status?: string | null
+          tratada_por?: string | null
+          valor_peca?: number | null
+        }
+        Update: {
+          banco_destinatario?: string | null
+          chave_pix?: string | null
+          conta_origem_pag?: string | null
+          created_at?: string | null
+          data_envio?: string | null
+          data_pagamento?: string | null
+          data_recebimento?: string | null
+          data_solicitacao?: string | null
+          forma_pagamento?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          justificativa?: string | null
+          loja_solicitante?: string | null
+          modelo_imei?: string | null
+          motivo_rejeicao?: string | null
+          motivo_tratamento?: string | null
+          observacao?: string | null
+          origem_entrada?: string | null
+          origem_peca?: string | null
+          os_cancelada?: boolean | null
+          os_id?: string | null
+          peca?: string | null
+          quantidade?: number | null
+          responsavel_compra?: string | null
+          status?: string | null
+          tratada_por?: string | null
+          valor_peca?: number | null
         }
         Relationships: []
       }

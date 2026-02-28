@@ -224,12 +224,12 @@ export default function GarantiaExtendidaDetalhes() {
   };
   
   // Finalizar adesão
-  const handleFinalizarAdesao = () => {
+  const handleFinalizarAdesao = async () => {
     const responsavel = colaboradores.find(c => c.id === responsavelConfirmacao);
     const novaDataFim = format(addMonths(new Date(), dadosAdesaoTemp.plano.meses), 'yyyy-MM-dd');
     
     // Criar tratativa comercial
-    const tratativa = addTratativaComercial({
+    const tratativa = await addTratativaComercial({
       garantiaId: garantia.id,
       vendaId: garantia.vendaId,
       tipo: dadosAdesaoTemp.plano.nome === 'Silver' ? 'Adesão Silver' : 'Adesão Gold',

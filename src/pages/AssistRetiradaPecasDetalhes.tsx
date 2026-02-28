@@ -149,7 +149,7 @@ export default function AssistRetiradaPecasDetalhes() {
     }
   };
 
-  const handleAddPeca = () => {
+  const handleAddPeca = async () => {
     if (!novaPeca.marca || !novaPeca.nome || !novaPeca.valor) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
@@ -181,7 +181,7 @@ export default function AssistRetiradaPecasDetalhes() {
     }
   };
 
-  const handleRemoverPeca = (pecaId: string) => {
+  const handleRemoverPeca = async (pecaId: string) => {
     const resultado = await removerPecaRetirada(retirada.id, pecaId);
     if (resultado.sucesso) {
       toast.success('Peça removida');

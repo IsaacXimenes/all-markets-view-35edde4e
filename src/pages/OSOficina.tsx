@@ -267,7 +267,7 @@ export default function OSOficina() {
     setSolicitarPecaModal(true);
   };
 
-  const handleEnviarSolicitacao = () => {
+  const handleEnviarSolicitacao = async () => {
     if (!osParaSolicitar) return;
     if (!solPeca.trim()) {
       toast.error('Informe o nome da peça.');
@@ -278,7 +278,7 @@ export default function OSOficina() {
       return;
     }
 
-    const novaSol = addSolicitacao({
+    const novaSol = await addSolicitacao({
       osId: osParaSolicitar.id,
       peca: solPeca,
       quantidade: solQuantidade,

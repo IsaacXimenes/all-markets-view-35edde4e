@@ -317,7 +317,7 @@ export default function OSSolicitacoesPecas() {
     }
   };
 
-  const handleConfirmarEncaminhamento = () => {
+  const handleConfirmarEncaminhamento = async () => {
     if (!encFormaPagamento || !encObservacao.trim()) {
       toast({ title: 'Erro', description: 'Preencha a forma de pagamento e a observação', variant: 'destructive' });
       return;
@@ -330,7 +330,7 @@ export default function OSSolicitacoesPecas() {
       chavePix: encChavePix,
       observacao: encObservacao
     };
-    const notasCriadas = encaminharParaFinanceiro(selecionadas, nomeUsuario, dadosPagamento);
+    const notasCriadas = await encaminharParaFinanceiro(selecionadas, nomeUsuario, dadosPagamento);
     
     setSolicitacoes(getSolicitacoes());
     setSelecionadas([]);
@@ -342,7 +342,7 @@ export default function OSSolicitacoesPecas() {
     });
   };
 
-  const handleConfirmarAgrupamento = () => {
+  const handleConfirmarAgrupamento = async () => {
     if (!encFormaPagamento || !encObservacao.trim()) {
       toast({ title: 'Erro', description: 'Preencha a forma de pagamento e a observação', variant: 'destructive' });
       return;
@@ -355,7 +355,7 @@ export default function OSSolicitacoesPecas() {
       chavePix: encChavePix,
       observacao: encObservacao
     };
-    const resultado = agruparParaPagamento(selecionadas, nomeUsuario, dadosPagamento);
+    const resultado = await agruparParaPagamento(selecionadas, nomeUsuario, dadosPagamento);
     
     if (resultado) {
       setSolicitacoes(getSolicitacoes());

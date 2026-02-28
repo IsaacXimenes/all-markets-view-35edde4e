@@ -99,7 +99,7 @@ export default function GarantiaDetalhes() {
     }
   };
   
-  const handleRegistrarTratativa = () => {
+  const handleRegistrarTratativa = async () => {
     if (!garantia) return;
     
     // Validações
@@ -114,7 +114,7 @@ export default function GarantiaDetalhes() {
     }
 
     // Usar orquestrador atômico
-    const resultado = processarTratativaGarantia({
+    const resultado = await processarTratativaGarantia({
       garantiaId: garantia.id,
       tipo: tipoTratativa as 'Direcionado Apple' | 'Encaminhado Assistência' | 'Assistência + Empréstimo' | 'Troca Direta',
       descricao: descricaoTratativa,

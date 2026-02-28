@@ -276,7 +276,7 @@ export default function GarantiasNovaManual() {
     }
   };
 
-  const handleSalvar = () => {
+  const handleSalvar = async () => {
     // Validations
     if (!formData.imei || !formData.modelo || !formData.condicao || !formData.lojaVenda || !formData.clienteNome) {
       toast.error('Preencha todos os campos obrigatórios (IMEI, Modelo, Condição, Loja e Cliente)');
@@ -329,7 +329,7 @@ export default function GarantiasNovaManual() {
       ? formData.dataFimGarantia 
       : format(addMonths(new Date(formData.dataInicioGarantia), formData.mesesGarantia), 'yyyy-MM-dd');
 
-    const novaGarantia = addGarantia({
+    const novaGarantia = await addGarantia({
       vendaId: '',
       itemVendaId: '',
       produtoId: '',
@@ -362,7 +362,7 @@ export default function GarantiasNovaManual() {
 
     // Se tiver tratativa, usar o orquestrador atômico (mesmo fluxo da página de detalhes)
     if (tipoTratativa && descricaoTratativa) {
-      const resultado = processarTratativaGarantia({
+      const resultado = await processarTratativaGarantia({
         garantiaId: novaGarantia.id,
         tipo: tipoTratativa as 'Direcionado Apple' | 'Encaminhado Assistência' | 'Assistência + Empréstimo' | 'Troca Direta',
         descricao: descricaoTratativa,

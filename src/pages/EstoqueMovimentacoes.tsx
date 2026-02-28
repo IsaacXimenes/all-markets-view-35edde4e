@@ -217,7 +217,7 @@ export default function EstoqueMovimentacoes() {
     setBuscaProduto('');
   };
 
-  const handleRegistrarMovimentacao = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleRegistrarMovimentacao = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (!produtoSelecionado) {
@@ -265,7 +265,7 @@ export default function EstoqueMovimentacoes() {
       return;
     }
 
-    const novaMovimentacao = addMovimentacao({
+    const novaMovimentacao = await addMovimentacao({
       data: formData.data || (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })(),
       produto: `${produtoSelecionado.marca} ${produtoSelecionado.modelo}`,
       imei: produtoSelecionado.imei,

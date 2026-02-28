@@ -483,12 +483,12 @@ const migrarParaEstoque = (produto: ProdutoPendente, origemDeferimento: 'Estoque
   return novoProduto;
 };
 
-export const salvarParecerEstoque = (
+export const salvarParecerEstoque = async (
   id: string, 
   status: ParecerEstoque['status'], 
   observacoes: string, 
   responsavel: string
-): { produto: ProdutoPendente | null; migrado: boolean; produtoMigrado?: Produto } => {
+): Promise<{ produto: ProdutoPendente | null; migrado: boolean; produtoMigrado?: Produto }> => {
   const produto = produtosPendentes.find(p => p.id === id);
   if (!produto) return { produto: null, migrado: false };
 
@@ -533,7 +533,7 @@ export const salvarParecerEstoque = (
     try {
       
       // Validar o aparelho na nota
-      const resultado = validarAparelhoNota(produto.notaOuVendaId, produto.imei, {
+      const resultado = await validarAparelhoNota(produto.notaOuVendaId, produto.imei, {
         responsavel,
         observacoes
       });

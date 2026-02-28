@@ -460,7 +460,7 @@ export default function EstoqueNotasCompra() {
               </Button>
               <Button 
                 className="bg-orange-600 hover:bg-orange-700"
-                onClick={() => {
+                onClick={async () => {
                   if (!urgenciaForm.fornecedor || !urgenciaForm.valorTotal || !urgenciaForm.formaPagamento) {
                     toast.error('Preencha todos os campos obrigatórios');
                     return;
@@ -478,7 +478,7 @@ export default function EstoqueNotasCompra() {
                   
                   // Criar nota de urgência no sistema
                   const valorNumerico = parseMoeda(urgenciaForm.valorTotal);
-                  const novaNota = addNotaCompra({
+                  const novaNota = await addNotaCompra({
                     data: new Date().toISOString().split('T')[0],
                     numeroNota: urgenciaId,
                     fornecedor: urgenciaForm.fornecedor,

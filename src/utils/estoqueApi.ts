@@ -301,7 +301,6 @@ const mapNotaFromDB = (row: any): NotaCompra => ({
   motivoDiscrepancia: (row.dados_extras as any)?.motivoDiscrepancia,
   acaoRecomendada: (row.dados_extras as any)?.acaoRecomendada,
   fotoComprovante: (row.dados_extras as any)?.fotoComprovante,
-  statusUrgencia: (row.dados_extras as any)?.statusUrgencia,
   timeline: (row.timeline as any[]) || [],
 });
 

@@ -115,7 +115,7 @@ export default function EstoqueNovaMovimentacaoMatriz() {
   };
   
   // Registrar lançamento
-  const handleRegistrarLancamento = () => {
+  const handleRegistrarLancamento = async () => {
     if (!responsavelLancamento) {
       toast({ title: 'Erro', description: 'Selecione o responsável pelo lançamento', variant: 'destructive' });
       return;
@@ -125,7 +125,7 @@ export default function EstoqueNovaMovimentacaoMatriz() {
       return;
     }
     
-    const novaMovimentacao = criarMovimentacaoMatriz({
+    const novaMovimentacao = await criarMovimentacaoMatriz({
       lojaDestinoId: matrizId,
       responsavelLancamento: obterNomeColaborador(responsavelLancamento),
       itens: itensParaEnviar

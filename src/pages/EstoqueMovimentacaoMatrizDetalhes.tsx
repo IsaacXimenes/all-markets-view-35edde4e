@@ -159,7 +159,7 @@ export default function EstoqueMovimentacaoMatrizDetalhes() {
   };
   
   // Registrar devolução
-  const handleRegistrarDevolucao = () => {
+  const handleRegistrarDevolucao = async () => {
     if (!movimentacao || !imeiDevolucao) {
       toast({ title: 'Erro', description: 'Informe o IMEI do aparelho', variant: 'destructive' });
       return;
@@ -172,7 +172,7 @@ export default function EstoqueMovimentacaoMatrizDetalhes() {
       return;
     }
     
-    const resultado = registrarRetornoItemMatriz(
+    const resultado = await registrarRetornoItemMatriz(
       movimentacao.id,
       item.aparelhoId,
       obterNomeColaborador(responsavelDevolucao) || 'Sistema'
@@ -188,10 +188,10 @@ export default function EstoqueMovimentacaoMatrizDetalhes() {
   };
   
   // Desfazer conferência
-  const handleDesfazerConferencia = (aparelhoId: string) => {
+  const handleDesfazerConferencia = async (aparelhoId: string) => {
     if (!movimentacao) return;
     
-    const resultado = desfazerRetornoItemMatriz(
+    const resultado = await desfazerRetornoItemMatriz(
       movimentacao.id,
       aparelhoId,
       'Sistema'

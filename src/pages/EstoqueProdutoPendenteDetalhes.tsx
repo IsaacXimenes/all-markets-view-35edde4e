@@ -165,7 +165,7 @@ export default function EstoqueProdutoPendenteDetalhes() {
     setConfirmDialogOpen(true);
   };
 
-  const handleConfirmarParecer = () => {
+  const handleConfirmarParecer = async () => {
     if (!id || !confirmResponsavel) {
       toast({
         title: "Confirmação inválida",
@@ -180,7 +180,7 @@ export default function EstoqueProdutoPendenteDetalhes() {
     // Fluxo de Validação pós-laboratório (Aprovar / Retrabalho)
     if (parecerStatus === 'Aparelho Aprovado - Retornar ao Estoque') {
       // Aprovar: somar custo assistência e deferir
-      const resultado = salvarParecerEstoque(id, 'Produto revisado e deferido', parecerObservacoes, parecerResponsavel);
+      const resultado = await salvarParecerEstoque(id, 'Produto revisado e deferido', parecerObservacoes, parecerResponsavel);
       if (resultado.produto) {
         // Sincronizar status da OS vinculada
         if (osVinculada) {
@@ -244,7 +244,7 @@ export default function EstoqueProdutoPendenteDetalhes() {
     // Fluxo padrão (análise inicial)
     const statusParecer = parecerStatus as 'Análise Realizada – Produto em ótimo estado' | 'Encaminhado para conferência da Assistência';
     
-    const resultado = salvarParecerEstoque(id, statusParecer, parecerObservacoes, parecerResponsavel);
+    const resultado = await salvarParecerEstoque(id, statusParecer, parecerObservacoes, parecerResponsavel);
 
     if (resultado.produto) {
       if (resultado.migrado && statusParecer === 'Análise Realizada – Produto em ótimo estado') {

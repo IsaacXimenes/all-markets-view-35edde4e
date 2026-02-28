@@ -166,7 +166,7 @@ export default function FinanceiroConferenciaNotas() {
   
   const botaoDesabilitado = !contaPagamento || !formaPagamento || !responsavelFinanceiro || (mostrarCampoParcelas && !parcelas);
 
-  const handleFinalizarNota = () => {
+  const handleFinalizarNota = async () => {
     if (!notaSelecionada || botaoDesabilitado) return;
 
     const pagamento = {
@@ -214,7 +214,7 @@ export default function FinanceiroConferenciaNotas() {
     }
 
     // FLUXO NORMAL PARA NOTAS REGULARES
-    const notaFinalizada = finalizarNota(notaSelecionada.id, pagamento, responsavelFinanceiro);
+    const notaFinalizada = await finalizarNota(notaSelecionada.id, pagamento, responsavelFinanceiro);
     
     if (notaFinalizada) {
       // Atualizar status no localStorage para Concluído

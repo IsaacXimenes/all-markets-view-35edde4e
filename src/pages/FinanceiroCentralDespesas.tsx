@@ -147,7 +147,7 @@ export default function FinanceiroCentralDespesas() {
     return `${ano}-${String(mes + 1).padStart(2, '0')}-${String(diaReal).padStart(2, '0')}`;
   };
 
-  const handleLancar = () => {
+  const handleLancar = async () => {
     const isRecorrente = form.tipo === 'Fixa' && form.recorrente;
     
     if (!form.tipo || !form.descricao || !form.valor || !form.lojaId || !form.categoria || !form.competencia || !form.conta) {
@@ -173,7 +173,7 @@ export default function FinanceiroCentralDespesas() {
       ? inferirDataVencimento(diaVenc!, competenciaNova)
       : form.dataVencimento;
 
-    const novaDespesa = addDespesa({
+    const novaDespesa = await addDespesa({
       tipo: form.tipo,
       descricao: form.descricao,
       valor: parseMoeda(form.valor),
@@ -194,7 +194,7 @@ export default function FinanceiroCentralDespesas() {
     });
     // Auto-provisionamento contínuo para despesas recorrentes (12 meses)
     if (isRecorrente && form.periodicidade) {
-      const criadas = provisionarRecorrenciaContinua(novaDespesa.id, 12);
+      const criadas = await provisionarRecorrenciaContinua(novaDespesa.id, 12);
       if (criadas.length > 0) {
         toast.success(`${criadas.length} despesa(s) futura(s) agendada(s) automaticamente`);
       }
@@ -209,9 +209,9 @@ export default function FinanceiroCentralDespesas() {
     resetForm();
   };
 
-  const handlePagar = () => {
+  const handlePagar = async () => {
     if (!pagarModal) return;
-    pagarDespesa(pagarModal.id, user?.colaborador?.nome || 'Não identificado', comprovantePagamento || undefined);
+    await pagarDespesa(pagarModal.id, user?.colaborador?.nome || 'Não identificado', comprovantePagamento || undefined);
     refreshDespesas();
     toast.success(`Despesa ${pagarModal.id} marcada como Paga`);
     if (pagarModal.recorrente) {
@@ -221,9 +221,9 @@ export default function FinanceiroCentralDespesas() {
     setComprovantePagamento('');
   };
 
-  const handleProvisionar = (sim: boolean) => {
+  const handleProvisionar = async (sim: boolean) => {
     if (sim && provisionarModal) {
-      const nova = provisionarProximoPeriodo(provisionarModal.id);
+      const nova = await provisionarProximoPeriodo(provisionarModal.id);
       if (nova) {
         refreshDespesas();
         toast.success(`Despesa provisionada para ${nova.competencia}`);
@@ -232,8 +232,8 @@ export default function FinanceiroCentralDespesas() {
     setProvisionarModal(null);
   };
 
-  const handleDelete = (id: string) => {
-    if (deleteDespesa(id)) {
+  const handleDelete = async (id: string) => {
+    if (await deleteDespesa(id)) {
       refreshDespesas();
       toast.success('Despesa excluída');
     }
@@ -260,9 +260,9 @@ export default function FinanceiroCentralDespesas() {
     else setSelectedDespesas(despesasFiltradas.map(d => d.id));
   };
 
-  const handleAlterarCompetenciaLote = () => {
+  const handleAlterarCompetenciaLote = async () => {
     if (!novaCompetenciaLote) { toast.error('Selecione a nova competência'); return; }
-    selectedDespesas.forEach(id => updateDespesa(id, { competencia: novaCompetenciaLote }));
+    for (const id of selectedDespesas) { await updateDespesa(id, { competencia: novaCompetenciaLote }); }
     refreshDespesas();
     setDialogLoteOpen(false);
     setSelectedDespesas([]);

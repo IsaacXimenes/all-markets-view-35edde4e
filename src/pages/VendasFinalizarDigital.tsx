@@ -748,7 +748,7 @@ export default function VendasFinalizarDigital() {
     setShowConfirmacaoModal(true);
   };
 
-  const handleConfirmarVenda = () => {
+  const handleConfirmarVenda = async () => {
     if (!venda) return;
     
     // Subtrair produtos do estoque
@@ -760,7 +760,7 @@ export default function VendasFinalizarDigital() {
     });
 
     // Registrar venda
-    const vendaRegistrada = addVenda({
+    const vendaRegistrada = await addVenda({
       dataHora: new Date().toISOString(),
       lojaVenda,
       vendedor: venda.responsavelVendaId,

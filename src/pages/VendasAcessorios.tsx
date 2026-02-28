@@ -401,9 +401,9 @@ export default function VendasAcessorios() {
     setShowConfirmacaoModal(true);
   };
 
-  const handleConfirmarVenda = () => {
+  const handleConfirmarVenda = async () => {
     // Criar venda no sistema (addVenda já subtrai estoque de acessórios automaticamente)
-    const novaVenda = addVenda({
+    const novaVenda = await addVenda({
       dataHora: new Date().toISOString(),
       lojaVenda,
       vendedor,

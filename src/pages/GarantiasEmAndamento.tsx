@@ -456,7 +456,7 @@ export default function GarantiasEmAndamento() {
                               <Button 
                                 variant="ghost" 
                                 size="icon"
-                                onClick={() => {
+                                onClick={async () => {
                                   const vendas = getVendas();
                                   let vendaGarantia = vendas.find(v => 
                                     v.origemVenda === 'Troca Garantia' && (
@@ -466,7 +466,7 @@ export default function GarantiasEmAndamento() {
                                   );
                                   // Se a venda não existe (aprovação anterior ao código), criar agora
                                   if (!vendaGarantia && tratativa) {
-                                    vendaGarantia = addVenda({
+                                    vendaGarantia = await addVenda({
                                       dataHora: new Date().toISOString(),
                                       lojaVenda: garantia.lojaVenda,
                                       vendedor: 'COL-001',

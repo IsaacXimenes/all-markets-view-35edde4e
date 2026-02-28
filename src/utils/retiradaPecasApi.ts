@@ -94,7 +94,7 @@ const saveRetirada = async (retirada: RetiradaPecas): Promise<void> => {
     timeline: retirada.timeline as any,
     logs_auditoria: retirada.logsAuditoria as any,
   }).eq('id', retirada.id);
-  if (error) console.error('Erro ao salvar retirada:', error);
+  if (error) { console.error('Erro ao salvar retirada:', error); throw error; }
 };
 
 export const initRetiradasPecasCache = async (): Promise<void> => {

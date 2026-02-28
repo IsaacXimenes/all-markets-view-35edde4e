@@ -533,7 +533,7 @@ export const aprovarAnaliseGarantia = async (id: string, dados: { tecnicoId: str
     data_aprovacao: dados.dataAprovacao,
     usuario_aprovacao: dados.usuarioAprovacao,
   }).eq('id', id);
-  if (error) { console.error('Erro ao aprovar análise:', error); return null; }
+  if (error) { console.error('Erro ao aprovar análise:', error); throw error; }
   const index = _registrosAnaliseCache.findIndex(r => r.id === id);
   if (index !== -1) {
     _registrosAnaliseCache[index] = { ..._registrosAnaliseCache[index], status: 'Solicitação Aprovada', ...dados };
@@ -549,7 +549,7 @@ export const recusarAnaliseGarantia = async (id: string, motivo: string): Promis
     motivo_recusa: motivo,
     data_recusa: agora,
   }).eq('id', id);
-  if (error) { console.error('Erro ao recusar análise:', error); return null; }
+  if (error) { console.error('Erro ao recusar análise:', error); throw error; }
   const index = _registrosAnaliseCache.findIndex(r => r.id === id);
   if (index !== -1) {
     _registrosAnaliseCache[index] = { ..._registrosAnaliseCache[index], status: 'Recusada', motivoRecusa: motivo, dataRecusa: agora };
@@ -564,7 +564,7 @@ export const encaminharParaAnaliseGarantia = async (origemId: string, origem: 'G
     data_chegada: new Date().toISOString(), status: 'Pendente',
     observacao: observacao || null, metadata: (metadata || {}) as any,
   }).select().single();
-  if (error) { console.error('Erro ao encaminhar para análise:', error); return; }
+  if (error) { console.error('Erro ao encaminhar para análise:', error); throw error; }
   _registrosAnaliseCache.unshift(mapRegistroAnaliseFromDB(data));
 };
 

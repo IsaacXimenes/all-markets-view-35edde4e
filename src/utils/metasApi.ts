@@ -85,7 +85,7 @@ export const updateMeta = async (id: string, data: Partial<Omit<MetaLoja, 'id' |
   if (data.ano !== undefined) updates.ano = data.ano;
 
   const { error } = await supabase.from('metas_lojas').update(updates).eq('id', id);
-  if (error) { console.error(error); return null; }
+  if (error) { console.error(error); throw error; }
 
   const idx = metasCache.findIndex(m => m.id === id);
   if (idx !== -1) {
@@ -97,7 +97,7 @@ export const updateMeta = async (id: string, data: Partial<Omit<MetaLoja, 'id' |
 
 export const deleteMeta = async (id: string): Promise<boolean> => {
   const { error } = await supabase.from('metas_lojas').delete().eq('id', id);
-  if (error) { console.error(error); return false; }
+  if (error) { console.error(error); throw error; }
   metasCache = metasCache.filter(m => m.id !== id);
   return true;
 };

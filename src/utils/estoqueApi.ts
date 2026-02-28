@@ -406,7 +406,7 @@ export const getProdutoByIMEI = (imei: string): Produto | null => _produtos.find
 export const updateProduto = async (id: string, updates: Partial<Produto>): Promise<Produto | null> => {
   const dbData = mapProdutoToDB(updates);
   const { data, error } = await supabase.from('produtos').update(dbData).eq('id', id).select().single();
-  if (error || !data) { console.error('[ESTOQUE] updateProduto error:', error); return null; }
+  if (error || !data) { console.error('[ESTOQUE] updateProduto error:', error); throw error || new Error('updateProduto: no data returned'); }
   const updated = mapProdutoFromDB(data);
   const idx = _produtos.findIndex(p => p.id === id);
   if (idx !== -1) _produtos[idx] = updated;

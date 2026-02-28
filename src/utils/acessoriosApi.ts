@@ -1,36 +1,7 @@
-// API de Acessórios - Gerenciamento de estoque de acessórios
+// API de Acessórios - Migrada para Supabase
+import { supabase } from '@/integrations/supabase/client';
 
-// Sistema centralizado de IDs para acessórios
-let globalAcessorioIdCounter = 100;
-const registeredAcessorioIds = new Set<string>();
-
-const initializeAcessorioIds = (existingIds: string[]) => {
-  existingIds.forEach(id => registeredAcessorioIds.add(id));
-  existingIds.forEach(id => {
-    const match = id.match(/ACESS-(\d+)/);
-    if (match) {
-      const num = parseInt(match[1]);
-      if (num >= globalAcessorioIdCounter) {
-        globalAcessorioIdCounter = num + 1;
-      }
-    }
-  });
-};
-
-const generateAcessorioId = (): string => {
-  let newId: string;
-  do {
-    newId = `ACESS-${String(globalAcessorioIdCounter).padStart(4, '0')}`;
-    globalAcessorioIdCounter++;
-  } while (registeredAcessorioIds.has(newId));
-  
-  registeredAcessorioIds.add(newId);
-  return newId;
-};
-
-export const isAcessorioIdRegistered = (id: string): boolean => {
-  return registeredAcessorioIds.has(id);
-};
+// ==================== INTERFACES ====================
 
 export interface HistoricoValorRecomendadoAcessorio {
   data: string;
@@ -61,244 +32,179 @@ export interface VendaAcessorio {
   valorTotal: number;
 }
 
-// Dados mockados de acessórios
-// UUIDs reais do useCadastroStore:
-// Lojas: 3ac7e00c (Matriz), db894e7d (JK Shopping), 5b9446d5 (Shopping Sul), 0d06e7db (Águas Lindas)
-let acessorios: Acessorio[] = [
-  {
-    id: 'ACESS-0001',
-    descricao: 'Capa iPhone 15',
-    categoria: 'Capas',
-    quantidade: 25,
-    valorCusto: 45.00,
-    valorRecomendado: 89.90,
-    loja: '3ac7e00c',
-    fornecedorId: 'FORN-001'
-  },
-  {
-    id: 'ACESS-0002',
-    descricao: 'Carregador USB-C 20W',
-    categoria: 'Carregadores',
-    quantidade: 18,
-    valorCusto: 89.00,
-    valorRecomendado: 149.90,
-    loja: '3ac7e00c',
-    fornecedorId: 'FORN-002'
-  },
-  {
-    id: 'ACESS-0003',
-    descricao: 'Fone de Ouvido Bluetooth',
-    categoria: 'Áudio',
-    quantidade: 8,
-    valorCusto: 120.00,
-    valorRecomendado: 249.90,
-    loja: '0d06e7db',
-    fornecedorId: 'FORN-001'
-  },
-  {
-    id: 'ACESS-0004',
-    descricao: 'Película Vidro iPhone 14',
-    categoria: 'Películas',
-    quantidade: 32,
-    valorCusto: 25.00,
-    valorRecomendado: 49.90,
-    loja: 'db894e7d',
-    fornecedorId: 'FORN-003'
-  },
-  {
-    id: 'ACESS-0005',
-    descricao: 'Cabo Lightning 1m',
-    categoria: 'Cabos',
-    quantidade: 5,
-    valorCusto: 35.00,
-    valorRecomendado: 69.90,
-    loja: '5b9446d5',
-    fornecedorId: 'FORN-002'
-  }
-];
+// ==================== CACHE ====================
 
-// Inicializar IDs existentes
-initializeAcessorioIds(acessorios.map(a => a.id));
+let acessoriosCache: Acessorio[] = [];
+let cacheInitialized = false;
 
-// Categorias de acessórios
-const categoriasAcessorios = [
-  'Capas',
-  'Carregadores',
-  'Cabos',
-  'Películas',
-  'Áudio',
-  'Suportes',
-  'Baterias Externas',
-  'Outros'
-];
+const mapFromDB = (row: any): Acessorio => ({
+  id: row.id,
+  descricao: row.nome,
+  categoria: row.categoria || '',
+  quantidade: row.quantidade || 0,
+  valorCusto: Number(row.valor_custo) || 0,
+  valorRecomendado: Number(row.valor_venda) || 0,
+  loja: row.loja_id || '',
+  fornecedorId: row.marca || undefined, // reusing marca field for fornecedorId
+});
 
-// Funções de API
-export const getAcessorios = (): Acessorio[] => {
-  return [...acessorios];
+const mapToDB = (a: Partial<Acessorio>) => ({
+  ...(a.descricao !== undefined && { nome: a.descricao }),
+  ...(a.categoria !== undefined && { categoria: a.categoria }),
+  ...(a.quantidade !== undefined && { quantidade: a.quantidade }),
+  ...(a.valorCusto !== undefined && { valor_custo: a.valorCusto }),
+  ...(a.valorRecomendado !== undefined && { valor_venda: a.valorRecomendado }),
+  ...(a.loja !== undefined && { loja_id: a.loja || null }),
+  ...(a.fornecedorId !== undefined && { marca: a.fornecedorId }),
+});
+
+export const initAcessoriosCache = async () => {
+  if (cacheInitialized) return;
+  const { data, error } = await supabase.from('acessorios').select('*');
+  if (error) { console.error('[ACESSORIOS] init error:', error); return; }
+  acessoriosCache = (data || []).map(mapFromDB);
+  cacheInitialized = true;
 };
 
+// Auto-init
+initAcessoriosCache();
+
+// ==================== CATEGORIAS ====================
+
+const categoriasAcessorios = [
+  'Capas', 'Carregadores', 'Cabos', 'Películas', 'Áudio',
+  'Suportes', 'Baterias Externas', 'Outros'
+];
+
+export const getCategoriasAcessorios = (): string[] => [...categoriasAcessorios];
+
+// ==================== GET (síncrono via cache) ====================
+
+export const getAcessorios = (): Acessorio[] => [...acessoriosCache];
+
 export const getAcessorioById = (id: string): Acessorio | null => {
-  return acessorios.find(a => a.id === id) || null;
+  return acessoriosCache.find(a => a.id === id) || null;
 };
 
 export const getAcessoriosByLoja = (loja: string): Acessorio[] => {
-  return acessorios.filter(a => a.loja === loja);
+  return acessoriosCache.filter(a => a.loja === loja);
 };
 
-export const getCategoriasAcessorios = (): string[] => {
-  return [...categoriasAcessorios];
+export const isAcessorioIdRegistered = (id: string): boolean => {
+  return acessoriosCache.some(a => a.id === id);
 };
 
-export const updateAcessorioQuantidade = (id: string, novaQuantidade: number): Acessorio | null => {
-  const acessorio = acessorios.find(a => a.id === id);
-  if (!acessorio) return null;
-  acessorio.quantidade = novaQuantidade;
-  return acessorio;
+// ==================== MUTAÇÕES (async) ====================
+
+export const addAcessorio = async (acessorio: Omit<Acessorio, 'id'>): Promise<Acessorio> => {
+  const dbData = mapToDB(acessorio);
+  const { data, error } = await supabase.from('acessorios').insert(dbData).select().single();
+  if (error) throw error;
+  const novo = mapFromDB(data);
+  acessoriosCache.push(novo);
+  return novo;
 };
 
-export const subtrairEstoqueAcessorio = (id: string, quantidade: number): boolean => {
-  const acessorio = acessorios.find(a => a.id === id);
-  if (!acessorio || acessorio.quantidade < quantidade) return false;
-  acessorio.quantidade -= quantidade;
+export const updateAcessorioQuantidade = async (id: string, novaQuantidade: number): Promise<Acessorio | null> => {
+  const { error } = await supabase.from('acessorios').update({ quantidade: novaQuantidade }).eq('id', id);
+  if (error) { console.error(error); return null; }
+  const idx = acessoriosCache.findIndex(a => a.id === id);
+  if (idx !== -1) { acessoriosCache[idx].quantidade = novaQuantidade; return acessoriosCache[idx]; }
+  return null;
+};
+
+export const subtrairEstoqueAcessorio = async (id: string, quantidade: number): Promise<boolean> => {
+  const a = acessoriosCache.find(x => x.id === id);
+  if (!a || a.quantidade < quantidade) return false;
+  const nova = a.quantidade - quantidade;
+  const { error } = await supabase.from('acessorios').update({ quantidade: nova }).eq('id', id);
+  if (error) { console.error(error); return false; }
+  a.quantidade = nova;
   return true;
 };
 
-export const adicionarEstoqueAcessorio = (id: string, quantidade: number, valorCusto?: number): boolean => {
-  const acessorio = acessorios.find(a => a.id === id);
-  if (acessorio) {
-    acessorio.quantidade += quantidade;
-    if (valorCusto !== undefined) {
-      acessorio.valorCusto = valorCusto;
-    }
-    return true;
-  }
-  return false;
+export const adicionarEstoqueAcessorio = async (id: string, quantidade: number, valorCusto?: number): Promise<boolean> => {
+  const a = acessoriosCache.find(x => x.id === id);
+  if (!a) return false;
+  const updates: any = { quantidade: a.quantidade + quantidade };
+  if (valorCusto !== undefined) updates.valor_custo = valorCusto;
+  const { error } = await supabase.from('acessorios').update(updates).eq('id', id);
+  if (error) { console.error(error); return false; }
+  a.quantidade += quantidade;
+  if (valorCusto !== undefined) a.valorCusto = valorCusto;
+  return true;
 };
 
-export const addAcessorio = (acessorio: Omit<Acessorio, 'id'>): Acessorio => {
-  const newId = generateAcessorioId();
-  const novoAcessorio: Acessorio = { ...acessorio, id: newId };
-  acessorios.push(novoAcessorio);
-  return novoAcessorio;
-};
-
-// Buscar ou criar acessório por descrição
-export const getOrCreateAcessorio = (
-  descricao: string, 
-  categoria: string, 
-  quantidade: number, 
-  valorCusto: number,
-  loja: string
-): Acessorio => {
-  // Buscar acessório existente pela descrição
-  const existente = acessorios.find(
+export const getOrCreateAcessorio = async (
+  descricao: string, categoria: string, quantidade: number, valorCusto: number, loja: string
+): Promise<Acessorio> => {
+  const existente = acessoriosCache.find(
     a => a.descricao.toLowerCase() === descricao.toLowerCase() && a.loja === loja
   );
-  
   if (existente) {
-    // Soma a quantidade
-    existente.quantidade += quantidade;
-    existente.valorCusto = valorCusto; // Atualiza custo
+    await adicionarEstoqueAcessorio(existente.id, quantidade, valorCusto);
     return existente;
   }
-  
-  // Criar novo acessório
-  return addAcessorio({
-    descricao,
-    categoria,
-    quantidade,
-    valorCusto,
-    loja
-  });
+  return addAcessorio({ descricao, categoria, quantidade, valorCusto, loja });
 };
 
-// formatCurrency removido - usar import { formatCurrency } from '@/utils/formatUtils'
-export { formatCurrency } from '@/utils/formatUtils';
-
-export const updateValorRecomendadoAcessorio = (
-  id: string,
-  novoValor: number,
-  usuario: string
-): Acessorio | null => {
-  const acessorio = acessorios.find(a => a.id === id);
-  if (!acessorio) return null;
-
-  const historicoEntry: HistoricoValorRecomendadoAcessorio = {
-    data: new Date().toISOString().split('T')[0],
-    usuario,
-    valorAntigo: acessorio.valorRecomendado || null,
-    valorNovo: novoValor
+export const updateValorRecomendadoAcessorio = async (
+  id: string, novoValor: number, usuario: string
+): Promise<Acessorio | null> => {
+  const a = acessoriosCache.find(x => x.id === id);
+  if (!a) return null;
+  const { error } = await supabase.from('acessorios').update({ valor_venda: novoValor }).eq('id', id);
+  if (error) { console.error(error); return null; }
+  const entry: HistoricoValorRecomendadoAcessorio = {
+    data: new Date().toISOString().split('T')[0], usuario,
+    valorAntigo: a.valorRecomendado || null, valorNovo: novoValor
   };
-
-  acessorio.valorRecomendado = novoValor;
-  if (!acessorio.historicoValorRecomendado) {
-    acessorio.historicoValorRecomendado = [];
-  }
-  acessorio.historicoValorRecomendado.unshift(historicoEntry);
-
-  return acessorio;
+  a.valorRecomendado = novoValor;
+  if (!a.historicoValorRecomendado) a.historicoValorRecomendado = [];
+  a.historicoValorRecomendado.unshift(entry);
+  return a;
 };
 
-// Transferir acessório da origem (subtrair estoque)
-export const transferirAcessorioOrigem = (id: string, quantidade: number, lojaOrigem: string): boolean => {
-  const acessorio = acessorios.find(a => a.id === id && a.loja === lojaOrigem);
-  if (!acessorio || acessorio.quantidade < quantidade) return false;
-  acessorio.quantidade -= quantidade;
-  return true;
+export const transferirAcessorioOrigem = async (id: string, quantidade: number, lojaOrigem: string): Promise<boolean> => {
+  const a = acessoriosCache.find(x => x.id === id && x.loja === lojaOrigem);
+  if (!a || a.quantidade < quantidade) return false;
+  return subtrairEstoqueAcessorio(id, quantidade);
 };
 
-// Receber acessório no destino (somar estoque ou criar novo registro)
-export const receberAcessorioDestino = (
-  id: string, 
-  quantidade: number, 
-  lojaDestino: string
-): boolean => {
-  const acessorioOrigem = acessorios.find(a => a.id === id);
-  if (!acessorioOrigem) return false;
-
-  // Buscar acessório com mesma descrição na loja de destino
-  const existenteDestino = acessorios.find(
-    a => a.descricao.toLowerCase() === acessorioOrigem.descricao.toLowerCase() && a.loja === lojaDestino
+export const receberAcessorioDestino = async (id: string, quantidade: number, lojaDestino: string): Promise<boolean> => {
+  const origem = acessoriosCache.find(x => x.id === id);
+  if (!origem) return false;
+  const existente = acessoriosCache.find(
+    a => a.descricao.toLowerCase() === origem.descricao.toLowerCase() && a.loja === lojaDestino
   );
-
-  if (existenteDestino) {
-    existenteDestino.quantidade += quantidade;
-  } else {
-    // Criar novo registro na loja destino
-    addAcessorio({
-      descricao: acessorioOrigem.descricao,
-      categoria: acessorioOrigem.categoria,
-      quantidade,
-      valorCusto: acessorioOrigem.valorCusto,
-      valorRecomendado: acessorioOrigem.valorRecomendado,
-      loja: lojaDestino,
-      fornecedorId: acessorioOrigem.fornecedorId
-    });
+  if (existente) {
+    return adicionarEstoqueAcessorio(existente.id, quantidade);
   }
+  await addAcessorio({
+    descricao: origem.descricao, categoria: origem.categoria, quantidade,
+    valorCusto: origem.valorCusto, valorRecomendado: origem.valorRecomendado, loja: lojaDestino,
+    fornecedorId: origem.fornecedorId
+  });
   return true;
 };
+
+// ==================== EXPORT CSV ====================
 
 export const exportAcessoriosToCSV = (data: Acessorio[], filename: string) => {
   if (data.length === 0) return;
-  
   const headers = ['ID', 'Descrição', 'Categoria', 'Fornecedor', 'Quantidade', 'Valor Custo', 'Valor Recomendado', 'Loja'];
   const csvContent = [
     headers.join(','),
     ...data.map(row => [
-      row.id,
-      `"${row.descricao}"`,
-      row.categoria,
-      `"${row.fornecedorId || ''}"`,
-      row.quantidade,
-      row.valorCusto.toFixed(2),
-      row.valorRecomendado?.toFixed(2) || '',
-      row.loja
+      row.id, `"${row.descricao}"`, row.categoria, `"${row.fornecedorId || ''}"`,
+      row.quantidade, row.valorCusto.toFixed(2), row.valorRecomendado?.toFixed(2) || '', row.loja
     ].join(','))
   ].join('\n');
-  
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = filename;
   link.click();
 };
+
+export { formatCurrency } from '@/utils/formatUtils';

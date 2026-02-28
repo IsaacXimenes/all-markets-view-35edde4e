@@ -138,10 +138,10 @@ export default function EstoqueAcessorios() {
     setShowEditModal(true);
   };
 
-  const handleSalvarQuantidade = () => {
+  const handleSalvarQuantidade = async () => {
     if (!acessorioSelecionado) return;
     
-    updateAcessorioQuantidade(acessorioSelecionado.id, novaQuantidade);
+    await updateAcessorioQuantidade(acessorioSelecionado.id, novaQuantidade);
     setAcessorios(getAcessorios());
     setShowEditModal(false);
     setAcessorioSelecionado(null);
@@ -155,7 +155,7 @@ export default function EstoqueAcessorios() {
     setShowValorRecomendadoModal(true);
   };
 
-  const handleSalvarValorRecomendado = () => {
+  const handleSalvarValorRecomendado = async () => {
     if (!acessorioSelecionado || !colaboradorSelecionado) {
       toast.error('Selecione o colaborador responsável');
       return;
@@ -170,7 +170,7 @@ export default function EstoqueAcessorios() {
     const colaborador = colaboradores.find(c => c.id === colaboradorSelecionado);
     const nomeColaborador = colaborador?.nome || colaboradorSelecionado;
 
-    updateValorRecomendadoAcessorio(acessorioSelecionado.id, valor, nomeColaborador);
+    await updateValorRecomendadoAcessorio(acessorioSelecionado.id, valor, nomeColaborador);
     setAcessorios(getAcessorios());
     setShowValorRecomendadoModal(false);
     setAcessorioSelecionado(null);

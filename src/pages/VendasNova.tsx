@@ -928,9 +928,9 @@ export default function VendasNova() {
     });
 
     // Subtrair acessórios do estoque
-    acessoriosVenda.forEach(acessorio => {
-      subtrairEstoqueAcessorio(acessorio.acessorioId, acessorio.quantidade);
-    });
+    for (const acessorio of acessoriosVenda) {
+      await subtrairEstoqueAcessorio(acessorio.acessorioId, acessorio.quantidade);
+    }
     setAcessoriosEstoque(getAcessorios());
 
     // Obter nome do vendedor para timeline

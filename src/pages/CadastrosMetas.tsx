@@ -76,7 +76,7 @@ export default function CadastrosMetas() {
     setModalOpen(true);
   };
 
-  const handleSalvar = () => {
+  const handleSalvar = async () => {
     const data = {
       lojaId: lojaIdModal,
       mes: Number(filtroMes),
@@ -88,10 +88,10 @@ export default function CadastrosMetas() {
     };
 
     if (editando) {
-      updateMeta(editando.id, data);
+      await updateMeta(editando.id, data);
       toast.success('Meta atualizada com sucesso!');
     } else {
-      addMeta(data);
+      await addMeta(data);
       toast.success('Meta cadastrada com sucesso!');
     }
 
@@ -100,8 +100,8 @@ export default function CadastrosMetas() {
     resetForm();
   };
 
-  const handleExcluir = (id: string) => {
-    deleteMeta(id);
+  const handleExcluir = async (id: string) => {
+    await deleteMeta(id);
     setMetas(getMetas());
     toast.success('Meta excluída');
   };

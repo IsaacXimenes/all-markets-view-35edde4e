@@ -186,7 +186,7 @@ export default function EstoquePendenciasBaseTrocas() {
 
       if (resultado) {
         // Migrar para Produtos Pendentes (inicia SLA de Tratativas)
-        const produtoMigrado = migrarParaProdutosPendentes(tradeInSelecionado.id);
+        const produtoMigrado = await migrarParaProdutosPendentes(tradeInSelecionado.id);
         
         if (produtoMigrado) {
           toast.success('Recebimento registrado com sucesso!', {

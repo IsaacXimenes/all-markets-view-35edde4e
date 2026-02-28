@@ -208,7 +208,7 @@ export default function EstoqueNotasUrgenciaPendentes() {
     return produtosInseridos.reduce((acc, p) => acc + p.valorUnitario, 0);
   }, [produtosInseridos]);
 
-  const handleFinalizarInsercao = () => {
+  const handleFinalizarInsercao = async () => {
     if (!notaSelecionada || produtosInseridos.length === 0) {
       toast.error('Adicione ao menos um produto');
       return;
@@ -241,7 +241,7 @@ export default function EstoqueNotasUrgenciaPendentes() {
 
     // Migrar produtos para Aparelhos Pendentes com origem NEGOCIADO
     const lojaDestino = ESTOQUE_SIA_LOJA_ID;
-    const produtosMigrados = migrarProdutosNotaParaPendentes(
+    const produtosMigrados = await migrarProdutosNotaParaPendentes(
       produtosParaMigrar,
       notaSelecionada.id,
       notaSelecionada.fornecedor,

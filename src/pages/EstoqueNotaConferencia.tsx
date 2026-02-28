@@ -272,7 +272,7 @@ export default function EstoqueNotaConferencia() {
   }, [nota]);
 
   // Salvar conferência - só aqui que confirma tudo
-  const handleSalvarConferencia = () => {
+  const handleSalvarConferencia = async () => {
     if (!nota) return;
     
     if (produtosConferidos.size === 0) {
@@ -311,7 +311,7 @@ export default function EstoqueNotaConferencia() {
         // Buscar nota original para a migração
         const notaOriginal = getNotaEntradaById(resultado.id);
         if (notaOriginal) {
-          const migracaoResult = migrarProdutosConferidosPorCategoria(notaOriginal, 'Carlos Estoque');
+          const migracaoResult = await migrarProdutosConferidosPorCategoria(notaOriginal, 'Carlos Estoque');
           
           const partes: string[] = [];
           if (migracaoResult.novos > 0) partes.push(`${migracaoResult.novos} novo(s) → Estoque`);

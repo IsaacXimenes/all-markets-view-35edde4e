@@ -13,9 +13,11 @@ export interface LogAlteracao {
 
 export interface TaxaEntrega {
   id: string;
+  codigo: string;
   local: string;
   valor: number;
   status: 'Ativo' | 'Inativo';
+  loja_id: string | null;
   dataCriacao: string;
   dataAtualizacao: string;
   logs: LogAlteracao[];
@@ -24,6 +26,8 @@ export interface TaxaEntrega {
 // Cache
 let _taxasCache: TaxaEntrega[] = [];
 let _initPromise: Promise<void> | null = null;
+
+const LOJA_ONLINE_ID = 'df3995f6-1da1-4661-a68f-20fb548a9468';
 
 const SEED_TAXAS = [
   { local: 'Águas Claras', valor: 40 }, { local: 'Asa Norte', valor: 30 }, { local: 'Asa Sul', valor: 30 },
@@ -39,13 +43,27 @@ const SEED_TAXAS = [
 
 const mapRow = (row: any): TaxaEntrega => ({
   id: row.id,
+  codigo: row.codigo || '',
   local: row.local,
   valor: Number(row.valor) || 0,
   status: row.status || 'Ativo',
+  loja_id: row.loja_id || null,
   dataCriacao: row.data_criacao || row.created_at,
   dataAtualizacao: row.data_atualizacao || row.created_at,
   logs: Array.isArray(row.logs) ? row.logs : [],
 });
+
+const getNextCodigo = (): string => {
+  let maxNum = 0;
+  _taxasCache.forEach(t => {
+    const match = t.codigo?.match(/TAXA-(\d+)/);
+    if (match) {
+      const num = parseInt(match[1]);
+      if (num > maxNum) maxNum = num;
+    }
+  });
+  return `TAXA-${String(maxNum + 1).padStart(4, '0')}`;
+};
 
 export const initTaxasEntregaCache = async (): Promise<void> => {
   if (_initPromise) return _initPromise;
@@ -53,7 +71,11 @@ export const initTaxasEntregaCache = async (): Promise<void> => {
     const { data, error } = await supabase.from('taxas_entrega').select('*');
     if (error) { console.error('Erro ao carregar taxas_entrega:', error); return; }
     if (!data || data.length === 0) {
-      const inserts = SEED_TAXAS.map(t => ({ local: t.local, valor: t.valor, status: 'Ativo' }));
+      const inserts = SEED_TAXAS.map((t, i) => ({
+        local: t.local, valor: t.valor, status: 'Ativo',
+        loja_id: LOJA_ONLINE_ID,
+        codigo: `TAXA-${String(i + 1).padStart(4, '0')}`,
+      }));
       const { data: seeded, error: seedErr } = await supabase.from('taxas_entrega').insert(inserts).select();
       if (seedErr) { console.error('Erro ao seed taxas_entrega:', seedErr); return; }
       _taxasCache = (seeded || []).map(mapRow);
@@ -70,11 +92,14 @@ export const getTaxaEntregaById = (id: string): TaxaEntrega | undefined => _taxa
 export const getTaxaEntregaByLocal = (local: string): TaxaEntrega | undefined =>
   _taxasCache.find(t => t.local.toLowerCase() === local.toLowerCase());
 
-export const addTaxaEntrega = async (local: string, valor: number, usuarioId: string, usuarioNome: string): Promise<TaxaEntrega> => {
+export const addTaxaEntrega = async (local: string, valor: number, usuarioId: string, usuarioNome: string, lojaId?: string): Promise<TaxaEntrega> => {
   const agora = new Date().toISOString();
+  const codigo = getNextCodigo();
   const log: LogAlteracao = { id: `LOG-${Date.now()}`, data: agora, usuarioId, usuarioNome, valorAnterior: 0, valorNovo: valor, acao: 'criacao' };
   const { data, error } = await supabase.from('taxas_entrega').insert({
     local, valor, status: 'Ativo', logs: [log] as any,
+    loja_id: lojaId || LOJA_ONLINE_ID,
+    codigo,
   }).select().single();
   if (error) throw error;
   const nova = mapRow(data);
@@ -118,6 +143,17 @@ export const toggleStatusTaxaEntrega = async (id: string, usuarioId: string, usu
 export const updateTaxaLocal = async (id: string, local: string): Promise<TaxaEntrega | null> => {
   const { data, error } = await supabase.from('taxas_entrega').update({
     local, data_atualizacao: new Date().toISOString(),
+  }).eq('id', id).select().single();
+  if (error) throw error;
+  const updated = mapRow(data);
+  const idx = _taxasCache.findIndex(t => t.id === id);
+  if (idx !== -1) _taxasCache[idx] = updated;
+  return updated;
+};
+
+export const updateTaxaLoja = async (id: string, lojaId: string): Promise<TaxaEntrega | null> => {
+  const { data, error } = await supabase.from('taxas_entrega').update({
+    loja_id: lojaId, data_atualizacao: new Date().toISOString(),
   }).eq('id', id).select().single();
   if (error) throw error;
   const updated = mapRow(data);

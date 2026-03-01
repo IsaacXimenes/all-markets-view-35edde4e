@@ -30,7 +30,6 @@ import {
   MapPin, 
   DollarSign,
   TrendingUp,
-  AlertTriangle,
   X
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -40,20 +39,21 @@ import { InputComMascara } from '@/components/ui/InputComMascara';
 import { formatCurrency, exportToCSV } from '@/utils/formatUtils';
 import {
   getTaxasEntrega,
-  getTaxasEntregaAtivas,
   addTaxaEntrega,
   updateTaxaEntrega,
   toggleStatusTaxaEntrega,
   updateTaxaLocal,
+  updateTaxaLoja,
   TaxaEntrega,
   LogAlteracao
 } from '@/utils/taxasEntregaApi';
 
 export default function CadastrosTaxasEntrega() {
-  const { obterGestores, obterColaboradoresAtivos } = useCadastroStore();
+  const { obterGestores, obterColaboradoresAtivos, lojas, obterLojaById, obterLojasTipoLoja } = useCadastroStore();
   
   const [taxas, setTaxas] = useState<TaxaEntrega[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
+  const [filtroLoja, setFiltroLoja] = useState<string>('todos');
   const [filtroBusca, setFiltroBusca] = useState('');
   
   // Modal de criação/edição
@@ -62,7 +62,8 @@ export default function CadastrosTaxasEntrega() {
   const [form, setForm] = useState({
     local: '',
     valor: '',
-    responsavelId: ''
+    responsavelId: '',
+    lojaId: ''
   });
   
   // Modal de histórico
@@ -72,6 +73,7 @@ export default function CadastrosTaxasEntrega() {
   
   const colaboradores = obterColaboradoresAtivos();
   const gestores = obterGestores();
+  const lojasVenda = obterLojasTipoLoja();
 
   useEffect(() => {
     carregarDados();
@@ -82,7 +84,7 @@ export default function CadastrosTaxasEntrega() {
   };
 
   const resetForm = () => {
-    setForm({ local: '', valor: '', responsavelId: '' });
+    setForm({ local: '', valor: '', responsavelId: '', lojaId: '' });
     setEditingId(null);
   };
 
@@ -92,7 +94,8 @@ export default function CadastrosTaxasEntrega() {
       setForm({
         local: taxa.local,
         valor: taxa.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
-        responsavelId: ''
+        responsavelId: '',
+        lojaId: taxa.loja_id || ''
       });
     } else {
       resetForm();
@@ -116,6 +119,11 @@ export default function CadastrosTaxasEntrega() {
       toast.error('Selecione o responsável');
       return;
     }
+
+    if (!form.lojaId) {
+      toast.error('Selecione a loja');
+      return;
+    }
     
     const responsavel = colaboradores.find(c => c.id === form.responsavelId);
     if (!responsavel) {
@@ -131,9 +139,13 @@ export default function CadastrosTaxasEntrega() {
         if (taxaAtual && taxaAtual.local !== form.local.trim()) {
           updateTaxaLocal(editingId, form.local.trim());
         }
+        // Atualizar loja se mudou
+        if (taxaAtual && taxaAtual.loja_id !== form.lojaId) {
+          updateTaxaLoja(editingId, form.lojaId);
+        }
         toast.success('Taxa de entrega atualizada com sucesso');
       } else {
-        addTaxaEntrega(form.local.trim(), valor, form.responsavelId, responsavel.nome);
+        addTaxaEntrega(form.local.trim(), valor, form.responsavelId, responsavel.nome, form.lojaId);
         toast.success('Taxa de entrega cadastrada com sucesso');
       }
       
@@ -146,7 +158,6 @@ export default function CadastrosTaxasEntrega() {
   };
 
   const handleToggleStatus = (taxa: TaxaEntrega) => {
-    // Usar o primeiro gestor como responsável (em prod seria o usuário logado)
     const responsavel = gestores[0] || colaboradores[0];
     if (!responsavel) {
       toast.error('Nenhum responsável disponível');
@@ -164,13 +175,29 @@ export default function CadastrosTaxasEntrega() {
     setShowHistoricoModal(true);
   };
 
+  const getNomeLoja = (lojaId: string | null): string => {
+    if (!lojaId) return '—';
+    const loja = obterLojaById(lojaId);
+    return loja?.nome || '—';
+  };
+
+  // Lojas únicas presentes nas taxas (para filtro)
+  const lojasNoFiltro = useMemo(() => {
+    const ids = new Set(taxas.map(t => t.loja_id).filter(Boolean));
+    return Array.from(ids).map(id => {
+      const loja = obterLojaById(id!);
+      return loja ? { id: loja.id, nome: loja.nome } : null;
+    }).filter(Boolean) as { id: string; nome: string }[];
+  }, [taxas, obterLojaById]);
+
   const taxasFiltradas = useMemo(() => {
     return taxas.filter(t => {
       if (filtroStatus !== 'todos' && t.status !== filtroStatus) return false;
+      if (filtroLoja !== 'todos' && t.loja_id !== filtroLoja) return false;
       if (filtroBusca && !t.local.toLowerCase().includes(filtroBusca.toLowerCase())) return false;
       return true;
     }).sort((a, b) => a.local.localeCompare(b.local));
-  }, [taxas, filtroStatus, filtroBusca]);
+  }, [taxas, filtroStatus, filtroLoja, filtroBusca]);
 
   // Estatísticas
   const stats = {
@@ -186,7 +213,8 @@ export default function CadastrosTaxasEntrega() {
 
   const handleExportCSV = () => {
     const dataToExport = taxasFiltradas.map(t => ({
-      ID: t.id,
+      Código: t.codigo,
+      Loja: getNomeLoja(t.loja_id),
       Local: t.local,
       'Valor (R$)': t.valor.toFixed(2),
       Status: t.status,
@@ -196,7 +224,7 @@ export default function CadastrosTaxasEntrega() {
     toast.success('CSV exportado com sucesso!');
   };
 
-  const temFiltroAtivo = filtroStatus !== 'todos' || filtroBusca;
+  const temFiltroAtivo = filtroStatus !== 'todos' || filtroLoja !== 'todos' || filtroBusca;
 
   return (
     <CadastrosLayout title="Taxas de Entrega">
@@ -271,6 +299,21 @@ export default function CadastrosTaxasEntrega() {
                 onChange={(e) => setFiltroBusca(e.target.value)}
               />
             </div>
+
+            <div className="w-[180px]">
+              <Label>Loja</Label>
+              <Select value={filtroLoja} onValueChange={setFiltroLoja}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas</SelectItem>
+                  {lojasNoFiltro.map(l => (
+                    <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             
             <div className="w-[150px]">
               <Label>Status</Label>
@@ -291,7 +334,7 @@ export default function CadastrosTaxasEntrega() {
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  onClick={() => { setFiltroStatus('todos'); setFiltroBusca(''); }}
+                  onClick={() => { setFiltroStatus('todos'); setFiltroLoja('todos'); setFiltroBusca(''); }}
                   title="Limpar filtros"
                 >
                   <X className="h-4 w-4" />
@@ -328,7 +371,8 @@ export default function CadastrosTaxasEntrega() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID</TableHead>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Loja</TableHead>
                   <TableHead>Local</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead>Status</TableHead>
@@ -339,7 +383,8 @@ export default function CadastrosTaxasEntrega() {
               <TableBody>
                 {taxasFiltradas.map((taxa) => (
                   <TableRow key={taxa.id} className={taxa.status === 'Inativo' ? 'opacity-60' : ''}>
-                    <TableCell className="font-mono text-xs">{taxa.id}</TableCell>
+                    <TableCell className="font-mono text-xs">{taxa.codigo}</TableCell>
+                    <TableCell className="text-sm">{getNomeLoja(taxa.loja_id)}</TableCell>
                     <TableCell className="font-medium">{taxa.local}</TableCell>
                     <TableCell className="text-right font-semibold text-green-600">
                       {formatCurrency(taxa.valor)}
@@ -385,7 +430,7 @@ export default function CadastrosTaxasEntrega() {
                 ))}
                 {taxasFiltradas.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Nenhuma taxa de entrega encontrada.
                     </TableCell>
                   </TableRow>
@@ -405,6 +450,23 @@ export default function CadastrosTaxasEntrega() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="loja">Loja *</Label>
+              <Select 
+                value={form.lojaId} 
+                onValueChange={(v) => setForm(prev => ({ ...prev, lojaId: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a loja" />
+                </SelectTrigger>
+                <SelectContent>
+                  {lojasVenda.map(loja => (
+                    <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="local">Local *</Label>
               <Input

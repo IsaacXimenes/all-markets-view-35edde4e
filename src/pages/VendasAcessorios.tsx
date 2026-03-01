@@ -36,7 +36,7 @@ import { useDraftVenda } from '@/hooks/useDraftVenda';
 import { PagamentoQuadro } from '@/components/vendas/PagamentoQuadro';
 import { PainelRentabilidadeVenda } from '@/components/vendas/PainelRentabilidadeVenda';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
-import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
+import { useAuthStore } from '@/store/authStore';
 
 // Alias para compatibilidade
 const formatCurrency = formatarMoeda;
@@ -46,6 +46,7 @@ const DRAFT_KEY = 'draft_venda_acessorios';
 
 export default function VendasAcessorios() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const { obterLojasAtivas, obterLojasTipoLoja, obterVendedores, obterNomeLoja, obterNomeColaborador, obterColaboradorById, obterRodizioAtivoDoColaborador } = useCadastroStore();
   
   // Dados do cadastros - usando Zustand store
@@ -57,10 +58,28 @@ export default function VendasAcessorios() {
   const [contasFinanceiras] = useState<ContaFinanceira[]>(getContasFinanceirasHabilitadas());
   const [acessoriosEstoque, setAcessoriosEstoque] = useState<Acessorio[]>(getAcessorios());
   
-  // Info da venda
+  // Info da venda - responsável auto-preenchido
   const [vendaInfo] = useState(getNextVendaNumber());
+  const colaboradorLogado = user?.colaborador;
+  const colaboradorId = colaboradorLogado?.id || '';
+  const colaboradorNome = colaboradorLogado?.nome || 'Não identificado';
+
+  const lojaAutoDetectada = useMemo(() => {
+    if (!colaboradorId) return '';
+    const col = obterColaboradorById(colaboradorId);
+    if (!col) return '';
+    const rodizio = obterRodizioAtivoDoColaborador(col.id);
+    return rodizio ? rodizio.loja_destino_id : col.loja_id;
+  }, [colaboradorId, obterColaboradorById, obterRodizioAtivoDoColaborador]);
+
   const [lojaVenda, setLojaVenda] = useState('');
-  const [vendedor, setVendedor] = useState('');
+  const [vendedor] = useState(colaboradorId);
+
+  useEffect(() => {
+    if (lojaAutoDetectada && !lojaVenda) {
+      setLojaVenda(lojaAutoDetectada);
+    }
+  }, [lojaAutoDetectada]);
   
   // Cliente
   const [clienteId, setClienteId] = useState('');
@@ -122,7 +141,7 @@ export default function VendasAcessorios() {
     const draft = loadDraft();
     if (draft) {
       setLojaVenda(draft.lojaVenda || '');
-      setVendedor(draft.vendedor || '');
+      // vendedor is auto-filled from logged-in user, skip draft restore
       setClienteId(draft.clienteId || '');
       setClienteNome(draft.clienteNome || '');
       setClienteCpf(draft.clienteCpf || '');
@@ -491,26 +510,13 @@ export default function VendasAcessorios() {
                 <Input value={vendaInfo.numero} disabled className="bg-muted" />
               </div>
               <div>
-                <label className={`text-sm font-medium ${!vendedor ? 'text-destructive' : ''}`}>
+                <label className="text-sm font-medium">
                   Responsável *
                 </label>
-                <AutocompleteColaborador
-                  value={vendedor}
-                  onChange={(id: string) => {
-                    setVendedor(id);
-                    if (id) {
-                      const col = obterColaboradorById(id);
-                      if (col) {
-                        const rodizio = obterRodizioAtivoDoColaborador(col.id);
-                        setLojaVenda(rodizio ? rodizio.loja_destino_id : col.loja_id);
-                      }
-                    } else {
-                      setLojaVenda('');
-                    }
-                  }}
-                  placeholder="Selecione o responsável"
-                  filtrarPorTipo="vendedoresEGestores"
-                  className={!vendedor ? 'border-destructive' : ''}
+                <Input
+                  value={colaboradorNome}
+                  disabled
+                  className="bg-muted cursor-not-allowed"
                 />
               </div>
               <div>

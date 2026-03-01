@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -21,6 +21,8 @@ type FormData = z.infer<typeof schema>;
 
 const DefinirSenha = () => {
   const navigate = useNavigate();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isFirstLogin = useAuthStore((state) => state.isFirstLogin);
   const updatePassword = useAuthStore((state) => state.updatePassword);
   const isMobile = useIsMobile();
   const [showPassword, setShowPassword] = useState(false);
@@ -29,6 +31,10 @@ const DefinirSenha = () => {
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
+
+  // Guards internos complementares ao FirstLoginRoute
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isFirstLogin) return <Navigate to="/" replace />;
 
   const onSubmit = async (data: FormData) => {
     setIsLoading(true);

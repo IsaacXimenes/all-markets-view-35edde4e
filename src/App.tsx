@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useCadastroStore } from "@/store/cadastroStore";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { FirstLoginRoute } from "@/components/auth/FirstLoginRoute";
 import { initPlanosGarantiaCache } from "@/utils/planosGarantiaApi";
 import { initTaxasEntregaCache } from "@/utils/taxasEntregaApi";
 import { initValoresTrocaCache } from "@/utils/valoresRecomendadosTrocaApi";
@@ -209,7 +210,11 @@ const App = () => (
           <Routes>
             {/* Rotas públicas */}
             <Route path="/login" element={<Login />} />
-            <Route path="/definir-senha" element={<DefinirSenha />} />
+            
+            {/* Rota protegida de primeiro acesso */}
+            <Route element={<FirstLoginRoute />}>
+              <Route path="/definir-senha" element={<DefinirSenha />} />
+            </Route>
             
             {/* Rotas protegidas */}
             <Route element={<ProtectedRoute />}>

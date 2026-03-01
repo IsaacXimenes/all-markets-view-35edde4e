@@ -1,52 +1,74 @@
 
 
-# Plano: Importar aparelhos do CSV para o estoque
+# Plano: Corrigir fluxo de movimentacoes e erros de RLS no seed
 
-## Resumo
+## Problemas Identificados
 
-Importar 132 aparelhos do arquivo `produtos-estoque_1-2.csv` para a tabela `produtos`, todos da loja "Aguas Lindas Shopping".
+### 1. Erros de RLS no seed (taxas_entrega, planos_garantia, valores_recomendados_troca)
+As tres tabelas possuem RLS com politica `auth.uid() IS NOT NULL`. Quando o app carrega sem usuario autenticado (tela de login), o SELECT retorna vazio por causa do RLS. O codigo interpreta como "tabela vazia" e tenta fazer INSERT (seed), que tambem falha por RLS. Os dados ja existem no banco (25 taxas, 9 planos, 68 valores), entao o seed nao deveria ser executado.
 
-## Analise do Arquivo
+**Correcao**: Nos tres arquivos (`taxasEntregaApi.ts`, `planosGarantiaApi.ts`, `valoresRecomendadosTrocaApi.ts`), verificar se o usuario esta autenticado antes de tentar seed. Se nao autenticado, pular o seed silenciosamente e aguardar o proximo carregamento apos login.
 
-- **Total de linhas com dados**: 132 aparelhos (linhas 2-132, restante sao linhas vazias)
-- **Loja**: Todas da "Aguas Lindas Shopping" (com encoding quebrado no CSV)
-- **Marcas**: Apple, Xiaomi, Samsung
-- **Modelos**: iPhone 11 a iPhone 17 Pro Max, Poco C85, Redmi A5/Note 14S, Galaxy A06/A16/A36
-- **Valores**: R$ 300 a R$ 8.500
-- **Tipos**: Novo e Seminovo
+### 2. Fluxo de movimentacoes quebrado - mapeamento DB incompleto
+O `mapMovFromDB` define `produto: ''` e `imei: ''` porque a tabela `movimentacoes_estoque` nao tem essas colunas. Os campos `produto` (nome do aparelho) e `imei` precisam ser derivados do cache de produtos via `produto_id`.
 
-## Problema Identificado
+**Correcao**: Apos carregar as movimentacoes, cruzar com o cache de produtos para preencher `produto` e `imei` a partir do `produto_id`.
 
-O `LOJA_MAP` da edge function `import-produtos-estoque` nao reconhece "Aguas Lindas Shopping" (apenas "Aguas Lindas" sem "Shopping"). Alem disso, o CSV tem caractere de encoding quebrado no nome da loja que precisa ser normalizado.
+### 3. addMovimentacao - produto_id null e responsavel_id como string
+- `produto_id` e inserido como `null`, quando deveria ser o UUID do produto
+- `responsavel_id` recebe o NOME do colaborador (string), mas a coluna espera UUID. Isso causa falha no INSERT
 
-## Etapas
+**Correcao**: 
+- Buscar o produto pelo IMEI e enviar o `produto_id` correto
+- Em `EstoqueMovimentacoes.tsx`, enviar o ID do colaborador (UUID) separado do nome, e armazenar o nome apenas no cache local
 
-### 1. Atualizar a Edge Function `import-produtos-estoque`
+### 4. confirmarRecebimentoMovimentacao - mesmos problemas de referencia
+A funcao busca produto por IMEI no cache, mas se o mapeamento esta vazio, nao encontra. Precisa usar `produto_id` da movimentacao para localizar.
 
-- Adicionar ao `LOJA_MAP`:
-  - "Aguas Lindas Shopping" -> `b2c6ac94-...`
-  - "Aguas Lindas Shopping" -> `b2c6ac94-...`
-- Adicionar funcao `normalizeLojaName()` para remover caracteres de encoding quebrado (como ja feito nas outras edge functions)
-- Filtrar linhas vazias (marca e modelo vazios ja sao filtrados)
+## Arquivos a Modificar
 
-### 2. Deploy e Execucao
+### `src/utils/estoqueApi.ts`
+- `mapMovFromDB`: Enriquecer com dados do produto (produto, imei) apos o cache ser carregado
+- `initEstoqueCache`: Apos carregar produtos e movimentacoes, fazer o cruzamento de dados
+- `addMovimentacao`: Receber `produtoId` e enviar para o DB; armazenar nome e IMEI no cache local
+- `confirmarRecebimentoMovimentacao`: Usar `produto_id` da movimentacao ao inves de buscar por IMEI
 
-- Copiar o CSV para `public/data/`
-- Deploy da edge function atualizada
-- Enviar o CSV via POST para a edge function
-- A funcao usa `upsert` com `onConflict: "imei"` e `ignoreDuplicates: true`, entao duplicatas serao ignoradas automaticamente
+### `src/pages/EstoqueMovimentacoes.tsx`
+- `handleRegistrarMovimentacao`: Enviar o ID do produto corretamente; separar responsavel nome de responsavel ID
 
-### 3. Validacao
+### `src/utils/taxasEntregaApi.ts`
+- `initTaxasEntregaCache`: Verificar se ha sessao ativa antes de tentar seed
 
-- Consultar o banco para confirmar a contagem de registros inseridos
+### `src/utils/planosGarantiaApi.ts`
+- `initPlanosGarantiaCache`: Verificar se ha sessao ativa antes de tentar seed
+
+### `src/utils/valoresRecomendadosTrocaApi.ts`
+- `initValoresTrocaCache`: Verificar se ha sessao ativa antes de tentar seed
 
 ## Detalhes Tecnicos
 
-Novo mapeamento no LOJA_MAP:
+### Correcao do mapeamento de movimentacoes
 ```text
-"Aguas Lindas Shopping" -> "b2c6ac94-f08b-4c2e-955f-8a91d658d7d6"
-"Aguas Lindas Shopping" -> "b2c6ac94-f08b-4c2e-955f-8a91d658d7d6"
+mapMovFromDB atualmente:
+  produto: ''    --> precisa cruzar com _produtos via produto_id
+  imei: ''       --> precisa cruzar com _produtos via produto_id
+
+initEstoqueCache:
+  1. Carregar produtos
+  2. Carregar movimentacoes
+  3. Para cada movimentacao, buscar produto pelo produto_id e preencher nome + IMEI
 ```
 
-A edge function ja trata corretamente: parsing de moeda (R$), saude de bateria (%), tipo (Novo/Seminovo), modelo (cleanModel), e insercao em batches de 50 com upsert.
+### Correcao do addMovimentacao
+```text
+Antes:  produto_id: null, responsavel_id: mov.responsavel (NOME)
+Depois: produto_id: produto.id (UUID), responsavel_id: responsavelId (UUID separado)
+```
+
+### Correcao do seed
+```text
+Antes de tentar seed, verificar:
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return; // Nao tenta seed sem autenticacao
+```
 

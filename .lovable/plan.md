@@ -1,49 +1,54 @@
 
+# Plano: Padronizar ID legivel nas movimentacoes de estoque
 
-# Plano: Corrigir botao "Salvar" na movimentacao de aparelhos
+## Problema Atual
 
-## Problema
+A funcao `addMovimentacao` em `estoqueApi.ts` (linha 569) usa o UUID retornado pelo Supabase como ID da movimentacao:
+```
+const newMov: Movimentacao = { ...mov, id: data.id, status: 'Pendente' };
+```
+Isso resulta em IDs como `a1b2c3d4-e5f6-...`, inconsistente com os demais modulos que usam IDs legiveis:
+- Movimentacao Matriz: `MM-20260301-0001`
+- Movimentacao Acessorios: `MOV-ACESS-1709312345`
+- Movimentacao Pecas: `MOV-PEC-0001`
 
-A funcao `handleRegistrarMovimentacao` em `EstoqueMovimentacoes.tsx` (linha 220) chama `await addMovimentacao(...)` sem `try-catch`. Se o INSERT no banco falhar (por ex: erro de RLS, sessao expirada, ou qualquer outro motivo), a excecao e silenciada e o usuario nao recebe nenhum feedback — o dialogo simplesmente nao fecha e nada acontece.
+## Solucao
 
-## Causa Raiz
+Adicionar um campo `codigoLegivel` a interface `Movimentacao` e gerar um ID padronizado no formato `MOV-XXXX` (sequencial), mantendo o UUID do banco como `id` interno.
 
-O `addMovimentacao` em `estoqueApi.ts` (linha 568) faz `if (error) throw error;` — ou seja, lanca excecao em caso de falha. Mas a chamada no componente nao captura essa excecao.
+## Alteracoes
 
-## Correcao
+### 1. `src/utils/estoqueApi.ts`
 
-### `src/pages/EstoqueMovimentacoes.tsx`
-- Envolver a chamada `addMovimentacao` em um bloco `try-catch`
-- No `catch`, exibir toast com a mensagem de erro para o usuario ter visibilidade do problema
-- Logar o erro no console para depuracao
+**Interface Movimentacao (linha 151):** Adicionar campo `codigoLegivel: string`
 
-### Codigo da correcao (linhas 268-296)
+**Contador e gerador (proximo da linha 555):** Criar variavel `movIdCounter` e funcao `generateMovId()` que retorna `MOV-XXXX` sequencial (padStart 4 digitos), similar ao padrao existente em `generateMovMatrizId`.
 
-```text
-Antes:
-  const novaMovimentacao = await addMovimentacao({...});
-  setMovimentacoes([...]);
-  setDialogOpen(false);
-  ...
-  toast({ title: 'Movimentacao registrada', ... });
-
-Depois:
-  try {
-    const novaMovimentacao = await addMovimentacao({...});
-    setMovimentacoes([...]);
-    setDialogOpen(false);
-    ...
-    toast({ title: 'Movimentacao registrada', ... });
-  } catch (err: any) {
-    console.error('[MOV] Erro ao registrar movimentacao:', err);
-    toast({
-      title: 'Erro ao registrar movimentacao',
-      description: err?.message || 'Verifique se voce esta logado e tente novamente',
-      variant: 'destructive',
-    });
-  }
+**Funcao addMovimentacao (linha 559-575):** Apos o insert no banco, gerar o codigo legivel:
+```
+const codigoLegivel = generateMovId();
+const newMov: Movimentacao = { ...mov, id: data.id, codigoLegivel, status: 'Pendente' };
 ```
 
-## Arquivo modificado
-- `src/pages/EstoqueMovimentacoes.tsx` — adicionar try-catch no handleRegistrarMovimentacao
+**Funcao getMovimentacoes (linha 557):** Garantir que movimentacoes carregadas do cache tambem tenham `codigoLegivel` preenchido.
 
+### 2. `src/pages/EstoqueMovimentacoes.tsx`
+
+**Toast de sucesso (linha 295):** Trocar `novaMovimentacao.id` por `novaMovimentacao.codigoLegivel`:
+```
+description: `Movimentacao ${novaMovimentacao.codigoLegivel} registrada com sucesso.`
+```
+
+**Tabela de listagem:** Onde o `id` e exibido na interface, usar `codigoLegivel` em vez do UUID.
+
+### 3. Demais chamadores (`vendasApi.ts`, `garantiasApi.ts`)
+
+Estes arquivos chamam `addMovimentacao` mas nao exibem o ID ao usuario — apenas passam dados. Nao precisam de alteracao, o campo `codigoLegivel` sera adicionado automaticamente ao retorno.
+
+## Detalhes Tecnicos
+
+- O UUID do Supabase continua como `id` principal para queries no banco
+- O `codigoLegivel` e apenas para exibicao no frontend
+- Contador inicia em 1 e incrementa sequencialmente
+- Formato: `MOV-0001`, `MOV-0002`, etc.
+- Nenhuma alteracao no banco de dados e necessaria

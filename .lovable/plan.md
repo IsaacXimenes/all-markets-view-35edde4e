@@ -1,66 +1,164 @@
 
+# Auditoria 360 - ERP Thiago Imports
 
-# Corrigir Dados e Exibicao das Maquinas de Cartao
+## 1. Integridade dos Cadastros
 
-## Problema
+| Tabela | Registros | Status |
+|--------|-----------|--------|
+| Profiles | 75 | OK |
+| Colaboradores (ativos) | 76 | OK |
+| Lojas | 17 | OK |
+| Maquinas Cartao | 18 | OK (corrigido hoje) |
+| Clientes | 0 | Vazio (aguardando cadastros reais) |
+| Fornecedores | 0 | Vazio (aguardando cadastros reais) |
 
-Os dados foram inseridos com o nome da loja embutido no campo `nome` da maquina (ex: "Cielo - Elo - Assistencia"), e o campo `cnpj_vinculado` armazena o CNPJ bruto. A interface tenta buscar a loja pelo CNPJ como se fosse um ID, o que falha.
+**Vinculo profiles-colaboradores**: 75/75 profiles possuem `colaborador_id` preenchido. Nenhum profile orfao.
 
-Resultado atual: Nome = "Cielo - Elo - Assistencia", Loja Vinculada = "54872234000158", CNPJ = "-"
+**User Roles distribuidos**: 4 admins, 16 gestores, 26 vendedores, 11 estoquistas.
 
-Resultado esperado: Nome = "Cielo - Elo", Loja Vinculada = "Assistencia", CNPJ = "54.872.234/0001-58"
+**Veredicto**: APROVADO
 
-## Solucao
+---
 
-### 1. Adicionar coluna `loja_vinculada` na tabela (Migration)
+## 2. Seguranca e RLS - CRITICO
 
-Adicionar coluna `loja_vinculada VARCHAR` na tabela `maquinas_cartao` para armazenar o nome da loja separadamente.
+**Todas as 74 tabelas possuem RLS habilitado** (nenhuma tabela sem `rowsecurity`).
 
-### 2. Atualizar os 18 registros existentes (Insert tool - dados)
+Porem, o scan de seguranca encontrou **21 vulnerabilidades**, sendo **20 de nivel ERROR**:
 
-- Extrair a parte da loja do campo `nome` e mover para `loja_vinculada`
-- Remover a parte da loja do campo `nome`
-- Exemplo: "Cielo - Elo - Assistencia" vira nome="Cielo - Elo", loja_vinculada="Assistencia"
+| Problema | Tabelas Afetadas |
+|----------|-----------------|
+| Dados pessoais de clientes publicamente legiveis | `clientes` (CPF, email, telefone, endereco) |
+| Dados de colaboradores expostos | `colaboradores` (CPF, salarios, comissoes) |
+| Dados financeiros expostos | `vendas`, `contas_financeiras`, `despesas`, `venda_pagamentos`, `movimentacoes_entre_contas` |
+| Dados de RH expostos | `salarios_colaboradores`, `adiantamentos`, `vales`, `comissao_por_loja` |
+| Dados operacionais expostos | `produtos`, `fornecedores`, `notas_entrada`, `maquinas_cartao`, `garantias`, `ordens_servico`, `dividas_fiado`, `vendas_conferencia` |
+| Credenciais WhatsApp expostas | `config_whatsapp` (tokens API) |
+| Protecao de senhas vazadas desativada | Configuracao Auth |
 
-Mapeamento completo:
-| nome atual | nome novo | loja_vinculada |
-|---|---|---|
-| Cielo - Elo - Assistencia | Cielo - Elo | Assistencia |
-| Cielo - Elo - JK | Cielo - Elo | JK |
-| Cielo - Elo - Matriz | Cielo - Elo | Matriz |
-| Cielo - Elo - Online | Cielo - Elo | Online |
-| Cielo - Elo - Shopping Sul | Cielo - Elo | Shopping Sul |
-| Cielo - Master - Assistencia | Cielo - Master | Assistencia |
-| Cielo - Master - JK | Cielo - Master | JK |
-| Cielo - Master - Online | Cielo - Master | Online |
-| Cielo - Master - Shopping Sul | Cielo - Master | Shopping Sul |
-| Cielo - Visa - Assistencia | Cielo - Visa | Assistencia |
-| Cielo - Visa - JK | Cielo - Visa | JK |
-| Cielo - Visa - Online | Cielo - Visa | Online |
-| Cielo - Visa - Shopping Sul | Cielo - Visa | Shopping Sul |
-| Cielo - Visa/Master - Matriz | Cielo - Visa/Master | Matriz |
-| Pagbank - Elo - Shopping Aguas Lindas | Pagbank - Elo | Shopping Aguas Lindas |
-| Pagbank - Master - Shopping Aguas Lindas | Pagbank - Master | Shopping Aguas Lindas |
-| Pagbank - Visa - Shopping Aguas Lindas | Pagbank - Visa | Shopping Aguas Lindas |
-| Terceirizada - TODAS - Todas Unidades | Terceirizada - TODAS | Todas Unidades |
+**Diagnostico**: RLS esta HABILITADO em todas as tabelas, mas as policies estao excessivamente permissivas (provavelmente `USING (true)` para SELECT). Os dados estao acessiveis a qualquer usuario autenticado sem restricao de role/loja.
 
-### 3. Atualizar interface e API
+**Acao necessaria**: Implementar policies restritivas utilizando as funcoes `has_role()`, `get_user_loja_id()` e `is_acesso_geral()` ja existentes no banco. Sera necessario:
 
-**`src/utils/cadastrosApi.ts`**:
-- Adicionar campo `lojaVinculada` na interface `MaquinaCartao`
-- Atualizar `mapRowToMaquinaCartao` para incluir `loja_vinculada`
-- Atualizar `addMaquinaCartao` para salvar `loja_vinculada`
+1. Substituir policies `SELECT` permissivas em ~20 tabelas criticas
+2. Aplicar regras: Vendedor ve apenas sua loja, Gestor ve sua loja, Admin ve tudo
+3. Tabelas de RH (`salarios_colaboradores`, `adiantamentos`, `vales`) restritas a admin
+4. `config_whatsapp` restrita a admin
+5. Ativar "Leaked Password Protection" no painel Auth do Supabase
 
-**`src/pages/CadastrosMaquinas.tsx`**:
-- Coluna "Loja Vinculada": exibir `maquina.lojaVinculada` diretamente (sem lookup)
-- Coluna "CNPJ": exibir `maquina.cnpjVinculado` formatado com mascara (`formatCNPJ` ou `formatCPFCNPJ`)
-- Export CSV: mesma logica
+---
 
-## Detalhes Tecnicos
+## 3. Fluxo de Autenticacao
 
-| Item | Detalhe |
-|---|---|
-| Nova coluna | `loja_vinculada VARCHAR` em `maquinas_cartao` |
-| Formatacao CNPJ | Usar `formatCPFCNPJ` de `src/utils/formatUtils.ts` |
-| Arquivos alterados | migration SQL, `cadastrosApi.ts`, `CadastrosMaquinas.tsx`, `types.ts` (auto) |
+| Item | Status |
+|------|--------|
+| Login `primeiro.ultimo` com transliteracao | OK |
+| Redirecionamento `/definir-senha` para `first_login=true` | OK |
+| `FirstLoginRoute` protege acesso | OK |
+| `ProtectedRoute` bloqueia nao-autenticados | OK |
+| `updatePassword` marca `first_login=false` | OK |
+| 74/75 usuarios ainda com `first_login=true` | Esperado (ninguem definiu senha ainda) |
 
+**Veredicto**: APROVADO
+
+---
+
+## 4. Automacao de Responsavel
+
+Conforme memoria do sistema, todos os campos de "Responsavel" foram padronizados para usar `useAuthStore.getState().user`. Usuarios de "Acesso Geral" podem editar manualmente.
+
+**Veredicto**: APROVADO (ja implementado conforme padrao)
+
+---
+
+## 5. Performance e Erros
+
+### Erros no Console (ativos):
+
+| Erro | Arquivo | Causa |
+|------|---------|-------|
+| `invalid input syntax for type uuid: "CONF-001"` | `conferenciaGestorApi.ts` | Seed tenta inserir IDs string em colunas UUID |
+| `invalid input syntax for type uuid: "SOL-020"` | `solicitacaoPecasApi.ts` | Seed tenta inserir IDs string em colunas UUID |
+| `invalid input syntax for type uuid: "NOTA-ASS-002"` | `solicitacaoPecasApi.ts` | Seed tenta inserir IDs string em colunas UUID |
+
+Estes erros sao causados por seeds com IDs hardcoded nao-UUID que falham no insert, mas o sistema continua funcionando com o cache local (dados fantasma).
+
+### Seeds/Mocks ainda ativos em producao:
+
+| Arquivo | Tipo | Acao |
+|---------|------|------|
+| `conferenciaGestorApi.ts` | seedData com 10 conferencias falsas | Remover seed, iniciar vazio |
+| `solicitacaoPecasApi.ts` | seedSolicitacoes (6 registros) + seedNotas (8 registros) | Remover seed, iniciar vazio |
+| `atividadesGestoresApi.ts` | MOCK_ATIVIDADES (6 atividades) | Remover seed, iniciar vazio |
+| `valoresRecomendadosTrocaApi.ts` | SEED_VALORES (dados de referencia) | **Manter** - sao dados de referencia de precos reais |
+| `taxasEntregaApi.ts` | SEED_TAXAS (taxas de entrega por regiao) | **Manter** - sao dados operacionais reais |
+| `storesApi.ts` | mockStoresData (dashboard) | **Manter** - excecao por design (dashboard visual) |
+| `notificationsApi.ts` | Efemero em memoria | **Manter** - excecao por design |
+
+### localStorage residual:
+
+| Arquivo | Uso | Status |
+|---------|-----|--------|
+| `fluxoVendasApi.ts` | Conferencia de OS (IDs iniciados por "OS-") | **Excecao documentada** - OS nao integradas na tabela fluxo_vendas |
+
+---
+
+## Plano de Correcao
+
+### Fase 1 - Remover Seeds Problematicos (3 arquivos)
+
+1. **`conferenciaGestorApi.ts`**: Remover `seedData` e logica de seed no `init`. Iniciar cache vazio.
+2. **`solicitacaoPecasApi.ts`**: Remover `seedSolicitacoes`, `seedNotas` e logica de seed nos dois inits. Iniciar caches vazios.
+3. **`atividadesGestoresApi.ts`**: Remover `MOCK_ATIVIDADES` e logica de seed. Iniciar cache vazio.
+
+Isso eliminara os 3 erros UUID no console.
+
+### Fase 2 - Blindagem RLS (20 tabelas criticas)
+
+Implementar policies restritivas usando as funcoes SECURITY DEFINER ja existentes:
+
+**Modelo de policy por grupo:**
+
+```text
+Grupo RH (admin only):
+  salarios_colaboradores, adiantamentos, vales, comissao_por_loja
+  -> SELECT: has_role(auth.uid(), 'admin') OR is_acesso_geral(auth.uid())
+
+Grupo Financeiro (gestor/admin):
+  contas_financeiras, despesas, movimentacoes_entre_contas, venda_pagamentos
+  -> SELECT: has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'gestor') OR is_acesso_geral(auth.uid())
+
+Grupo Operacional (filtro por loja):
+  vendas, produtos, ordens_servico, garantias, notas_entrada, fornecedores
+  -> SELECT: has_role(auth.uid(), 'admin') OR is_acesso_geral(auth.uid()) 
+             OR get_user_loja_id(auth.uid()) = loja_id
+
+Grupo Sensivel (admin only):
+  config_whatsapp
+  -> SELECT: has_role(auth.uid(), 'admin')
+
+Dados pessoais:
+  clientes, colaboradores
+  -> SELECT: autenticado (manter leitura geral pois sao usados em autocompletes)
+  -> Criar VIEW sem CPF para consultas gerais
+```
+
+### Fase 3 - Configuracao Auth
+
+Ativar "Leaked Password Protection" no painel do Supabase (manual, via dashboard).
+
+---
+
+## Resumo Executivo
+
+| Area | Status | Acao |
+|------|--------|------|
+| Cadastros e dados | APROVADO | Nenhuma |
+| Vinculo profiles-colaboradores | APROVADO | Nenhuma |
+| Autenticacao e primeiro acesso | APROVADO | Nenhuma |
+| Automacao de responsavel | APROVADO | Nenhuma |
+| Seeds/mocks residuais | 3 FALHAS | Remover seeds de 3 arquivos |
+| Erros no console | 3 ERROS | Corrigidos ao remover seeds |
+| RLS/Seguranca | 20 FALHAS CRITICAS | Implementar policies restritivas em ~20 tabelas |
+| Leaked Password Protection | AVISO | Ativar no dashboard Supabase |
+| localStorage residual | 1 EXCECAO | Documentada e aceita (OS fallback) |

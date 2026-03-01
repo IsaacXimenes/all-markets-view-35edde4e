@@ -638,7 +638,7 @@ export default function EstoqueProdutosPendentes() {
                       </TableCell>
                       <TableCell>{getLojaNome(produto.loja)}</TableCell>
                       <TableCell className="font-medium text-primary">{formatCurrency(produto.valorOrigem || produto.valorCusto)}</TableCell>
-                      <TableCell className="font-mono text-xs">{produto.id}</TableCell>
+                      <TableCell className="font-mono text-xs">{produto.codigo || produto.id}</TableCell>
                       <TableCell className="font-mono text-xs">{formatIMEI(produto.imei)}</TableCell>
                       <TableCell>{getOrigemBadge(produto.origemEntrada)}</TableCell>
                       <TableCell>

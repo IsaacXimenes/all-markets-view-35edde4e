@@ -1,0 +1,1 @@
+ALTER TABLE public.maquinas_cartao ADD COLUMN loja_vinculada character varying;

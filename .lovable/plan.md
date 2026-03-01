@@ -1,54 +1,50 @@
 
-# Plano: Padronizar ID legivel nas movimentacoes de estoque
+# Corrigir campo "Responsavel" nas movimentacoes para exibir nome
 
-## Problema Atual
+## Problema
 
-A funcao `addMovimentacao` em `estoqueApi.ts` (linha 569) usa o UUID retornado pelo Supabase como ID da movimentacao:
+Na funcao `mapMovFromDB` em `estoqueApi.ts` (linha 357), o campo `responsavel` recebe diretamente o `responsavel_id` (UUID) do banco:
 ```
-const newMov: Movimentacao = { ...mov, id: data.id, status: 'Pendente' };
+responsavel: row.responsavel_id || '',
 ```
-Isso resulta em IDs como `a1b2c3d4-e5f6-...`, inconsistente com os demais modulos que usam IDs legiveis:
-- Movimentacao Matriz: `MM-20260301-0001`
-- Movimentacao Acessorios: `MOV-ACESS-1709312345`
-- Movimentacao Pecas: `MOV-PEC-0001`
+Isso faz com que a tabela de movimentacoes exiba o UUID em vez do nome do colaborador.
 
-## Solucao
+## Correcao
 
-Adicionar um campo `codigoLegivel` a interface `Movimentacao` e gerar um ID padronizado no formato `MOV-XXXX` (sequencial), mantendo o UUID do banco como `id` interno.
+### `src/utils/estoqueApi.ts`
 
-## Alteracoes
+**1. No `initEstoqueCache` (linhas 380-392):** Apos carregar as movimentacoes e enriquecer com dados do produto, tambem resolver o `responsavel_id` para o nome do colaborador. Importar `getColaboradores` do `cadastroStore` ou do `cadastrosApi` para fazer o lookup.
 
-### 1. `src/utils/estoqueApi.ts`
+Como o cache de colaboradores pode ja estar carregado via `cadastrosApi`, usar `getColaboradores()` para buscar a lista e resolver o nome:
 
-**Interface Movimentacao (linha 151):** Adicionar campo `codigoLegivel: string`
+```typescript
+// Dentro do bloco de enriquecimento das movimentacoes (linha 382-391)
+_movimentacoes = rawMovs.map(mov => {
+  const row = (movRes.data || []).find((r: any) => r.id === mov.id);
+  const produtoId = row?.produto_id;
+  const responsavelId = row?.responsavel_id;
+  let produto = mov.produto;
+  let imei = mov.imei;
+  let responsavel = mov.responsavel;
 
-**Contador e gerador (proximo da linha 555):** Criar variavel `movIdCounter` e funcao `generateMovId()` que retorna `MOV-XXXX` sequencial (padStart 4 digitos), similar ao padrao existente em `generateMovMatrizId`.
+  if (produtoId) {
+    const prod = _produtos.find(p => p.id === produtoId);
+    if (prod) { produto = `${prod.marca} ${prod.modelo}`; imei = prod.imei; }
+  }
 
-**Funcao addMovimentacao (linha 559-575):** Apos o insert no banco, gerar o codigo legivel:
+  if (responsavelId) {
+    const cols = getColaboradores();
+    const col = cols.find(c => c.id === responsavelId);
+    if (col) responsavel = col.nome;
+  }
+
+  return { ...mov, produto, imei, responsavel };
+});
 ```
-const codigoLegivel = generateMovId();
-const newMov: Movimentacao = { ...mov, id: data.id, codigoLegivel, status: 'Pendente' };
-```
 
-**Funcao getMovimentacoes (linha 557):** Garantir que movimentacoes carregadas do cache tambem tenham `codigoLegivel` preenchido.
+**2. No `mapMovFromDB` (linha 357):** Manter `responsavel: row.responsavel_id || ''` como fallback — o enriquecimento no `initEstoqueCache` sobreescreve com o nome.
 
-### 2. `src/pages/EstoqueMovimentacoes.tsx`
+Isso garante que tanto movimentacoes carregadas do banco quanto novas movimentacoes (que ja passam o nome na linha 276 do componente) exibam o nome do responsavel.
 
-**Toast de sucesso (linha 295):** Trocar `novaMovimentacao.id` por `novaMovimentacao.codigoLegivel`:
-```
-description: `Movimentacao ${novaMovimentacao.codigoLegivel} registrada com sucesso.`
-```
-
-**Tabela de listagem:** Onde o `id` e exibido na interface, usar `codigoLegivel` em vez do UUID.
-
-### 3. Demais chamadores (`vendasApi.ts`, `garantiasApi.ts`)
-
-Estes arquivos chamam `addMovimentacao` mas nao exibem o ID ao usuario — apenas passam dados. Nao precisam de alteracao, o campo `codigoLegivel` sera adicionado automaticamente ao retorno.
-
-## Detalhes Tecnicos
-
-- O UUID do Supabase continua como `id` principal para queries no banco
-- O `codigoLegivel` e apenas para exibicao no frontend
-- Contador inicia em 1 e incrementa sequencialmente
-- Formato: `MOV-0001`, `MOV-0002`, etc.
-- Nenhuma alteracao no banco de dados e necessaria
+## Arquivo modificado
+- `src/utils/estoqueApi.ts` — resolver responsavel_id para nome no carregamento do cache

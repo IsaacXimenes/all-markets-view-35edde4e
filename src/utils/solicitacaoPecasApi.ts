@@ -237,46 +237,18 @@ const loteToDb = (l: LotePagamento) => ({
   data_conferencia: l.dataConferencia || null,
 });
 
-// ============= SEED DATA =============
-const seedSolicitacoes: SolicitacaoPeca[] = [
-  { id: 'SOL-020', osId: 'OS-2025-0020', peca: 'Bateria iPhone 13 Pro', quantidade: 1, justificativa: 'Bateria com saúde em 65%, cliente relatou desligamentos', modeloImei: '999888777666001', lojaSolicitante: 'db894e7d', dataSolicitacao: '2025-01-18T10:00:00', status: 'Pendente', origemEntrada: 'Balcao' },
-  { id: 'SOL-001', osId: 'OS-2025-0007', peca: 'Display OLED iPhone 14 Pro', quantidade: 1, justificativa: 'Tela com burn-in severo, necessário troca urgente para garantia', modeloImei: '789012345678901', lojaSolicitante: '3ac7e00c', dataSolicitacao: '2025-01-11T10:00:00', status: 'Pendente', origemEntrada: 'Garantia' },
-  { id: 'SOL-002', osId: 'OS-2025-0006', peca: 'Câmera Traseira iPhone 13', quantidade: 1, justificativa: 'Câmera com defeito de foco automático', modeloImei: '678901234567890', lojaSolicitante: 'db894e7d', dataSolicitacao: '2025-01-16T09:30:00', status: 'Pendente', origemEntrada: 'Balcao' },
-  { id: 'SOL-003', osId: 'OS-2025-0003', peca: 'Bateria iPhone 12', quantidade: 2, justificativa: 'Reposição de estoque para assistências futuras', modeloImei: '345678901234567', lojaSolicitante: 'db894e7d', dataSolicitacao: '2025-01-13T14:00:00', status: 'Aprovada', fornecedorId: 'FORN-003', valorPeca: 180, responsavelCompra: 'COL-002', dataRecebimento: '2025-01-20', dataEnvio: '2025-01-21', origemEntrada: 'Estoque' },
-  { id: 'SOL-004', osId: 'OS-2025-0004', peca: 'Conector de Carga USB-C', quantidade: 3, justificativa: 'Peça com alta demanda, reposição de estoque', modeloImei: '456789012345678', lojaSolicitante: '5b9446d5', dataSolicitacao: '2025-01-14T11:00:00', status: 'Aprovada', fornecedorId: 'FORN-003', valorPeca: 45, responsavelCompra: 'COL-002', dataRecebimento: '2025-01-20', dataEnvio: '2025-01-21', origemEntrada: 'Balcao' },
-  { id: 'SOL-005', osId: 'OS-2025-0001', peca: 'Tela LCD iPhone 11', quantidade: 1, justificativa: 'Troca de tela para serviço de garantia', modeloImei: '123456789012345', lojaSolicitante: 'db894e7d', dataSolicitacao: '2025-01-10T11:00:00', status: 'Recebida', fornecedorId: 'FORN-005', valorPeca: 320, responsavelCompra: 'COL-002', dataRecebimento: '2025-01-15', dataEnvio: '2025-01-16', origemEntrada: 'Garantia' },
-];
-
-const seedNotas: NotaAssistencia[] = [
-  { id: 'NOTA-ASS-002', solicitacaoId: 'SOL-020', fornecedor: 'FORN-003', lojaSolicitante: 'db894e7d', osId: 'OS-2025-0020', dataCriacao: '2025-01-18T10:00:00', valorTotal: 450, status: 'Pendente', itens: [{ peca: 'Bateria iPhone 13 Pro', quantidade: 1, valorUnitario: 280 }, { peca: 'Película de vidro', quantidade: 2, valorUnitario: 85 }] },
-  { id: 'NOTA-ASS-003', solicitacaoId: 'SOL-018', fornecedor: 'FORN-005', lojaSolicitante: '5b9446d5', osId: 'OS-2025-0018', dataCriacao: '2025-01-17T14:30:00', valorTotal: 890, status: 'Pendente', itens: [{ peca: 'Tela LCD iPhone 14', quantidade: 1, valorUnitario: 750 }, { peca: 'Cola B7000', quantidade: 2, valorUnitario: 35 }, { peca: 'Ferramentas Troca Tela', quantidade: 1, valorUnitario: 70 }] },
-  { id: 'NOTA-ASS-004', solicitacaoId: 'SOL-015', fornecedor: 'FORN-001', lojaSolicitante: '3ac7e00c', osId: 'OS-2025-0015', dataCriacao: '2025-01-16T09:00:00', valorTotal: 1250, status: 'Pendente', itens: [{ peca: 'Módulo Câmera iPhone 15 Pro', quantidade: 1, valorUnitario: 1100 }, { peca: 'Flex Power', quantidade: 1, valorUnitario: 150 }] },
-  { id: 'NOTA-ASS-005', solicitacaoId: 'SOL-012', fornecedor: 'FORN-002', lojaSolicitante: '5b9446d5', osId: 'OS-2025-0012', dataCriacao: '2025-01-15T11:00:00', valorTotal: 320, status: 'Pendente', itens: [{ peca: 'Conector de Carga iPhone 12', quantidade: 2, valorUnitario: 120 }, { peca: 'Alto-falante auricular', quantidade: 1, valorUnitario: 80 }] },
-  { id: 'NOTA-ASS-006', solicitacaoId: 'SOL-010', fornecedor: 'FORN-003', lojaSolicitante: '0d06e7db', osId: 'OS-2025-0010', dataCriacao: '2025-01-14T15:00:00', valorTotal: 580, status: 'Pendente', itens: [{ peca: 'Bateria iPhone 14 Pro Max', quantidade: 1, valorUnitario: 380 }, { peca: 'Adesivo bateria', quantidade: 2, valorUnitario: 25 }, { peca: 'Parafusos Pentalobe', quantidade: 1, valorUnitario: 150 }] },
-  { id: 'NOTA-ASS-001', solicitacaoId: 'SOL-005', fornecedor: 'FORN-005', lojaSolicitante: 'db894e7d', osId: 'OS-2025-0005', dataCriacao: '2025-01-12T14:00:00', valorTotal: 320, status: 'Concluído', itens: [{ peca: 'Tela LCD iPhone 11', quantidade: 1, valorUnitario: 320 }], responsavelFinanceiro: 'Fernanda Lima', formaPagamento: 'Pix', contaPagamento: 'Conta Bancária Principal', dataConferencia: '2025-01-13' },
-  { id: 'NOTA-ASS-007', solicitacaoId: 'SOL-003', fornecedor: 'FORN-001', lojaSolicitante: '5b9446d5', osId: 'OS-2025-0003', dataCriacao: '2025-01-08T10:00:00', valorTotal: 420, status: 'Concluído', itens: [{ peca: 'Bateria iPhone 11', quantidade: 2, valorUnitario: 180 }, { peca: 'Adesivo bateria', quantidade: 2, valorUnitario: 30 }], responsavelFinanceiro: 'Lucas Mendes', formaPagamento: 'Transferência Bancária', contaPagamento: 'Conta Digital Administrativo', dataConferencia: '2025-01-09' },
-  { id: 'NOTA-ASS-008', solicitacaoId: 'SOL-001', fornecedor: 'FORN-002', lojaSolicitante: '3ac7e00c', osId: 'OS-2025-0001', dataCriacao: '2025-01-05T09:00:00', valorTotal: 780, status: 'Concluído', itens: [{ peca: 'Módulo câmera frontal iPhone 14', quantidade: 1, valorUnitario: 450 }, { peca: 'Face ID Flex', quantidade: 1, valorUnitario: 330 }], responsavelFinanceiro: 'Fernanda Lima', formaPagamento: 'Boleto', contaPagamento: 'Conta Bancária Principal', dataConferencia: '2025-01-07' },
-];
-
 // ============= INIT CACHES =============
 export const initSolicitacoesPecasCache = async () => {
   try {
     const { data, error } = await supabase.from('solicitacoes_pecas').select('*');
     if (error) throw error;
-    if (!data || data.length === 0) {
-      const records = seedSolicitacoes.map(solicitacaoToDb);
-      const { error: insertErr } = await supabase.from('solicitacoes_pecas').insert(records as any);
-      if (insertErr) console.error('[SolicitacoesPecas] Erro seed:', insertErr);
-      solicitacoes = [...seedSolicitacoes];
-    } else {
-      solicitacoes = data.map(dbToSolicitacao);
-    }
-    solicitacaoCounter = Math.max(21, solicitacoes.length + 1);
+    solicitacoes = (data || []).map(dbToSolicitacao);
+    solicitacaoCounter = Math.max(1, solicitacoes.length + 1);
     solicitacoesCacheInit = true;
     console.log(`[SolicitacoesPecas] Cache: ${solicitacoes.length} registros`);
   } catch (err) {
     console.error('[SolicitacoesPecas] Erro init:', err);
-    solicitacoes = [...seedSolicitacoes];
+    solicitacoes = [];
     solicitacoesCacheInit = true;
   }
 };
@@ -285,20 +257,13 @@ export const initNotasAssistenciaCache = async () => {
   try {
     const { data, error } = await supabase.from('notas_assistencia').select('*');
     if (error) throw error;
-    if (!data || data.length === 0) {
-      const records = seedNotas.map(notaToDb);
-      const { error: insertErr } = await supabase.from('notas_assistencia').insert(records as any);
-      if (insertErr) console.error('[NotasAssistencia] Erro seed:', insertErr);
-      notasAssistencia = [...seedNotas];
-    } else {
-      notasAssistencia = data.map(dbToNota);
-    }
-    notaAssistenciaCounter = Math.max(9, notasAssistencia.length + 1);
+    notasAssistencia = (data || []).map(dbToNota);
+    notaAssistenciaCounter = Math.max(1, notasAssistencia.length + 1);
     notasCacheInit = true;
     console.log(`[NotasAssistencia] Cache: ${notasAssistencia.length} registros`);
   } catch (err) {
     console.error('[NotasAssistencia] Erro init:', err);
-    notasAssistencia = [...seedNotas];
+    notasAssistencia = [];
     notasCacheInit = true;
   }
 };

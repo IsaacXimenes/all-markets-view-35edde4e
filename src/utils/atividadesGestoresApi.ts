@@ -51,17 +51,6 @@ let _execucoesCache: ExecucaoAtividade[] = [];
 let _logsCache: LogAtividade[] = [];
 let _atividadesCacheLoaded = false;
 
-const MOCK_ATIVIDADES: AtividadeCadastro[] = [
-  { id: 'ATV-001', nome: 'Abertura de Caixa', tipoHorario: 'fixo', horarioPrevisto: '09:00', pontuacaoBase: 1, lojasAtribuidas: 'todas', ativa: true },
-  { id: 'ATV-002', nome: 'Verificação de Estoque', tipoHorario: 'aberto', pontuacaoBase: 1, lojasAtribuidas: 'todas', ativa: true },
-  { id: 'ATV-003', nome: 'Conferência de Vitrine', tipoHorario: 'fixo', horarioPrevisto: '10:00', pontuacaoBase: 1, lojasAtribuidas: 'todas', ativa: true },
-  { id: 'ATV-004', nome: 'Relatório de Vendas do Dia Anterior', tipoHorario: 'fixo', horarioPrevisto: '09:30', pontuacaoBase: 1, lojasAtribuidas: 'todas', ativa: true },
-  { id: 'ATV-005', nome: 'Alinhamento com Equipe', tipoHorario: 'aberto', pontuacaoBase: 1, lojasAtribuidas: 'todas', ativa: true },
-  { id: 'ATV-006', nome: 'Fechamento de Caixa', tipoHorario: 'fixo', horarioPrevisto: '18:00', pontuacaoBase: 1, lojasAtribuidas: 'todas', ativa: true },
-  { id: 'ATV-007', nome: 'Envio de Relatório Final', tipoHorario: 'fixo', horarioPrevisto: '18:30', pontuacaoBase: 1, lojasAtribuidas: 'todas', ativa: true },
-  { id: 'ATV-008', nome: 'Conferir Lançamentos da Assistência', tipoHorario: 'fixo', horarioPrevisto: '10:00', pontuacaoBase: 1, lojasAtribuidas: 'todas', ativa: true },
-];
-
 // ── Mappers ──
 const mapAtividade = (r: any): AtividadeCadastro => ({
   id: r.id,
@@ -117,22 +106,6 @@ export const initAtividadesGestoresCache = async () => {
 
   _atividadesCache = (atvRes.data || []).map(mapAtividade);
   _logsCache = (logsRes.data || []).map(mapLog);
-
-  // Seed if empty
-  if (_atividadesCache.length === 0) {
-    for (const mock of MOCK_ATIVIDADES) {
-      const { data } = await supabase.from('atividades_gestores').insert({
-        nome: mock.nome,
-        tipo_horario: mock.tipoHorario,
-        horario_previsto: mock.horarioPrevisto || null,
-        pontuacao_base: mock.pontuacaoBase,
-        lojas_atribuidas: mock.lojasAtribuidas as any,
-        ativa: mock.ativa,
-      }).select().single();
-      if (data) _atividadesCache.push(mapAtividade(data));
-    }
-  }
-
   _atividadesCacheLoaded = true;
 };
 

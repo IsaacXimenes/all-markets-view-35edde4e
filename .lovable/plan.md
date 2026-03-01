@@ -1,164 +1,77 @@
 
-# Auditoria 360 - ERP Thiago Imports
+# Plano: Importacao de 466 Aparelhos para o Estoque
 
-## 1. Integridade dos Cadastros
+## Resumo
 
-| Tabela | Registros | Status |
-|--------|-----------|--------|
-| Profiles | 75 | OK |
-| Colaboradores (ativos) | 76 | OK |
-| Lojas | 17 | OK |
-| Maquinas Cartao | 18 | OK (corrigido hoje) |
-| Clientes | 0 | Vazio (aguardando cadastros reais) |
-| Fornecedores | 0 | Vazio (aguardando cadastros reais) |
+Importar os 466 produtos do CSV `produtos-estoque_1.csv` para a tabela `produtos` no Supabase, tratando todas as inconsistencias de formato detectadas.
 
-**Vinculo profiles-colaboradores**: 75/75 profiles possuem `colaborador_id` preenchido. Nenhum profile orfao.
+## Abordagem
 
-**User Roles distribuidos**: 4 admins, 16 gestores, 26 vendedores, 11 estoquistas.
+Criar uma **Edge Function** (`import-produtos-estoque`) que:
+1. Recebe o CSV como texto no body da requisicao
+2. Parseia todas as 466 linhas com tratamento de dados
+3. Mapeia nomes de lojas para UUIDs reais
+4. Insere em lotes no Supabase (batches de 50)
+5. Retorna relatorio de sucesso/erros
 
-**Veredicto**: APROVADO
+## Tratamento de Dados
 
----
+| Campo CSV | Transformacao | Valor no DB |
+|-----------|---------------|-------------|
+| `valorCusto` "R$ 4.762,00" | Remove "R$", espaco, troca "." por "", "," por "." | `4762.00` (numeric) |
+| `valorVendaSugerido` idem | Mesmo tratamento | numeric |
+| `vendaRecomendada` idem | Mesmo tratamento | numeric |
+| `saudeBateria` "84%" | Remove "%", parseInt | `84` (integer) |
+| `quantidade` vazia | Default `1` | `1` |
+| `tipo` "SEMINOVO"/"Seminovo" | Normaliza para "Seminovo" ou "Novo" | varchar |
+| `loja` "Shopping Sul" | Mapeia para UUID `0fc4a1f3-...` | uuid |
+| `condicao` vazio | Default vazio | varchar |
+| `statusNota` vazio | Default "Concluido" (ja conferidos) | varchar |
+| `origemEntrada` vazio | Default "Fornecedor" | varchar |
+| `estoqueConferido` "true" | Boolean true | boolean |
+| `assistenciaConferida` "true" | Boolean true | boolean |
+| Caracteres corrompidos em modelos | Limpar caracteres nao-ASCII invisivel | varchar limpo |
 
-## 2. Seguranca e RLS - CRITICO
-
-**Todas as 74 tabelas possuem RLS habilitado** (nenhuma tabela sem `rowsecurity`).
-
-Porem, o scan de seguranca encontrou **21 vulnerabilidades**, sendo **20 de nivel ERROR**:
-
-| Problema | Tabelas Afetadas |
-|----------|-----------------|
-| Dados pessoais de clientes publicamente legiveis | `clientes` (CPF, email, telefone, endereco) |
-| Dados de colaboradores expostos | `colaboradores` (CPF, salarios, comissoes) |
-| Dados financeiros expostos | `vendas`, `contas_financeiras`, `despesas`, `venda_pagamentos`, `movimentacoes_entre_contas` |
-| Dados de RH expostos | `salarios_colaboradores`, `adiantamentos`, `vales`, `comissao_por_loja` |
-| Dados operacionais expostos | `produtos`, `fornecedores`, `notas_entrada`, `maquinas_cartao`, `garantias`, `ordens_servico`, `dividas_fiado`, `vendas_conferencia` |
-| Credenciais WhatsApp expostas | `config_whatsapp` (tokens API) |
-| Protecao de senhas vazadas desativada | Configuracao Auth |
-
-**Diagnostico**: RLS esta HABILITADO em todas as tabelas, mas as policies estao excessivamente permissivas (provavelmente `USING (true)` para SELECT). Os dados estao acessiveis a qualquer usuario autenticado sem restricao de role/loja.
-
-**Acao necessaria**: Implementar policies restritivas utilizando as funcoes `has_role()`, `get_user_loja_id()` e `is_acesso_geral()` ja existentes no banco. Sera necessario:
-
-1. Substituir policies `SELECT` permissivas em ~20 tabelas criticas
-2. Aplicar regras: Vendedor ve apenas sua loja, Gestor ve sua loja, Admin ve tudo
-3. Tabelas de RH (`salarios_colaboradores`, `adiantamentos`, `vales`) restritas a admin
-4. `config_whatsapp` restrita a admin
-5. Ativar "Leaked Password Protection" no painel Auth do Supabase
-
----
-
-## 3. Fluxo de Autenticacao
-
-| Item | Status |
-|------|--------|
-| Login `primeiro.ultimo` com transliteracao | OK |
-| Redirecionamento `/definir-senha` para `first_login=true` | OK |
-| `FirstLoginRoute` protege acesso | OK |
-| `ProtectedRoute` bloqueia nao-autenticados | OK |
-| `updatePassword` marca `first_login=false` | OK |
-| 74/75 usuarios ainda com `first_login=true` | Esperado (ninguem definiu senha ainda) |
-
-**Veredicto**: APROVADO
-
----
-
-## 4. Automacao de Responsavel
-
-Conforme memoria do sistema, todos os campos de "Responsavel" foram padronizados para usar `useAuthStore.getState().user`. Usuarios de "Acesso Geral" podem editar manualmente.
-
-**Veredicto**: APROVADO (ja implementado conforme padrao)
-
----
-
-## 5. Performance e Erros
-
-### Erros no Console (ativos):
-
-| Erro | Arquivo | Causa |
-|------|---------|-------|
-| `invalid input syntax for type uuid: "CONF-001"` | `conferenciaGestorApi.ts` | Seed tenta inserir IDs string em colunas UUID |
-| `invalid input syntax for type uuid: "SOL-020"` | `solicitacaoPecasApi.ts` | Seed tenta inserir IDs string em colunas UUID |
-| `invalid input syntax for type uuid: "NOTA-ASS-002"` | `solicitacaoPecasApi.ts` | Seed tenta inserir IDs string em colunas UUID |
-
-Estes erros sao causados por seeds com IDs hardcoded nao-UUID que falham no insert, mas o sistema continua funcionando com o cache local (dados fantasma).
-
-### Seeds/Mocks ainda ativos em producao:
-
-| Arquivo | Tipo | Acao |
-|---------|------|------|
-| `conferenciaGestorApi.ts` | seedData com 10 conferencias falsas | Remover seed, iniciar vazio |
-| `solicitacaoPecasApi.ts` | seedSolicitacoes (6 registros) + seedNotas (8 registros) | Remover seed, iniciar vazio |
-| `atividadesGestoresApi.ts` | MOCK_ATIVIDADES (6 atividades) | Remover seed, iniciar vazio |
-| `valoresRecomendadosTrocaApi.ts` | SEED_VALORES (dados de referencia) | **Manter** - sao dados de referencia de precos reais |
-| `taxasEntregaApi.ts` | SEED_TAXAS (taxas de entrega por regiao) | **Manter** - sao dados operacionais reais |
-| `storesApi.ts` | mockStoresData (dashboard) | **Manter** - excecao por design (dashboard visual) |
-| `notificationsApi.ts` | Efemero em memoria | **Manter** - excecao por design |
-
-### localStorage residual:
-
-| Arquivo | Uso | Status |
-|---------|-----|--------|
-| `fluxoVendasApi.ts` | Conferencia de OS (IDs iniciados por "OS-") | **Excecao documentada** - OS nao integradas na tabela fluxo_vendas |
-
----
-
-## Plano de Correcao
-
-### Fase 1 - Remover Seeds Problematicos (3 arquivos)
-
-1. **`conferenciaGestorApi.ts`**: Remover `seedData` e logica de seed no `init`. Iniciar cache vazio.
-2. **`solicitacaoPecasApi.ts`**: Remover `seedSolicitacoes`, `seedNotas` e logica de seed nos dois inits. Iniciar caches vazios.
-3. **`atividadesGestoresApi.ts`**: Remover `MOCK_ATIVIDADES` e logica de seed. Iniciar cache vazio.
-
-Isso eliminara os 3 erros UUID no console.
-
-### Fase 2 - Blindagem RLS (20 tabelas criticas)
-
-Implementar policies restritivas usando as funcoes SECURITY DEFINER ja existentes:
-
-**Modelo de policy por grupo:**
+## Mapeamento de Lojas
 
 ```text
-Grupo RH (admin only):
-  salarios_colaboradores, adiantamentos, vales, comissao_por_loja
-  -> SELECT: has_role(auth.uid(), 'admin') OR is_acesso_geral(auth.uid())
-
-Grupo Financeiro (gestor/admin):
-  contas_financeiras, despesas, movimentacoes_entre_contas, venda_pagamentos
-  -> SELECT: has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'gestor') OR is_acesso_geral(auth.uid())
-
-Grupo Operacional (filtro por loja):
-  vendas, produtos, ordens_servico, garantias, notas_entrada, fornecedores
-  -> SELECT: has_role(auth.uid(), 'admin') OR is_acesso_geral(auth.uid()) 
-             OR get_user_loja_id(auth.uid()) = loja_id
-
-Grupo Sensivel (admin only):
-  config_whatsapp
-  -> SELECT: has_role(auth.uid(), 'admin')
-
-Dados pessoais:
-  clientes, colaboradores
-  -> SELECT: autenticado (manter leitura geral pois sao usados em autocompletes)
-  -> Criar VIEW sem CPF para consultas gerais
+CSV                -> UUID no Supabase
+"Shopping Sul"     -> 0fc4a1f3-9cd6-4e24-b0b5-7a6af4953fad
+"JK Shopping"      -> 9009b91c-0436-4070-9d30-670b8e6bd68e
+"Aguas Lindas"     -> b2c6ac94-f08b-4c2e-955f-8a91d658d7d6
+"Estoque - SIA"    -> fe27bdab-b6de-433c-8718-3f1690f2315d
+"Online"           -> df3995f6-1da1-4661-a68f-20fb548a9468
+"Matriz"           -> 6231ea0e-9ff3-4ad6-b822-6f9a8270afa6
 ```
 
-### Fase 3 - Configuracao Auth
+## Implementacao Tecnica
 
-Ativar "Leaked Password Protection" no painel do Supabase (manual, via dashboard).
+### 1. Edge Function `import-produtos-estoque`
 
----
+- Arquivo: `supabase/functions/import-produtos-estoque/index.ts`
+- Metodo: POST
+- Body: CSV completo como texto
+- Autenticacao: requer token de admin
+- Logica:
+  - Split por linhas, skip header
+  - Split cada linha por ";"
+  - Aplica transformacoes de valor
+  - Insere em batches de 50 via `supabase.from('produtos').insert(batch)`
+  - Retorna JSON com total inserido e erros
 
-## Resumo Executivo
+### 2. Copiar CSV para o projeto
 
-| Area | Status | Acao |
-|------|--------|------|
-| Cadastros e dados | APROVADO | Nenhuma |
-| Vinculo profiles-colaboradores | APROVADO | Nenhuma |
-| Autenticacao e primeiro acesso | APROVADO | Nenhuma |
-| Automacao de responsavel | APROVADO | Nenhuma |
-| Seeds/mocks residuais | 3 FALHAS | Remover seeds de 3 arquivos |
-| Erros no console | 3 ERROS | Corrigidos ao remover seeds |
-| RLS/Seguranca | 20 FALHAS CRITICAS | Implementar policies restritivas em ~20 tabelas |
-| Leaked Password Protection | AVISO | Ativar no dashboard Supabase |
-| localStorage residual | 1 EXCECAO | Documentada e aceita (OS fallback) |
+- Copiar `produtos-estoque_1.csv` para `public/data/` para referencia
+
+### 3. Execucao
+
+- Deploy da edge function
+- Chamar via curl com o conteudo do CSV
+- Verificar contagem final: `SELECT count(*) FROM produtos` deve retornar 466
+
+## Validacoes Pos-Importacao
+
+- Confirmar 466 registros na tabela
+- Verificar que todos os `loja_id` sao UUIDs validos
+- Confirmar que nenhum IMEI esta duplicado
+- Verificar que valores monetarios estao corretos (amostragem)

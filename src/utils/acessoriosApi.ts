@@ -20,6 +20,7 @@ export interface Acessorio {
   historicoValorRecomendado?: HistoricoValorRecomendadoAcessorio[];
   loja: string;
   fornecedorId?: string;
+  imei?: string;
 }
 
 export interface VendaAcessorio {
@@ -45,7 +46,8 @@ const mapFromDB = (row: any): Acessorio => ({
   valorCusto: Number(row.valor_custo) || 0,
   valorRecomendado: Number(row.valor_venda) || 0,
   loja: row.loja_id || '',
-  fornecedorId: row.marca || undefined, // reusing marca field for fornecedorId
+  fornecedorId: row.marca || undefined,
+  imei: row.imei || undefined,
 });
 
 const mapToDB = (a: Partial<Acessorio>) => ({
@@ -56,6 +58,7 @@ const mapToDB = (a: Partial<Acessorio>) => ({
   ...(a.valorRecomendado !== undefined && { valor_venda: a.valorRecomendado }),
   ...(a.loja !== undefined && { loja_id: a.loja || null }),
   ...(a.fornecedorId !== undefined && { marca: a.fornecedorId }),
+  ...(a.imei !== undefined && { imei: a.imei || null }),
 });
 
 export const initAcessoriosCache = async () => {

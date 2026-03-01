@@ -1,61 +1,65 @@
 
+# Plano: Finalizar Login, Primeiro Acesso e Automacao de Responsavel
 
-# Plano: Automacao Global de Primeiro Acesso
+## Estado Atual
 
-## Situacao Atual
+Apos analise detalhada, a maior parte do fluxo ja esta implementada:
 
-A maior parte do fluxo ja esta implementada:
-- Trigger `handle_new_user` cria profile com username extraido do email -- OK
-- Coluna `first_login` tem default `true` -- OK
-- Login converte `primeiro.ultimo` para email -- OK
-- `ProtectedRoute` redireciona para `/definir-senha` quando `first_login = true` -- OK
-- Pagina `/definir-senha` atualiza senha e seta `first_login = false` -- OK
+- **Login primeiro.ultimo**: Funciona. `LoginForm.tsx` converte username para email com transliteracao de acentos. OK.
+- **Trigger `handle_new_user`**: Existe e vincula colaborador automaticamente por matching de nome. OK.
+- **Rota `/definir-senha` protegida**: `FirstLoginRoute` exige autenticacao + `first_login = true`. OK.
+- **Pagina `DefinirSenha`**: Atualiza senha via `supabase.auth.updateUser` e seta `first_login = false`. OK.
+- **`ProtectedRoute`**: Redireciona para `/definir-senha` se `first_login = true`. OK.
+- **RLS em `profiles`**: Usuarios autenticados podem ler todos os profiles e atualizar o proprio. OK.
+- **65 arquivos** ja importam `useAuthStore` e muitos ja usam o colaborador logado.
 
-## Lacunas Identificadas
+## Lacunas a Resolver
 
-### 1. Trigger nao vincula colaborador automaticamente
-O trigger `handle_new_user` atual apenas insere `id`, `username` e `nome_completo` vazio. Nao tenta vincular ao `colaborador_id` nem preenche flags de funcao.
+### 1. Paginas de criacao com campo "Responsavel" editavel (deveria ser auto-preenchido e bloqueado)
 
-### 2. Rota `/definir-senha` esta publica
-Atualmente em `App.tsx` (linha 212), `/definir-senha` esta fora do `ProtectedRoute`. Isso significa que um usuario nao autenticado pode acessar a pagina, e um usuario autenticado que ja definiu senha tambem pode acessar.
+Os seguintes modulos ainda permitem selecao manual do responsavel em vez de usar o usuario logado automaticamente:
 
-### 3. Pagina `DefinirSenha` nao valida estado de autenticacao
-A pagina nao verifica se o usuario esta logado nem se `first_login` e realmente `true`.
+| Pagina | Campo | Situacao |
+|--------|-------|----------|
+| `VendasNova.tsx` | `vendedor` (Responsavel) | Autocomplete editavel, deveria auto-preencher com colaborador logado |
+| `VendasAcessorios.tsx` | `vendedor` (Responsavel) | Autocomplete editavel, deveria auto-preencher com colaborador logado |
+| `OSAssistenciaNova.tsx` | `tecnicoId` | Editavel, nao auto-preenche |
+| `EstoqueNotaCadastrar.tsx` | `responsavelLancamento` | Ja inicializa com `user?.colaborador?.id` mas ainda permite edicao |
+
+### 2. Inicializacao automatica do responsavel em formularios
+
+Alguns formularios inicializam o campo com string vazia em vez de usar o colaborador logado.
 
 ---
 
 ## Acoes
 
-### Acao 1: Atualizar trigger `handle_new_user` no Supabase
+### Acao 1: Auto-preencher e bloquear "Responsavel" em VendasNova
 
-Recriar a funcao para:
-- Extrair username do email
-- Buscar colaborador correspondente pelo nome (matching primeiro + ultimo nome)
-- Preencher `colaborador_id`, `nome_completo`, `cargo`, `eh_gestor`, `eh_vendedor`, `eh_estoquista`
-- Manter `first_login = true`
+- Inicializar `vendedor` com `user?.colaborador?.id` em vez de string vazia
+- Inicializar `lojaVenda` automaticamente baseado no rodizio ou loja do colaborador
+- Trocar o `AutocompleteColaborador` por um `Input` com `disabled` mostrando o nome do colaborador logado
+- Manter a logica de determinacao de loja (rodizio) na inicializacao
 
-```text
-handle_new_user():
-  username = split(email, '@')[1]
-  buscar colaborador onde LOWER(nome) contenha as partes do username
-  se encontrar -> preencher colaborador_id + flags
-  se nao -> inserir apenas username com first_login = true
-```
+### Acao 2: Auto-preencher e bloquear "Responsavel" em VendasAcessorios
 
-### Acao 2: Proteger rota `/definir-senha`
+- Mesma logica da Acao 1: inicializar `vendedor` com colaborador logado e bloquear campo
 
-Mover `/definir-senha` de rota publica para dentro de um wrapper protegido que:
-- Exige autenticacao (redireciona para `/login` se nao autenticado)
-- Permite acesso SOMENTE se `first_login = true`
-- Redireciona para `/` se `first_login = false`
+### Acao 3: Auto-preencher tecnico em OSAssistenciaNova
 
-Criar um componente `FirstLoginRoute` que encapsula essa logica.
+- Inicializar `tecnicoId` com `user?.colaborador?.id` quando o usuario logado for tecnico
+- Manter editavel apenas para gestores (que podem atribuir OS a outros tecnicos)
 
-### Acao 3: Adicionar validacao na pagina `DefinirSenha`
+### Acao 4: Garantir campo bloqueado em EstoqueNotaCadastrar
 
-Adicionar verificacao de estado do auth store:
-- Se nao autenticado, redirecionar para `/login`
-- Se `first_login` nao e `true`, redirecionar para `/`
+- O campo ja inicializa com o colaborador logado, mas ainda permite edicao
+- Trocar o `AutocompleteColaborador` por `Input` com `disabled`
+
+### Acao 5: Validar pagina DefinirSenha com guards internos
+
+- Adicionar verificacao de `isAuthenticated` e `isFirstLogin` dentro do componente
+- Redirecionar para `/login` se nao autenticado ou para `/` se `first_login` ja e `false`
+- Isso complementa a protecao da rota `FirstLoginRoute`
 
 ---
 
@@ -63,31 +67,33 @@ Adicionar verificacao de estado do auth store:
 
 ### Arquivos a editar
 
-1. **Migration SQL** -- Recriar funcao `handle_new_user` com vinculacao de colaborador
-2. **`src/App.tsx`** -- Mover rota `/definir-senha` para dentro de wrapper protegido
-3. **`src/components/auth/ProtectedRoute.tsx`** -- Nenhuma alteracao necessaria (ja funciona)
-4. **`src/components/auth/FirstLoginRoute.tsx`** -- Novo componente para proteger `/definir-senha`
-5. **`src/pages/DefinirSenha.tsx`** -- Adicionar guards de autenticacao e estado
+1. **`src/pages/VendasNova.tsx`** -- Auto-preencher vendedor com colaborador logado, bloquear campo, auto-determinar loja
+2. **`src/pages/VendasAcessorios.tsx`** -- Mesmo tratamento de VendasNova
+3. **`src/pages/OSAssistenciaNova.tsx`** -- Auto-preencher tecnico com colaborador logado (quando aplicavel)
+4. **`src/pages/EstoqueNotaCadastrar.tsx`** -- Bloquear campo responsavel (ja inicializa corretamente)
+5. **`src/pages/DefinirSenha.tsx`** -- Adicionar guards de autenticacao internos
 
-### Nova funcao SQL `handle_new_user`
-
-A funcao atualizada ira:
-1. Inserir o profile com username
-2. Executar um UPDATE imediato tentando vincular ao colaborador pelo matching de nome
-3. Copiar `nome`, `cargo`, `eh_gestor`, `eh_vendedor`, `eh_estoquista` do colaborador encontrado
-
-### Componente `FirstLoginRoute`
+### Padrao de auto-preenchimento
 
 ```text
-FirstLoginRoute:
-  if loading -> spinner
-  if !authenticated -> redirect /login
-  if !firstLogin -> redirect /
-  else -> render Outlet (pagina /definir-senha)
+// Em cada formulario:
+const { user } = useAuthStore();
+
+// Inicializacao
+const [vendedor] = useState(user?.colaborador?.id || '');
+
+// No JSX: campo somente leitura
+<Input value={user?.colaborador?.nome || 'Nao identificado'} disabled className="bg-muted" />
 ```
 
+### Logica de loja automatica (VendasNova)
+
+Ao auto-preencher o vendedor, o sistema tambem determina a loja:
+1. Verifica se o colaborador tem rodizio ativo
+2. Se sim, usa a loja de destino do rodizio
+3. Se nao, usa a loja cadastrada do colaborador
+
 ### Estimativa
-- 1 migration SQL
-- 1 novo componente (FirstLoginRoute)
-- 2 arquivos editados (App.tsx, DefinirSenha.tsx)
+- 5 arquivos editados
 - Complexidade: Baixa
+- Nenhuma migration SQL necessaria (trigger e RLS ja estao corretos)

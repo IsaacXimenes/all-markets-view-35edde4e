@@ -32,6 +32,7 @@ import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { formatCurrency } from '@/utils/formatUtils';
 import { useAuthStore } from '@/store/authStore';
+import { useIsAcessoGeral } from '@/utils/permissoesUtils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { BufferAnexos, AnexoTemporario } from '@/components/estoque/BufferAnexos';
 import { getProdutosCadastro } from '@/utils/cadastrosApi';
@@ -74,6 +75,7 @@ export default function EstoqueNotaCadastrar() {
   const produtosCadastro = getProdutosCadastro();
   const acessoriosCadastro = getAcessorios();
   const { user } = useAuthStore();
+  const acessoGeral = useIsAcessoGeral();
   
   const DRAFT_KEY = 'draft_nota_entrada';
 
@@ -468,11 +470,19 @@ export default function EstoqueNotaCadastrar() {
               </div>
               <div>
                 <Label>Responsável pelo Lançamento *</Label>
-                <Input
-                  value={user?.colaborador?.nome || 'Não identificado'}
-                  disabled
-                  className="bg-muted cursor-not-allowed"
-                />
+                {acessoGeral ? (
+                  <AutocompleteColaborador
+                    value={responsavelLancamento}
+                    onChange={setResponsavelLancamento}
+                    placeholder="Selecione o responsável..."
+                  />
+                ) : (
+                  <Input
+                    value={user?.colaborador?.nome || 'Não identificado'}
+                    disabled
+                    className="bg-muted cursor-not-allowed"
+                  />
+                )}
               </div>
             </div>
             

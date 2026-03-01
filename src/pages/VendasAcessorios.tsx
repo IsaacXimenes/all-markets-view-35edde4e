@@ -37,6 +37,8 @@ import { PagamentoQuadro } from '@/components/vendas/PagamentoQuadro';
 import { PainelRentabilidadeVenda } from '@/components/vendas/PainelRentabilidadeVenda';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { useAuthStore } from '@/store/authStore';
+import { useIsAcessoGeral } from '@/utils/permissoesUtils';
+import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 
 // Alias para compatibilidade
 const formatCurrency = formatarMoeda;
@@ -47,6 +49,7 @@ const DRAFT_KEY = 'draft_venda_acessorios';
 export default function VendasAcessorios() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const acessoGeral = useIsAcessoGeral();
   const { obterLojasAtivas, obterLojasTipoLoja, obterVendedores, obterNomeLoja, obterNomeColaborador, obterColaboradorById, obterRodizioAtivoDoColaborador } = useCadastroStore();
   
   // Dados do cadastros - usando Zustand store
@@ -73,7 +76,7 @@ export default function VendasAcessorios() {
   }, [colaboradorId, obterColaboradorById, obterRodizioAtivoDoColaborador]);
 
   const [lojaVenda, setLojaVenda] = useState('');
-  const [vendedor] = useState(colaboradorId);
+  const [vendedor, setVendedor] = useState(colaboradorId);
 
   useEffect(() => {
     if (lojaAutoDetectada && !lojaVenda) {
@@ -513,11 +516,20 @@ export default function VendasAcessorios() {
                 <label className="text-sm font-medium">
                   Responsável *
                 </label>
-                <Input
-                  value={colaboradorNome}
-                  disabled
-                  className="bg-muted cursor-not-allowed"
-                />
+                {acessoGeral ? (
+                  <AutocompleteColaborador
+                    value={vendedor}
+                    onChange={setVendedor}
+                    filtrarPorTipo="vendedoresEGestores"
+                    placeholder="Selecione o responsável..."
+                  />
+                ) : (
+                  <Input
+                    value={colaboradorNome}
+                    disabled
+                    className="bg-muted cursor-not-allowed"
+                  />
+                )}
               </div>
               <div>
                 <label className={`text-sm font-medium ${!lojaVenda ? 'text-destructive' : ''}`}>

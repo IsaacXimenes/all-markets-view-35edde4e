@@ -2817,22 +2817,22 @@ export default function VendasNova() {
             {!showPendentesTab ? (
               /* Aba Produtos Estoque */
               <Table className="min-w-full [&_th]:px-3 [&_td]:px-3 [&_th]:text-sm [&_td]:text-sm">
-                <TableHeader>
+                 <TableHeader>
                   <TableRow>
-                    <TableHead>Produto</TableHead>
+                    <TableHead className="max-w-[150px]">Produto</TableHead>
                     <TableHead>IMEI</TableHead>
                     <TableHead className="text-right">Valor Rec.</TableHead>
-                    <TableHead>Loja</TableHead>
+                    <TableHead className="max-w-[100px]">Loja</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {produtosFiltrados.map(produto => (
                     <TableRow key={produto.id} className={produto.quantidade === 0 ? 'opacity-50' : ''}>
-                      <TableCell className="font-medium">{produto.modelo}</TableCell>
+                      <TableCell className="font-medium max-w-[150px] truncate">{produto.modelo}</TableCell>
                       <TableCell className="font-mono text-sm">{displayIMEI(produto.imei)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(produto.vendaRecomendada || produto.valorVendaSugerido)}</TableCell>
-                      <TableCell>{obterNomeLoja(produto.lojaAtualId || produto.loja)}</TableCell>
+                      <TableCell className="max-w-[100px] truncate">{obterNomeLoja(produto.lojaAtualId || produto.loja)}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">
                           <Button 

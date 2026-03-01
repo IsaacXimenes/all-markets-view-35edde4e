@@ -930,3 +930,6 @@ export const conferirItensAutomaticamentePorVenda = (
   }
   return { movimentacao, itensConferidos };
 };
+
+// Auto-init
+initEstoqueCache().catch(e => console.error('[ESTOQUE] Erro ao inicializar cache:', e));

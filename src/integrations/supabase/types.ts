@@ -3600,6 +3600,24 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       vales: {
         Row: {
           colaborador_id: string | null
@@ -4154,10 +4172,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_colaborador_id: { Args: { _user_id: string }; Returns: string }
+      get_user_loja_id: { Args: { _user_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_acesso_geral: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "gestor" | "vendedor" | "estoquista"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -4284,6 +4311,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "gestor", "vendedor", "estoquista"],
+    },
   },
 } as const

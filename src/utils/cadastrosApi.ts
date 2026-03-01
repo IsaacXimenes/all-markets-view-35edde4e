@@ -294,7 +294,7 @@ let cargos: Cargo[] = [
   { id: 'CARGO-005', funcao: 'Técnico Assistência', permissoes: ['Assistência', 'Estoque'] },
   { id: 'CARGO-006', funcao: 'Auxiliar Administrativo', permissoes: ['Cadastros'] },
   { id: 'CARGO-007', funcao: 'Analista Financeiro', permissoes: ['Financeiro', 'Relatórios'] },
-  { id: 'CARGO-008', funcao: 'Supervisor de Loja', permissoes: ['Vendas', 'Estoque', 'Relatórios'] },
+  { id: 'CARGO-008', funcao: 'Gestor de Loja', permissoes: ['Vendas', 'Estoque', 'Relatórios'] },
   { id: 'CARGO-009', funcao: 'Motoboy', permissoes: ['Entregas'] },
   { id: 'CARGO-010', funcao: 'Sócio Administrador', permissoes: ['Financeiro', 'Estoque', 'Vendas', 'Assistência', 'Cadastros', 'Relatórios', 'Admin'] },
   { id: 'CARGO-011', funcao: 'Assistente Administrativo', permissoes: ['Cadastros', 'Financeiro'] },

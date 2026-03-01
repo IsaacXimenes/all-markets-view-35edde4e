@@ -26,6 +26,7 @@ import { initLotesRevisaoCache } from "@/utils/loteRevisaoApi";
 import { initNotasEntradaCache } from "@/utils/notaEntradaFluxoApi";
 import { initConfigWhatsAppCache } from "@/utils/whatsappNotificacaoApi";
 import Login from "./pages/Login";
+import DefinirSenha from "./pages/DefinirSenha";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Performance from "./pages/Performance";
@@ -206,8 +207,9 @@ const App = () => (
         
         <BrowserRouter>
           <Routes>
-            {/* Rota pública de login */}
+            {/* Rotas públicas */}
             <Route path="/login" element={<Login />} />
+            <Route path="/definir-senha" element={<DefinirSenha />} />
             
             {/* Rotas protegidas */}
             <Route element={<ProtectedRoute />}>

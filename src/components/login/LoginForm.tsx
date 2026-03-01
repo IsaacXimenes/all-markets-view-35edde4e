@@ -8,7 +8,9 @@ import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const loginSchema = z.object({
-  username: z.string().min(1, 'Nome de usuário é obrigatório'),
+  username: z.string()
+    .min(1, 'Nome de usuário é obrigatório')
+    .regex(/^[a-záàâãéèêíóôõúüç]+\.[a-záàâãéèêíóôõúüç]+$/i, 'Formato inválido. Use primeiro.ultimo'),
   password: z.string().min(1, 'Senha é obrigatória'),
 });
 
@@ -37,12 +39,11 @@ export const LoginForm = ({ onLoginSuccess, className }: LoginFormProps) => {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     setError(null);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    const success = login(data.username, data.password);
-    if (success) {
+    const result = await login(data.username, data.password);
+    if (result.success) {
       onLoginSuccess();
     } else {
-      setError('Credenciais inválidas. Tente novamente.');
+      setError(result.error || 'Usuário sem permissão de acesso');
       setIsLoading(false);
     }
   };
@@ -68,7 +69,7 @@ export const LoginForm = ({ onLoginSuccess, className }: LoginFormProps) => {
             <input
               {...register('username')}
               type="text"
-              placeholder="Digite seu usuário"
+              placeholder="primeiro.ultimo"
               autoComplete="username"
               className={cn(
                 cn('w-full rounded-xl pl-11 pr-4 text-white text-sm', isMobile ? 'py-3' : 'py-3.5'),
@@ -145,17 +146,6 @@ export const LoginForm = ({ onLoginSuccess, className }: LoginFormProps) => {
             style={{ backgroundColor: '#F7BB05', color: '#111111' }}
           >
             {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Entrar'}
-          </button>
-        </div>
-
-        {/* Forgot */}
-        <div className="text-center pt-1">
-          <button
-            type="button"
-            className="text-sm transition-colors duration-200 hover:text-[#F7BB05]"
-            style={{ color: '#6B7280' }}
-          >
-            Esqueceu a senha?
           </button>
         </div>
       </form>

@@ -7,13 +7,22 @@ const Login = () => {
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isAnimating = useAuthStore((state) => state.isAnimating);
+  const isFirstLogin = useAuthStore((state) => state.isFirstLogin);
+  const initialize = useAuthStore((state) => state.initialize);
 
-  // Redirecionar se já estiver autenticado e não estiver animando
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
   useEffect(() => {
     if (isAuthenticated && !isAnimating) {
-      navigate('/', { replace: true });
+      if (isFirstLogin) {
+        navigate('/definir-senha', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     }
-  }, [isAuthenticated, isAnimating, navigate]);
+  }, [isAuthenticated, isAnimating, isFirstLogin, navigate]);
 
   return <LoginCard />;
 };

@@ -25,6 +25,7 @@ export interface TimelineEntry {
 
 export interface Produto {
   id: string;
+  codigo: string;
   imei: string;
   imagem?: string;
   marca: string;
@@ -193,6 +194,7 @@ export const getLojasPorPoolEstoque = (lojaId: string): string[] => {
 
 const mapProdutoFromDB = (row: any): Produto => ({
   id: row.id,
+  codigo: row.codigo || '',
   imei: row.imei || '',
   imagem: row.imagem || undefined,
   marca: row.marca,
@@ -235,6 +237,7 @@ const mapProdutoFromDB = (row: any): Produto => ({
 
 const mapProdutoToDB = (p: Partial<Produto>) => {
   const db: any = {};
+  if (p.codigo !== undefined) db.codigo = p.codigo;
   if (p.imei !== undefined) db.imei = p.imei;
   if (p.imagem !== undefined) db.imagem = p.imagem || null;
   if (p.marca !== undefined) db.marca = p.marca;
@@ -373,7 +376,7 @@ export const initEstoqueCache = async (): Promise<void> => {
     _notas = (notaRes.data || []).map(mapNotaFromDB);
     _movimentacoes = (movRes.data || []).map(mapMovFromDB);
     _cacheLoaded = true;
-    initializeProductIds(_produtos.map(p => p.id));
+    initializeProductIds(_produtos.map(p => p.codigo));
   } catch (e) {
     console.error('[ESTOQUE] Erro ao carregar cache:', e);
   }
@@ -606,7 +609,7 @@ export const migrarAparelhoNovoParaEstoque = async (
   if (jaExiste) return jaExiste;
   const newId = generateProductId();
   const novoProduto: Produto = {
-    id: newId, imei: produto.imei, marca: produto.marca, modelo: produto.modelo, cor: produto.cor,
+    id: newId, codigo: newId, imei: produto.imei, marca: produto.marca, modelo: produto.modelo, cor: produto.cor,
     tipo: 'Novo', quantidade: 1, valorCusto: produto.valorUnitario, valorVendaSugerido: produto.valorUnitario * 1.8,
     saudeBateria: produto.saudeBateria || 100, loja: lojaDestino, estoqueConferido: true, assistenciaConferida: true,
     condicao: 'Lacrado', historicoCusto: [{ data: new Date().toISOString().split('T')[0], fornecedor, valor: produto.valorUnitario }],

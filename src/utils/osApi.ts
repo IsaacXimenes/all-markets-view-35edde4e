@@ -71,148 +71,7 @@ export interface ProdutoPendente {
 let produtosPendentesCache: ProdutoPendente[] = [];
 let cacheInitialized = false;
 
-// Dados seed iniciais
-const SEED_DATA: ProdutoPendente[] = [
-  {
-    id: 'PROD-0001',
-    imei: '352999888777001',
-    marca: 'Apple',
-    modelo: 'iPhone 13 Pro',
-    cor: 'Grafite',
-    tipo: 'Seminovo',
-    condicao: 'Semi-novo',
-    origemEntrada: 'Fornecedor',
-    notaOuVendaId: 'NC-2025-0010',
-    valorCusto: 3100.00,
-    valorCustoOriginal: 3100.00,
-    valorOrigem: 3100.00,
-    saudeBateria: 86,
-    loja: 'db894e7d',
-    dataEntrada: '2025-12-13',
-    timeline: [{ id: 'TL-001', data: '2025-12-13T09:30:00', tipo: 'entrada', titulo: 'Entrada via Fornecedor', descricao: 'Produto PROD-0001 recebido da nota NC-2025-0010 - Fornecedor TechSupply Imports', responsavel: 'Lucas Mendes' }],
-    custoAssistencia: 0,
-    statusGeral: 'Pendente Estoque',
-    contadorEncaminhamentos: 0
-  },
-  {
-    id: 'PROD-0002',
-    imei: '352999888777002',
-    marca: 'Apple',
-    modelo: 'iPhone 14',
-    cor: 'Azul',
-    tipo: 'Seminovo',
-    condicao: 'Semi-novo',
-    origemEntrada: 'Base de Troca',
-    notaOuVendaId: 'VEN-2025-0050',
-    valorCusto: 3500.00,
-    valorCustoOriginal: 3500.00,
-    valorOrigem: 3500.00,
-    saudeBateria: 91,
-    loja: '3ac7e00c',
-    dataEntrada: '2025-12-10',
-    timeline: [{ id: 'TL-002', data: '2025-12-10T10:00:00', tipo: 'entrada', titulo: 'Entrada via Base de Troca', descricao: 'Produto PROD-0002 recebido como base de troca na venda VEN-2025-0050', responsavel: 'Roberto Alves' }],
-    custoAssistencia: 0,
-    statusGeral: 'Pendente Estoque',
-    contadorEncaminhamentos: 0
-  },
-  {
-    id: 'PROD-0003',
-    imei: '352999888777003',
-    marca: 'Apple',
-    modelo: 'iPhone 12 Mini',
-    cor: 'Branco',
-    tipo: 'Seminovo',
-    condicao: 'Semi-novo',
-    origemEntrada: 'Fornecedor',
-    notaOuVendaId: 'NC-2025-0012',
-    valorCusto: 1800.00,
-    valorCustoOriginal: 1800.00,
-    valorOrigem: 1800.00,
-    saudeBateria: 72,
-    loja: '5b9446d5',
-    dataEntrada: '2025-12-08',
-    timeline: [{ id: 'TL-004', data: '2025-12-08T08:30:00', tipo: 'entrada', titulo: 'Entrada via Fornecedor', descricao: 'Produto PROD-0003 recebido da nota NC-2025-0012 - Fornecedor FastCell Distribuição', responsavel: 'Ana Paula' }],
-    custoAssistencia: 0,
-    statusGeral: 'Pendente Estoque',
-    contadorEncaminhamentos: 0
-  },
-  {
-    id: 'PROD-0004',
-    imei: '352999888777004',
-    marca: 'Apple',
-    modelo: 'iPhone 11 Pro',
-    cor: 'Verde Meia-Noite',
-    tipo: 'Seminovo',
-    condicao: 'Semi-novo',
-    origemEntrada: 'Base de Troca',
-    notaOuVendaId: 'VEN-2025-0045',
-    valorCusto: 1500.00,
-    valorCustoOriginal: 1500.00,
-    valorOrigem: 1500.00,
-    saudeBateria: 78,
-    loja: '0d06e7db',
-    dataEntrada: '2025-12-09',
-    parecerEstoque: { id: 'PE-003', data: '2025-12-09T11:30:00', status: 'Encaminhado para conferência da Assistência', observacoes: 'Base de troca com bateria degradada, encaminhar para troca de bateria.', responsavel: 'Roberto Alves' },
-    timeline: [
-      { id: 'TL-006', data: '2025-12-09T10:00:00', tipo: 'entrada', titulo: 'Entrada via Base de Troca', descricao: 'Produto PROD-0004 recebido como base de troca na venda VEN-2025-0045 - Cliente Maria Silva', responsavel: 'Vendedor João' },
-      { id: 'TL-007', data: '2025-12-09T11:30:00', tipo: 'parecer_estoque', titulo: 'Parecer Estoque - Encaminhado Assistência', descricao: 'PROD-0004 encaminhado para conferência da Assistência. Bateria degradada.', responsavel: 'Roberto Alves' }
-    ],
-    custoAssistencia: 0,
-    statusGeral: 'Aguardando Recebimento Assistência',
-    contadorEncaminhamentos: 1
-  },
-  {
-    id: 'PROD-0005',
-    imei: '352999888777005',
-    marca: 'Apple',
-    modelo: 'iPhone 13',
-    cor: 'Rosa',
-    tipo: 'Seminovo',
-    condicao: 'Semi-novo',
-    origemEntrada: 'Fornecedor',
-    notaOuVendaId: 'NC-2025-0015',
-    valorCusto: 2200.00,
-    valorCustoOriginal: 2200.00,
-    valorOrigem: 2200.00,
-    saudeBateria: 82,
-    loja: 'fcc78c1a',
-    dataEntrada: '2025-12-11',
-    parecerEstoque: { id: 'PE-004', data: '2025-12-11T15:00:00', status: 'Encaminhado para conferência da Assistência', observacoes: 'Tela com pequeno risco, encaminhar para polimento.', responsavel: 'Fernanda Lima' },
-    timeline: [
-      { id: 'TL-009', data: '2025-12-11T10:30:00', tipo: 'entrada', titulo: 'Entrada via Fornecedor', descricao: 'Produto PROD-0005 recebido da nota NC-2025-0015 - Fornecedor TechnoImports', responsavel: 'Vendedora Ana' },
-      { id: 'TL-010', data: '2025-12-11T15:00:00', tipo: 'parecer_estoque', titulo: 'Parecer Estoque - Encaminhado Assistência', descricao: 'PROD-0005 encaminhado para conferência da Assistência. Tela com pequeno risco.', responsavel: 'Fernanda Lima' }
-    ],
-    custoAssistencia: 0,
-    statusGeral: 'Aguardando Recebimento Assistência',
-    contadorEncaminhamentos: 1
-  },
-  {
-    id: 'PROD-0006',
-    imei: '999888777666555',
-    marca: 'Apple',
-    modelo: 'iPhone 15 Pro Max',
-    cor: 'Titânio Natural',
-    tipo: 'Seminovo',
-    condicao: 'Semi-novo',
-    origemEntrada: 'Base de Troca',
-    notaOuVendaId: 'VEN-2025-0060',
-    valorCusto: 5500.00,
-    valorCustoOriginal: 5500.00,
-    valorOrigem: 5500.00,
-    saudeBateria: 88,
-    loja: 'db894e7d',
-    dataEntrada: '2025-01-20',
-    parecerEstoque: { id: 'PE-006', data: '2025-01-20T14:00:00', status: 'Encaminhado para conferência da Assistência', observacoes: 'Tela com defeito, encaminhar para reparo.', responsavel: 'Roberto Alves' },
-    timeline: [
-      { id: 'TL-020', data: '2025-01-20T10:00:00', tipo: 'entrada', titulo: 'Entrada via Base de Troca', descricao: 'Produto PROD-0006 recebido como base de troca na venda VEN-2025-0060', responsavel: 'Vendedor João' },
-      { id: 'TL-021', data: '2025-01-20T14:00:00', tipo: 'parecer_estoque', titulo: 'Parecer Estoque - Encaminhado Assistência', descricao: 'Tela com defeito, encaminhar para reparo.', responsavel: 'Roberto Alves' },
-      { id: 'TL-022', data: '2025-01-22T16:00:00', tipo: 'parecer_assistencia', titulo: 'Serviço Concluído no Laboratório – OS-2025-0009', descricao: 'Tela OLED substituída com sucesso. Aparelho testado e funcionando normalmente.', responsavel: 'Jeferson Sousa Cabral', valor: 450 }
-    ],
-    custoAssistencia: 450,
-    statusGeral: 'Serviço Concluído - Validar Aparelho',
-    contadorEncaminhamentos: 1
-  }
-];
+// Seed removido - dados vêm exclusivamente do Supabase
 
 // Helper: mapear row do Supabase para ProdutoPendente
 const mapRowToProduto = (row: any): ProdutoPendente => ({
@@ -293,24 +152,15 @@ export const initProdutosPendentesCache = async () => {
     const { data, error } = await supabase.from('produtos_pendentes_os').select('*');
     if (error) throw error;
 
-    if (data && data.length > 0) {
-      produtosPendentesCache = data.map(mapRowToProduto);
-    } else {
-      // Seed
-      produtosPendentesCache = [...SEED_DATA];
-      for (const p of SEED_DATA) {
-        await syncToSupabase(p);
-      }
-    }
+    produtosPendentesCache = (data || []).map(mapRowToProduto);
 
     // Register IDs
     produtosPendentesCache.forEach(p => registerProductId(p.id));
     cacheInitialized = true;
     console.log(`[osApi] Cache inicializado com ${produtosPendentesCache.length} produtos pendentes`);
   } catch (err) {
-    console.error('[osApi] Erro ao inicializar cache, usando seed:', err);
-    produtosPendentesCache = [...SEED_DATA];
-    produtosPendentesCache.forEach(p => registerProductId(p.id));
+    console.error('[osApi] Erro ao inicializar cache:', err);
+    produtosPendentesCache = [];
     cacheInitialized = true;
   }
 };

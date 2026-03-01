@@ -1,66 +1,67 @@
 
 
-# Auto-preencher Loja ao selecionar Colaborador
+# Adicionar coluna "Loja" nas Taxas de Entrega + IDs padronizados
 
-## Objetivo
+## Resumo
 
-Quando um usuario de "Acesso Geral" seleciona um colaborador no campo de responsavel, o campo de loja deve ser preenchido automaticamente com a loja daquele colaborador (considerando rodizio ativo).
+Duas alteracoes no modulo de Taxas de Entrega:
+1. Adicionar coluna `loja_id` para vincular cada taxa a uma loja (dados existentes serao vinculados a "Online")
+2. Substituir o UUID longo por um ID sequencial legivel no formato `TAXA-0001`
 
-## Paginas afetadas
+---
 
-As paginas que possuem **ambos** os campos (colaborador + loja de venda) e onde faz sentido vincular:
+## Acoes
 
-| Pagina | Campo Colaborador | Campo Loja | Acao |
-|--------|-------------------|------------|------|
-| `VendasNova.tsx` | `vendedor` | `lojaVenda` | Auto-preencher loja ao mudar vendedor |
-| `VendasAcessorios.tsx` | `vendedor` | `lojaVenda` | Auto-preencher loja ao mudar vendedor |
-| `VendasFinalizarDigital.tsx` | `vendedor` | `lojaVenda` | Verificar se aplica o mesmo padrao |
+### 1. Migration: adicionar coluna `loja_id` e `codigo` na tabela `taxas_entrega`
 
-As demais paginas (EstoqueNotaCadastrar, OSMovimentacaoPecas, OSSolicitacoesPecas) possuem campo de responsavel mas **nao** possuem um campo de loja vinculado ao responsavel -- a loja nessas telas tem contexto proprio (nota, peca, OS).
+- Adicionar coluna `loja_id` (uuid, nullable, referenciando `lojas.id`)
+- Adicionar coluna `codigo` (varchar, para o ID curto tipo `TAXA-0001`)
+- Atualizar registros existentes: setar `loja_id` para o ID da loja "Online" (`df3995f6-1da1-4661-a68f-20fb548a9468`)
+- Gerar codigos sequenciais para os registros existentes
 
-## Solucao
+### 2. Atualizar API (`src/utils/taxasEntregaApi.ts`)
 
-### 1. VendasNova.tsx
+- Adicionar `loja_id` e `codigo` na interface `TaxaEntrega`
+- Atualizar `mapRow` para incluir os novos campos
+- Atualizar `addTaxaEntrega` para receber `loja_id` e gerar `codigo` automaticamente (proximo sequencial)
+- Atualizar `SEED_TAXAS` para incluir `loja_id` da loja Online
+- Adicionar funcao auxiliar para gerar proximo codigo (`TAXA-XXXX`)
 
-Substituir o `onChange={setVendedor}` por uma funcao que:
-1. Atualiza o vendedor
-2. Busca o colaborador pelo ID via `obterColaboradorById`
-3. Verifica rodizio ativo via `obterRodizioAtivoDoColaborador`
-4. Atualiza `lojaVenda` com a loja correta
+### 3. Atualizar pagina (`src/pages/CadastrosTaxasEntrega.tsx`)
 
-```text
-const handleVendedorChange = (colId: string) => {
-  setVendedor(colId);
-  if (colId) {
-    const col = obterColaboradorById(colId);
-    if (col) {
-      const rodizio = obterRodizioAtivoDoColaborador(col.id);
-      setLojaVenda(rodizio ? rodizio.loja_destino_id : col.loja_id);
-    }
-  }
-};
-```
+**Tabela:**
+- Substituir coluna "ID" (UUID) por coluna "Codigo" exibindo `TAXA-0001`
+- Adicionar coluna "Loja" entre "Codigo" e "Local", mostrando o nome da loja
+- Ajustar `colSpan` da linha vazia
 
-Usar `handleVendedorChange` no `onChange` do `AutocompleteColaborador`.
+**Filtros:**
+- Adicionar filtro por loja (Select com lojas disponiveis)
 
-### 2. VendasAcessorios.tsx
+**Formulario (Dialog):**
+- Adicionar campo Select de "Loja" no formulario de criacao/edicao
+- Preencher com lojas ativas do tipo "Loja" (vendas)
+- Tornar obrigatorio
 
-Mesma logica aplicada ao campo vendedor, reutilizando o mesmo padrao.
+**Exportacao CSV:**
+- Incluir coluna "Codigo" e "Loja" no export
 
-### 3. VendasFinalizarDigital.tsx
+---
 
-Verificar se tem o mesmo padrao de colaborador + loja e aplicar se necessario.
+## Detalhes tecnicos
 
-## Arquivos a editar
+### Arquivos a criar/editar
 
-1. `src/pages/VendasNova.tsx` -- handler de onChange do vendedor
-2. `src/pages/VendasAcessorios.tsx` -- handler de onChange do vendedor
-3. `src/pages/VendasFinalizarDigital.tsx` -- verificar e aplicar se necessario
+| Arquivo | Acao |
+|---------|------|
+| `supabase/migrations/xxx_add_loja_codigo_taxas_entrega.sql` | Criar migration |
+| `src/utils/taxasEntregaApi.ts` | Editar: interface, mapRow, funcoes CRUD |
+| `src/pages/CadastrosTaxasEntrega.tsx` | Editar: tabela, filtros, formulario |
 
-## Comportamento esperado
+### Formato do codigo
 
-- Usuario de Acesso Geral seleciona um vendedor -> loja atualiza automaticamente
-- Se o colaborador estiver em rodizio, usa a loja de destino do rodizio
-- O campo de loja continua desabilitado (readonly), apenas reflete a loja do colaborador selecionado
-- Para usuarios normais (nao Acesso Geral), nada muda -- loja continua vindo do colaborador logado
+Seguindo o padrao do `idManager.ts` que usa `PROD-0001`, as taxas usarao `TAXA-0001`. O proximo codigo sera calculado buscando o maior existente no banco.
+
+### Loja padrao
+
+Todos os registros existentes serao vinculados a loja "Online" (ID: `df3995f6-1da1-4661-a68f-20fb548a9468`) conforme informado.
 

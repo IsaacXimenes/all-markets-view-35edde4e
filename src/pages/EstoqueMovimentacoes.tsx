@@ -292,7 +292,7 @@ export default function EstoqueMovimentacoes() {
       setProdutoSelecionado(null);
       toast({
         title: 'Movimentação registrada',
-        description: `Movimentação ${novaMovimentacao.id} registrada com sucesso. Produto agora está "Em movimentação".`,
+        description: `Movimentação ${novaMovimentacao.codigoLegivel} registrada com sucesso. Produto agora está "Em movimentação".`,
       });
     } catch (err: any) {
       console.error('[MOV] Erro ao registrar movimentação:', err);
@@ -557,7 +557,7 @@ export default function EstoqueMovimentacoes() {
                 >
                   <TableCell className="sticky left-0 z-10 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{mov.produto}</TableCell>
                   <TableCell className="font-mono text-xs">{formatIMEI(mov.imei)}</TableCell>
-                  <TableCell className="font-mono text-xs">{mov.id}</TableCell>
+                  <TableCell className="font-mono text-xs">{mov.codigoLegivel}</TableCell>
                   <TableCell>{mov.responsavel}</TableCell>
                   <TableCell>{new Date(mov.data).toLocaleDateString('pt-BR')}</TableCell>
                   <TableCell>{getLojaNome(mov.origem)}</TableCell>

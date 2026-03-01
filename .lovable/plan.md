@@ -1,80 +1,90 @@
 
 
-# Plano: Importar 120 Aparelhos Pendentes para o Estoque
+# Plano: Importar Acessorios do Excel para o Banco de Dados
 
 ## Resumo
 
-Importar os 120 produtos do CSV `produtos-pendentes-2026-03-01.csv` para a tabela `produtos_pendentes_os` no Supabase. A tabela esta vazia atualmente.
+Importar os ~2.117 acessorios do arquivo `Estoque_Acessorios_Consolidado.xlsx` para a tabela `acessorios` no Supabase, adicionando a nova coluna `imei` conforme solicitado.
 
-## Analise do CSV
+## Analise do Arquivo
 
-- **Total**: 120 linhas de dados (sem header)
-- **Separador**: ponto-e-virgula (;)
-- **Colunas**: ID (vazio), IMEI, Produto, Cor, Origem, Fornecedor, Loja, Valor Custo, Saude Bateria, SLA (dias), Status
-- **Todos os status**: "Pendente Estoque"
-- **Todas as origens**: "Fornecedor"
-- **Lojas presentes**: Shopping Sul, JK Shopping, Aguas Lindas, Estoque - SIA
-- **Cores**: PRETO, BRANCO, AZUL, ROSA, INDISPONIVEL, ".", "-" (precisa normalizar)
-- **Bateria**: Alguns vazios (sem %)
-- **Fornecedor**: Todos "-" (nenhum especificado)
+- **Total de linhas**: ~2.117 itens
+- **Colunas**: Origem (loja), Modelo + Descricao, Categoria, Quantidade em estoque, Valor Custo, Valor Recomendado, IMEI
+- **Lojas presentes**: Estoque - SIA, Estoque - Shopping Sul, Estoque - Shopping JK, Estoque - Aguas Lindas, Estoque - Online
+- **Categorias**: Capas, Peliculas, Carregadores, Audio, Acessorios Apple, Acessorios - Geral, Acessorios
+- **IMEI**: Maioria vazia, mas presente em itens individuais (chips, fontes originais, JBLs)
+- **Quantidade vazia**: Sera tratada como 0
 
-## Abordagem
+## Etapa 1 - Migracao do Banco de Dados
 
-Criar uma **Edge Function** (`import-produtos-pendentes`) similar a `import-produtos-estoque`, adaptada para a tabela `produtos_pendentes_os`.
+Adicionar a coluna `imei` na tabela `acessorios`:
 
-## Tratamento de Dados
-
-| Campo CSV | Transformacao | Campo DB |
-|-----------|---------------|----------|
-| ID (vazio) | Gerar UUID automatico | `id` |
-| IMEI | Trim | `imei` |
-| Produto "IPHONE 14 128GB" | Extrair marca="Apple" e modelo limpo | `marca`, `modelo` |
-| Cor ".", "-", "INDISPONIVEL" | Normalizar para null quando invalido | `cor` |
-| Origem "Fornecedor" | Direto | `origem_entrada` |
-| Fornecedor "-" | Salvar como null | `fornecedor` |
-| Loja "Shopping Sul" | Mapear para UUID da loja | `loja` |
-| Valor Custo "R$ 1.995,00" | Parse para numerico `1995.00` | `valor_custo`, `valor_custo_original`, `valor_origem` |
-| Saude Bateria "84%" | Parse int, vazio = 100 | `saude_bateria` |
-| Status "Pendente Estoque" | Direto | `status_geral` |
-| - | Data de hoje | `data_entrada` |
-| - | "Seminovo" | `tipo`, `condicao` |
-
-## Mapeamento de Lojas (mesmo do import anterior)
-
-```text
-"Shopping Sul"   -> 0fc4a1f3-9cd6-4e24-b0b5-7a6af4953fad
-"JK Shopping"    -> 9009b91c-0436-4070-9d30-670b8e6bd68e
-"Aguas Lindas"   -> b2c6ac94-f08b-4c2e-955f-8a91d658d7d6
-"Estoque - SIA"  -> fe27bdab-b6de-433c-8718-3f1690f2315d
+```sql
+ALTER TABLE public.acessorios ADD COLUMN imei VARCHAR(100);
 ```
 
-**Nota importante**: A tabela `produtos_pendentes_os` usa `loja` como VARCHAR. O campo armazena o UUID como string, seguindo o padrao ja existente no `mapProdutoToRow`.
+## Etapa 2 - Edge Function `import-acessorios`
 
-## Deteccao de Marca
+Criar uma Edge Function seguindo o mesmo padrao das funcoes `import-produtos-estoque` e `import-produtos-pendentes`.
 
-Todos os produtos sao iPhones. A logica extraira "Apple" como marca e o restante como modelo:
-- "IPHONE 14 128GB" -> marca: "Apple", modelo: "iPhone 14 128GB"
-- "IPHONE 15 PRO MAX 256GB" -> marca: "Apple", modelo: "iPhone 15 Pro Max 256GB"
+### Mapeamento de Dados
 
-## Implementacao Tecnica
+| Campo Excel | Transformacao | Campo DB |
+|---|---|---|
+| Origem "Estoque - SIA" | Mapear para UUID da loja | `loja_id` |
+| Modelo + Descricao | Direto, trim | `nome` |
+| Categoria | Direto | `categoria` |
+| Quantidade em estoque | Parse int, vazio = 0 | `quantidade` |
+| Valor Custo "R$ 3.70" | Parse numerico | `valor_custo` |
+| Valor Recomendado "R$ 35.00" | Parse numerico | `valor_venda` |
+| IMEI | Trim, vazio = null | `imei` |
+| - | "Disponivel" | `status` |
 
-### 1. Edge Function `import-produtos-pendentes`
+### Mapeamento de Lojas
 
-- Arquivo: `supabase/functions/import-produtos-pendentes/index.ts`
-- Metodo: POST
-- Body: CSV como texto
-- Logica:
-  - Split por linhas, skip header
-  - Split cada linha por ";"
-  - Aplica transformacoes (valor, bateria, cor, marca/modelo)
-  - Insere em batches de 50 via `supabase.from('produtos_pendentes_os').insert(batch)`
-  - Ignora duplicatas por IMEI
-  - Retorna relatorio
+```text
+"Estoque - SIA"           -> fe27bdab-b6de-433c-8718-3f1690f2315d
+"Estoque - Shopping Sul"  -> 949afa0c-6324-4a4e-ab6e-f7071fcfc3c0
+"Estoque - Shopping JK"   -> f071311a-5532-4874-bb9c-5a2e550300c8
+"Estoque - Águas Lindas"  -> 9c33d643-52dd-4134-8c91-2e01ddc05937  (ou "Aguas Lindas")
+"Estoque - Online"        -> df3995f6-1da1-4661-a68f-20fb548a9468  (loja Online)
+```
 
-### 2. Execucao e Validacao
+### Logica da Edge Function
 
+- Recebe o CSV como texto via POST
+- Faz split por linhas, pula header
+- Split por ";" (ponto e virgula)
+- Aplica transformacoes de valor monetario (R$) e quantidade
+- Insere em batches de 50 na tabela `acessorios`
+- Retorna relatorio com totais e erros
+
+## Etapa 3 - Atualizar Codigo Frontend
+
+### 3.1 Interface e mapeamento (`src/utils/acessoriosApi.ts`)
+
+- Adicionar campo `imei` na interface `Acessorio`
+- Atualizar `mapFromDB` e `mapToDB` para incluir `imei`
+
+### 3.2 Tabela de exibicao (`src/pages/EstoqueAcessorios.tsx`)
+
+- Adicionar coluna IMEI na tabela (visivel apenas quando preenchido)
+
+### 3.3 Config TOML
+
+- Adicionar entrada `[functions.import-acessorios]` com `verify_jwt = false`
+
+## Etapa 4 - Execucao
+
+- Copiar o XLSX para `public/data/`
+- Converter para CSV (separador ;)
 - Deploy da edge function
-- Chamar com o conteudo do CSV
-- Verificar: `SELECT count(*) FROM produtos_pendentes_os` deve retornar 120
-- Conferir que os dados aparecem na aba "Aparelhos Pendentes"
+- Chamar a edge function com o conteudo CSV
+- Validar: `SELECT count(*) FROM acessorios` deve retornar ~2.117
+
+## Observacoes
+
+- A coluna `marca` existente no banco sera mantida como null (o arquivo nao tem essa informacao separada)
+- Itens com quantidade vazia serao importados com quantidade 0
+- A loja "Estoque - Online" sera mapeada para o UUID da loja "Online" existente
 

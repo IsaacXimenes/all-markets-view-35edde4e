@@ -36,8 +36,33 @@ function parseBattery(val: string): number | null {
 }
 
 function cleanModel(val: string): string {
-  // Remove invisible/non-ASCII control characters but keep accented letters
   return val.replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202F\uFEFF]/g, "").trim();
+}
+
+// Title Case com regras especiais
+function titleCaseModelo(input: string): string {
+  if (!input) return input;
+  let cleaned = input.replace(/\s+/g, " ").replace(/\s*-\s*/g, " ").trim();
+  cleaned = cleaned.replace(/IPHOINE/gi, "IPHONE");
+  
+  const UPPER_WORDS = new Set([
+    "GB", "TB", "RAM", "5G", "4G", "LTE", "NFC", "OTG", "HDMI", "USB-C", "USBC", "TYPEC",
+    "PRO", "MAX", "PLUS", "MINI", "SE", "XR", "XS", "ULTRA",
+    "JBL", "PS5", "PS4", "PS3", "TWS", "LED", "LCD", "HD", "FHD", "QHD", "USB", "AUX",
+  ]);
+  const SPECIAL: Record<string, string> = {
+    "IPHONE": "iPhone", "IPAD": "iPad", "AIRPODS": "AirPods", "MACBOOK": "MacBook",
+  };
+
+  return cleaned.split(" ").map(word => {
+    const upper = word.toUpperCase();
+    if (SPECIAL[upper]) return SPECIAL[upper];
+    if (UPPER_WORDS.has(upper)) return upper;
+    if (/^\d+$/.test(word)) return word;
+    if (/^[A-Za-z]?\d+[A-Za-z]*$/.test(word)) return upper;
+    if (/^\d+GB$/i.test(word) || /^\d+TB$/i.test(word) || /^\d+RAM$/i.test(word)) return upper;
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  }).join(" ");
 }
 
 function normalizeTipo(val: string): string {
@@ -84,8 +109,8 @@ serve(async (req) => {
       
       // CSV columns: id;imei;marca;modelo;cor;tipo;quantidade;valorCusto;valorVendaSugerido;vendaRecomendada;saudeBateria;loja;estoqueConferido;assistenciaConferida;condicao;historicoCusto;historicoValorRecomendado;statusNota;origemEntrada
       
-      const marca = cleanModel(cols[2] || "").trim();
-      const modelo = cleanModel(cols[3] || "").trim();
+      const marca = titleCaseModelo(cleanModel(cols[2] || "").trim());
+      const modelo = titleCaseModelo(cleanModel(cols[3] || "").trim());
       
       if (!marca || !modelo) {
         errors.push({ line: i + 2, error: "marca ou modelo vazio", raw: line.substring(0, 100) });

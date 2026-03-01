@@ -64,6 +64,7 @@ export default function EstoqueAcessorios() {
   const acessoriosAgrupados = useMemo(() => {
     const agrupados: Record<string, { 
       id: string;
+      codigo?: string;
       descricao: string; 
       categoria: string; 
       quantidadeTotal: number; 
@@ -79,6 +80,7 @@ export default function EstoqueAcessorios() {
       if (!agrupados[a.id]) {
         agrupados[a.id] = {
           id: a.id,
+          codigo: a.codigo,
           descricao: a.descricao,
           categoria: a.categoria,
           quantidadeTotal: 0,
@@ -364,7 +366,7 @@ export default function EstoqueAcessorios() {
                         <Badge variant="secondary">{acessorio.categoria}</Badge>
                       </TableCell>
                       <TableCell className="text-sm">{getFornecedorNome(acessorio.fornecedorId)}</TableCell>
-                      <TableCell className="font-mono font-medium">{acessorio.id}</TableCell>
+                      <TableCell className="font-mono font-medium text-xs">{acessorio.itens[0]?.codigo || acessorio.id.substring(0, 8)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           {acessorio.quantidadeTotal <= 5 && (

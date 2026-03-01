@@ -1,50 +1,59 @@
 
-# Corrigir campo "Responsavel" nas movimentacoes para exibir nome
 
-## Problema
+# Corrigir movimentacao de aparelhos: status e loja
 
-Na funcao `mapMovFromDB` em `estoqueApi.ts` (linha 357), o campo `responsavel` recebe diretamente o `responsavel_id` (UUID) do banco:
-```
-responsavel: row.responsavel_id || '',
-```
-Isso faz com que a tabela de movimentacoes exiba o UUID em vez do nome do colaborador.
+## Problemas Identificados
 
-## Correcao
+### 1. Produto nao fica "Em movimentacao"
+Na funcao `addMovimentacao` (linha 591-593), o codigo chama `updateProduto` com `statusMovimentacao: 'Em movimentação'`, mas o `produtoId` depende de `mov.produtoId` ser passado corretamente. O componente passa `produtoSelecionado.id` (linha 278), que deve ser um UUID valido. O problema pode estar na RLS impedindo o UPDATE silenciosamente, ou no cache nao sendo atualizado na UI.
 
-### `src/utils/estoqueApi.ts`
+### 2. Confirmacao de recebimento nao altera a loja (BUG PRINCIPAL)
+Na funcao `confirmarRecebimentoMovimentacao` (linha 620), o codigo atualiza apenas `loja: mov.destino`, mas **NAO atualiza `lojaAtualId`**. Como o sistema usa `lojaAtualId` como localizacao fisica prioritaria (conforme arquitetura), o produto continua aparecendo na loja de origem.
 
-**1. No `initEstoqueCache` (linhas 380-392):** Apos carregar as movimentacoes e enriquecer com dados do produto, tambem resolver o `responsavel_id` para o nome do colaborador. Importar `getColaboradores` do `cadastroStore` ou do `cadastrosApi` para fazer o lookup.
+## Correcoes
 
-Como o cache de colaboradores pode ja estar carregado via `cadastrosApi`, usar `getColaboradores()` para buscar a lista e resolver o nome:
+### Arquivo: `src/utils/estoqueApi.ts`
+
+**1. `addMovimentacao` (linha 591-593):** Adicionar log de erro caso `updateProduto` falhe, e garantir que o cache local tambem atualiza o produto:
 
 ```typescript
-// Dentro do bloco de enriquecimento das movimentacoes (linha 382-391)
-_movimentacoes = rawMovs.map(mov => {
-  const row = (movRes.data || []).find((r: any) => r.id === mov.id);
-  const produtoId = row?.produto_id;
-  const responsavelId = row?.responsavel_id;
-  let produto = mov.produto;
-  let imei = mov.imei;
-  let responsavel = mov.responsavel;
-
-  if (produtoId) {
-    const prod = _produtos.find(p => p.id === produtoId);
-    if (prod) { produto = `${prod.marca} ${prod.modelo}`; imei = prod.imei; }
+if (produtoId) {
+  const prodAtualizado = await updateProduto(produtoId, { 
+    statusMovimentacao: 'Em movimentação', 
+    movimentacaoId: data.id 
+  });
+  if (!prodAtualizado) {
+    console.error('[MOV] Falha ao marcar produto como Em movimentação:', produtoId);
   }
+}
+```
 
-  if (responsavelId) {
-    const cols = getColaboradores();
-    const col = cols.find(c => c.id === responsavelId);
-    if (col) responsavel = col.nome;
-  }
+**2. `confirmarRecebimentoMovimentacao` (linha 620):** Atualizar TAMBEM o campo `lojaAtualId` para o destino da movimentacao, garantindo que a localizacao fisica efetiva seja alterada:
 
-  return { ...mov, produto, imei, responsavel };
+Trocar:
+```typescript
+await updateProduto(produto.id, { 
+  loja: mov.destino, 
+  statusMovimentacao: null, 
+  movimentacaoId: undefined, 
+  timeline 
 });
 ```
 
-**2. No `mapMovFromDB` (linha 357):** Manter `responsavel: row.responsavel_id || ''` como fallback — o enriquecimento no `initEstoqueCache` sobreescreve com o nome.
+Por:
+```typescript
+await updateProduto(produto.id, { 
+  loja: mov.destino, 
+  lojaAtualId: mov.destino, 
+  statusMovimentacao: null, 
+  movimentacaoId: undefined, 
+  timeline 
+});
+```
 
-Isso garante que tanto movimentacoes carregadas do banco quanto novas movimentacoes (que ja passam o nome na linha 276 do componente) exibam o nome do responsavel.
+Isso faz com que tanto `loja` (campo base) quanto `lojaAtualId` (localizacao fisica efetiva) apontem para a loja de destino ao confirmar o recebimento.
 
-## Arquivo modificado
-- `src/utils/estoqueApi.ts` — resolver responsavel_id para nome no carregamento do cache
+## Resumo das alteracoes
+- **1 arquivo:** `src/utils/estoqueApi.ts`
+- **2 pontos:** `addMovimentacao` (log de falha) e `confirmarRecebimentoMovimentacao` (incluir `lojaAtualId` no update)
+

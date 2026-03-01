@@ -24,9 +24,19 @@ interface NavbarProps {
 
 export function Navbar({ className, isMobile, onMenuClick }: NavbarProps) {
   const logout = useAuthStore((state) => state.logout);
+  const user = useAuthStore((state) => state.user);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
+  };
+
+  // Get initials from colaborador name
+  const getInitials = () => {
+    const nome = user?.colaborador?.nome;
+    if (!nome) return <User className="h-5 w-5" />;
+    const parts = nome.split(' ').filter(Boolean);
+    if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    return parts[0]?.[0]?.toUpperCase() || '';
   };
 
   return (
@@ -71,14 +81,16 @@ export function Navbar({ className, isMobile, onMenuClick }: NavbarProps) {
             <DropdownMenuTrigger asChild>
               <button className="focus:outline-none">
                 <Avatar className="h-9 w-9 transition-transform duration-200 hover:scale-105 cursor-pointer border border-[#333]">
-                  <AvatarFallback className="bg-[#F7BB05]/15 text-[#F7BB05]">
-                    <User className="h-5 w-5" />
+                  <AvatarFallback className="bg-[#F7BB05]/15 text-[#F7BB05] text-xs font-bold">
+                    {getInitials()}
                   </AvatarFallback>
                 </Avatar>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+              <DropdownMenuLabel className="truncate">
+                {user?.colaborador?.nome || 'Minha Conta'}
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />

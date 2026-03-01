@@ -450,7 +450,7 @@ export default function EstoqueProdutos() {
                     })()}
                   </TableCell>
                   {/* ID */}
-                  <TableCell className="font-mono text-xs">{produto.id}</TableCell>
+                  <TableCell className="font-mono text-xs">{produto.codigo || produto.id}</TableCell>
                   {/* IMEI */}
                   <TableCell className="font-mono text-xs">{formatIMEI(produto.imei)}</TableCell>
                   {/* Tipo */}

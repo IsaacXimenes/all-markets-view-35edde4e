@@ -867,6 +867,7 @@ export default function EstoqueProdutosPendentes() {
         onOpenChange={setShowRetiradaModal}
         produto={produtoRetirada ? {
           id: produtoRetirada.id,
+          codigo: produtoRetirada.id,
           imei: produtoRetirada.imei,
           marca: produtoRetirada.marca,
           modelo: produtoRetirada.modelo,

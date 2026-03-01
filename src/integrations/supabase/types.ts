@@ -2818,6 +2818,7 @@ export type Database = {
           assistencia_conferida: boolean | null
           bloqueado_em_troca_garantia_id: string | null
           bloqueado_em_venda_id: string | null
+          codigo: string | null
           condicao: string | null
           cor: string | null
           created_at: string | null
@@ -2861,6 +2862,7 @@ export type Database = {
           assistencia_conferida?: boolean | null
           bloqueado_em_troca_garantia_id?: string | null
           bloqueado_em_venda_id?: string | null
+          codigo?: string | null
           condicao?: string | null
           cor?: string | null
           created_at?: string | null
@@ -2904,6 +2906,7 @@ export type Database = {
           assistencia_conferida?: boolean | null
           bloqueado_em_troca_garantia_id?: string | null
           bloqueado_em_venda_id?: string | null
+          codigo?: string | null
           condicao?: string | null
           cor?: string | null
           created_at?: string | null

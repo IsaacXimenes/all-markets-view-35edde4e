@@ -278,6 +278,7 @@ const migrarParaEstoque = (produto: ProdutoPendente, origemDeferimento: 'Estoque
 
   const novoProduto: Produto = {
     id: produto.id,
+    codigo: produto.id,
     imei: produto.imei,
     imagem: produto.imagem,
     marca: produto.marca,

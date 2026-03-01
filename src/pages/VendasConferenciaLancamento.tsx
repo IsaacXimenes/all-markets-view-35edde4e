@@ -45,6 +45,7 @@ import { useCadastroStore } from '@/store/cadastroStore';
 import { toast } from 'sonner';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { useAuthStore } from '@/store/authStore';
+import { useIsAcessoGeral } from '@/utils/permissoesUtils';
 
 export default function VendasConferenciaLancamento() {
   const user = useAuthStore(s => s.user);
@@ -62,12 +63,14 @@ export default function VendasConferenciaLancamento() {
   const colaboradores = obterColaboradoresAtivos();
   
   // Verificar se usuário é gestor ou financeiro
+  const acessoGeral = useIsAcessoGeral();
   const isGestorOuFinanceiro = useMemo(() => {
+    if (acessoGeral) return true;
     const colaborador = colaboradores.find(c => c.id === usuarioLogado.id);
     if (!colaborador) return false;
     // Usando as flags do novo modelo
     return colaborador.eh_gestor;
-  }, [colaboradores]);
+  }, [colaboradores, acessoGeral]);
 
   // Loja do usuário logado (para painel de metas)
   const lojaUsuarioLogado = useMemo(() => {

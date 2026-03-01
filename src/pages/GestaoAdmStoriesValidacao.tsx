@@ -12,6 +12,7 @@ import { ArrowLeft, CheckCircle2, XCircle, Image as ImageIcon, Award, Info, Thum
 import { Checkbox } from '@/components/ui/checkbox';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { useAuthStore } from '@/store/authStore';
+import { useIsAcessoGeral } from '@/utils/permissoesUtils';
 import { toast } from 'sonner';
 import {
   getLoteById,
@@ -46,7 +47,8 @@ export default function GestaoAdmStoriesValidacao() {
   const cannotValidate = loteOriginal?.conferidoPor === user?.colaborador?.id;
   const [overrideGestor, setOverrideGestor] = useState(false);
   const colaboradorCompleto = colaboradores.find(c => c.id === user?.colaborador?.id);
-  const isGestor = colaboradorCompleto?.eh_gestor ?? user?.colaborador?.cargo?.toLowerCase().includes('gestor') ?? false;
+  const acessoGeral = useIsAcessoGeral();
+  const isGestor = acessoGeral || (colaboradorCompleto?.eh_gestor ?? user?.colaborador?.cargo?.toLowerCase().includes('gestor') ?? false);
   const bloqueado = cannotValidate && !overrideGestor;
 
   const handleValidar = (vendaId: string) => {

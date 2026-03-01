@@ -19,6 +19,7 @@ import { Eye, Edit3, DollarSign, CheckCircle2, Clock, AlertTriangle, ShieldAlert
 import { ComprovantePreview } from '@/components/vendas/ComprovantePreview';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { useAuthStore } from '@/store/authStore';
+import { useIsAcessoGeral } from '@/utils/permissoesUtils';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { toast } from 'sonner';
@@ -49,7 +50,8 @@ export default function GestaoAdministrativa() {
   
   // Verificar se é gestor - busca no cadastro ou fallback pelo cargo do authStore
   const colaboradorLogado = colaboradores.find(c => c.id === user?.colaborador?.id);
-  const ehGestor = colaboradorLogado?.eh_gestor ?? user?.colaborador?.cargo?.toLowerCase().includes('gestor') ?? false;
+  const acessoGeral = useIsAcessoGeral();
+  const ehGestor = acessoGeral || (colaboradorLogado?.eh_gestor ?? user?.colaborador?.cargo?.toLowerCase().includes('gestor') ?? false);
   
   // Estados de filtros - competência derivada das datas
   const [competencia, setCompetencia] = useState(format(new Date(), 'yyyy-MM'));

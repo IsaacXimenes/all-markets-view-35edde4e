@@ -2758,7 +2758,7 @@ export default function VendasNova() {
 
       {/* Modal Selecionar Produto */}
       <Dialog open={showProdutoModal} onOpenChange={setShowProdutoModal}>
-        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogContent className="max-w-4xl max-h-[90vh] h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>Selecionar Produto</DialogTitle>
           </DialogHeader>

@@ -326,12 +326,12 @@ export default function EstoqueProdutos() {
 
         {/* Table */}
         <Card>
-          <CardContent className="p-0">
-          <Table className="min-w-[1200px]">
+          <CardContent className="p-0 overflow-x-auto">
+          <Table className="min-w-[1100px]">
             <TableHeader>
               <TableRow>
-                <TableHead className="sticky left-0 z-10 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Produto</TableHead>
-                <TableHead className="sticky left-[150px] z-10 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Saúde</TableHead>
+                <TableHead className="sticky left-0 z-20 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[120px] max-w-[160px]">Produto</TableHead>
+                <TableHead>Saúde</TableHead>
                 <TableHead>Loja</TableHead>
                 <TableHead>Venda Recomendada</TableHead>
                 <TableHead>Custo</TableHead>
@@ -370,22 +370,20 @@ export default function EstoqueProdutos() {
                   className={getRowClassByBattery(produto.saudeBateria)}
                 >
                   {/* Produto (sticky) */}
-                   <TableCell className={cn("sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]", getStickyBgByBattery(produto.saudeBateria))}>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium">{produto.modelo}</span>
-                        {verificarEstoqueBaixo(produto.modelo, produto.quantidade) && (
-                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                            <AlertCircle className="h-3 w-3 mr-0.5" />
-                            Estoque Baixo
-                          </Badge>
-                        )}
-                      </div>
+                   <TableCell className={cn("sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[120px] max-w-[160px]", getStickyBgByBattery(produto.saudeBateria))}>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-medium text-sm truncate max-w-[140px]" title={produto.modelo}>{produto.modelo}</span>
                       <span className="text-xs text-muted-foreground">{produto.cor}</span>
+                      {verificarEstoqueBaixo(produto.modelo, produto.quantidade) && (
+                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0 w-fit">
+                          <AlertCircle className="h-3 w-3 mr-0.5" />
+                          Baixo
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
-                  {/* Saúde (sticky) */}
-                  <TableCell className={cn("sticky left-[150px] z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]", getStickyBgByBattery(produto.saudeBateria))}>
+                  {/* Saúde */}
+                  <TableCell>
                     <span className={cn(
                       'font-semibold',
                       produto.saudeBateria < 70 ? 'text-destructive' :

@@ -12,6 +12,7 @@ export interface HistoricoValorRecomendadoAcessorio {
 
 export interface Acessorio {
   id: string;
+  codigo?: string;
   descricao: string;
   categoria: string;
   quantidade: number;
@@ -40,6 +41,7 @@ let cacheInitialized = false;
 
 const mapFromDB = (row: any): Acessorio => ({
   id: row.id,
+  codigo: row.codigo || undefined,
   descricao: row.nome,
   categoria: row.categoria || '',
   quantidade: row.quantidade || 0,

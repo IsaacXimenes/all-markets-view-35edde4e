@@ -17,6 +17,7 @@ export type Database = {
       acessorios: {
         Row: {
           categoria: string | null
+          codigo: string | null
           created_at: string | null
           id: string
           imei: string | null
@@ -30,6 +31,7 @@ export type Database = {
         }
         Insert: {
           categoria?: string | null
+          codigo?: string | null
           created_at?: string | null
           id?: string
           imei?: string | null
@@ -43,6 +45,7 @@ export type Database = {
         }
         Update: {
           categoria?: string | null
+          codigo?: string | null
           created_at?: string | null
           id?: string
           imei?: string | null

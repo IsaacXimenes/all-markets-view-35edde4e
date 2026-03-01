@@ -46,18 +46,33 @@ function normalizeColor(val: string): string | null {
 
 function extractBrandModel(produto: string): { marca: string; modelo: string } {
   const cleaned = produto.replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202F\uFEFF]/g, "").trim();
-  if (cleaned.toUpperCase().startsWith("IPHONE")) {
-    // Convert to proper case: "IPHONE 14 128GB" -> "iPhone 14 128GB"
-    const rest = cleaned.substring(6).trim(); // after "IPHONE"
-    const words = rest.split(/\s+/).map(w => {
-      if (/^\d+GB$/i.test(w)) return w.toUpperCase();
-      if (/^\d+TB$/i.test(w)) return w.toUpperCase();
-      if (/^(pro|max|plus|mini)$/i.test(w)) return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
-      return w;
-    });
-    return { marca: "Apple", modelo: "iPhone " + words.join(" ") };
+  
+  const UPPER_WORDS = new Set([
+    "GB", "TB", "RAM", "5G", "4G", "LTE", "NFC", "OTG", "HDMI",
+    "PRO", "MAX", "PLUS", "MINI", "SE", "XR", "XS", "ULTRA",
+    "JBL", "PS5", "PS4", "TWS", "LED", "USB",
+  ]);
+  const SPECIAL: Record<string, string> = {
+    "IPHONE": "iPhone", "IPHOINE": "iPhone", "IPAD": "iPad", "AIRPODS": "AirPods", "MACBOOK": "MacBook",
+  };
+
+  function titleCase(input: string): string {
+    return input.replace(/\s+/g, " ").replace(/\s*-\s*/g, " ").trim().split(" ").map(word => {
+      const upper = word.toUpperCase();
+      if (SPECIAL[upper]) return SPECIAL[upper];
+      if (UPPER_WORDS.has(upper)) return upper;
+      if (/^\d+$/.test(word)) return word;
+      if (/^[A-Za-z]?\d+[A-Za-z]*$/.test(word)) return upper;
+      if (/^\d+GB$/i.test(word) || /^\d+TB$/i.test(word) || /^\d+RAM$/i.test(word)) return upper;
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }).join(" ");
   }
-  return { marca: "", modelo: cleaned };
+
+  if (cleaned.toUpperCase().startsWith("IPHONE") || cleaned.toUpperCase().startsWith("IPHOINE")) {
+    const rest = cleaned.substring(cleaned.toUpperCase().startsWith("IPHOINE") ? 7 : 6).trim();
+    return { marca: "Apple", modelo: "iPhone " + titleCase(rest) };
+  }
+  return { marca: "", modelo: titleCase(cleaned) };
 }
 
 serve(async (req) => {
@@ -81,6 +96,21 @@ serve(async (req) => {
         status: 400,
       });
     }
+
+    // Get next sequential codigo for pendentes
+    const { data: maxCodeData } = await supabase.rpc("", {}).catch(() => ({ data: null }));
+    // Query max codigo from both tables
+    const { data: prodCodes } = await supabase.from("produtos").select("codigo").not("codigo", "is", null).order("codigo", { ascending: false }).limit(1);
+    const { data: pendCodes } = await supabase.from("produtos_pendentes_os").select("codigo").not("codigo", "is", null).order("codigo", { ascending: false }).limit(1);
+    
+    let maxNum = 0;
+    for (const src of [prodCodes, pendCodes]) {
+      if (src && src.length > 0 && src[0].codigo) {
+        const match = src[0].codigo.match(/^PROD-(\d+)$/);
+        if (match) maxNum = Math.max(maxNum, parseInt(match[1], 10));
+      }
+    }
+    let nextCodigo = maxNum + 1;
 
     const dataLines = lines.slice(1); // skip header
     const errors: { line: number; error: string; raw: string }[] = [];
@@ -120,6 +150,7 @@ serve(async (req) => {
         marca,
         modelo,
         cor,
+        codigo: `PROD-${String(nextCodigo).padStart(4, "0")}`,
         origem_entrada: origemEntrada,
         fornecedor,
         loja: lojaId,
@@ -132,6 +163,7 @@ serve(async (req) => {
         tipo: "Seminovo",
         condicao: "Seminovo",
       });
+      nextCodigo++;
     }
 
     // Insert in batches of 50

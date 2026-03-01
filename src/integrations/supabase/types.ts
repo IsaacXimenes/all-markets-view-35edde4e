@@ -3486,36 +3486,50 @@ export type Database = {
       }
       taxas_entrega: {
         Row: {
+          codigo: string | null
           created_at: string | null
           data_atualizacao: string | null
           data_criacao: string | null
           id: string
           local: string
           logs: Json | null
+          loja_id: string | null
           status: string | null
           valor: number | null
         }
         Insert: {
+          codigo?: string | null
           created_at?: string | null
           data_atualizacao?: string | null
           data_criacao?: string | null
           id?: string
           local: string
           logs?: Json | null
+          loja_id?: string | null
           status?: string | null
           valor?: number | null
         }
         Update: {
+          codigo?: string | null
           created_at?: string | null
           data_atualizacao?: string | null
           data_criacao?: string | null
           id?: string
           local?: string
           logs?: Json | null
+          loja_id?: string | null
           status?: string | null
           valor?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "taxas_entrega_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "lojas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tratativas_comerciais: {
         Row: {

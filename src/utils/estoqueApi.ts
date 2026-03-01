@@ -589,7 +589,10 @@ export const addMovimentacao = async (mov: Omit<Movimentacao, 'id' | 'codigoLegi
   _movimentacoes.push(newMov);
   // Mark product in transit
   if (produtoId) {
-    await updateProduto(produtoId, { statusMovimentacao: 'Em movimentação', movimentacaoId: data.id });
+    const prodAtualizado = await updateProduto(produtoId, { statusMovimentacao: 'Em movimentação', movimentacaoId: data.id });
+    if (!prodAtualizado) {
+      console.error('[MOV] Falha ao marcar produto como Em movimentação:', produtoId);
+    }
   }
   return newMov;
 };
@@ -617,7 +620,7 @@ export const confirmarRecebimentoMovimentacao = async (movId: string, responsave
       descricao: `Aparelho recebido na loja de destino. Origem: ${mov.origem} → Destino: ${mov.destino}.`,
       responsavel,
     }];
-    await updateProduto(produto.id, { loja: mov.destino, statusMovimentacao: null, movimentacaoId: undefined, timeline });
+    await updateProduto(produto.id, { loja: mov.destino, lojaAtualId: mov.destino, statusMovimentacao: null, movimentacaoId: undefined, timeline });
   }
   return mov;
 };

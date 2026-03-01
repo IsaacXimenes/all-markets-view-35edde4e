@@ -48,6 +48,9 @@ export const initPlanosGarantiaCache = async (): Promise<void> => {
     const { data, error } = await supabase.from('planos_garantia').select('*');
     if (error) { console.error('Erro ao carregar planos_garantia:', error); return; }
     if (!data || data.length === 0) {
+      // Verificar se há sessão ativa antes de tentar seed
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { console.log('[PLANOS] Sem sessão ativa, pulando seed'); return; }
       // Seed
       const inserts = SEED_PLANOS.map(p => ({
         nome: p.nome, tipo: p.tipo, condicao: p.condicao, meses: p.meses,

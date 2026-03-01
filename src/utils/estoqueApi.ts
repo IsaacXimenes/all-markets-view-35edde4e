@@ -374,7 +374,19 @@ export const initEstoqueCache = async (): Promise<void> => {
     ]);
     _produtos = (prodRes.data || []).map(mapProdutoFromDB);
     _notas = (notaRes.data || []).map(mapNotaFromDB);
-    _movimentacoes = (movRes.data || []).map(mapMovFromDB);
+    // Enriquecer movimentações com dados do produto
+    const rawMovs = (movRes.data || []).map(mapMovFromDB);
+    _movimentacoes = rawMovs.map(mov => {
+      const row = (movRes.data || []).find((r: any) => r.id === mov.id);
+      const produtoId = row?.produto_id;
+      if (produtoId) {
+        const produto = _produtos.find(p => p.id === produtoId);
+        if (produto) {
+          return { ...mov, produto: `${produto.marca} ${produto.modelo}`, imei: produto.imei };
+        }
+      }
+      return mov;
+    });
     _cacheLoaded = true;
     initializeProductIds(_produtos.map(p => p.codigo));
   } catch (e) {
@@ -544,18 +556,21 @@ export const finalizarNota = async (id: string, pagamento: NotaCompra['pagamento
 
 export const getMovimentacoes = (): Movimentacao[] => [..._movimentacoes];
 
-export const addMovimentacao = async (mov: Omit<Movimentacao, 'id'>): Promise<Movimentacao> => {
+export const addMovimentacao = async (mov: Omit<Movimentacao, 'id'> & { produtoId?: string; responsavelId?: string }): Promise<Movimentacao> => {
+  // Determinar produto_id: usar produtoId explícito ou buscar pelo IMEI
+  const produtoId = mov.produtoId || _produtos.find(p => p.imei === mov.imei)?.id || null;
+  // Usar responsavelId (UUID) para o DB, e manter o nome no cache local
+  const responsavelIdDb = mov.responsavelId || null;
   const { data, error } = await supabase.from('movimentacoes_estoque').insert({
-    produto_id: null, loja_origem_id: mov.origem, loja_destino_id: mov.destino,
-    responsavel_id: mov.responsavel, motivo: mov.motivo, tipo_movimentacao: 'Pendente',
+    produto_id: produtoId, loja_origem_id: mov.origem, loja_destino_id: mov.destino,
+    responsavel_id: responsavelIdDb, motivo: mov.motivo, tipo_movimentacao: 'Pendente',
   }).select().single();
   if (error) throw error;
   const newMov: Movimentacao = { ...mov, id: data.id, status: 'Pendente' };
   _movimentacoes.push(newMov);
   // Mark product in transit
-  const produto = _produtos.find(p => p.imei === mov.imei);
-  if (produto) {
-    await updateProduto(produto.id, { statusMovimentacao: 'Em movimentação', movimentacaoId: data.id });
+  if (produtoId) {
+    await updateProduto(produtoId, { statusMovimentacao: 'Em movimentação', movimentacaoId: data.id });
   }
   return newMov;
 };
@@ -567,7 +582,15 @@ export const confirmarRecebimentoMovimentacao = async (movId: string, responsave
   mov.dataRecebimento = new Date().toISOString();
   mov.responsavelRecebimento = responsavel;
   await supabase.from('movimentacoes_estoque').update({ tipo_movimentacao: 'Recebido' }).eq('id', movId);
-  const produto = _produtos.find(p => p.imei === mov.imei);
+  // Buscar produto por IMEI ou pelo produto_id da movimentação no DB
+  let produto = mov.imei ? _produtos.find(p => p.imei === mov.imei) : null;
+  if (!produto) {
+    // Fallback: buscar movimentação no DB para pegar produto_id
+    const { data: movRow } = await supabase.from('movimentacoes_estoque').select('produto_id').eq('id', movId).single();
+    if (movRow?.produto_id) {
+      produto = _produtos.find(p => p.id === movRow.produto_id) || null;
+    }
+  }
   if (produto) {
     const timeline = [...(produto.timeline || []), {
       id: `TL-${produto.id}-MOV-${mov.id}`, tipo: 'entrada' as const, data: new Date().toISOString(),

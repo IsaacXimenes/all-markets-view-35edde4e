@@ -108,41 +108,18 @@ const conferenciaToDb = (v: VendaConferencia) => ({
   dados_venda: v.dadosVenda,
 });
 
-// Seed data for first run
-const seedData: VendaConferencia[] = [
-  { id: 'CONF-001', vendaId: 'VEN-0001', dataRegistro: new Date(Date.now() - 0 * 86400000).toISOString(), lojaId: 'db894e7d', lojaNome: 'Loja - JK Shopping', vendedorId: '6dcbc817', vendedorNome: 'Caua Victor Costa dos Santos', clienteNome: 'Ricardo Mendes', valorTotal: 15800, tipoVenda: 'Normal', status: 'Conferência - Gestor', slaDias: 0, timeline: [{ id: 'TL-001', tipo: 'registro', titulo: 'Venda Registrada', descricao: 'Venda registrada pelo vendedor', dataHora: new Date(Date.now() - 0 * 86400000).toISOString(), responsavel: 'Caua Victor Costa dos Santos' }], dadosVenda: { clienteCpf: '789.123.456-00', clienteTelefone: '(11) 99999-8888', origemVenda: 'Loja Física', itens: [{ produto: 'iPhone 15 Pro Max', imei: '352123456789100', valorVenda: 15800, valorCusto: 7500 }], pagamentos: [{ meioPagamento: 'Pix', valor: 15800 }], subtotal: 15800, totalTradeIn: 0, total: 15800, lucro: 8300, margem: 110.67 } },
-  { id: 'CONF-002', vendaId: 'VEN-0002', dataRegistro: new Date(Date.now() - 1 * 86400000).toISOString(), lojaId: '3ac7e00c', lojaNome: 'Loja - Matriz', vendedorId: '143ac0c2', vendedorNome: 'Antonio Sousa Silva', clienteNome: 'Fernanda Lima', valorTotal: 8900, tipoVenda: 'Digital', status: 'Conferência - Gestor', slaDias: 1, timeline: [{ id: 'TL-002', tipo: 'registro', titulo: 'Venda Digital Registrada', descricao: 'Venda digital enviada', dataHora: new Date(Date.now() - 1 * 86400000).toISOString(), responsavel: 'Antonio Sousa Silva' }], dadosVenda: { subtotal: 8900, totalTradeIn: 0, total: 8900, lucro: 4700, margem: 111.90 } },
-  { id: 'CONF-003', vendaId: 'VEN-0003', dataRegistro: new Date(Date.now() - 2 * 86400000).toISOString(), lojaId: '5b9446d5', lojaNome: 'Loja - Shopping Sul', vendedorId: '9812948d', vendedorNome: 'Gustavo de Souza dos Santos', clienteNome: 'Bruno Santos', valorTotal: 2350, tipoVenda: 'Acessórios', status: 'Conferência - Gestor', slaDias: 2, timeline: [{ id: 'TL-003', tipo: 'registro', titulo: 'Venda de Acessórios', descricao: 'Venda de acessórios registrada', dataHora: new Date(Date.now() - 2 * 86400000).toISOString(), responsavel: 'Gustavo de Souza dos Santos' }], dadosVenda: { subtotal: 2350, totalTradeIn: 0, total: 2350, lucro: 850, margem: 56.67 } },
-  { id: 'CONF-004', vendaId: 'VEN-0004', dataRegistro: new Date(Date.now() - 4 * 86400000).toISOString(), lojaId: '0d06e7db', lojaNome: 'Loja - Águas Lindas Shopping', vendedorId: 'b106080f', vendedorNome: 'Erick Guthemberg Ferreira da Silva', clienteNome: 'Carla Oliveira', valorTotal: 22500, tipoVenda: 'Normal', status: 'Conferência - Gestor', slaDias: 4, timeline: [{ id: 'TL-004', tipo: 'registro', titulo: 'Venda Registrada', descricao: 'Venda de alto valor registrada', dataHora: new Date(Date.now() - 4 * 86400000).toISOString(), responsavel: 'Erick Guthemberg' }], dadosVenda: { subtotal: 22500, totalTradeIn: 0, total: 22500, lucro: 11300, margem: 100.89 } },
-  { id: 'CONF-005', vendaId: 'VEN-0005', dataRegistro: new Date(Date.now() - 7 * 86400000).toISOString(), lojaId: 'db894e7d', lojaNome: 'Loja - JK Shopping', vendedorId: '6dcbc817', vendedorNome: 'Caua Victor Costa dos Santos', clienteNome: 'Amanda Rodrigues', valorTotal: 9800, tipoVenda: 'Normal', status: 'Conferência - Financeiro', slaDias: 0, gestorConferencia: 'b467c728', gestorNome: 'Anna Beatriz Borges', observacaoGestor: 'Valores conferidos.', dataConferencia: new Date(Date.now() - 6 * 86400000).toISOString(), timeline: [{ id: 'TL-005-1', tipo: 'registro', titulo: 'Venda Registrada', descricao: 'Venda registrada', dataHora: new Date(Date.now() - 7 * 86400000).toISOString(), responsavel: 'Caua Victor' }], dadosVenda: { subtotal: 9800, totalTradeIn: 0, total: 9800, lucro: 5000, margem: 104.17 } },
-  { id: 'CONF-006', vendaId: 'VEN-0006', dataRegistro: new Date(Date.now() - 8 * 86400000).toISOString(), lojaId: '3ac7e00c', lojaNome: 'Loja - Matriz', vendedorId: '143ac0c2', vendedorNome: 'Antonio Sousa Silva', clienteNome: 'Diego Martins', valorTotal: 5600, tipoVenda: 'Digital', status: 'Conferência - Financeiro', slaDias: 0, gestorConferencia: '428d37c2', gestorNome: 'Bruno Alves Peres', dataConferencia: new Date(Date.now() - 7 * 86400000).toISOString(), timeline: [], dadosVenda: { subtotal: 5600, totalTradeIn: 0, total: 5600, lucro: 2800, margem: 100 } },
-  { id: 'CONF-007', vendaId: 'VEN-0007', dataRegistro: new Date(Date.now() - 10 * 86400000).toISOString(), lojaId: '5b9446d5', lojaNome: 'Loja - Shopping Sul', vendedorId: '9812948d', vendedorNome: 'Gustavo de Souza dos Santos', clienteNome: 'Letícia Souza', valorTotal: 3200, tipoVenda: 'Acessórios', status: 'Conferência - Financeiro', slaDias: 0, gestorConferencia: 'b467c728', gestorNome: 'Anna Beatriz Borges', dataConferencia: new Date(Date.now() - 9 * 86400000).toISOString(), timeline: [], dadosVenda: { subtotal: 3200, totalTradeIn: 0, total: 3200, lucro: 1100, margem: 52.38 } },
-  { id: 'CONF-008', vendaId: 'VEN-0008', dataRegistro: new Date(Date.now() - 12 * 86400000).toISOString(), lojaId: '0d06e7db', lojaNome: 'Loja - Águas Lindas Shopping', vendedorId: '6dcbc817', vendedorNome: 'Caua Victor Costa dos Santos', clienteNome: 'Rafael Costa', valorTotal: 18500, tipoVenda: 'Normal', status: 'Concluído', slaDias: 0, gestorConferencia: '428d37c2', gestorNome: 'Bruno Alves Peres', dataConferencia: new Date(Date.now() - 11 * 86400000).toISOString(), financeiroResponsavel: '7c1231ea', financeiroNome: 'Fernanda Gabrielle Silva de Lima', dataFinalizacao: new Date(Date.now() - 10 * 86400000).toISOString(), timeline: [], dadosVenda: { subtotal: 18500, totalTradeIn: 0, total: 18500, lucro: 9500, margem: 105.56 } },
-  { id: 'CONF-009', vendaId: 'VEN-0009', dataRegistro: new Date(Date.now() - 14 * 86400000).toISOString(), lojaId: 'fcc78c1a', lojaNome: 'Loja - Online', vendedorId: '143ac0c2', vendedorNome: 'Antonio Sousa Silva', clienteNome: 'Gabriela Pereira', valorTotal: 7200, tipoVenda: 'Normal', status: 'Concluído', slaDias: 0, gestorConferencia: 'b467c728', gestorNome: 'Anna Beatriz Borges', dataConferencia: new Date(Date.now() - 13 * 86400000).toISOString(), financeiroResponsavel: '7c1231ea', financeiroNome: 'Fernanda Gabrielle Silva de Lima', dataFinalizacao: new Date(Date.now() - 12 * 86400000).toISOString(), timeline: [], dadosVenda: { subtotal: 10200, totalTradeIn: 3000, total: 7200, lucro: 2200, margem: 44 } },
-  { id: 'CONF-010', vendaId: 'VEN-0010', dataRegistro: new Date(Date.now() - 16 * 86400000).toISOString(), lojaId: 'db894e7d', lojaNome: 'Loja - JK Shopping', vendedorId: '9812948d', vendedorNome: 'Gustavo de Souza dos Santos', clienteNome: 'Marina Oliveira', valorTotal: 12500, tipoVenda: 'Normal', status: 'Concluído', slaDias: 0, gestorConferencia: '428d37c2', gestorNome: 'Bruno Alves Peres', dataConferencia: new Date(Date.now() - 15 * 86400000).toISOString(), financeiroResponsavel: '7c1231ea', financeiroNome: 'Fernanda Gabrielle Silva de Lima', dataFinalizacao: new Date(Date.now() - 14 * 86400000).toISOString(), timeline: [], dadosVenda: { subtotal: 12500, totalTradeIn: 0, total: 12500, lucro: 6500, margem: 108.33 } },
-];
-
 export const initConferenciasGestorCache = async () => {
   try {
     const { data, error } = await supabase.from('conferencias_gestor').select('*');
     if (error) throw error;
-
-    if (!data || data.length === 0) {
-      // Seed
-      const records = seedData.map(conferenciaToDb);
-      const { error: insertError } = await supabase.from('conferencias_gestor').insert(records as any);
-      if (insertError) console.error('[ConferenciasGestor] Erro seed:', insertError);
-      conferenciaCache = [...seedData];
-    } else {
-      conferenciaCache = data.map(dbToConferencia);
-    }
+    conferenciaCache = (data || []).map(dbToConferencia);
     conferenciaCounter = conferenciaCache.length;
     conferenciaCacheInitialized = true;
     console.log(`[ConferenciasGestor] Cache: ${conferenciaCache.length} registros`);
   } catch (err) {
     console.error('[ConferenciasGestor] Erro init:', err);
-    conferenciaCache = [...seedData];
-    conferenciaCounter = conferenciaCache.length;
+    conferenciaCache = [];
+    conferenciaCounter = 0;
     conferenciaCacheInitialized = true;
   }
 };

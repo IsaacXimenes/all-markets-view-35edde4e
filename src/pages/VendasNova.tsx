@@ -2813,7 +2813,7 @@ export default function VendasNova() {
               </Select>
             </div>
             
-            <div className="flex-1 overflow-y-auto overflow-x-hidden [&_table]:min-w-0 [&_[data-radix-scroll-area-viewport]]:!overflow-x-hidden [&_[data-radix-scroll-area-scrollbar][data-orientation=horizontal]]:hidden">
+            <div className="flex-1 overflow-auto">
             {!showPendentesTab ? (
               /* Aba Produtos Estoque */
               <Table className="min-w-full [&_th]:px-3 [&_td]:px-3 [&_th]:text-sm [&_td]:text-sm">

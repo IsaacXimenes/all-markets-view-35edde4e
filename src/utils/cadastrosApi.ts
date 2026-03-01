@@ -328,6 +328,11 @@ let cargos: Cargo[] = [
   { id: 'CARGO-007', funcao: 'Analista Financeiro', permissoes: ['Financeiro', 'Relatórios'] },
   { id: 'CARGO-008', funcao: 'Supervisor de Loja', permissoes: ['Vendas', 'Estoque', 'Relatórios'] },
   { id: 'CARGO-009', funcao: 'Motoboy', permissoes: ['Entregas'] },
+  { id: 'CARGO-010', funcao: 'Sócio Administrador', permissoes: ['Financeiro', 'Estoque', 'Vendas', 'Assistência', 'Cadastros', 'Relatórios', 'Admin'] },
+  { id: 'CARGO-011', funcao: 'Assistente Administrativo', permissoes: ['Cadastros', 'Financeiro'] },
+  { id: 'CARGO-012', funcao: 'Analista de Dados', permissoes: ['Relatórios', 'Admin'] },
+  { id: 'CARGO-013', funcao: 'Estoquista', permissoes: ['Estoque'] },
+  { id: 'CARGO-014', funcao: 'Marketing', permissoes: ['Admin'] },
 ];
 
 let modelosPagamento: ModeloPagamento[] = [

@@ -49,6 +49,7 @@ import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuthStore } from '@/store/authStore';
 import { PainelRentabilidadeVenda } from '@/components/vendas/PainelRentabilidadeVenda';
+import { useIsAcessoGeral } from '@/utils/permissoesUtils';
 
 // Alias para compatibilidade
 const formatCurrency = formatarMoeda;
@@ -60,6 +61,7 @@ export default function VendasNova() {
   const isMobilePreview = useIsMobile();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const acessoGeral = useIsAcessoGeral();
   const { obterLojasAtivas, obterLojasTipoLoja, obterVendedores, obterMotoboys, obterLojaById, obterNomeLoja, obterNomeColaborador, obterLojaMatriz, obterLojaOnline, obterColaboradorById, obterRodizioAtivoDoColaborador } = useCadastroStore();
   
   // Dados do cadastros - usando Zustand store
@@ -91,7 +93,7 @@ export default function VendasNova() {
   }, [colaboradorId, obterColaboradorById, obterRodizioAtivoDoColaborador]);
 
   const [lojaVenda, setLojaVenda] = useState('');
-  const [vendedor] = useState(colaboradorId);
+  const [vendedor, setVendedor] = useState(colaboradorId);
 
   // Auto-set loja on mount
   useEffect(() => {
@@ -1135,11 +1137,21 @@ export default function VendasNova() {
                 <label className={cn("font-medium", isMobilePreview ? "text-xs" : "text-sm")}>
                   Responsável *
                 </label>
-                <Input
-                  value={colaboradorNome}
-                  disabled
-                  className={cn("bg-muted cursor-not-allowed", isMobilePreview && "h-8 text-xs")}
-                />
+                {acessoGeral ? (
+                  <AutocompleteColaborador
+                    value={vendedor}
+                    onChange={setVendedor}
+                    filtrarPorTipo="vendedoresEGestores"
+                    placeholder="Selecione o responsável..."
+                    className={cn(isMobilePreview && "h-8 text-xs")}
+                  />
+                ) : (
+                  <Input
+                    value={colaboradorNome}
+                    disabled
+                    className={cn("bg-muted cursor-not-allowed", isMobilePreview && "h-8 text-xs")}
+                  />
+                )}
               </div>
               <div>
                 <label className={cn("font-medium", isMobilePreview ? "text-xs" : "text-sm", !lojaVenda && 'text-destructive')}>

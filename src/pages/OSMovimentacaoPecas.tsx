@@ -13,6 +13,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { useAuthStore } from '@/store/authStore';
+import { useIsAcessoGeral } from '@/utils/permissoesUtils';
+import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { getPecas, getPecaById, updatePeca, Peca, initializePecasWithLojaIds } from '@/utils/pecasApi';
 import { formatCurrency } from '@/utils/formatUtils';
 import { Plus, Package, Search, X, CheckCircle, Clock, Eye, Edit, ArrowRight, ArrowDown } from 'lucide-react';
@@ -42,8 +44,9 @@ let movPecaCounter = 1;
 
 export default function OSMovimentacaoPecas() {
   const { toast } = useToast();
-  const { obterLojasPorTipo, obterNomeLoja, obterColaboradoresAtivos } = useCadastroStore();
+  const { obterLojasPorTipo, obterNomeLoja, obterColaboradoresAtivos, obterNomeColaborador } = useCadastroStore();
   const user = useAuthStore(state => state.user);
+  const acessoGeral = useIsAcessoGeral();
   const lojas = obterLojasPorTipo('Assistência');
   const colaboradores = obterColaboradoresAtivos();
 
@@ -171,7 +174,7 @@ export default function OSMovimentacaoPecas() {
       quantidade: qtd,
       origem: pecaSelecionada.lojaId,
       destino: formData.destino,
-      responsavel: user?.colaborador?.nome || 'Não identificado',
+      responsavel: formData.responsavel ? obterNomeColaborador(formData.responsavel) : (user?.colaborador?.nome || 'Não identificado'),
       motivo: formData.motivo,
       data: formData.data || (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })(),
       status: 'Pendente'
@@ -493,11 +496,19 @@ export default function OSMovimentacaoPecas() {
 
             <div>
               <Label htmlFor="responsavel">Responsável *</Label>
-              <Input
-                value={user?.colaborador?.nome || 'Não identificado'}
-                disabled
-                className="bg-muted"
-              />
+              {acessoGeral ? (
+                <AutocompleteColaborador
+                  value={formData.responsavel}
+                  onChange={(colId) => setFormData(prev => ({ ...prev, responsavel: colId }))}
+                  placeholder="Selecione o responsável..."
+                />
+              ) : (
+                <Input
+                  value={user?.colaborador?.nome || 'Não identificado'}
+                  disabled
+                  className="bg-muted"
+                />
+              )}
             </div>
 
             <div>

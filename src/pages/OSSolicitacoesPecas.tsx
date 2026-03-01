@@ -30,7 +30,9 @@ import { getFornecedores, addFornecedor } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { useAuthStore } from '@/store/authStore';
+import { useIsAcessoGeral } from '@/utils/permissoesUtils';
 import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
+import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { getOrdemServicoById, updateOrdemServico, getOrdensServico } from '@/utils/assistenciaApi';
 import { CustoPorOrigemCards } from '@/components/assistencia/CustoPorOrigemCards';
 import { Eye, Check, X, Package, Clock, AlertTriangle, Send, Plus, Edit, History, DollarSign, TrendingUp } from 'lucide-react';
@@ -43,6 +45,7 @@ export default function OSSolicitacoesPecas() {
   const [solicitacoes, setSolicitacoes] = useState(getSolicitacoes());
   const { obterLojasPorTipo, obterNomeLoja, obterColaboradoresAtivos } = useCadastroStore();
   const user = useAuthStore(state => state.user);
+  const acessoGeral = useIsAcessoGeral();
   const lojas = obterLojasPorTipo('Assistência');
   const fornecedores = getFornecedores().filter(f => f.status === 'Ativo');
   const colaboradores = obterColaboradoresAtivos();
@@ -1072,11 +1075,19 @@ export default function OSSolicitacoesPecas() {
             <div className="border-t pt-4 space-y-4">
               <div className="space-y-2">
                 <Label>Responsável pela Compra *</Label>
-                <Input
-                  value={user?.colaborador?.nome || 'Não identificado'}
-                  disabled
-                  className="bg-muted"
-                />
+                {acessoGeral ? (
+                  <AutocompleteColaborador
+                    value={responsavelCompraGlobal}
+                    onChange={setResponsavelCompraGlobal}
+                    placeholder="Selecione o responsável..."
+                  />
+                ) : (
+                  <Input
+                    value={user?.colaborador?.nome || 'Não identificado'}
+                    disabled
+                    className="bg-muted"
+                  />
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

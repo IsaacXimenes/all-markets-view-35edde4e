@@ -5,6 +5,7 @@ interface Colaborador {
   id: string;
   nome: string;
   cargo: string;
+  loja_id?: string;
   eh_gestor?: boolean;
   eh_vendedor?: boolean;
   eh_estoquista?: boolean;
@@ -51,7 +52,7 @@ async function fetchProfile(userId: string): Promise<{
 async function fetchColaborador(colaboradorId: string): Promise<Colaborador | null> {
   const { data, error } = await supabase
     .from('colaboradores')
-    .select('id, nome, cargo, eh_gestor, eh_vendedor, eh_estoquista')
+    .select('id, nome, cargo, loja_id, eh_gestor, eh_vendedor, eh_estoquista')
     .eq('id', colaboradorId)
     .single();
   if (error || !data) return null;
@@ -59,6 +60,7 @@ async function fetchColaborador(colaboradorId: string): Promise<Colaborador | nu
     id: data.id,
     nome: data.nome,
     cargo: data.cargo || '',
+    loja_id: data.loja_id || undefined,
     eh_gestor: data.eh_gestor || false,
     eh_vendedor: data.eh_vendedor || false,
     eh_estoquista: data.eh_estoquista || false,

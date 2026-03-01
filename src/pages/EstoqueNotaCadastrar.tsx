@@ -468,11 +468,10 @@ export default function EstoqueNotaCadastrar() {
               </div>
               <div>
                 <Label>Responsável pelo Lançamento *</Label>
-                <AutocompleteColaborador
-                  value={responsavelLancamento}
-                  onChange={setResponsavelLancamento}
-                  placeholder="Selecione o responsável"
-                  filtrarPorTipo="estoquistas"
+                <Input
+                  value={user?.colaborador?.nome || 'Não identificado'}
+                  disabled
+                  className="bg-muted cursor-not-allowed"
                 />
               </div>
             </div>

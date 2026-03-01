@@ -35,6 +35,7 @@ import {
   ProdutoCadastro
 } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
+import { useAuthStore } from '@/store/authStore';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { AutocompleteFornecedor } from '@/components/AutocompleteFornecedor';
@@ -91,6 +92,7 @@ interface PagamentoForm {
 export default function OSAssistenciaNova() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuthStore();
   const [searchParams] = useSearchParams();
   
   // Parâmetros de origem
@@ -126,8 +128,20 @@ export default function OSAssistenciaNova() {
 
   // Form state
   const [lojaId, setLojaId] = useState('');
-  const [tecnicoId, setTecnicoId] = useState('');
+  // Auto-preencher técnico se o usuário logado for técnico (não-gestor mantém editável para gestores)
+  const isTecnicoLogado = useMemo(() => {
+    return user?.colaborador && !user.colaborador.eh_gestor && obterTecnicos().some(t => t.id === user.colaborador?.id);
+  }, [user, obterTecnicos]);
+  const [tecnicoId, setTecnicoId] = useState(isTecnicoLogado ? (user?.colaborador?.id || '') : '');
   const [vendedorId, setVendedorId] = useState(''); // NOVO: campo vendedor
+
+  // Auto-set loja when técnico is pre-filled
+  useEffect(() => {
+    if (isTecnicoLogado && tecnicoId && !lojaId) {
+      const tecnico = obterTecnicos().find(t => t.id === tecnicoId);
+      if (tecnico) setLojaId(tecnico.loja_id);
+    }
+  }, [isTecnicoLogado, tecnicoId]);
   const [setor, setSetor] = useState<'GARANTIA' | 'ASSISTÊNCIA' | 'TROCA' | ''>('');
   const [clienteId, setClienteId] = useState('');
   const [descricao, setDescricao] = useState('');

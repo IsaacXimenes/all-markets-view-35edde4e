@@ -47,6 +47,7 @@ import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
 import { getTaxasEntregaAtivas, TaxaEntrega } from '@/utils/taxasEntregaApi';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuthStore } from '@/store/authStore';
 import { PainelRentabilidadeVenda } from '@/components/vendas/PainelRentabilidadeVenda';
 
 // Alias para compatibilidade
@@ -58,6 +59,7 @@ const DRAFT_KEY = 'draft_venda_nova';
 export default function VendasNova() {
   const isMobilePreview = useIsMobile();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const { obterLojasAtivas, obterLojasTipoLoja, obterVendedores, obterMotoboys, obterLojaById, obterNomeLoja, obterNomeColaborador, obterLojaMatriz, obterLojaOnline, obterColaboradorById, obterRodizioAtivoDoColaborador } = useCadastroStore();
   
   // Dados do cadastros - usando Zustand store
@@ -73,10 +75,30 @@ export default function VendasNova() {
   const [produtosPendentes] = useState<ProdutoPendente[]>(getProdutosPendentes());
   const [acessoriosEstoque, setAcessoriosEstoque] = useState<Acessorio[]>(getAcessorios());
   
-  // Info da venda
+  // Info da venda - responsável auto-preenchido com colaborador logado
   const [vendaInfo] = useState(getNextVendaNumber());
+  const colaboradorLogado = user?.colaborador;
+  const colaboradorId = colaboradorLogado?.id || '';
+  const colaboradorNome = colaboradorLogado?.nome || 'Não identificado';
+
+  // Determinar loja automaticamente (rodízio ou loja base)
+  const lojaAutoDetectada = useMemo(() => {
+    if (!colaboradorId) return '';
+    const col = obterColaboradorById(colaboradorId);
+    if (!col) return '';
+    const rodizio = obterRodizioAtivoDoColaborador(col.id);
+    return rodizio ? rodizio.loja_destino_id : col.loja_id;
+  }, [colaboradorId, obterColaboradorById, obterRodizioAtivoDoColaborador]);
+
   const [lojaVenda, setLojaVenda] = useState('');
-  const [vendedor, setVendedor] = useState('');
+  const [vendedor] = useState(colaboradorId);
+
+  // Auto-set loja on mount
+  useEffect(() => {
+    if (lojaAutoDetectada && !lojaVenda) {
+      setLojaVenda(lojaAutoDetectada);
+    }
+  }, [lojaAutoDetectada]);
   
   // Cliente
   const [clienteId, setClienteId] = useState('');
@@ -208,7 +230,7 @@ export default function VendasNova() {
     const draft = loadDraft();
     if (draft) {
       setLojaVenda(draft.lojaVenda || '');
-      setVendedor(draft.vendedor || '');
+      // vendedor is auto-filled from logged-in user, skip draft restore
       setClienteId(draft.clienteId || '');
       setClienteNome(draft.clienteNome || '');
       setClienteCpf(draft.clienteCpf || '');
@@ -1110,26 +1132,13 @@ export default function VendasNova() {
                 </div>
               )}
               <div>
-                <label className={cn("font-medium", isMobilePreview ? "text-xs" : "text-sm", !vendedor && 'text-destructive')}>
+                <label className={cn("font-medium", isMobilePreview ? "text-xs" : "text-sm")}>
                   Responsável *
                 </label>
-                <AutocompleteColaborador
-                  value={vendedor}
-                  onChange={(id: string) => {
-                    setVendedor(id);
-                    if (id) {
-                      const col = obterColaboradorById(id);
-                      if (col) {
-                        const rodizio = obterRodizioAtivoDoColaborador(col.id);
-                        setLojaVenda(rodizio ? rodizio.loja_destino_id : col.loja_id);
-                      }
-                    } else {
-                      setLojaVenda('');
-                    }
-                  }}
-                  placeholder="Selecione"
-                  filtrarPorTipo="vendedoresEGestores"
-                  className={cn(!vendedor && 'border-destructive', isMobilePreview && "h-8 text-xs")}
+                <Input
+                  value={colaboradorNome}
+                  disabled
+                  className={cn("bg-muted cursor-not-allowed", isMobilePreview && "h-8 text-xs")}
                 />
               </div>
               <div>
@@ -1169,7 +1178,7 @@ export default function VendasNova() {
                   if (window.confirm('Limpar todos os campos? Esta ação não pode ser desfeita.')) {
                     // Informações da Venda
                     setLojaVenda('');
-                    setVendedor('');
+                    // vendedor is auto-filled, not resettable
                     setOrigemVenda('');
                     setObservacoes('');
                     

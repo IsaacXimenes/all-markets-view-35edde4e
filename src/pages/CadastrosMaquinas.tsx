@@ -21,7 +21,7 @@ import {
 } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
-import { exportToCSV } from '@/utils/formatUtils';
+import { exportToCSV, formatCPFCNPJ } from '@/utils/formatUtils';
 import { toast } from 'sonner';
 
 // Interface para parcelamento
@@ -123,6 +123,7 @@ export default function CadastrosMaquinas() {
 
     const maquinaData = {
       nome: form.nome,
+      lojaVinculada: '',
       cnpjVinculado: form.cnpjVinculado,
       contaOrigem: form.contaOrigem,
       status: form.status,
@@ -154,13 +155,12 @@ export default function CadastrosMaquinas() {
 
   const handleExport = () => {
     const data = maquinas.map(m => {
-      const loja = getLojaById(m.cnpjVinculado);
       const conta = getContaFinanceiraById(m.contaOrigem);
       return {
         ID: m.codigo || m.id,
         Nome: m.nome,
-        'Loja Vinculada': loja?.nome || m.cnpjVinculado,
-        'CNPJ': loja?.cnpj || '-',
+        'Loja Vinculada': m.lojaVinculada || '-',
+        'CNPJ': m.cnpjVinculado ? formatCPFCNPJ(m.cnpjVinculado) : '-',
         'Conta de Origem': conta?.nome || m.contaOrigem,
         '% da Máquina': `${m.percentualMaquina || m.taxas?.debito || 2}%`,
         Status: m.status
@@ -386,7 +386,6 @@ export default function CadastrosMaquinas() {
               </TableHeader>
               <TableBody>
                 {maquinas.map((maquina) => {
-                  const loja = getLojaById(maquina.cnpjVinculado);
                   const conta = getContaFinanceiraById(maquina.contaOrigem);
                   const percentual = maquina.percentualMaquina ?? maquina.taxas?.debito ?? 2;
                   
@@ -394,8 +393,8 @@ export default function CadastrosMaquinas() {
                     <TableRow key={maquina.id}>
                       <TableCell className="font-mono text-xs">{maquina.codigo || maquina.id}</TableCell>
                       <TableCell className="font-medium">{maquina.nome}</TableCell>
-                      <TableCell>{loja?.nome || maquina.cnpjVinculado}</TableCell>
-                      <TableCell className="font-mono text-xs">{loja?.cnpj || '-'}</TableCell>
+                      <TableCell>{maquina.lojaVinculada || '-'}</TableCell>
+                      <TableCell className="font-mono text-xs">{maquina.cnpjVinculado ? formatCPFCNPJ(maquina.cnpjVinculado) : '-'}</TableCell>
                       <TableCell>{conta?.nome || maquina.contaOrigem}</TableCell>
                       <TableCell>
                         {editingPercentual === maquina.id ? (

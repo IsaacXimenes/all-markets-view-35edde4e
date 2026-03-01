@@ -127,6 +127,7 @@ export interface MaquinaCartao {
   id: string;
   codigo: string;
   nome: string;
+  lojaVinculada: string;
   cnpjVinculado: string;
   contaOrigem: string;
   status: 'Ativo' | 'Inativo';
@@ -359,7 +360,7 @@ const mapRowToContaFinanceira = (row: any): ContaFinanceira => ({
 });
 
 const mapRowToMaquinaCartao = (row: any): MaquinaCartao => ({
-  id: row.id, codigo: row.codigo || '', nome: row.nome, cnpjVinculado: row.cnpj_vinculado || '',
+  id: row.id, codigo: row.codigo || '', nome: row.nome, lojaVinculada: row.loja_vinculada || '', cnpjVinculado: row.cnpj_vinculado || '',
   contaOrigem: row.conta_origem || '', status: (row.status as 'Ativo' | 'Inativo') || 'Ativo',
   percentualMaquina: row.percentual_maquina ?? 0,
   taxas: row.taxas && typeof row.taxas === 'object' ? row.taxas : { credito: {}, debito: 0 },
@@ -762,7 +763,8 @@ export const addMaquinaCartao = async (maquina: Omit<MaquinaCartao, 'id' | 'codi
   const novoCodigo = `MQ-${String(nextNum).padStart(3, '0')}`;
 
   const { data, error } = await supabase.from('maquinas_cartao').insert({
-    nome: maquina.nome, cnpj_vinculado: maquina.cnpjVinculado,
+    nome: maquina.nome, loja_vinculada: maquina.lojaVinculada || '',
+    cnpj_vinculado: maquina.cnpjVinculado,
     conta_origem: maquina.contaOrigem, status: maquina.status || 'Ativo',
     percentual_maquina: maquina.percentualMaquina ?? 0,
     taxas: maquina.taxas, parcelamentos: maquina.parcelamentos || [],

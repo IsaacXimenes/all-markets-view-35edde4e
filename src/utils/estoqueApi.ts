@@ -150,6 +150,7 @@ export interface NotaCompra {
 
 export interface Movimentacao {
   id: string;
+  codigoLegivel: string;
   data: string;
   produto: string;
   imei: string;
@@ -343,8 +344,10 @@ const mapNotaToDB = (nota: Partial<NotaCompra> & { produtos?: any; pagamento?: a
   return db;
 };
 
+let mapMovCounter = 1;
 const mapMovFromDB = (row: any): Movimentacao => ({
   id: row.id,
+  codigoLegivel: `MOV-${String(mapMovCounter++).padStart(4, '0')}`,
   data: row.created_at || '',
   produto: '', // derived
   imei: '', // derived
@@ -388,6 +391,7 @@ export const initEstoqueCache = async (): Promise<void> => {
       return mov;
     });
     _cacheLoaded = true;
+    movIdCounter = _movimentacoes.length + 1;
     initializeProductIds(_produtos.map(p => p.codigo));
   } catch (e) {
     console.error('[ESTOQUE] Erro ao carregar cache:', e);
@@ -554,9 +558,12 @@ export const finalizarNota = async (id: string, pagamento: NotaCompra['pagamento
 
 // ==================== MOVIMENTAÇÕES ====================
 
+let movIdCounter = _movimentacoes.length + 1;
+const generateMovId = () => `MOV-${String(movIdCounter++).padStart(4, '0')}`;
+
 export const getMovimentacoes = (): Movimentacao[] => [..._movimentacoes];
 
-export const addMovimentacao = async (mov: Omit<Movimentacao, 'id'> & { produtoId?: string; responsavelId?: string }): Promise<Movimentacao> => {
+export const addMovimentacao = async (mov: Omit<Movimentacao, 'id' | 'codigoLegivel'> & { produtoId?: string; responsavelId?: string }): Promise<Movimentacao> => {
   // Determinar produto_id: usar produtoId explícito ou buscar pelo IMEI
   const produtoId = mov.produtoId || _produtos.find(p => p.imei === mov.imei)?.id || null;
   // Usar responsavelId (UUID) para o DB, e manter o nome no cache local
@@ -566,7 +573,8 @@ export const addMovimentacao = async (mov: Omit<Movimentacao, 'id'> & { produtoI
     responsavel_id: responsavelIdDb, motivo: mov.motivo, tipo_movimentacao: 'Pendente',
   }).select().single();
   if (error) throw error;
-  const newMov: Movimentacao = { ...mov, id: data.id, status: 'Pendente' };
+  const codigoLegivel = generateMovId();
+  const newMov: Movimentacao = { ...mov, id: data.id, codigoLegivel, status: 'Pendente' };
   _movimentacoes.push(newMov);
   // Mark product in transit
   if (produtoId) {

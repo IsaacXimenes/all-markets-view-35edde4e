@@ -34,51 +34,7 @@ interface MovimentacaoAcessorio {
   responsavelRecebimento?: string;
 }
 
-// Mock data
-const mockMovimentacoes: MovimentacaoAcessorio[] = [
-  {
-    id: 'MOV-ACESS-001',
-    data: '2024-01-15',
-    acessorio: 'Capa iPhone 14 Pro Silicone',
-    acessorioId: 'ACESS-001',
-    quantidade: 5,
-    origem: '3ac7e00c',
-    destino: 'db894e7d',
-    responsavel: 'Maria Souza',
-    motivo: 'Reposição de estoque',
-    status: 'Recebido',
-    dataRecebimento: '2024-01-16T10:30:00',
-    responsavelRecebimento: 'João Silva'
-  },
-  {
-    id: 'MOV-ACESS-002',
-    data: '2024-01-16',
-    acessorio: 'Película Vidro Samsung S23',
-    acessorioId: 'ACESS-002',
-    quantidade: 10,
-    origem: '3ac7e00c',
-    destino: '5b9446d5',
-    responsavel: 'João Silva',
-    motivo: 'Transferência',
-    status: 'Pendente'
-  },
-  {
-    id: 'MOV-ACESS-003',
-    data: '2024-01-18',
-    acessorio: 'Carregador USB-C 20W',
-    acessorioId: 'ACESS-003',
-    quantidade: 3,
-    origem: 'db894e7d',
-    destino: '0d06e7db',
-    responsavel: 'Ana Costa',
-    motivo: 'Devolução',
-    status: 'Recebido',
-    dataRecebimento: '2024-01-19T14:00:00',
-    responsavelRecebimento: 'Pedro Santos'
-  }
-];
-
-let movimentacoesData = [...mockMovimentacoes];
+let movimentacoesData: MovimentacaoAcessorio[] = [];
 
 export default function EstoqueMovimentacoesAcessorios() {
   const { obterLojasTipoLoja, obterColaboradoresAtivos, obterLojaById, obterNomeLoja } = useCadastroStore();

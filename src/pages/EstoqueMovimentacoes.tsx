@@ -273,7 +273,9 @@ export default function EstoqueMovimentacoes() {
       origem: formData.origem,
       destino: formData.destino,
       responsavel: colaboradores.find(c => c.id === formData.responsavel)?.nome || formData.responsavel,
-      motivo: formData.motivo
+      motivo: formData.motivo,
+      produtoId: produtoSelecionado.id,
+      responsavelId: formData.responsavel,
     });
 
     setMovimentacoes([...movimentacoes, novaMovimentacao]);

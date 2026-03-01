@@ -71,6 +71,9 @@ export const initTaxasEntregaCache = async (): Promise<void> => {
     const { data, error } = await supabase.from('taxas_entrega').select('*');
     if (error) { console.error('Erro ao carregar taxas_entrega:', error); return; }
     if (!data || data.length === 0) {
+      // Verificar se há sessão ativa antes de tentar seed
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { console.log('[TAXAS] Sem sessão ativa, pulando seed'); return; }
       const inserts = SEED_TAXAS.map((t, i) => ({
         local: t.local, valor: t.valor, status: 'Ativo',
         loja_id: LOJA_ONLINE_ID,

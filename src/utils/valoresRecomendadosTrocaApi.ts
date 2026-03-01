@@ -126,6 +126,9 @@ export const initValoresTrocaCache = async (): Promise<void> => {
     ]);
     if (valoresRes.error) { console.error('Erro ao carregar valores_recomendados_troca:', valoresRes.error); return; }
     if (!valoresRes.data || valoresRes.data.length === 0) {
+      // Verificar se há sessão ativa antes de tentar seed
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { console.log('[VALORES_TROCA] Sem sessão ativa, pulando seed'); return; }
       // Seed
       const inserts = SEED_VALORES.map(v => ({
         modelo: v.modelo, marca: v.marca, condicao: v.condicao,

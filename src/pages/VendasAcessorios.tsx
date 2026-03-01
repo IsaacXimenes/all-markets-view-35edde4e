@@ -519,7 +519,16 @@ export default function VendasAcessorios() {
                 {acessoGeral ? (
                   <AutocompleteColaborador
                     value={vendedor}
-                    onChange={setVendedor}
+                    onChange={(colId) => {
+                      setVendedor(colId);
+                      if (colId) {
+                        const col = obterColaboradorById(colId);
+                        if (col) {
+                          const rodizio = obterRodizioAtivoDoColaborador(col.id);
+                          setLojaVenda(rodizio ? rodizio.loja_destino_id : col.loja_id);
+                        }
+                      }
+                    }}
                     filtrarPorTipo="vendedoresEGestores"
                     placeholder="Selecione o responsável..."
                   />

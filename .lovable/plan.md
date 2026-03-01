@@ -1,74 +1,86 @@
 
 
-# Plano: Corrigir fluxo de movimentacoes e erros de RLS no seed
+# Plano: Padronizar nomes e IDs nas 3 abas de estoque
 
-## Problemas Identificados
+## Resumo dos Problemas
 
-### 1. Erros de RLS no seed (taxas_entrega, planos_garantia, valores_recomendados_troca)
-As tres tabelas possuem RLS com politica `auth.uid() IS NOT NULL`. Quando o app carrega sem usuario autenticado (tela de login), o SELECT retorna vazio por causa do RLS. O codigo interpreta como "tabela vazia" e tenta fazer INSERT (seed), que tambem falha por RLS. Os dados ja existem no banco (25 taxas, 9 planos, 68 valores), entao o seed nao deveria ser executado.
+### 1. Aparelhos (tabela `produtos`) - 629 registros
+- **Modelos em CAIXA ALTA**: "IPHONE 15 128GB", "GALAXY A06 128GB 4RAM", "REDMI NOTE 14S 256GB 8RAM"
+- Devem ficar com apenas a primeira letra maiuscula por palavra, respeitando siglas: "iPhone 15 128GB", "Galaxy A06 128GB 4RAM"
+- Typos nos modelos: "IPHOINE 11 128GB", "IPHONE 11- 64GB", "IPHONE 12 PRO-128GB"
+- **IDs**: Todos ja possuem `codigo` (PROD-0001 a PROD-0629) - OK
 
-**Correcao**: Nos tres arquivos (`taxasEntregaApi.ts`, `planosGarantiaApi.ts`, `valoresRecomendadosTrocaApi.ts`), verificar se o usuario esta autenticado antes de tentar seed. Se nao autenticado, pular o seed silenciosamente e aguardar o proximo carregamento apos login.
+### 2. Aparelhos Pendentes (tabela `produtos_pendentes_os`) - 165 registros
+- **42 registros sem codigo**: Precisam receber PROD-0630 em diante (sequencial apos o maior codigo existente = PROD-0629)
+- Modelos ja estao em formato aceitavel ("iPhone 14 128GB") - importacao recente fez Title Case
+- Cores em branco em varios registros
 
-### 2. Fluxo de movimentacoes quebrado - mapeamento DB incompleto
-O `mapMovFromDB` define `produto: ''` e `imei: ''` porque a tabela `movimentacoes_estoque` nao tem essas colunas. Os campos `produto` (nome do aparelho) e `imei` precisam ser derivados do cache de produtos via `produto_id`.
+### 3. Acessorios (tabela `acessorios`) - 2.464 registros
+- **Nomes em CAIXA ALTA**: "CASE 17 PRO MAX", "CABO APPLE TYPEC", "ADAPTADOR OTG"
+- Devem ficar Title Case: "Case 17 Pro Max", "Cabo Apple Typec", "Adaptador Otg"
+- **Sem coluna `codigo`**: Precisa criar coluna e popular com AC-0001 em diante (auto-incremento)
+- Typos e duplicatas nos nomes: "CASE  17" (espaco duplo), "CASE 11PRO" (falta espaco), "BASTÃÕ SELFIE PEINING" (acentuacao errada)
 
-**Correcao**: Apos carregar as movimentacoes, cruzar com o cache de produtos para preencher `produto` e `imei` a partir do `produto_id`.
+## Plano de Execucao
 
-### 3. addMovimentacao - produto_id null e responsavel_id como string
-- `produto_id` e inserido como `null`, quando deveria ser o UUID do produto
-- `responsavel_id` recebe o NOME do colaborador (string), mas a coluna espera UUID. Isso causa falha no INSERT
-
-**Correcao**: 
-- Buscar o produto pelo IMEI e enviar o `produto_id` correto
-- Em `EstoqueMovimentacoes.tsx`, enviar o ID do colaborador (UUID) separado do nome, e armazenar o nome apenas no cache local
-
-### 4. confirmarRecebimentoMovimentacao - mesmos problemas de referencia
-A funcao busca produto por IMEI no cache, mas se o mapeamento esta vazio, nao encontra. Precisa usar `produto_id` da movimentacao para localizar.
-
-## Arquivos a Modificar
-
-### `src/utils/estoqueApi.ts`
-- `mapMovFromDB`: Enriquecer com dados do produto (produto, imei) apos o cache ser carregado
-- `initEstoqueCache`: Apos carregar produtos e movimentacoes, fazer o cruzamento de dados
-- `addMovimentacao`: Receber `produtoId` e enviar para o DB; armazenar nome e IMEI no cache local
-- `confirmarRecebimentoMovimentacao`: Usar `produto_id` da movimentacao ao inves de buscar por IMEI
-
-### `src/pages/EstoqueMovimentacoes.tsx`
-- `handleRegistrarMovimentacao`: Enviar o ID do produto corretamente; separar responsavel nome de responsavel ID
-
-### `src/utils/taxasEntregaApi.ts`
-- `initTaxasEntregaCache`: Verificar se ha sessao ativa antes de tentar seed
-
-### `src/utils/planosGarantiaApi.ts`
-- `initPlanosGarantiaCache`: Verificar se ha sessao ativa antes de tentar seed
-
-### `src/utils/valoresRecomendadosTrocaApi.ts`
-- `initValoresTrocaCache`: Verificar se ha sessao ativa antes de tentar seed
-
-## Detalhes Tecnicos
-
-### Correcao do mapeamento de movimentacoes
-```text
-mapMovFromDB atualmente:
-  produto: ''    --> precisa cruzar com _produtos via produto_id
-  imei: ''       --> precisa cruzar com _produtos via produto_id
-
-initEstoqueCache:
-  1. Carregar produtos
-  2. Carregar movimentacoes
-  3. Para cada movimentacao, buscar produto pelo produto_id e preencher nome + IMEI
+### Etapa 1: Migration - Adicionar coluna `codigo` na tabela `acessorios`
+```sql
+ALTER TABLE acessorios ADD COLUMN IF NOT EXISTS codigo TEXT;
 ```
 
-### Correcao do addMovimentacao
+### Etapa 2: Migration de dados - Padronizar nomes e gerar IDs
+
+**2a. Produtos - Padronizar modelos para Title Case**
+- Converter modelos UPPERCASE para formato legivel
+- Regras especiais: "iPhone" (nao "Iphone"), "iPad", "AirPods", siglas como "GB", "RAM", "5G", "PRO", "MAX" mantidas
+- Corrigir typos: "IPHOINE" -> "iPhone", hifens errados "IPHONE 11- 64GB" -> "iPhone 11 64GB"
+
+**2b. Produtos Pendentes - Atribuir codigos faltantes**
+- Gerar PROD-0630 a PROD-0671 para os 42 registros sem codigo (ordenados por created_at)
+
+**2c. Acessorios - Padronizar nomes e gerar codigos**
+- Converter nomes para Title Case
+- Corrigir espacos duplos e caracteres especiais
+- Gerar AC-0001 a AC-2464 (ordenados por created_at)
+
+### Etapa 3: Atualizar codigo frontend
+
+**`src/utils/acessoriosApi.ts`**
+- Adicionar campo `codigo` na interface `Acessorio`
+- Atualizar `mapFromDB` e `mapToDB` para incluir o campo `codigo`
+
+**`src/pages/EstoqueAcessorios.tsx`**
+- Exibir `codigo` (AC-XXXX) na coluna ID ao inves do UUID
+
+**`src/utils/estoqueApi.ts`**
+- Nenhuma alteracao de mapeamento necessaria (modelo ja e mapeado como string)
+
+**`src/utils/osApi.ts`**
+- Nenhuma alteracao (codigo ja e mapeado)
+
+### Etapa 4: Atualizar Edge Functions de importacao
+- `import-produtos-estoque`: Aplicar Title Case nos modelos antes de inserir
+- `import-produtos-pendentes`: Gerar `codigo` sequencial ao inserir (consultar MAX do banco)
+- `import-acessorios`: Aplicar Title Case nos nomes e gerar `codigo` sequencial
+
+## Regras de Normalizacao de Nomes
+
 ```text
-Antes:  produto_id: null, responsavel_id: mov.responsavel (NOME)
-Depois: produto_id: produto.id (UUID), responsavel_id: responsavelId (UUID separado)
+Palavras especiais (manter como estao):
+- iPhone, iPad, AirPods, MacBook (Apple products)
+- GB, TB, RAM, 5G, 4G, LTE (siglas tecnicas)
+- PRO, MAX, PLUS, MINI, SE, XR, XS (variantes de produto)
+- USB-C, OTG, HDMI, NFC (siglas de tecnologia)
+- JBL, PS5, PS4 (marcas/siglas conhecidas)
+
+Demais palavras: primeira letra maiuscula, restante minuscula
 ```
 
-### Correcao do seed
-```text
-Antes de tentar seed, verificar:
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return; // Nao tenta seed sem autenticacao
-```
+## Arquivos Modificados
+1. `supabase/migrations/` - Nova migration (schema + dados)
+2. `src/utils/acessoriosApi.ts` - Interface e mapeamento do campo `codigo`
+3. `src/pages/EstoqueAcessorios.tsx` - Exibir `codigo` na coluna ID
+4. `supabase/functions/import-produtos-estoque/index.ts` - Title Case nos modelos
+5. `supabase/functions/import-produtos-pendentes/index.ts` - Gerar codigo sequencial
+6. `supabase/functions/import-acessorios/index.ts` - Title Case e codigo sequencial
 

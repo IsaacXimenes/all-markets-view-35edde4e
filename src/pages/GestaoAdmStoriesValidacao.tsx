@@ -265,7 +265,7 @@ export default function GestaoAdmStoriesValidacao() {
                   <Textarea
                     value={selectedVenda.observacaoValidacao || ''}
                     onChange={e => handleObsChange(selectedVendaId!, e.target.value)}
-                    placeholder="Observações do supervisor..."
+                    placeholder="Observações do gestor..."
                     disabled={isReadOnly || bloqueado}
                     rows={3}
                   />

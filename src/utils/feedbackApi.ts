@@ -140,12 +140,12 @@ export const deleteFeedback = async (id: string) => {
 };
 
 // Verificar se usuário atual é gestor
-const cargosGestores = ['Gerente Geral', 'Gerente Financeiro', 'Gerente de Estoque', 'Supervisor de Loja'];
+const cargosGestores = ['Gerente Geral', 'Gerente Financeiro', 'Gerente de Estoque', 'Gestor de Loja'];
 
 export const isUsuarioGestor = (cargoNome: string): boolean => {
   return cargosGestores.some(c => cargoNome.toLowerCase().includes(c.toLowerCase()) ||
     cargoNome.toLowerCase().includes('gerente') ||
-    cargoNome.toLowerCase().includes('supervisor'));
+    cargoNome.toLowerCase().includes('gestor'));
 };
 
 // Usuário logado real via authStore
@@ -157,7 +157,7 @@ export const getUsuarioLogado = () => {
     cargo: user?.colaborador?.cargo || '',
     isGestor: user?.colaborador?.cargo?.toLowerCase().includes('gerente') || 
               user?.colaborador?.cargo?.toLowerCase().includes('gestor') || 
-              user?.colaborador?.cargo?.toLowerCase().includes('supervisor') || false
+              user?.colaborador?.cargo?.toLowerCase().includes('gestor') || false
   };
 };
 

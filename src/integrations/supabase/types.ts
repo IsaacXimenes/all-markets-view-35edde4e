@@ -19,6 +19,7 @@ export type Database = {
           categoria: string | null
           created_at: string | null
           id: string
+          imei: string | null
           loja_id: string | null
           marca: string | null
           nome: string
@@ -31,6 +32,7 @@ export type Database = {
           categoria?: string | null
           created_at?: string | null
           id?: string
+          imei?: string | null
           loja_id?: string | null
           marca?: string | null
           nome: string
@@ -43,6 +45,7 @@ export type Database = {
           categoria?: string | null
           created_at?: string | null
           id?: string
+          imei?: string | null
           loja_id?: string | null
           marca?: string | null
           nome?: string

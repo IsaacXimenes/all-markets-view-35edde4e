@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { LojaMockada, ColaboradorMockado, TipoLoja, RodizioColaborador } from '../types/mockData';
 import { registrarInicioRodizio, registrarEncerramentoRodizio, getTimelineByEntidade, TimelineEntry } from '../utils/timelineApi';
+import { getCargoNome } from '../utils/cadastrosApi';
 import { supabase } from '@/integrations/supabase/client';
 
 interface CadastroStore {
@@ -94,7 +95,7 @@ const mapSupabaseColaborador = (row: any): ColaboradorMockado => ({
   email: row.email || '',
   telefone: row.telefone || '',
   loja_id: row.loja_id || '',
-  cargo: row.cargo || '',
+  cargo: getCargoNome(row.cargo || ''),
   data_admissao: row.data_admissao || '',
   salario_fixo: Number(row.salario_fixo) || 0,
   ajuda_custo: Number(row.ajuda_custo) || 0,

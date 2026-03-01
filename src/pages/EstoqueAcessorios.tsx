@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { ResponsiveCardGrid, ResponsiveFilterGrid, ResponsiveTableContainer } from '@/components/ui/ResponsiveContainers';
+import { ResponsiveCardGrid, ResponsiveFilterGrid } from '@/components/ui/ResponsiveContainers';
 
 import { toast } from 'sonner';
 import { Download, Package, Edit, AlertTriangle, DollarSign, Layers, Hash, TrendingUp, X } from 'lucide-react';
@@ -326,12 +326,11 @@ export default function EstoqueAcessorios() {
 
         {/* Tabela de Acessórios */}
         <Card>
-          <CardContent className="pt-6">
-            <ResponsiveTableContainer>
-              <Table>
+          <CardContent className="p-0 sm:pt-6 sm:px-6 sm:pb-6 overflow-x-auto">
+              <Table className="min-w-[900px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="sticky left-0 z-20 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Descrição</TableHead>
+                    <TableHead className="sticky left-0 z-20 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[130px] max-w-[180px]">Descrição</TableHead>
                     <TableHead>Loja</TableHead>
                     <TableHead>Categoria</TableHead>
                     <TableHead>Fornecedor</TableHead>
@@ -351,11 +350,13 @@ export default function EstoqueAcessorios() {
                       acessorio.quantidadeTotal >= 10 && 'bg-green-500/10'
                     )}>
                       <TableCell className={cn(
-                        "font-medium sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]",
-                        acessorio.quantidadeTotal <= 5 ? 'bg-red-500/10' :
-                        acessorio.quantidadeTotal > 5 && acessorio.quantidadeTotal < 10 ? 'bg-yellow-500/10' : 
-                        acessorio.quantidadeTotal >= 10 ? 'bg-green-500/10' : 'bg-background'
-                      )}>{acessorio.descricao}</TableCell>
+                        "font-medium sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[130px] max-w-[180px]",
+                        acessorio.quantidadeTotal <= 5 ? 'bg-[hsl(0,84%,95%)] dark:bg-[hsl(0,40%,14%)]' :
+                        acessorio.quantidadeTotal > 5 && acessorio.quantidadeTotal < 10 ? 'bg-[hsl(38,92%,95%)] dark:bg-[hsl(38,40%,14%)]' : 
+                        acessorio.quantidadeTotal >= 10 ? 'bg-[hsl(142,72%,95%)] dark:bg-[hsl(142,30%,14%)]' : 'bg-background'
+                      )}>
+                        <span className="truncate block max-w-[160px]" title={acessorio.descricao}>{acessorio.descricao}</span>
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {acessorio.lojas.map(lojaId => getLojaNome(lojaId)).join(', ')}
                       </TableCell>
@@ -442,7 +443,6 @@ export default function EstoqueAcessorios() {
                   )}
                 </TableBody>
               </Table>
-            </ResponsiveTableContainer>
           </CardContent>
         </Card>
 

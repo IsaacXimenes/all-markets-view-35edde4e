@@ -1,160 +1,36 @@
 
+# Importar Base de Acessorios do Excel
 
-# Politicas de Row Level Security (RLS) - Protecao de Dados Sensiveis
+## Resumo
 
-## Contexto Atual
+Substituir os 5 registros mock atuais pela base completa de 779 acessorios extraidos do arquivo Excel. IDs incrementais no formato `AC-001` ate `AC-779`, com `limiteMinimo: 0` para todos.
 
-Todas as tabelas usam uma unica politica `auth_all` que permite acesso total a qualquer usuario autenticado. Nao existe tabela `user_roles`. O conceito de "admin" no sistema corresponde a usuarios da loja "Acesso Geral" (ID: `90dc7c04-d4f8-4c95-82d7-13f600be4e31`), atualmente: isaac.ximenes, fellipe.rodrigues, leandro.amorim, matheus.mota.
+## Alteracoes
 
-## Arquitetura Proposta
+### Arquivo: `src/pages/CadastrosAcessorios.tsx`
 
-Seguindo as boas praticas de seguranca do Supabase, criaremos:
+**Dados mock (linhas 20-26):**
+- Remover os 5 registros mock existentes
+- Inserir os 779 registros do Excel no formato:
+  ```text
+  { id: 'AC-001', marca: 'GENÉRICO', categoria: 'Acessórios - Geral', produto: 'Adaptador Otg', limiteMinimo: 0 },
+  { id: 'AC-002', marca: 'APPLE', categoria: 'Acessórios', produto: 'Airpods 4', limiteMinimo: 0 },
+  ...ate...
+  { id: 'AC-779', marca: 'JBL', categoria: 'Áudio', produto: 'Xtreme 4', limiteMinimo: 0 },
+  ```
 
-1. **Tabela `user_roles`** com enum `app_role` (admin, gestor, vendedor, estoquista)
-2. **Funcoes `SECURITY DEFINER`** para consultas seguras sem recursao
-3. **Politicas granulares** por tabela, substituindo o `auth_all` generico
+**Contador nextId (linha 28):**
+- Atualizar de `6` para `780`
 
----
+**Nenhuma outra alteracao** - a estrutura da tabela, formulario, filtros, exportacao CSV e funcoes auxiliares (`getLimiteMinimo`, `verificarEstoqueBaixo`, etc.) permanecem inalterados.
 
-## Etapa 1: Criar infraestrutura de roles
+## Detalhes
 
-### Migration SQL
-
-- Criar enum `app_role` com valores: `admin`, `gestor`, `vendedor`, `estoquista`
-- Criar tabela `user_roles` (user_id referenciando auth.users, role app_role, unique constraint)
-- Habilitar RLS na tabela `user_roles` (somente admins podem gerenciar)
-- Popular automaticamente:
-  - Usuarios da loja "Acesso Geral" recebem role `admin`
-  - Usuarios com `eh_gestor = true` recebem role `gestor`
-  - Usuarios com `eh_vendedor = true` recebem role `vendedor`
-  - Usuarios com `eh_estoquista = true` recebem role `estoquista`
-
-### Funcoes SECURITY DEFINER
-
-```text
-has_role(user_id, role) -> boolean
-  Verifica se o usuario tem determinada role
-
-get_user_loja_id(user_id) -> uuid
-  Retorna o loja_id do colaborador vinculado ao usuario
-
-get_user_colaborador_id(user_id) -> uuid
-  Retorna o colaborador_id vinculado ao profile do usuario
-
-is_acesso_geral(user_id) -> boolean
-  Verifica se o usuario pertence a loja Acesso Geral (admin)
-```
-
-## Etapa 2: Politicas por grupo de tabelas
-
-### Grupo 1 - RH (Salarios e Dados Pessoais)
-
-**Tabelas:** `colaboradores`, `salarios_colaboradores`, `historico_salarios`, `adiantamentos`, `vales`
-
-| Tabela | SELECT | INSERT/UPDATE/DELETE |
-|--------|--------|----------------------|
-| `colaboradores` | Admin: tudo. Demais: apenas seu proprio registro (dados sensiveis como salario, cpf ficam protegidos) | Somente admin |
-| `salarios_colaboradores` | Somente admin | Somente admin |
-| `historico_salarios` | Somente admin | Somente admin |
-| `adiantamentos` | Admin: tudo. Colaborador: apenas os seus | Admin para tudo, colaborador nao altera |
-| `vales` | Admin: tudo. Colaborador: apenas os seus | Somente admin |
-
-**Politica para `colaboradores` (SELECT):**
-```text
-Admin/Acesso Geral -> ve tudo
-Demais -> ve apenas seu proprio registro (colaborador_id do profile = id da tabela)
-```
-
-### Grupo 2 - Estoque e Inventario
-
-**Tabelas:** `produtos`, `movimentacoes_estoque`
-
-| Tabela | SELECT | INSERT/UPDATE/DELETE |
-|--------|--------|----------------------|
-| `produtos` | Admin: tudo. Gestor/Estoquista: apenas da sua loja | Admin e estoquista para escrita |
-| `movimentacoes_estoque` | Admin: tudo. Demais: apenas movimentacoes da sua loja (origem ou destino) | Admin e estoquista |
-
-**Politica para `produtos` (SELECT):**
-```text
-Admin -> ve todos os produtos
-Gestor/Vendedor/Estoquista -> apenas produtos onde loja_id = sua loja
-```
-
-### Grupo 3 - Financeiro e Vendas
-
-**Tabelas:** `vendas`, `financeiro`, `despesas`
-
-| Tabela | SELECT | INSERT/UPDATE/DELETE |
-|--------|--------|----------------------|
-| `vendas` | Admin: tudo. Gestor: vendas da sua loja. Vendedor: apenas suas vendas | Admin e gestor para edicao |
-| `financeiro` | Admin: tudo. Gestor: da sua loja | Somente admin |
-| `despesas` | Admin: tudo. Gestor: da sua loja | Admin e gestor |
-
-**Politica para `vendas` (SELECT):**
-```text
-Admin -> todas as vendas
-Gestor -> vendas onde loja_id = sua loja
-Vendedor -> vendas onde vendedor_id = seu colaborador_id
-```
-
-## Etapa 3: Ajustes na Interface (Frontend)
-
-Nenhum ajuste critico necessario no frontend. O sistema ja aplica filtros por loja no dashboard e listagens (verificado no codigo existente com `useAuthStore` e `useIsAcessoGeral`). O RLS atuara como uma camada de seguranca adicional no backend -- se um vendedor tentar acessar dados de outra loja via API, o banco retornara vazio ao inves de dados.
-
-A logica existente de `isAcessoGeral` no frontend continuara funcionando normalmente, pois usuarios admin terao acesso total via RLS.
-
----
-
-## Detalhes Tecnicos
-
-### Arquivos a criar/editar
-
-| Arquivo | Acao |
-|---------|------|
-| `supabase/migrations/xxx_create_user_roles_and_rls.sql` | Migration com enum, tabela, funcoes e politicas |
-| `src/integrations/supabase/types.ts` | Atualizado automaticamente apos migration |
-
-### Tabelas impactadas (9 tabelas)
-
-`colaboradores`, `salarios_colaboradores`, `historico_salarios`, `adiantamentos`, `vales`, `produtos`, `movimentacoes_estoque`, `vendas`, `financeiro`, `despesas`
-
-### Processo por tabela
-
-Para cada tabela:
-1. Remover politica `auth_all` existente
-2. Criar politicas especificas (SELECT, INSERT, UPDATE, DELETE separados)
-3. Usar funcoes SECURITY DEFINER para evitar recursao
-
-### Populacao inicial de roles
-
-```text
-INSERT INTO user_roles (user_id, role)
-  -- Admins: usuarios da loja Acesso Geral
-  SELECT p.id, 'admin'
-  FROM profiles p
-  JOIN colaboradores c ON p.colaborador_id = c.id
-  WHERE c.loja_id = '90dc7c04-d4f8-4c95-82d7-13f600be4e31'
-
-  UNION ALL
-  -- Gestores
-  SELECT p.id, 'gestor'
-  FROM profiles p WHERE p.eh_gestor = true
-
-  UNION ALL
-  -- Vendedores
-  SELECT p.id, 'vendedor'
-  FROM profiles p WHERE p.eh_vendedor = true
-
-  UNION ALL
-  -- Estoquistas
-  SELECT p.id, 'estoquista'
-  FROM profiles p WHERE p.eh_estoquista = true
-```
-
-### Riscos e mitigacoes
-
-- **Risco**: Politicas muito restritivas podem bloquear funcionalidades existentes
-- **Mitigacao**: Todas as funcoes usam SECURITY DEFINER, evitando recursao. Admins (Acesso Geral) sempre tem acesso total como fallback
-- **Risco**: Novos usuarios criados nao terao role
-- **Mitigacao**: Atualizar o trigger `handle_new_user` para inserir roles automaticamente baseado nas flags do colaborador
-
+| Item | Valor |
+|------|-------|
+| Total de registros | 779 |
+| Formato ID | AC-001 a AC-779 (incremental, 3 digitos) |
+| Limite Minimo | 0 para todos (sera preenchido depois) |
+| Categorias encontradas | Capas, Carregadores, Peliculas, Audio, Acessorios - Geral, Acessorios - Apple, Games, Relogios, Perifericos, Eletronicos, Acessorios |
+| Marcas encontradas | GENERICO, APPLE, JBL, SONY, SAMSUNG, AIWA, AMAZON, CLARO, PHILIPS, STARLINK, XBOX |
+| Arquivo editado | `src/pages/CadastrosAcessorios.tsx` |

@@ -382,29 +382,31 @@ export default function FinanceiroExtrato() {
 
         {/* Gráfico */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Fluxo de Caixa
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
-                  <Label className="text-xs whitespace-nowrap">De</Label>
-                  <Input
-                    type="date"
-                    value={graficoDataInicio}
-                    onChange={(e) => setGraficoDataInicio(e.target.value)}
-                    className="h-7 text-xs w-[130px]"
-                  />
-                </div>
-                <div className="flex items-center gap-1">
-                  <Label className="text-xs whitespace-nowrap">Até</Label>
-                  <Input
-                    type="date"
-                    value={graficoDataFim}
-                    onChange={(e) => setGraficoDataFim(e.target.value)}
-                    className="h-7 text-xs w-[130px]"
-                  />
+            <CardHeader className="space-y-2 pb-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Fluxo de Caixa
+                </CardTitle>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <Label className="text-xs whitespace-nowrap">De</Label>
+                    <Input
+                      type="date"
+                      value={graficoDataInicio}
+                      onChange={(e) => setGraficoDataInicio(e.target.value)}
+                      className="h-7 text-xs w-[120px]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Label className="text-xs whitespace-nowrap">Até</Label>
+                    <Input
+                      type="date"
+                      value={graficoDataFim}
+                      onChange={(e) => setGraficoDataFim(e.target.value)}
+                      className="h-7 text-xs w-[120px]"
+                    />
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -442,7 +444,7 @@ export default function FinanceiroExtrato() {
                 <TrendingUp className="h-4 w-4 text-green-600" />
                 Comparativo de Entradas
               </CardTitle>
-              <div className="grid grid-cols-2 gap-2 mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                 <div>
                   <Label className="text-xs text-muted-foreground">Período A</Label>
                   <div className="flex items-center gap-1">
@@ -488,7 +490,7 @@ export default function FinanceiroExtrato() {
                 <TrendingDown className="h-4 w-4 text-red-600" />
                 Comparativo de Saídas
               </CardTitle>
-              <div className="grid grid-cols-2 gap-2 mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                 <div>
                   <Label className="text-xs text-muted-foreground">Período A</Label>
                   <div className="flex items-center gap-1">

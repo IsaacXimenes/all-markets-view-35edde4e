@@ -114,39 +114,41 @@ export default function VendaDetalhes() {
   return (
     <PageLayout title={`Detalhes da Venda ${venda.id}`}>
       {/* Botões de ação */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
             Voltar
           </Button>
           {modoConferencia && (
-            <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 text-sm px-3 py-1">
+            <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 text-xs px-2 py-1">
               Modo Conferência
             </Badge>
           )}
           {!modoConferencia && isFiadoVenda ? (
-            <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 text-sm px-3 py-1">
-              <CreditCard className="h-4 w-4 mr-1" />
+            <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 text-xs px-2 py-1">
+              <CreditCard className="h-3 w-3 mr-1" />
               Fiado
             </Badge>
           ) : !modoConferencia ? (
-            <Badge variant="outline" className="text-sm px-3 py-1">
+            <Badge variant="outline" className="text-xs px-2 py-1">
               Normal
             </Badge>
           ) : null}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           {modoConferencia && (
             <>
               <Button 
                 variant="outline" 
+                size="sm"
                 onClick={() => navigate(-1)}
               >
-                <X className="h-4 w-4 mr-2" />
+                <X className="h-4 w-4 mr-1" />
                 Cancelar
               </Button>
               <Button 
+                size="sm"
                 className="bg-green-600 hover:bg-green-700"
                 onClick={() => {
                    const user = useAuthStore.getState().user;
@@ -163,14 +165,14 @@ export default function VendaDetalhes() {
                   }
                 }}
               >
-                <Check className="h-4 w-4 mr-2" />
-                Confirmar Conferência
+                <Check className="h-4 w-4 mr-1" />
+                Confirmar
               </Button>
             </>
           )}
           {!modoConferencia && (
             <>
-              <Button variant="outline" onClick={async () => {
+              <Button variant="outline" size="sm" onClick={async () => {
                 await gerarNotaGarantiaPdf(venda);
                 const cab = getCabecalhoLoja(venda.lojaVenda || '');
                 const authUser = useAuthStore.getState().user;
@@ -186,12 +188,12 @@ export default function VendaDetalhes() {
                 });
                 toast.success('Nota de Garantia gerada com sucesso');
               }}>
-                <FileText className="h-4 w-4 mr-2" />
-                Gerar Nota de Garantia
+                <FileText className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Gerar </span>Nota
               </Button>
-              <Button onClick={handleImprimir}>
-                <Printer className="h-4 w-4 mr-2" />
-                Imprimir Recibo
+              <Button size="sm" onClick={handleImprimir}>
+                <Printer className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Imprimir </span>Recibo
               </Button>
             </>
           )}
@@ -289,6 +291,7 @@ export default function VendaDetalhes() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -316,6 +319,7 @@ export default function VendaDetalhes() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 
@@ -328,8 +332,8 @@ export default function VendaDetalhes() {
                   Base de Troca ({venda.tradeIns.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-0">
-                <Table>
+              <CardContent className="p-0 overflow-x-auto">
+                <Table className="min-w-[700px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Modelo</TableHead>
@@ -337,7 +341,7 @@ export default function VendaDetalhes() {
                       <TableHead>IMEI</TableHead>
                       <TableHead>Status Entrega</TableHead>
                       <TableHead>Anexos</TableHead>
-                      <TableHead className="text-right">Valor de Compra Usado</TableHead>
+                      <TableHead className="text-right">Valor Compra</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -409,12 +413,12 @@ export default function VendaDetalhes() {
                 Pagamentos ({venda.pagamentos.length})
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="min-w-[500px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Meio de Pagamento</TableHead>
-                    <TableHead>Conta de Destino</TableHead>
+                    <TableHead>Meio Pgto</TableHead>
+                    <TableHead>Conta Destino</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead>Comprovante</TableHead>
                   </TableRow>
@@ -506,7 +510,7 @@ export default function VendaDetalhes() {
                   };
                   
                   return (
-                    <div key={item.id} className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+                    <div key={item.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 p-3 bg-muted/30 rounded-lg">
                       <div>
                         <p className="font-medium">{item.produto}</p>
                         <p className="text-sm text-muted-foreground">IMEI: {item.imei}</p>

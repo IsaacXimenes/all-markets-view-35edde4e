@@ -1,6 +1,7 @@
 // Estoque API - Supabase
 import { supabase } from '@/integrations/supabase/client';
 import { initializeProductIds, registerProductId, generateProductId } from './idManager';
+import { useCadastroStore } from '@/store/cadastroStore';
 
 // ==================== INTERFACES ====================
 
@@ -379,16 +380,26 @@ export const initEstoqueCache = async (): Promise<void> => {
     _notas = (notaRes.data || []).map(mapNotaFromDB);
     // Enriquecer movimentações com dados do produto
     const rawMovs = (movRes.data || []).map(mapMovFromDB);
+    const colaboradores = useCadastroStore.getState().colaboradores;
     _movimentacoes = rawMovs.map(mov => {
       const row = (movRes.data || []).find((r: any) => r.id === mov.id);
       const produtoId = row?.produto_id;
+      const responsavelId = row?.responsavel_id;
+      let produto = mov.produto;
+      let imei = mov.imei;
+      let responsavel = mov.responsavel;
+
       if (produtoId) {
-        const produto = _produtos.find(p => p.id === produtoId);
-        if (produto) {
-          return { ...mov, produto: `${produto.marca} ${produto.modelo}`, imei: produto.imei };
-        }
+        const prod = _produtos.find(p => p.id === produtoId);
+        if (prod) { produto = `${prod.marca} ${prod.modelo}`; imei = prod.imei; }
       }
-      return mov;
+
+      if (responsavelId) {
+        const col = colaboradores.find((c: any) => c.id === responsavelId);
+        if (col) responsavel = col.nome;
+      }
+
+      return { ...mov, produto, imei, responsavel };
     });
     _cacheLoaded = true;
     movIdCounter = _movimentacoes.length + 1;

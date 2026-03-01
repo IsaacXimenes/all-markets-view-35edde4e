@@ -1797,6 +1797,7 @@ export type Database = {
           conta_origem: string | null
           created_at: string | null
           id: string
+          loja_vinculada: string | null
           nome: string
           parcelamentos: Json | null
           percentual_maquina: number | null
@@ -1809,6 +1810,7 @@ export type Database = {
           conta_origem?: string | null
           created_at?: string | null
           id?: string
+          loja_vinculada?: string | null
           nome: string
           parcelamentos?: Json | null
           percentual_maquina?: number | null
@@ -1821,6 +1823,7 @@ export type Database = {
           conta_origem?: string | null
           created_at?: string | null
           id?: string
+          loja_vinculada?: string | null
           nome?: string
           parcelamentos?: Json | null
           percentual_maquina?: number | null

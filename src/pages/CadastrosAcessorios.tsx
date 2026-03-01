@@ -16,16 +16,11 @@ export interface AcessorioCadastro {
   limiteMinimo: number;
 }
 
-// Mock data
-let acessoriosCadastro: AcessorioCadastro[] = [
-  { id: 'AC-001', marca: 'Apple', categoria: 'Cabos', produto: 'Cabo USB-C Lightning', limiteMinimo: 10 },
-  { id: 'AC-002', marca: 'Samsung', categoria: 'Capas', produto: 'Capa Galaxy S23 Ultra Silicone', limiteMinimo: 5 },
-  { id: 'AC-003', marca: 'Apple', categoria: 'Películas', produto: 'Película Vidro iPhone 14 Pro Max', limiteMinimo: 15 },
-  { id: 'AC-004', marca: 'JBL', categoria: 'Fones', produto: 'Fone Bluetooth JBL Tune 510', limiteMinimo: 3 },
-  { id: 'AC-005', marca: 'Anker', categoria: 'Carregadores', produto: 'Carregador USB-C 20W', limiteMinimo: 8 },
-];
+import { initialAcessoriosCadastro, INITIAL_NEXT_ID } from '@/data/acessoriosCadastroData';
 
-let nextId = 6;
+let acessoriosCadastro: AcessorioCadastro[] = [...initialAcessoriosCadastro];
+
+let nextId = INITIAL_NEXT_ID;
 
 export const getAcessoriosCadastro = () => [...acessoriosCadastro];
 

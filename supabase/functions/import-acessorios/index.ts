@@ -14,7 +14,13 @@ const LOJA_MAP: Record<string, string> = {
   "Estoque - Águas Lindas": "9c33d643-52dd-4134-8c91-2e01ddc05937",
   "Estoque - Aguas Lindas": "9c33d643-52dd-4134-8c91-2e01ddc05937",
   "Estoque - Online": "df3995f6-1da1-4661-a68f-20fb548a9468",
+  "Águas Lindas Shopping": "b2c6ac94-f08b-4c2e-955f-8a91d658d7d6",
+  "Aguas Lindas Shopping": "b2c6ac94-f08b-4c2e-955f-8a91d658d7d6",
 };
+
+function normalizeLojaName(name: string): string {
+  return name.replace(/\ufffd/g, "").replace(/\s+/g, " ").trim();
+}
 
 function parseCurrency(val: unknown): number | null {
   if (val === null || val === undefined || val === "") return null;
@@ -23,6 +29,13 @@ function parseCurrency(val: unknown): number | null {
   const cleaned = str.replace(/R\$\s*/g, "").replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
   const num = parseFloat(cleaned);
   return isNaN(num) ? null : num;
+}
+
+function isValidName(name: string): boolean {
+  if (!name) return false;
+  const trimmed = name.trim();
+  if (!trimmed || trimmed === "0") return false;
+  return true;
 }
 
 serve(async (req) => {
@@ -40,7 +53,49 @@ serve(async (req) => {
     const contentType = req.headers.get("content-type") || "";
     let dataRows: Record<string, unknown>[] = [];
 
-    if (contentType.includes("application/json")) {
+    if (contentType.includes("text/csv") || contentType.includes("text/plain")) {
+      // CSV delimited by semicolon
+      const csvText = await req.text();
+      const lines = csvText.split("\n").filter((l) => l.trim().length > 0);
+
+      if (lines.length < 2) {
+        return new Response(JSON.stringify({ error: "CSV vazio ou sem dados" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+
+      const dataLines = lines.slice(1); // skip header
+
+      for (const line of dataLines) {
+        const cols = line.split(";");
+        // Columns: ID;Descricao;Categoria;Fornecedor;Quantidade;Valor Custo;Valor Recomendado;imei;Loja
+        const nome = (cols[1] || "").trim();
+        if (!isValidName(nome)) continue;
+
+        const categoria = (cols[2] || "").trim() || null;
+        const quantidadeRaw = (cols[4] || "").trim();
+        const quantidade = quantidadeRaw ? parseInt(quantidadeRaw, 10) : 0;
+        const valorCusto = parseCurrency(cols[5] || "");
+        const valorVenda = parseCurrency(cols[6] || "");
+        const imei = (cols[7] || "").trim() || null;
+
+        const lojaRaw = (cols[8] || "").trim();
+        const lojaName = normalizeLojaName(lojaRaw);
+        const lojaId = LOJA_MAP[lojaName] || LOJA_MAP[lojaRaw] || null;
+
+        dataRows.push({
+          nome,
+          categoria,
+          quantidade: isNaN(quantidade) ? 0 : quantidade,
+          valor_custo: valorCusto,
+          valor_venda: valorVenda,
+          imei,
+          loja_id: lojaId,
+          status: "Disponivel",
+        });
+      }
+    } else if (contentType.includes("application/json")) {
       // Accept JSON with "rows" array (pre-parsed data)
       const body = await req.json();
       const rows = body.rows;
@@ -50,13 +105,15 @@ serve(async (req) => {
           status: 400,
         });
       }
-      
+
       for (const row of rows) {
         const origem = String(row.origem || "").trim();
         const nome = String(row.nome || "").trim();
-        if (!nome) continue;
-        
-        const lojaId = LOJA_MAP[origem] || null;
+        if (!isValidName(nome)) continue;
+
+        const lojaRaw = origem;
+        const lojaName = normalizeLojaName(lojaRaw);
+        const lojaId = LOJA_MAP[lojaName] || LOJA_MAP[lojaRaw] || null;
         const quantidade = parseInt(String(row.quantidade || "0"), 10);
 
         dataRows.push({
@@ -80,15 +137,17 @@ serve(async (req) => {
       for (const row of jsonData as Record<string, unknown>[]) {
         const origem = String(row["Origem"] || "").trim();
         const nome = String(row["Modelo + Descrição"] || row["Modelo + Descricao"] || "").trim();
+        if (!isValidName(nome)) continue;
+
         const categoria = String(row["Categoria"] || "").trim();
         const quantidadeRaw = row["Quantidade em estoque"];
         const valorCustoRaw = row["Valor Custo"];
         const valorRecomendadoRaw = row["Valor Recomendado"];
         const imeiRaw = String(row["IMEI"] || "").trim();
 
-        if (!nome) continue;
-
-        const lojaId = LOJA_MAP[origem] || null;
+        const lojaRaw = origem;
+        const lojaName = normalizeLojaName(lojaRaw);
+        const lojaId = LOJA_MAP[lojaName] || LOJA_MAP[lojaRaw] || null;
         const quantidade = quantidadeRaw ? parseInt(String(quantidadeRaw), 10) : 0;
 
         dataRows.push({

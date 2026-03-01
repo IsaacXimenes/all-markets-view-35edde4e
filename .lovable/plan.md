@@ -1,64 +1,43 @@
 
 
-# Importar Base de Maquinas de Cartao do Excel
+# Padronizar IDs da Aba de Maquinas
 
-## Resumo
+## Contexto
 
-Inserir 18 maquinas de cartao na tabela `maquinas_cartao` do Supabase com todas as taxas de parcelamento extraidas do arquivo Excel. A tabela esta atualmente vazia.
+As abas de Cadastros usam IDs padronizados:
+- Acessorios: `AC-001`, `AC-002`, ...
+- Aparelhos: `AP-001`, `AP-002`, ...
+- Maquinas: atualmente exibem UUIDs do Supabase (ex: `cf32174c-fe89-4b05-...`)
 
-## Dados do Excel
+## Solucao
 
-18 maquinas com taxas detalhadas por bandeira, loja e parcelamento (debito + 1x ate 18x):
+Adicionar uma coluna `codigo` na tabela `maquinas_cartao` do Supabase para armazenar o ID visual padronizado no formato `MQ-001`, e exibir esse codigo na interface em vez do UUID.
 
-| # | Nome Maquina | Loja | CNPJ | Conta de Origem | Debito | Parcelas ate |
-|---|---|---|---|---|---|---|
-| 1 | Cielo - Elo | Matriz | 53295194000166 | Bradesco Thiago Eduardo | 1.38% | 12x |
-| 2 | Cielo - Visa/Master | Matriz | 53295194000166 | Bradesco Thiago Eduardo | 0.86% | 12x |
-| 3 | Cielo - Elo | Online | 53197533000106 | Bradesco Thiago Imports | 1.46% | 12x |
-| 4 | Cielo - Visa | Online | 53197533000106 | Bradesco Thiago Imports | 1.10% | 12x |
-| 5 | Cielo - Master | Online | 53197533000106 | Bradesco Thiago Imports | 0.91% | 12x |
-| 6 | Cielo - Elo | Shopping Sul | 55449390000173 | Bradesco Acessorios | 2.37% | 12x |
-| 7 | Cielo - Visa | Shopping Sul | 55449390000173 | Bradesco Acessorios | 1.83% | 12x |
-| 8 | Cielo - Master | Shopping Sul | 55449390000173 | Bradesco Acessorios | 1.03% | 12x |
-| 9 | Cielo - Elo | Assistencia | 54872234000158 | Bradesco Assistencia | 2.49% | 12x |
-| 10 | Cielo - Visa | Assistencia | 54872234000158 | Bradesco Assistencia | 1.89% | 12x |
-| 11 | Cielo - Master | Assistencia | 54872234000158 | Bradesco Assistencia | 1.89% | 12x |
-| 12 | Cielo - Elo | JK | 62.968.637/0001-23 | Sicoob JK | 1.47% | 12x |
-| 13 | Cielo - Visa | JK | 62.968.637/0001-23 | Sicoob JK | 1.02% | 12x |
-| 14 | Cielo - Master | JK | 62.968.637/0001-23 | Sicoob JK | 0.92% | 12x |
-| 15 | Pagbank - Elo | Shopping Aguas Lindas | (sem CNPJ) | Pagbank | 1.50% | 18x |
-| 16 | Pagbank - Visa | Shopping Aguas Lindas | (sem CNPJ) | Pagbank | 1.08% | 18x |
-| 17 | Pagbank - Master | Shopping Aguas Lindas | (sem CNPJ) | Pagbank | 1.08% | 18x |
-| 18 | Terceirizada - TODAS | Todas Unidades | (sem CNPJ) | Escritorio Terceirizado | 2.96% | 18x |
+## Alteracoes
 
-## Implementacao
+### 1. Migration SQL
 
-### Migration SQL
+- Adicionar coluna `codigo VARCHAR` na tabela `maquinas_cartao`
+- Popular as 18 maquinas existentes com `MQ-001` ate `MQ-018` (ordenadas por nome)
 
-Criar migration que insere as 18 maquinas diretamente na tabela `maquinas_cartao` com:
+### 2. Arquivo: `src/utils/cadastrosApi.ts`
 
-- **nome**: Nome da maquina conforme Excel (ex: "Cielo - Elo - Matriz")
-- **cnpj_vinculado**: CNPJ conforme Excel (texto, nao e FK)
-- **conta_origem**: Nome da conta conforme Excel (texto, nao e FK)
-- **status**: "Ativo" para todas
-- **percentual_maquina**: Valor da coluna Debito
-- **taxas**: JSON com `{ debito: X, credito: { 1: Y, 2: Z, ... } }`
-- **parcelamentos**: JSON array com `[{ parcelas: 1, taxa: Y }, { parcelas: 2, taxa: Z }, ...]`
+- Adicionar campo `codigo` na interface `MaquinaCartao`
+- Atualizar `mapRowToMaquinaCartao` para incluir `codigo`
+- Na funcao `addMaquinaCartao`, gerar o proximo codigo incremental (consultar o maior existente e incrementar)
 
-Cada maquina tera suas taxas especificas por numero de parcelas conforme o Excel.
+### 3. Arquivo: `src/pages/CadastrosMaquinas.tsx`
 
-### Observacao sobre a coluna "nome"
-
-Para diferenciar maquinas com mesmo operador mas lojas diferentes, o nome incluira a loja. Exemplo: "Cielo - Elo - Matriz", "Cielo - Elo - Online", "Cielo - Elo - Shopping Sul".
+- Exibir `maquina.codigo` em vez de `maquina.id` na coluna ID da tabela
+- Exibir `maquina.codigo` no export CSV
 
 ## Detalhes Tecnicos
 
 | Item | Valor |
 |---|---|
-| Total de registros | 18 |
-| Tabela | maquinas_cartao (Supabase) |
-| Tipo de operacao | INSERT via migration SQL |
-| Campos preenchidos | nome, cnpj_vinculado, conta_origem, status, percentual_maquina, taxas, parcelamentos |
-| Arquivo criado | supabase/migrations/xxx_seed_maquinas_cartao.sql |
-| Arquivo atualizado | src/integrations/supabase/types.ts (automatico) |
+| Formato do ID | MQ-001 (prefixo MQ, 3 digitos) |
+| Registros existentes | MQ-001 a MQ-018 |
+| Proximo ID | MQ-019 (auto-incremento no insert) |
+| Coluna Supabase | `codigo VARCHAR` |
+| UUID permanece | Sim, como chave primaria interna |
 

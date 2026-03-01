@@ -1,90 +1,50 @@
 
 
-# Plano: Importar Acessorios do Excel para o Banco de Dados
+# Plano: Importar mais produtos pendentes
 
 ## Resumo
 
-Importar os ~2.117 acessorios do arquivo `Estoque_Acessorios_Consolidado.xlsx` para a tabela `acessorios` no Supabase, adicionando a nova coluna `imei` conforme solicitado.
+Importar 42 novos aparelhos do CSV `produtos-pendentes-2026-03-01-2.csv` para a tabela `produtos_pendentes_os`, todos da loja "Aguas Lindas Shopping".
 
 ## Analise do Arquivo
 
-- **Total de linhas**: ~2.117 itens
-- **Colunas**: Origem (loja), Modelo + Descricao, Categoria, Quantidade em estoque, Valor Custo, Valor Recomendado, IMEI
-- **Lojas presentes**: Estoque - SIA, Estoque - Shopping Sul, Estoque - Shopping JK, Estoque - Aguas Lindas, Estoque - Online
-- **Categorias**: Capas, Peliculas, Carregadores, Audio, Acessorios Apple, Acessorios - Geral, Acessorios
-- **IMEI**: Maioria vazia, mas presente em itens individuais (chips, fontes originais, JBLs)
-- **Quantidade vazia**: Sera tratada como 0
+- **Total de linhas com dados**: 42 aparelhos
+- **Loja**: Todas as linhas sao da loja "Aguas Lindas Shopping"
+- **Modelos**: iPhone 12 Pro 256GB, iPhone 14 128GB, iPhone 14 Pro Max 256GB, iPhone 15 Pro Max 256GB, iPhone 14 Plus 128GB, entre outros
+- **Valores**: R$ 1.900 a R$ 4.065
+- **Origem**: Fornecedor (todos)
+- **Status**: Pendente Estoque (todos)
 
-## Etapa 1 - Migracao do Banco de Dados
+## Problema Identificado
 
-Adicionar a coluna `imei` na tabela `acessorios`:
+O `LOJA_MAP` da edge function `import-produtos-pendentes` nao reconhece a variante "Aguas Lindas Shopping" (com encoding UTF-8 para o "A" acentuado). O CSV usa esse nome, que sera rejeitado com erro "Loja desconhecida".
 
-```sql
-ALTER TABLE public.acessorios ADD COLUMN imei VARCHAR(100);
-```
+## Etapas
 
-## Etapa 2 - Edge Function `import-acessorios`
+### 1. Atualizar a Edge Function
 
-Criar uma Edge Function seguindo o mesmo padrao das funcoes `import-produtos-estoque` e `import-produtos-pendentes`.
-
-### Mapeamento de Dados
-
-| Campo Excel | Transformacao | Campo DB |
-|---|---|---|
-| Origem "Estoque - SIA" | Mapear para UUID da loja | `loja_id` |
-| Modelo + Descricao | Direto, trim | `nome` |
-| Categoria | Direto | `categoria` |
-| Quantidade em estoque | Parse int, vazio = 0 | `quantidade` |
-| Valor Custo "R$ 3.70" | Parse numerico | `valor_custo` |
-| Valor Recomendado "R$ 35.00" | Parse numerico | `valor_venda` |
-| IMEI | Trim, vazio = null | `imei` |
-| - | "Disponivel" | `status` |
-
-### Mapeamento de Lojas
+Adicionar as variantes do nome da loja no `LOJA_MAP` em `supabase/functions/import-produtos-pendentes/index.ts`:
 
 ```text
-"Estoque - SIA"           -> fe27bdab-b6de-433c-8718-3f1690f2315d
-"Estoque - Shopping Sul"  -> 949afa0c-6324-4a4e-ab6e-f7071fcfc3c0
-"Estoque - Shopping JK"   -> f071311a-5532-4874-bb9c-5a2e550300c8
-"Estoque - Águas Lindas"  -> 9c33d643-52dd-4134-8c91-2e01ddc05937  (ou "Aguas Lindas")
-"Estoque - Online"        -> df3995f6-1da1-4661-a68f-20fb548a9468  (loja Online)
+"Águas Lindas Shopping"  -> b2c6ac94-f08b-4c2e-955f-8a91d658d7d6
+"Aguas Lindas Shopping"  -> b2c6ac94-f08b-4c2e-955f-8a91d658d7d6
 ```
 
-### Logica da Edge Function
+Tambem adicionar uma normalizacao para remover caracteres com encoding quebrado (o `\ufffd` que aparece no CSV) e mapear para "Aguas Lindas Shopping".
 
-- Recebe o CSV como texto via POST
-- Faz split por linhas, pula header
-- Split por ";" (ponto e virgula)
-- Aplica transformacoes de valor monetario (R$) e quantidade
-- Insere em batches de 50 na tabela `acessorios`
-- Retorna relatorio com totais e erros
+### 2. Deploy e Execucao
 
-## Etapa 3 - Atualizar Codigo Frontend
+- Fazer deploy da edge function atualizada
+- Copiar o CSV para `public/data/`
+- Enviar o conteudo do CSV para a edge function via POST
+- Validar que os 42 registros foram inseridos com sucesso
 
-### 3.1 Interface e mapeamento (`src/utils/acessoriosApi.ts`)
+### 3. Validacao
 
-- Adicionar campo `imei` na interface `Acessorio`
-- Atualizar `mapFromDB` e `mapToDB` para incluir `imei`
+Consultar o banco para confirmar a contagem de registros inseridos.
 
-### 3.2 Tabela de exibicao (`src/pages/EstoqueAcessorios.tsx`)
+## Detalhes Tecnicos
 
-- Adicionar coluna IMEI na tabela (visivel apenas quando preenchido)
-
-### 3.3 Config TOML
-
-- Adicionar entrada `[functions.import-acessorios]` com `verify_jwt = false`
-
-## Etapa 4 - Execucao
-
-- Copiar o XLSX para `public/data/`
-- Converter para CSV (separador ;)
-- Deploy da edge function
-- Chamar a edge function com o conteudo CSV
-- Validar: `SELECT count(*) FROM acessorios` deve retornar ~2.117
-
-## Observacoes
-
-- A coluna `marca` existente no banco sera mantida como null (o arquivo nao tem essa informacao separada)
-- Itens com quantidade vazia serao importados com quantidade 0
-- A loja "Estoque - Online" sera mapeada para o UUID da loja "Online" existente
+- A edge function ja trata corretamente: parsing de moeda (R$), extracao de marca/modelo (Apple/iPhone), linhas vazias (IMEI vazio = skip), e insercao em batches de 50
+- O unico ajuste necessario e o mapeamento de loja
 

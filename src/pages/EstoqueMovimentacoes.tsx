@@ -265,34 +265,43 @@ export default function EstoqueMovimentacoes() {
       return;
     }
 
-    const novaMovimentacao = await addMovimentacao({
-      data: formData.data || (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })(),
-      produto: `${produtoSelecionado.marca} ${produtoSelecionado.modelo}`,
-      imei: produtoSelecionado.imei,
-      quantidade: 1,
-      origem: formData.origem,
-      destino: formData.destino,
-      responsavel: colaboradores.find(c => c.id === formData.responsavel)?.nome || formData.responsavel,
-      motivo: formData.motivo,
-      produtoId: produtoSelecionado.id,
-      responsavelId: formData.responsavel,
-    });
+    try {
+      const novaMovimentacao = await addMovimentacao({
+        data: formData.data || (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })(),
+        produto: `${produtoSelecionado.marca} ${produtoSelecionado.modelo}`,
+        imei: produtoSelecionado.imei,
+        quantidade: 1,
+        origem: formData.origem,
+        destino: formData.destino,
+        responsavel: colaboradores.find(c => c.id === formData.responsavel)?.nome || formData.responsavel,
+        motivo: formData.motivo,
+        produtoId: produtoSelecionado.id,
+        responsavelId: formData.responsavel,
+      });
 
-    setMovimentacoes([...movimentacoes, novaMovimentacao]);
-    setDialogOpen(false);
-    setFormData({
-      produtoId: '',
-      responsavel: user?.colaborador?.id || '',
-      data: '',
-      motivo: '',
-      origem: '',
-      destino: '',
-    });
-    setProdutoSelecionado(null);
-    toast({
-      title: 'Movimentação registrada',
-      description: `Movimentação ${novaMovimentacao.id} registrada com sucesso. Produto agora está "Em movimentação".`,
-    });
+      setMovimentacoes([...movimentacoes, novaMovimentacao]);
+      setDialogOpen(false);
+      setFormData({
+        produtoId: '',
+        responsavel: user?.colaborador?.id || '',
+        data: '',
+        motivo: '',
+        origem: '',
+        destino: '',
+      });
+      setProdutoSelecionado(null);
+      toast({
+        title: 'Movimentação registrada',
+        description: `Movimentação ${novaMovimentacao.id} registrada com sucesso. Produto agora está "Em movimentação".`,
+      });
+    } catch (err: any) {
+      console.error('[MOV] Erro ao registrar movimentação:', err);
+      toast({
+        title: 'Erro ao registrar movimentação',
+        description: err?.message || 'Verifique se você está logado e tente novamente',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (

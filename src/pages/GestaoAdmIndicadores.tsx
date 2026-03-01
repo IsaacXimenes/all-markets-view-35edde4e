@@ -16,6 +16,7 @@ import { Camera, TrendingUp, Target, Users, ShieldAlert, Award, CalendarIcon, Ba
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { useAuthStore } from '@/store/authStore';
+import { useIsAcessoGeral } from '@/utils/permissoesUtils';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { cn } from '@/lib/utils';
 import {
@@ -38,7 +39,8 @@ export default function GestaoAdmIndicadores() {
   const { user } = useAuthStore();
 
   const colaboradorLogado = colaboradores.find(c => c.id === user?.colaborador?.id);
-  const ehGestor = colaboradorLogado?.eh_gestor ?? user?.colaborador?.cargo?.toLowerCase().includes('gestor') ?? false;
+  const acessoGeral = useIsAcessoGeral();
+  const ehGestor = acessoGeral || (colaboradorLogado?.eh_gestor ?? user?.colaborador?.cargo?.toLowerCase().includes('gestor') ?? false);
 
   // Stories state
   const [dataInicio, setDataInicio] = useState<Date | undefined>(startOfMonth(new Date()));

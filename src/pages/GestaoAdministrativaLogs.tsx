@@ -12,6 +12,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { History, CheckCircle, XCircle, FileEdit, ShieldAlert, CalendarIcon, ListChecks } from 'lucide-react';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { useAuthStore } from '@/store/authStore';
+import { useIsAcessoGeral } from '@/utils/permissoesUtils';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -41,7 +42,8 @@ export default function GestaoAdministrativaLogs() {
   const { user } = useAuthStore();
   
   const colaboradorLogado = colaboradores.find(c => c.id === user?.colaborador?.id);
-  const ehGestor = colaboradorLogado?.eh_gestor ?? user?.colaborador?.cargo?.toLowerCase().includes('gestor') ?? false;
+  const acessoGeral = useIsAcessoGeral();
+  const ehGestor = acessoGeral || (colaboradorLogado?.eh_gestor ?? user?.colaborador?.cargo?.toLowerCase().includes('gestor') ?? false);
   
   const [lojaId, setLojaId] = useState<string>('');
   const [dataInicio, setDataInicio] = useState<Date | undefined>(startOfMonth(new Date()));

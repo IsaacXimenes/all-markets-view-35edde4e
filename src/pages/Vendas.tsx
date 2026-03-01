@@ -16,6 +16,7 @@ import { calcularLucroReal } from '@/utils/calculoRentabilidadeVenda';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { getStatusConferenciaByVendaId, StatusConferencia } from '@/utils/conferenciaGestorApi';
 import { displayIMEI } from '@/utils/imeiMask';
+import { useIsAcessoGeral } from '@/utils/permissoesUtils';
 import { getGarantiasByVendaId, calcularStatusExpiracao } from '@/utils/garantiasApi';
 import { format, addMonths } from 'date-fns';
 import { useAuthStore } from '@/store/authStore';
@@ -55,7 +56,8 @@ export default function Vendas() {
     return colaboradores.find(c => c.id === usuarioLogado.id);
   }, [colaboradores, usuarioLogado.id]);
   
-  const isGestor = colaboradorLogado?.eh_gestor || false;
+  const acessoGeral = useIsAcessoGeral();
+  const isGestor = acessoGeral || (colaboradorLogado?.eh_gestor || false);
 
   // Verifica se uma venda é Fiado
   const isFiadoVenda = (venda: Venda) => {
@@ -141,8 +143,12 @@ export default function Vendas() {
     return null;
   };
 
-  // Aplicar filtragem por permissão: vendedor vê apenas suas vendas, gestor vê apenas da sua loja
+  // Aplicar filtragem por permissão: vendedor vê apenas suas vendas, gestor vê apenas da sua loja, acesso geral vê tudo
   const vendasVisiveis = useMemo(() => {
+    if (acessoGeral) {
+      // Acesso Geral vê todas as vendas
+      return vendas;
+    }
     if (isGestor && colaboradorLogado) {
       // Gestor vê apenas vendas da sua loja
       return vendas.filter(v => v.lojaVenda === colaboradorLogado.loja_id);
@@ -152,7 +158,7 @@ export default function Vendas() {
     }
     // Fallback: admin vê tudo
     return vendas;
-  }, [vendas, colaboradorLogado, isGestor]);
+  }, [vendas, colaboradorLogado, isGestor, acessoGeral]);
 
   const vendasFiltradas = useMemo(() => {
     return vendasVisiveis.filter(v => {

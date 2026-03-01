@@ -13,6 +13,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Eye, Upload, CheckCircle, Camera, TrendingUp, AlertTriangle, CalendarIcon } from 'lucide-react';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { useAuthStore } from '@/store/authStore';
+import { useIsAcessoGeral } from '@/utils/permissoesUtils';
 import { AutocompleteLoja } from '@/components/AutocompleteLoja';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ShieldAlert } from 'lucide-react';
@@ -35,7 +36,8 @@ export default function GestaoAdmStoriesLotes() {
   const { user } = useAuthStore();
 
   const colaboradorLogado = colaboradores.find(c => c.id === user?.colaborador?.id);
-  const ehGestor = colaboradorLogado?.eh_gestor ?? user?.colaborador?.cargo?.toLowerCase().includes('gestor') ?? false;
+  const acessoGeral = useIsAcessoGeral();
+  const ehGestor = acessoGeral || (colaboradorLogado?.eh_gestor ?? user?.colaborador?.cargo?.toLowerCase().includes('gestor') ?? false);
 
   const [competencia, setCompetencia] = useState(format(new Date(), 'yyyy-MM'));
   const [lojaFiltro, setLojaFiltro] = useState<string>('');

@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { ListChecks, CalendarIcon, ShieldAlert, CheckCircle2, Clock, Target, Store, CalendarDays } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import { useIsAcessoGeral } from '@/utils/permissoesUtils';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -43,7 +44,8 @@ export default function GestaoAdmAtividades() {
   const { colaboradores, lojas } = useCadastroStore();
 
   const colaboradorLogado = colaboradores.find(c => c.id === user?.colaborador?.id);
-  const ehGestor = colaboradorLogado?.eh_gestor ?? user?.colaborador?.cargo?.toLowerCase().includes('gestor') ?? false;
+  const acessoGeral = useIsAcessoGeral();
+  const ehGestor = acessoGeral || (colaboradorLogado?.eh_gestor ?? user?.colaborador?.cargo?.toLowerCase().includes('gestor') ?? false);
 
   const [dataSelecionada, setDataSelecionada] = useState<Date>(new Date());
   const [refreshKey, setRefreshKey] = useState(0);

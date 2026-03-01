@@ -125,6 +125,7 @@ export interface ContaFinanceira {
 
 export interface MaquinaCartao {
   id: string;
+  codigo: string;
   nome: string;
   cnpjVinculado: string;
   contaOrigem: string;
@@ -358,7 +359,7 @@ const mapRowToContaFinanceira = (row: any): ContaFinanceira => ({
 });
 
 const mapRowToMaquinaCartao = (row: any): MaquinaCartao => ({
-  id: row.id, nome: row.nome, cnpjVinculado: row.cnpj_vinculado || '',
+  id: row.id, codigo: row.codigo || '', nome: row.nome, cnpjVinculado: row.cnpj_vinculado || '',
   contaOrigem: row.conta_origem || '', status: (row.status as 'Ativo' | 'Inativo') || 'Ativo',
   percentualMaquina: row.percentual_maquina ?? 0,
   taxas: row.taxas && typeof row.taxas === 'object' ? row.taxas : { credito: {}, debito: 0 },
@@ -750,12 +751,22 @@ export const getMaquinasCartaoAsync = async (): Promise<MaquinaCartao[]> => {
 export const getMaquinaCartaoById = (id: string): MaquinaCartao | undefined =>
   _maquinasCartaoCache.find(m => m.id === id);
 
-export const addMaquinaCartao = async (maquina: Omit<MaquinaCartao, 'id'>): Promise<MaquinaCartao> => {
+export const addMaquinaCartao = async (maquina: Omit<MaquinaCartao, 'id' | 'codigo'>): Promise<MaquinaCartao> => {
+  // Gerar próximo código MQ-XXX
+  const { data: maxData } = await supabase.from('maquinas_cartao').select('codigo').order('codigo', { ascending: false }).limit(1);
+  let nextNum = 1;
+  if (maxData && maxData.length > 0 && maxData[0].codigo) {
+    const match = maxData[0].codigo.match(/MQ-(\d+)/);
+    if (match) nextNum = parseInt(match[1]) + 1;
+  }
+  const novoCodigo = `MQ-${String(nextNum).padStart(3, '0')}`;
+
   const { data, error } = await supabase.from('maquinas_cartao').insert({
     nome: maquina.nome, cnpj_vinculado: maquina.cnpjVinculado,
     conta_origem: maquina.contaOrigem, status: maquina.status || 'Ativo',
     percentual_maquina: maquina.percentualMaquina ?? 0,
     taxas: maquina.taxas, parcelamentos: maquina.parcelamentos || [],
+    codigo: novoCodigo,
   }).select().single();
   if (error) throw error;
   const nova = mapRowToMaquinaCartao(data);

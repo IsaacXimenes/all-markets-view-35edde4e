@@ -1793,6 +1793,7 @@ export type Database = {
       maquinas_cartao: {
         Row: {
           cnpj_vinculado: string | null
+          codigo: string | null
           conta_origem: string | null
           created_at: string | null
           id: string
@@ -1804,6 +1805,7 @@ export type Database = {
         }
         Insert: {
           cnpj_vinculado?: string | null
+          codigo?: string | null
           conta_origem?: string | null
           created_at?: string | null
           id?: string
@@ -1815,6 +1817,7 @@ export type Database = {
         }
         Update: {
           cnpj_vinculado?: string | null
+          codigo?: string | null
           conta_origem?: string | null
           created_at?: string | null
           id?: string

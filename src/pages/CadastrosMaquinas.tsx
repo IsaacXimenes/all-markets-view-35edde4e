@@ -157,7 +157,7 @@ export default function CadastrosMaquinas() {
       const loja = getLojaById(m.cnpjVinculado);
       const conta = getContaFinanceiraById(m.contaOrigem);
       return {
-        ID: m.id,
+        ID: m.codigo || m.id,
         Nome: m.nome,
         'Loja Vinculada': loja?.nome || m.cnpjVinculado,
         'CNPJ': loja?.cnpj || '-',
@@ -392,7 +392,7 @@ export default function CadastrosMaquinas() {
                   
                   return (
                     <TableRow key={maquina.id}>
-                      <TableCell className="font-mono text-xs">{maquina.id}</TableCell>
+                      <TableCell className="font-mono text-xs">{maquina.codigo || maquina.id}</TableCell>
                       <TableCell className="font-medium">{maquina.nome}</TableCell>
                       <TableCell>{loja?.nome || maquina.cnpjVinculado}</TableCell>
                       <TableCell className="font-mono text-xs">{loja?.cnpj || '-'}</TableCell>

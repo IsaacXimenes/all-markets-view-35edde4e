@@ -43,6 +43,7 @@ export interface TimelineEntry {
 
 export interface ProdutoPendente {
   id: string;
+  codigo: string;
   imei: string;
   imagem?: string;
   marca: string;
@@ -76,6 +77,7 @@ let cacheInitialized = false;
 // Helper: mapear row do Supabase para ProdutoPendente
 const mapRowToProduto = (row: any): ProdutoPendente => ({
   id: row.id,
+  codigo: row.codigo || '',
   imei: row.imei || '',
   imagem: row.imagem || undefined,
   marca: row.marca || '',
@@ -103,6 +105,7 @@ const mapRowToProduto = (row: any): ProdutoPendente => ({
 // Helper: mapear ProdutoPendente para row do Supabase
 const mapProdutoToRow = (p: ProdutoPendente): any => ({
   id: p.id,
+  codigo: p.codigo || null,
   imei: p.imei,
   imagem: p.imagem || null,
   marca: p.marca,
@@ -509,7 +512,7 @@ export const updateProdutoPendente = (id: string, dados: Partial<ProdutoPendente
 };
 
 export const addProdutoPendente = async (
-  produto: Omit<ProdutoPendente, 'id' | 'timeline' | 'custoAssistencia' | 'statusGeral' | 'valorCustoOriginal' | 'contadorEncaminhamentos'>,
+  produto: Omit<ProdutoPendente, 'id' | 'codigo' | 'timeline' | 'custoAssistencia' | 'statusGeral' | 'valorCustoOriginal' | 'contadorEncaminhamentos'>,
   forcarCriacao: boolean = false
 ): Promise<ProdutoPendente> => {
   if (!forcarCriacao && produto.imei) {
@@ -525,6 +528,7 @@ export const addProdutoPendente = async (
   const newProduto: ProdutoPendente = {
     ...produto,
     id: newId,
+    codigo: newId,
     valorCustoOriginal: produto.valorCusto,
     timeline: [
       {
@@ -579,6 +583,7 @@ export const migrarTradeInsParaPendentes = async (
     
     const novoProdutoPendente: ProdutoPendente = {
       id: newId,
+      codigo: newId,
       imei: tradeIn.imei,
       marca: 'Apple',
       modelo: tradeIn.modelo,
@@ -660,6 +665,7 @@ export const migrarProdutosNotaParaPendentes = async (
     
     const novoProduto: ProdutoPendente = {
       id: newId,
+      codigo: newId,
       imei: produto.imei,
       marca: produto.marca,
       modelo: produto.modelo,

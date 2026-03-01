@@ -2965,6 +2965,7 @@ export type Database = {
       }
       produtos_pendentes_os: {
         Row: {
+          codigo: string | null
           condicao: string | null
           contador_encaminhamentos: number | null
           cor: string | null
@@ -2991,6 +2992,7 @@ export type Database = {
           valor_origem: number | null
         }
         Insert: {
+          codigo?: string | null
           condicao?: string | null
           contador_encaminhamentos?: number | null
           cor?: string | null
@@ -3017,6 +3019,7 @@ export type Database = {
           valor_origem?: number | null
         }
         Update: {
+          codigo?: string | null
           condicao?: string | null
           contador_encaminhamentos?: number | null
           cor?: string | null

@@ -11,10 +11,16 @@ const LOJA_MAP: Record<string, string> = {
   "JK Shopping": "9009b91c-0436-4070-9d30-670b8e6bd68e",
   "Aguas Lindas": "b2c6ac94-f08b-4c2e-955f-8a91d658d7d6",
   "Águas Lindas": "b2c6ac94-f08b-4c2e-955f-8a91d658d7d6",
+  "Aguas Lindas Shopping": "b2c6ac94-f08b-4c2e-955f-8a91d658d7d6",
+  "Águas Lindas Shopping": "b2c6ac94-f08b-4c2e-955f-8a91d658d7d6",
   "Estoque - SIA": "fe27bdab-b6de-433c-8718-3f1690f2315d",
   "Online": "df3995f6-1da1-4661-a68f-20fb548a9468",
   "Matriz": "6231ea0e-9ff3-4ad6-b822-6f9a8270afa6",
 };
+
+function normalizeLojaName(name: string): string {
+  return name.replace(/\ufffd/g, "").replace(/\s+/g, " ").trim();
+}
 
 function parseCurrency(val: string): number | null {
   if (!val || !val.trim()) return null;
@@ -86,11 +92,12 @@ serve(async (req) => {
         continue;
       }
 
-      const lojaName = (cols[11] || "").trim();
-      const lojaId = LOJA_MAP[lojaName] || null;
+      const lojaRaw = (cols[11] || "").trim();
+      const lojaName = normalizeLojaName(lojaRaw);
+      const lojaId = LOJA_MAP[lojaName] || LOJA_MAP[lojaRaw] || null;
       
       if (lojaName && !lojaId) {
-        errors.push({ line: i + 2, error: `Loja desconhecida: "${lojaName}"`, raw: line.substring(0, 100) });
+        errors.push({ line: i + 2, error: `Loja desconhecida: "${lojaRaw}"`, raw: line.substring(0, 100) });
         continue;
       }
 

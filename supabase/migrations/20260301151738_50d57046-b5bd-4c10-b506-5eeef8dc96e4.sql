@@ -1,0 +1,1 @@
+UPDATE acessorios SET loja_id = 'b2c6ac94-f08b-4c2e-955f-8a91d658d7d6' WHERE loja_id IS NULL AND created_at >= now() - interval '15 minutes';

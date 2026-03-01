@@ -288,7 +288,7 @@ export default function Vendas() {
     <VendasLayout title="Gestão de Vendas">
       {/* Dashboard Cards - Sticky */}
       <div className="sticky top-0 z-10 bg-background pb-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -297,7 +297,7 @@ export default function Vendas() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Vendas do Período</p>
-                  <p className="text-2xl font-bold">{totais.quantidade}</p>
+                  <p className="text-lg sm:text-2xl font-bold">{totais.quantidade}</p>
                 </div>
               </div>
             </CardContent>
@@ -310,7 +310,7 @@ export default function Vendas() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Vendas</p>
-                  <p className="text-2xl font-bold">{formatCurrency(totais.totalVendas)}</p>
+                  <p className="text-lg sm:text-2xl font-bold truncate">{formatCurrency(totais.totalVendas)}</p>
                 </div>
               </div>
             </CardContent>
@@ -323,7 +323,7 @@ export default function Vendas() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Lucro Total</p>
-                  <p className="text-2xl font-bold">{formatCurrency(totais.totalLucro)}</p>
+                  <p className="text-lg sm:text-2xl font-bold truncate">{formatCurrency(totais.totalLucro)}</p>
                 </div>
               </div>
             </CardContent>
@@ -336,7 +336,7 @@ export default function Vendas() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Margem Média</p>
-                  <p className="text-2xl font-bold">{totais.margemMedia.toFixed(2)}%</p>
+                  <p className="text-lg sm:text-2xl font-bold">{totais.margemMedia.toFixed(2)}%</p>
                 </div>
               </div>
             </CardContent>
@@ -347,7 +347,7 @@ export default function Vendas() {
       {/* Filtros */}
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-8 3xl:grid-cols-9 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-8 gap-3 sm:gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Data Início</label>
               <Input
@@ -736,9 +736,9 @@ export default function Vendas() {
 
       {/* Totalizador */}
       <Card className="mt-4">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap justify-between items-center gap-4">
-            <div className="flex gap-6">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-wrap justify-between items-center gap-2 sm:gap-4">
+            <div className="flex gap-3 sm:gap-6 flex-wrap">
               <div>
                 <span className="text-sm text-muted-foreground">Vendas:</span>
                 <span className="ml-2 font-bold">{totais.quantidade}</span>

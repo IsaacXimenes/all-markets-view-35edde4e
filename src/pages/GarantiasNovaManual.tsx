@@ -162,7 +162,7 @@ export default function GarantiasNovaManual() {
     return produtosEstoque.filter(p => 
       getStatusAparelho(p) === 'Disponível' &&
       (buscaAparelho === '' || 
-        p.imei?.toLowerCase().includes(buscaAparelho.toLowerCase()) ||
+        p.imei?.replace(/\D/g, '').includes(buscaAparelho.replace(/\D/g, '')) ||
         p.modelo.toLowerCase().includes(buscaAparelho.toLowerCase()))
     );
   }, [buscaAparelho]);

@@ -48,7 +48,7 @@ export default function GarantiasExtendida() {
       if (filters.cliente && !g.clienteNome.toLowerCase().includes(filters.cliente.toLowerCase())) return false;
       
       // Filtro por IMEI
-      if (filters.imei && !g.imei.includes(filters.imei)) return false;
+      if (filters.imei && !g.imei.includes(filters.imei.replace(/\D/g, ''))) return false;
       
       // Filtro por loja
       if (filters.loja !== 'todas' && g.lojaVenda !== filters.loja) return false;

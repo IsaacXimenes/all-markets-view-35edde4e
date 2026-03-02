@@ -74,7 +74,7 @@ export default function GarantiaDetalhes() {
       getStatusAparelho(p) === 'Disponível' &&
       (garantia ? p.loja === garantia.lojaVenda : true) &&
       (buscaAparelho === '' || 
-        p.imei?.toLowerCase().includes(buscaAparelho.toLowerCase()) ||
+        p.imei?.replace(/\D/g, '').includes(buscaAparelho.replace(/\D/g, '')) ||
         p.modelo.toLowerCase().includes(buscaAparelho.toLowerCase()))
     );
   }, [buscaAparelho, garantia]);

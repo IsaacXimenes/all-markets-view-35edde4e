@@ -65,7 +65,7 @@ export default function EstoqueNovaMovimentacaoMatriz() {
     
     const termo = buscaProduto.toLowerCase();
     return disponiveis.filter(p => 
-      p.imei.toLowerCase().includes(termo) ||
+      p.imei.replace(/\D/g, '').includes(termo.replace(/\D/g, '')) ||
       p.modelo.toLowerCase().includes(termo)
     );
   }, [buscaProduto]);

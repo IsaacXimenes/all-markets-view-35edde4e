@@ -412,7 +412,7 @@ export default function VendasEditar() {
         const lojaEfetivaProduto = p.lojaAtualId || p.loja;
         if (lojaEfetivaProduto !== filtroLojaProduto) return false;
       }
-      if (buscaProduto && !p.imei.includes(buscaProduto)) return false;
+      if (buscaProduto && !p.imei.includes(buscaProduto.replace(/\D/g, ''))) return false;
       if (buscaModeloProduto && !p.modelo.toLowerCase().includes(buscaModeloProduto.toLowerCase())) return false;
       return true;
     });
@@ -431,7 +431,7 @@ export default function VendasEditar() {
       if (p.statusEmprestimo) return false;
       const lojaEfetivaProduto = p.lojaAtualId || p.loja;
       if (lojaEfetivaProduto === lojaEstoqueReal) return false;
-      if (buscaProduto && !p.imei.includes(buscaProduto)) return false;
+      if (buscaProduto && !p.imei.includes(buscaProduto.replace(/\D/g, ''))) return false;
       if (buscaModeloProduto && !p.modelo.toLowerCase().includes(buscaModeloProduto.toLowerCase())) return false;
       return true;
     });
@@ -2010,7 +2010,7 @@ export default function VendasEditar() {
                 </TableHeader>
                 <TableBody>
                   {produtosPendentes.filter(p => {
-                    if (buscaProduto && !p.imei.includes(buscaProduto)) return false;
+                    if (buscaProduto && !p.imei.includes(buscaProduto.replace(/\D/g, ''))) return false;
                     if (buscaModeloProduto && !p.modelo.toLowerCase().includes(buscaModeloProduto.toLowerCase())) return false;
                     return true;
                   }).map(produto => (

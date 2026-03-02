@@ -4340,6 +4340,22 @@ export type Database = {
         Args: { p_produto_id: string }
         Returns: boolean
       }
+      get_colaboradores_basicos: {
+        Args: never
+        Returns: {
+          ativo: boolean
+          cargo: string
+          created_at: string
+          data_admissao: string
+          eh_estoquista: boolean
+          eh_gestor: boolean
+          eh_vendedor: boolean
+          foto: string
+          id: string
+          loja_id: string
+          nome: string
+        }[]
+      }
       get_user_colaborador_id: { Args: { _user_id: string }; Returns: string }
       get_user_loja_id: { Args: { _user_id: string }; Returns: string }
       has_role: {

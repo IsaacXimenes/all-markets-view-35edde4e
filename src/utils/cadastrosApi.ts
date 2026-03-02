@@ -513,9 +513,23 @@ export const getColaboradores = (): Colaborador[] => [..._colaboradoresCache];
 
 export const getColaboradoresAsync = async (): Promise<Colaborador[]> => {
   try {
-    const { data, error } = await supabase.from('colaboradores').select('*').order('nome');
+    const { data, error } = await supabase.rpc('get_colaboradores_basicos');
     if (error) throw error;
-    _colaboradoresCache = (data || []).map(mapRowToColaborador);
+    _colaboradoresCache = (data || []).map((row: any) => mapRowToColaborador({
+      ...row,
+      cpf: '',
+      email: '',
+      telefone: '',
+      salario_fixo: 0,
+      ajuda_custo: 0,
+      comissao: 0,
+      salario: 0,
+      data_nascimento: null,
+      data_inativacao: null,
+      modelo_pagamento: null,
+      status: row.ativo ? 'Ativo' : 'Inativo',
+      numero: null,
+    }));
     _colaboradoresLoaded = true;
     return [..._colaboradoresCache];
   } catch (e) { console.error('Erro ao buscar colaboradores:', e); return [..._colaboradoresCache]; }

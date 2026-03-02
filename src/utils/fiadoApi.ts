@@ -1,5 +1,6 @@
 // Fiado API - Supabase
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 
 export interface DividaFiado {
   id: string;
@@ -140,7 +141,7 @@ export async function criarDividaFiado(
   const agora = new Date();
   const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-  const { data, error } = await supabase.from('dividas_fiado').insert({
+  const { data, error } = await withRetry(() => supabase.from('dividas_fiado').insert({
     venda_id: vendaId,
     cliente_id: clienteId,
     cliente_nome: clienteNome,
@@ -151,7 +152,7 @@ export async function criarDividaFiado(
     tipo_recorrencia: tipoRecorrencia,
     inicio_competencia: `${meses[agora.getMonth()]}-${agora.getFullYear()}`,
     situacao: 'Em Aberto',
-  }).select().single();
+  }).select().single());
   if (error) throw error;
   const divida = mapDivida(data);
   dividasCache.unshift(divida);
@@ -168,13 +169,13 @@ export async function registrarPagamentoFiado(
   const divida = dividasCache.find(d => d.id === dividaId);
   if (!divida || divida.situacao === 'Quitado') return null;
 
-  const { data, error } = await supabase.from('pagamentos_fiado').insert({
+  const { data, error } = await withRetry(() => supabase.from('pagamentos_fiado').insert({
     divida_id: dividaId,
     valor,
     responsavel,
     comprovante: comprovanteBase64 || null,
     comprovante_nome: comprovanteNome || null,
-  }).select().single();
+  }).select().single());
   if (error) throw error;
   const pagamento = mapPagamento(data);
   pagamentosCache.unshift(pagamento);
@@ -195,13 +196,13 @@ export async function registrarAnotacaoFiado(
   observacao: string,
   importante: boolean
 ): Promise<AnotacaoFiado> {
-  const { data, error } = await supabase.from('anotacoes_fiado').insert({
+  const { data, error } = await withRetry(() => supabase.from('anotacoes_fiado').insert({
     divida_id: dividaId,
     data_hora: new Date().toISOString(),
     usuario,
     observacao,
     importante,
-  }).select().single();
+  }).select().single());
   if (error) throw error;
   const anotacao = mapAnotacao(data);
   anotacoesCache.unshift(anotacao);

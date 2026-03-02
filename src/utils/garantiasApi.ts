@@ -1,5 +1,6 @@
 // Garantias API - Supabase
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 import { format, addMonths, differenceInDays } from 'date-fns';
 import { addOrdemServico } from './assistenciaApi';
 import { updateProduto, addMovimentacao, Produto, getProdutoById, getStatusAparelho } from './estoqueApi';
@@ -269,10 +270,10 @@ let timelineCounter = 0;
 const persistGarantiaTratativas = async (garantiaId: string) => {
   const tratativas = _tratativasCache.filter(t => t.garantiaId === garantiaId);
   const timeline = _timelineCache.filter(t => t.garantiaId === garantiaId);
-  await supabase.from('garantias').update({
+  await withRetry(() => supabase.from('garantias').update({
     tratativas: tratativas as any,
     timeline_garantia: timeline as any,
-  }).eq('id', garantiaId);
+  }).eq('id', garantiaId));
 };
 
 // ==================== FUNÇÕES CRUD ====================
@@ -284,7 +285,7 @@ export const getGarantiaById = (id: string): GarantiaItem | undefined => _garant
 export const getGarantiasByVendaId = (vendaId: string): GarantiaItem[] => _garantiasCache.filter(g => g.vendaId === vendaId);
 
 export const addGarantia = async (garantia: Omit<GarantiaItem, 'id'>): Promise<GarantiaItem> => {
-  const { data, error } = await supabase.from('garantias').insert({
+  const { data, error } = await withRetry(() => supabase.from('garantias').insert({
     venda_id: garantia.vendaId || null,
     venda_id_ref: garantia.vendaId || null,
     item_venda_id: garantia.itemVendaId || null,
@@ -304,7 +305,7 @@ export const addGarantia = async (garantia: Omit<GarantiaItem, 'id'>): Promise<G
     cliente_email: garantia.clienteEmail || null,
     tratativas: [],
     timeline_garantia: [],
-  }).select().single();
+  }).select().single());
 
   if (error) throw error;
 
@@ -322,7 +323,7 @@ export const updateGarantia = async (id: string, updates: Partial<GarantiaItem>)
   if (updates.clienteEmail !== undefined) dbUpdates.cliente_email = updates.clienteEmail;
 
   if (Object.keys(dbUpdates).length > 0) {
-    await supabase.from('garantias').update(dbUpdates).eq('id', id);
+    await withRetry(() => supabase.from('garantias').update(dbUpdates).eq('id', id));
   }
 
   const index = _garantiasCache.findIndex(g => g.id === id);

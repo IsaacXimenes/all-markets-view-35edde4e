@@ -1,5 +1,6 @@
 // Cadastros API - Supabase-backed with sync cache for backward compatibility
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 
 // ==================== INTERFACES ====================
 
@@ -384,12 +385,12 @@ export const getLojasAsync = async (): Promise<Loja[]> => {
 export const getLojaById = (id: string): Loja | undefined => _lojasCache.find(l => l.id === id);
 
 export const addLoja = async (loja: Omit<Loja, 'id'>): Promise<Loja> => {
-  const { data, error } = await supabase.from('lojas').insert({
+  const { data, error } = await withRetry(() => supabase.from('lojas').insert({
     nome: loja.nome, cnpj: loja.cnpj, endereco: loja.endereco, telefone: loja.telefone,
     cep: loja.cep, cidade: loja.cidade, estado: loja.estado, responsavel: loja.responsavel,
     horario_funcionamento: loja.horarioFuncionamento, ativa: loja.status === 'Ativo',
     comissao_percentual: loja.nome.toLowerCase().includes('online') ? 6 : 10,
-  }).select().single();
+  }).select().single());
   if (error) throw error;
   const nova = mapRowToLoja(data);
   _lojasCache.push(nova);
@@ -408,7 +409,7 @@ export const updateLoja = async (id: string, updates: Partial<Loja>): Promise<Lo
   if (updates.responsavel !== undefined) mapped.responsavel = updates.responsavel;
   if (updates.horarioFuncionamento !== undefined) mapped.horario_funcionamento = updates.horarioFuncionamento;
   if (updates.status !== undefined) mapped.ativa = updates.status === 'Ativo';
-  const { data, error } = await supabase.from('lojas').update(mapped).eq('id', id).select().single();
+  const { data, error } = await withRetry(() => supabase.from('lojas').update(mapped).eq('id', id).select().single());
   if (error) { console.error('Erro ao atualizar loja:', error); return null; }
   const updated = mapRowToLoja(data);
   const idx = _lojasCache.findIndex(l => l.id === id);
@@ -441,7 +442,7 @@ export const getClienteByCpf = (cpf: string): Cliente | undefined => _clientesCa
 
 export const addCliente = async (cliente: Omit<Cliente, 'id' | 'tipoCliente' | 'tipoPessoa'>): Promise<Cliente> => {
   const idsCompras = cliente.idsCompras || [];
-  const { data, error } = await supabase.from('clientes').insert({
+  const { data, error } = await withRetry(() => supabase.from('clientes').insert({
     nome: cliente.nome, cpf: cliente.cpf, telefone: cliente.telefone,
     data_nascimento: cliente.dataNascimento || null, email: cliente.email,
     cep: cliente.cep, endereco: cliente.endereco, numero: cliente.numero,
@@ -449,7 +450,7 @@ export const addCliente = async (cliente: Omit<Cliente, 'id' | 'tipoCliente' | '
     status: cliente.status || 'Ativo', origem_cliente: cliente.origemCliente || 'Venda',
     ids_compras: idsCompras, tipo_pessoa: calcularTipoPessoa(cliente.cpf),
     tipo_cliente: calcularTipoCliente(idsCompras),
-  }).select().single();
+  }).select().single());
   if (error) throw error;
   const novo = mapRowToCliente(data);
   _clientesCache.push(novo);
@@ -475,7 +476,7 @@ export const updateCliente = async (id: string, updates: Partial<Cliente>): Prom
     mapped.ids_compras = updates.idsCompras;
     mapped.tipo_cliente = calcularTipoCliente(updates.idsCompras);
   }
-  const { data, error } = await supabase.from('clientes').update(mapped).eq('id', id).select().single();
+  const { data, error } = await withRetry(() => supabase.from('clientes').update(mapped).eq('id', id).select().single());
   if (error) { console.error('Erro ao atualizar cliente:', error); return null; }
   const updated = mapRowToCliente(data);
   const idx = _clientesCache.findIndex(c => c.id === id);
@@ -557,7 +558,7 @@ export const getCargoNome = (cargoId: string) => {
 };
 
 export const addColaborador = async (colaborador: Omit<Colaborador, 'id'>): Promise<Colaborador> => {
-  const { data, error } = await supabase.from('colaboradores').insert({
+  const { data, error } = await withRetry(() => supabase.from('colaboradores').insert({
     nome: colaborador.nome, cpf: colaborador.cpf, email: colaborador.email,
     telefone: colaborador.telefone, loja_id: colaborador.loja || null,
     cargo: colaborador.cargo, data_admissao: colaborador.dataAdmissao || null,
@@ -565,7 +566,7 @@ export const addColaborador = async (colaborador: Omit<Colaborador, 'id'>): Prom
     modelo_pagamento: colaborador.modeloPagamento || null,
     salario: colaborador.salario ?? null, status: colaborador.status,
     ativo: colaborador.status === 'Ativo', foto: colaborador.foto || null,
-  }).select().single();
+  }).select().single());
   if (error) throw error;
   const novo = mapRowToColaborador(data);
   _colaboradoresCache.push(novo);
@@ -587,7 +588,7 @@ export const updateColaborador = async (id: string, updates: Partial<Colaborador
   if (updates.salario !== undefined) mapped.salario = updates.salario;
   if (updates.foto !== undefined) mapped.foto = updates.foto;
   if (updates.status !== undefined) { mapped.status = updates.status; mapped.ativo = updates.status === 'Ativo'; }
-  const { data, error } = await supabase.from('colaboradores').update(mapped).eq('id', id).select().single();
+  const { data, error } = await withRetry(() => supabase.from('colaboradores').update(mapped).eq('id', id).select().single());
   if (error) { console.error('Erro ao atualizar colaborador:', error); return null; }
   const updated = mapRowToColaborador(data);
   const idx = _colaboradoresCache.findIndex(c => c.id === id);
@@ -618,11 +619,11 @@ export const getFornecedoresAsync = async (): Promise<Fornecedor[]> => {
 export const getFornecedorById = (id: string): Fornecedor | undefined => _fornecedoresCache.find(f => f.id === id);
 
 export const addFornecedor = async (fornecedor: Omit<Fornecedor, 'id'>): Promise<Fornecedor> => {
-  const { data, error } = await supabase.from('fornecedores').insert({
+  const { data, error } = await withRetry(() => supabase.from('fornecedores').insert({
     nome: fornecedor.nome, cnpj: fornecedor.cnpj, endereco: fornecedor.endereco,
     responsavel: fornecedor.responsavel, telefone: fornecedor.telefone,
     status: fornecedor.status || 'Ativo', ultima_compra: fornecedor.ultimaCompra || null,
-  }).select().single();
+  }).select().single());
   if (error) throw error;
   const novo = mapRowToFornecedor(data);
   _fornecedoresCache.push(novo);
@@ -638,7 +639,7 @@ export const updateFornecedor = async (id: string, updates: Partial<Fornecedor>)
   if (updates.telefone !== undefined) mapped.telefone = updates.telefone;
   if (updates.status !== undefined) mapped.status = updates.status;
   if (updates.ultimaCompra !== undefined) mapped.ultima_compra = updates.ultimaCompra;
-  const { data, error } = await supabase.from('fornecedores').update(mapped).eq('id', id).select().single();
+  const { data, error } = await withRetry(() => supabase.from('fornecedores').update(mapped).eq('id', id).select().single());
   if (error) { console.error('Erro ao atualizar fornecedor:', error); return null; }
   const updated = mapRowToFornecedor(data);
   const idx = _fornecedoresCache.findIndex(f => f.id === id);
@@ -692,13 +693,13 @@ export const toggleContaFinanceira = async (id: string, usuario: string, observa
 };
 
 export const addContaFinanceira = async (conta: Omit<ContaFinanceira, 'id'>): Promise<ContaFinanceira> => {
-  const { data, error } = await supabase.from('contas_financeiras').insert({
+  const { data, error } = await withRetry(() => supabase.from('contas_financeiras').insert({
     nome: conta.nome, tipo: conta.tipo, loja_vinculada: conta.lojaVinculada,
     banco: conta.banco, agencia: conta.agencia, conta: conta.conta, cnpj: conta.cnpj,
     saldo_inicial: conta.saldoInicial, saldo_atual: conta.saldoAtual, status: conta.status || 'Ativo',
     status_maquina: conta.statusMaquina, nota_fiscal: conta.notaFiscal,
     habilitada: conta.habilitada ?? true, historico_alteracoes: (conta.historicoAlteracoes || []) as any,
-  } as any).select().single();
+  } as any).select().single());
   if (error) throw error;
   const nova = mapRowToContaFinanceira(data);
   _contasFinanceirasCache.push(nova);
@@ -721,7 +722,7 @@ export const updateContaFinanceira = async (id: string, updates: Partial<ContaFi
   if (updates.notaFiscal !== undefined) mapped.nota_fiscal = updates.notaFiscal;
   if (updates.habilitada !== undefined) mapped.habilitada = updates.habilitada;
   if (updates.historicoAlteracoes !== undefined) mapped.historico_alteracoes = updates.historicoAlteracoes;
-  const { data, error } = await supabase.from('contas_financeiras').update(mapped).eq('id', id).select().single();
+  const { data, error } = await withRetry(() => supabase.from('contas_financeiras').update(mapped).eq('id', id).select().single());
   if (error) { console.error('Erro ao atualizar conta financeira:', error); return null; }
   const updated = mapRowToContaFinanceira(data);
   const idx = _contasFinanceirasCache.findIndex(c => c.id === id);

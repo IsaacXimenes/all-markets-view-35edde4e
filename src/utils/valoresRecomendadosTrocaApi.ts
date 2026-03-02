@@ -1,5 +1,6 @@
 // API de Valores Recomendados para Trade-In - Supabase
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 import { useAuthStore } from '@/store/authStore';
 
 export interface ValorRecomendadoTroca {
@@ -178,10 +179,10 @@ export const buscarValoresRecomendados = (busca: string): ValorRecomendadoTroca[
 // Mutações async
 export const criarValorRecomendado = async (dados: Omit<ValorRecomendadoTroca, 'id' | 'ultimaAtualizacao'>): Promise<ValorRecomendadoTroca> => {
   const ultimaAtualizacao = new Date().toISOString().split('T')[0];
-  const { data, error } = await supabase.from('valores_recomendados_troca').insert({
+  const { data, error } = await withRetry(() => supabase.from('valores_recomendados_troca').insert({
     modelo: dados.modelo, marca: dados.marca, condicao: dados.condicao,
     valor_sugerido: dados.valorSugerido, ultima_atualizacao: ultimaAtualizacao,
-  }).select().single();
+  }).select().single());
   if (error) throw error;
   const novo = mapValorRow(data);
   _valoresCache.push(novo);
@@ -205,7 +206,7 @@ export const editarValorRecomendado = async (id: string, dados: Partial<Omit<Val
   if (dados.valorSugerido !== undefined) dbUpdates.valor_sugerido = dados.valorSugerido;
   if (dados.condicao !== undefined) dbUpdates.condicao = dados.condicao;
 
-  const { data, error } = await supabase.from('valores_recomendados_troca').update(dbUpdates).eq('id', id).select().single();
+  const { data, error } = await withRetry(() => supabase.from('valores_recomendados_troca').update(dbUpdates).eq('id', id).select().single());
   if (error) throw error;
   const updated = mapValorRow(data);
   _valoresCache[idx] = updated;
@@ -220,7 +221,7 @@ export const excluirValorRecomendado = async (id: string): Promise<boolean> => {
   const idx = _valoresCache.findIndex(v => v.id === id);
   if (idx === -1) return false;
   const removido = _valoresCache[idx];
-  const { error } = await supabase.from('valores_recomendados_troca').delete().eq('id', id);
+  const { error } = await withRetry(() => supabase.from('valores_recomendados_troca').delete().eq('id', id).select());
   if (error) throw error;
   _valoresCache.splice(idx, 1);
   await registrarLog('exclusao', id, removido.modelo, `Removido valor para ${removido.modelo}`);

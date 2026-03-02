@@ -2390,6 +2390,8 @@ export type Database = {
           aparelho_modelo: string | null
           cliente_nome: string
           conclusao_servico: string | null
+          conferencia_financeiro: Json | null
+          conferencia_gestor: Json | null
           created_at: string | null
           cronometro: Json | null
           custo_total: number | null
@@ -2428,6 +2430,8 @@ export type Database = {
           aparelho_modelo?: string | null
           cliente_nome: string
           conclusao_servico?: string | null
+          conferencia_financeiro?: Json | null
+          conferencia_gestor?: Json | null
           created_at?: string | null
           cronometro?: Json | null
           custo_total?: number | null
@@ -2466,6 +2470,8 @@ export type Database = {
           aparelho_modelo?: string | null
           cliente_nome?: string
           conclusao_servico?: string | null
+          conferencia_financeiro?: Json | null
+          conferencia_gestor?: Json | null
           created_at?: string | null
           cronometro?: Json | null
           custo_total?: number | null

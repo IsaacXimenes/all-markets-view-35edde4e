@@ -1,5 +1,6 @@
 // API para Retirada de Peças - Supabase
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 import { Produto, getProdutoById, updateProduto } from './estoqueApi';
 import { getProdutoPendenteById, updateProdutoPendente } from './osApi';
 import { addPeca } from './pecasApi';
@@ -85,7 +86,7 @@ const mapRow = (row: any): RetiradaPecas => ({
 });
 
 const saveRetirada = async (retirada: RetiradaPecas): Promise<void> => {
-  const { error } = await supabase.from('retiradas_pecas').update({
+  const { error } = await withRetry(() => supabase.from('retiradas_pecas').update({
     status: retirada.status,
     tecnico_responsavel: retirada.tecnicoResponsavel,
     data_inicio_desmonte: retirada.dataInicioDesmonte,
@@ -93,7 +94,7 @@ const saveRetirada = async (retirada: RetiradaPecas): Promise<void> => {
     pecas_retiradas: retirada.pecasRetiradas as any,
     timeline: retirada.timeline as any,
     logs_auditoria: retirada.logsAuditoria as any,
-  }).eq('id', retirada.id);
+  }).eq('id', retirada.id).select());
   if (error) { console.error('Erro ao salvar retirada:', error); throw error; }
 };
 
@@ -151,12 +152,12 @@ export const solicitarRetiradaPecas = async (
     detalhes: `Solicitação de retirada criada. Motivo: ${motivo}`, tipoAlteracao: 'criacao'
   }];
 
-  const { data: row, error } = await supabase.from('retiradas_pecas').insert({
+  const { data: row, error } = await withRetry(() => supabase.from('retiradas_pecas').insert({
     aparelho_id: aparelhoId, imei_original: imei, modelo_original: modelo, cor_original: cor,
     valor_custo_aparelho: valorCusto, motivo, responsavel_solicitacao: responsavel,
     status: 'Pendente Assistência', pecas_retiradas: [] as any, timeline: timeline as any,
     loja_id: loja, logs_auditoria: logsAuditoria as any,
-  }).select().single();
+  }).select().single());
   if (error) return { sucesso: false, mensagem: error.message };
 
   const novaRetirada = mapRow(row);

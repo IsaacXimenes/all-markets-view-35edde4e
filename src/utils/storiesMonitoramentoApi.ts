@@ -1,5 +1,6 @@
 // Stories Monitoramento API - Supabase Integration
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 import { getVendas, Venda } from './vendasApi';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -215,9 +216,9 @@ export const gerarLotesDiarios = async (
     };
 
     if (lote.id) {
-      await supabase.from('stories_lotes').update(payload).eq('id', lote.id);
+      await withRetry(() => supabase.from('stories_lotes').update(payload).eq('id', lote.id).select());
     } else {
-      const { data: row } = await supabase.from('stories_lotes').insert(payload).select().single();
+      const { data: row } = await withRetry(() => supabase.from('stories_lotes').insert(payload).select().single());
       if (row) {
         lote.id = row.id;
         // Update vendas loteId references
@@ -270,7 +271,7 @@ export const salvarConferenciaOperacional = async (
     dataConferencia: new Date().toISOString(),
   };
 
-  await supabase.from('stories_lotes').update({
+  await withRetry(() => supabase.from('stories_lotes').update({
     vendas: vendasAtualizadas as any,
     vendas_com_story: comStory,
     percentual_stories: lotes[idx].percentualStories,
@@ -278,7 +279,7 @@ export const salvarConferenciaOperacional = async (
     conferido_por: responsavelId,
     conferido_por_nome: responsavelNome,
     data_conferencia: new Date().toISOString(),
-  }).eq('id', loteId);
+  }).eq('id', loteId).select());
 
   _lotesCache.set(competencia, lotes);
 };
@@ -309,7 +310,7 @@ export const salvarValidacao = async (
     dataValidacao: new Date().toISOString(),
   };
 
-  await supabase.from('stories_lotes').update({
+  await withRetry(() => supabase.from('stories_lotes').update({
     vendas: vendasValidadas as any,
     vendas_com_story: comStoryValidado,
     percentual_stories: lotes[idx].percentualStories,
@@ -317,7 +318,7 @@ export const salvarValidacao = async (
     validado_por: responsavelId,
     validado_por_nome: responsavelNome,
     data_validacao: new Date().toISOString(),
-  }).eq('id', loteId);
+  }).eq('id', loteId).select());
 
   _lotesCache.set(competencia, lotes);
 };

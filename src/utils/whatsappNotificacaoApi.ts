@@ -1,5 +1,6 @@
 // WhatsApp Notification API - Configuração e disparo de notificações de vendas
 import { supabase } from "@/integrations/supabase/client";
+import { withRetry } from './supabaseRetry';
 
 export interface ConfigWhatsApp {
   habilitado: boolean;
@@ -82,17 +83,18 @@ export const salvarConfigWhatsApp = async (config: ConfigWhatsApp): Promise<void
 
   try {
     if (_configId) {
-      const { error } = await supabase
+      const { error } = await withRetry(() => supabase
         .from('config_whatsapp')
         .update(row)
-        .eq('id', _configId);
+        .eq('id', _configId)
+        .select());
       if (error) throw error;
     } else {
-      const { data, error } = await supabase
+      const { data, error } = await withRetry(() => supabase
         .from('config_whatsapp')
         .insert(row)
         .select('id')
-        .single();
+        .single());
       if (error) throw error;
       _configId = data.id;
     }

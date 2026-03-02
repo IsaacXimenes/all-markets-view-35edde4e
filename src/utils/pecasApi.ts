@@ -1,5 +1,6 @@
 // API para gestão de Peças no Estoque - Supabase
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 
 export interface MovimentacaoPeca {
   id: string;
@@ -112,18 +113,18 @@ export const getPecaByDescricao = (descricao: string): Peca | undefined => {
 
 export const addPeca = async (peca: Omit<Peca, 'id'>): Promise<Peca> => {
   const dbData = mapPecaToDB(peca);
-  const { data, error } = await supabase.from('pecas').insert(dbData).select().single();
+  const { data, error } = await withRetry(() => supabase.from('pecas').insert(dbData).select().single());
   if (error) throw error;
   const newPeca = mapPecaFromDB(data);
 
   // Registrar movimentação de entrada
-  await supabase.from('movimentacoes_pecas').insert({
+  await withRetry(() => supabase.from('movimentacoes_pecas').insert({
     peca_id: newPeca.id,
     tipo: 'Entrada',
     quantidade: newPeca.quantidade,
     data: newPeca.dataEntrada || new Date().toISOString(),
     descricao: `Entrada - ${newPeca.origem}`,
-  });
+  }).select());
 
   _pecasCache.push(newPeca);
   return newPeca;
@@ -131,7 +132,7 @@ export const addPeca = async (peca: Omit<Peca, 'id'>): Promise<Peca> => {
 
 export const updatePeca = async (id: string, updates: Partial<Peca>): Promise<Peca | null> => {
   const dbData = mapPecaToDB(updates);
-  const { data, error } = await supabase.from('pecas').update(dbData).eq('id', id).select().single();
+  const { data, error } = await withRetry(() => supabase.from('pecas').update(dbData).eq('id', id).select().single());
   if (error || !data) return null;
   const updated = mapPecaFromDB(data);
   const idx = _pecasCache.findIndex(p => p.id === id);
@@ -140,7 +141,7 @@ export const updatePeca = async (id: string, updates: Partial<Peca>): Promise<Pe
 };
 
 export const deletePeca = async (id: string): Promise<boolean> => {
-  const { error } = await supabase.from('pecas').delete().eq('id', id);
+  const { error } = await withRetry(() => supabase.from('pecas').delete().eq('id', id).select());
   if (error) return false;
   _pecasCache = _pecasCache.filter(p => p.id !== id);
   return true;
@@ -163,18 +164,18 @@ export const darBaixaPeca = async (id: string, quantidade: number = 1, osId?: st
   const novaQtd = peca.quantidade - quantidade;
   const novoStatus = novaQtd === 0 ? 'Utilizada' : peca.status;
 
-  await supabase.from('pecas').update({ quantidade: novaQtd, status: novoStatus }).eq('id', id);
+  await withRetry(() => supabase.from('pecas').update({ quantidade: novaQtd, status: novoStatus }).eq('id', id).select());
   peca.quantidade = novaQtd;
   peca.status = novoStatus as Peca['status'];
 
-  await supabase.from('movimentacoes_pecas').insert({
+  await withRetry(() => supabase.from('movimentacoes_pecas').insert({
     peca_id: id,
     tipo: 'Saída',
     quantidade,
     data: new Date().toISOString(),
     os_id: osId || null,
     descricao: `Baixa para OS${osId ? ` ${osId}` : ''} - ${peca.descricao}`,
-  });
+  }).select());
 
   if (peca.loteConsignacaoId && onConsumoPecaConsignada && osId) {
     onConsumoPecaConsignada(id, osId, tecnico || 'Sistema', quantidade);
@@ -192,14 +193,14 @@ export const getMovimentacoesByPecaId = (pecaId: string): MovimentacaoPeca[] => 
 
 // Adicionar movimentação manual
 export const addMovimentacaoPeca = async (mov: Omit<MovimentacaoPeca, 'id'>): Promise<MovimentacaoPeca> => {
-  const { data, error } = await supabase.from('movimentacoes_pecas').insert({
+  const { data, error } = await withRetry(() => supabase.from('movimentacoes_pecas').insert({
     peca_id: mov.pecaId,
     tipo: mov.tipo,
     quantidade: mov.quantidade,
     data: mov.data,
     os_id: mov.osId || null,
     descricao: mov.descricao,
-  }).select().single();
+  }).select().single());
   if (error) throw error;
   const newMov = mapMovFromDB(data);
   _movCache.push(newMov);

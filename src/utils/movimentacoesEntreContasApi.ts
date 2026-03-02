@@ -1,5 +1,6 @@
 // Movimentações entre Contas API - Supabase
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 
 export interface MovimentacaoEntreConta {
   id: string;
@@ -78,7 +79,7 @@ export const getLogsMovimentacoes = (): LogMovimentacao[] => [..._logsCache];
 // Mutações async
 export const addMovimentacaoEntreConta = async (data: Omit<MovimentacaoEntreConta, 'id' | 'transacaoId'>): Promise<MovimentacaoEntreConta> => {
   const transacaoId = `TXN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-  const { data: row, error } = await supabase.from('movimentacoes_entre_contas').insert({
+  const { data: row, error } = await withRetry(() => supabase.from('movimentacoes_entre_contas').insert({
     transacao_id: transacaoId,
     conta_origem_id: data.contaOrigemId,
     conta_destino_id: data.contaDestinoId,
@@ -87,7 +88,7 @@ export const addMovimentacaoEntreConta = async (data: Omit<MovimentacaoEntreCont
     observacao: data.observacao,
     usuario_id: data.usuarioId,
     usuario_nome: data.usuarioNome,
-  }).select().single();
+  }).select().single());
   if (error) throw error;
   const nova = mapMovRow(row);
   _movCache.unshift(nova);
@@ -95,7 +96,7 @@ export const addMovimentacaoEntreConta = async (data: Omit<MovimentacaoEntreCont
 };
 
 export const addLogMovimentacao = async (mov: MovimentacaoEntreConta): Promise<void> => {
-  const { data: row, error } = await supabase.from('logs_movimentacoes_contas').insert({
+  const { data: row, error } = await withRetry(() => supabase.from('logs_movimentacoes_contas').insert({
     movimentacao_id: mov.id,
     transacao_id: mov.transacaoId,
     data_hora: mov.dataHora,
@@ -105,7 +106,7 @@ export const addLogMovimentacao = async (mov: MovimentacaoEntreConta): Promise<v
     conta_destino_id: mov.contaDestinoId,
     valor: mov.valor,
     observacao: mov.observacao,
-  }).select().single();
+  }).select().single());
   if (error) { console.error('Erro ao adicionar log movimentação:', error); throw error; }
   if (row) _logsCache.unshift(mapLogRow(row));
 };

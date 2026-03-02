@@ -109,21 +109,24 @@ export default function OSConsignacao() {
   }, [viewMode, novoFornecedor, novoItens, saveDraft]);
 
   const handleNovoLoteClick = () => {
-    if (hasDraft()) {
-      setShowDraftDialog(true);
-    } else {
-      setViewMode('novo');
-    }
+    setViewMode('novo');
   };
+
+  // Show draft dialog when entering 'novo' mode
+  useEffect(() => {
+    if (viewMode === 'novo' && hasDraft()) {
+      setShowDraftDialog(true);
+    }
+  }, [viewMode]);
 
   const handleRestaurarDraft = () => {
     const draft = loadDraft();
     if (draft) {
       setNovoFornecedor(draft.novoFornecedor || '');
       setNovoItens(draft.novoItens || [{ descricao: '', modelo: '', quantidade: '1', valorCusto: '', lojaDestinoId: '' }]);
+      toast({ title: 'Rascunho carregado', description: 'Dados do lote anterior foram restaurados' });
     }
     setShowDraftDialog(false);
-    setViewMode('novo');
   };
 
   const handleDescartarDraft = () => {
@@ -131,7 +134,7 @@ export default function OSConsignacao() {
     setNovoFornecedor('');
     setNovoItens([{ descricao: '', modelo: '', quantidade: '1', valorCusto: '', lojaDestinoId: '' }]);
     setShowDraftDialog(false);
-    setViewMode('novo');
+    toast({ title: 'Rascunho descartado', description: 'Iniciando novo lote' });
   };
 
   const getFornecedorNome = (id: string) => fornecedores.find(f => f.id === id)?.nome || id;
@@ -225,24 +228,29 @@ export default function OSConsignacao() {
       return;
     }
 
-    const input: CriarLoteInput = {
-      fornecedorId: novoFornecedor,
-      responsavel: user?.colaborador?.nome || 'Sistema',
-      itens: itensValidos.map(i => ({
-        descricao: i.descricao,
-        modelo: i.modelo,
-        quantidade: parseInt(i.quantidade) || 1,
-        valorCusto: parseFloat(i.valorCusto.replace(/\D/g, '')) / 100,
-        lojaDestinoId: i.lojaDestinoId,
-      })),
-    };
+    try {
+      const input: CriarLoteInput = {
+        fornecedorId: novoFornecedor,
+        responsavel: user?.colaborador?.nome || 'Sistema',
+        itens: itensValidos.map(i => ({
+          descricao: i.descricao,
+          modelo: i.modelo,
+          quantidade: parseInt(i.quantidade) || 1,
+          valorCusto: parseFloat(i.valorCusto.replace(/\D/g, '')) / 100,
+          lojaDestinoId: i.lojaDestinoId,
+        })),
+      };
 
-    const lote = await criarLoteConsignacao(input);
-    clearDraft();
-    setNovoFornecedor('');
-    setNovoItens([{ descricao: '', modelo: '', quantidade: '1', valorCusto: '', lojaDestinoId: '' }]);
-    toast({ title: 'Lote criado', description: `${lote.id} cadastrado com ${lote.itens.length} item(s)` });
-    voltar();
+      const lote = await criarLoteConsignacao(input);
+      clearDraft();
+      setNovoFornecedor('');
+      setNovoItens([{ descricao: '', modelo: '', quantidade: '1', valorCusto: '', lojaDestinoId: '' }]);
+      toast({ title: 'Lote criado', description: `${lote.id} cadastrado com ${lote.itens.length} item(s)` });
+      voltar();
+    } catch (error) {
+      console.error('Erro ao criar lote:', error);
+      toast({ title: 'Erro', description: 'Falha ao cadastrar o lote. Tente novamente.', variant: 'destructive' });
+    }
   };
 
   // readOnly mode for detalhamento (Eye) vs edit (Pencil)

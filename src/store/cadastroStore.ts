@@ -104,7 +104,7 @@ const mapSupabaseColaborador = (row: any): ColaboradorMockado => ({
   eh_vendedor: row.eh_vendedor ?? false,
   eh_estoquista: row.eh_estoquista ?? false,
   ativo: row.ativo ?? true,
-  data_criacao: row.created_at ? row.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+  data_criacao: row.created_at ? String(row.created_at).split('T')[0] : new Date().toISOString().split('T')[0],
 });
 
 const mapColaboradorToSupabase = (col: Partial<ColaboradorMockado>) => {
@@ -156,7 +156,7 @@ export const useCadastroStore = create<CadastroStore>((set, get) => ({
     
     Promise.all([
       supabase.from('lojas').select('*').order('nome'),
-      supabase.from('colaboradores').select('*').order('nome'),
+      supabase.rpc('get_colaboradores_basicos'),
       supabase.from('rodizios_colaboradores').select('*').order('created_at', { ascending: false }),
     ]).then(([lojasRes, colaboradoresRes, rodiziosRes]) => {
       if (lojasRes.error) {

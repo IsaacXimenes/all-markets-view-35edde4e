@@ -576,10 +576,33 @@ const generateMovId = () => `MOV-${String(movIdCounter++).padStart(4, '0')}`;
 export const getMovimentacoes = (): Movimentacao[] => [..._movimentacoes];
 
 export const addMovimentacao = async (mov: Omit<Movimentacao, 'id' | 'codigoLegivel'> & { produtoId?: string; responsavelId?: string }): Promise<Movimentacao> => {
-  // Determinar produto_id: usar produtoId explícito ou buscar pelo IMEI
   const produtoId = mov.produtoId || _produtos.find(p => p.imei === mov.imei)?.id || null;
-  // Usar responsavelId (UUID) para o DB, e manter o nome no cache local
   const responsavelIdDb = mov.responsavelId || null;
+
+  if (produtoId && responsavelIdDb) {
+    // Usar RPC atômica — transação única para INSERT mov + UPDATE produto
+    const { data: movId, error } = await supabase.rpc('transferir_estoque', {
+      p_produto_id: produtoId,
+      p_loja_origem: mov.origem,
+      p_loja_destino: mov.destino,
+      p_responsavel_id: responsavelIdDb,
+      p_motivo: mov.motivo || 'Movimentação entre lojas',
+    });
+    if (error) throw error;
+    const codigoLegivel = generateMovId();
+    const newMov: Movimentacao = { ...mov, id: movId, codigoLegivel, status: 'Pendente' };
+    _movimentacoes.push(newMov);
+    // Atualizar cache local do produto
+    const prodIdx = _produtos.findIndex(p => p.id === produtoId);
+    if (prodIdx !== -1) {
+      _produtos[prodIdx].statusMovimentacao = 'Em movimentação';
+      _produtos[prodIdx].movimentacaoId = movId;
+      _produtos[prodIdx].lojaAtualId = mov.destino;
+    }
+    return newMov;
+  }
+
+  // Fallback para movimentações sem produto_id ou responsavel_id
   const { data, error } = await withRetry(() => supabase.from('movimentacoes_estoque').insert({
     produto_id: produtoId, loja_origem_id: mov.origem, loja_destino_id: mov.destino,
     responsavel_id: responsavelIdDb, motivo: mov.motivo, tipo_movimentacao: 'Pendente',
@@ -588,12 +611,8 @@ export const addMovimentacao = async (mov: Omit<Movimentacao, 'id' | 'codigoLegi
   const codigoLegivel = generateMovId();
   const newMov: Movimentacao = { ...mov, id: data.id, codigoLegivel, status: 'Pendente' };
   _movimentacoes.push(newMov);
-  // Mark product in transit
   if (produtoId) {
-    const prodAtualizado = await updateProduto(produtoId, { statusMovimentacao: 'Em movimentação', movimentacaoId: data.id });
-    if (!prodAtualizado) {
-      console.error('[MOV] Falha ao marcar produto como Em movimentação:', produtoId);
-    }
+    await updateProduto(produtoId, { statusMovimentacao: 'Em movimentação', movimentacaoId: data.id });
   }
   return newMov;
 };
@@ -601,27 +620,45 @@ export const addMovimentacao = async (mov: Omit<Movimentacao, 'id' | 'codigoLegi
 export const confirmarRecebimentoMovimentacao = async (movId: string, responsavel: string): Promise<Movimentacao | null> => {
   const mov = _movimentacoes.find(m => m.id === movId);
   if (!mov) return null;
+
+  // Usar RPC atômica para confirmar recebimento
+  const { data: sucesso, error } = await supabase.rpc('confirmar_recebimento_movimentacao', {
+    p_movimentacao_id: movId,
+    p_loja_destino: mov.destino,
+  });
+
+  if (error || !sucesso) {
+    console.error('[MOV] Erro ao confirmar recebimento via RPC:', error);
+    return null;
+  }
+
+  // Atualizar cache local
   mov.status = 'Recebido';
   mov.dataRecebimento = new Date().toISOString();
   mov.responsavelRecebimento = responsavel;
-  await supabase.from('movimentacoes_estoque').update({ tipo_movimentacao: 'Recebido' }).eq('id', movId);
-  // Buscar produto por IMEI ou pelo produto_id da movimentação no DB
+
+  // Atualizar cache do produto
   let produto = mov.imei ? _produtos.find(p => p.imei === mov.imei) : null;
   if (!produto) {
-    // Fallback: buscar movimentação no DB para pegar produto_id
     const { data: movRow } = await supabase.from('movimentacoes_estoque').select('produto_id').eq('id', movId).single();
     if (movRow?.produto_id) {
       produto = _produtos.find(p => p.id === movRow.produto_id) || null;
     }
   }
   if (produto) {
+    produto.loja = mov.destino;
+    produto.lojaAtualId = mov.destino;
+    produto.statusMovimentacao = null;
+    produto.movimentacaoId = undefined;
     const timeline = [...(produto.timeline || []), {
       id: `TL-${produto.id}-MOV-${mov.id}`, tipo: 'entrada' as const, data: new Date().toISOString(),
       titulo: 'Movimentação Finalizada',
       descricao: `Aparelho recebido na loja de destino. Origem: ${useCadastroStore.getState().obterNomeLoja(mov.origem)} → Destino: ${useCadastroStore.getState().obterNomeLoja(mov.destino)}.`,
       responsavel,
     }];
-    await updateProduto(produto.id, { loja: mov.destino, lojaAtualId: mov.destino, statusMovimentacao: null, movimentacaoId: undefined, timeline });
+    produto.timeline = timeline;
+    // Persistir timeline
+    await supabase.from('produtos').update({ timeline: timeline as any }).eq('id', produto.id);
   }
   return mov;
 };
@@ -630,12 +667,18 @@ export const getLojas = (): string[] => Object.values(ESTOQUE_LOJAS_IDS);
 
 export const getFornecedores = (): string[] => [];
 
+// Alerta de estoque crítico — produtos abaixo da quantidade mínima definida
+export const getProdutosEstoqueCritico = (): Produto[] => {
+  return _produtos.filter(p => p.quantidade > 0 && (p as any).quantidadeMinima > 0 && p.quantidade <= (p as any).quantidadeMinima);
+};
+
 export const getEstoqueStats = () => {
   const totalProdutos = _produtos.length;
   const valorTotalEstoque = _produtos.reduce((acc, p) => acc + p.valorCusto * p.quantidade, 0);
   const produtosBateriaFraca = _produtos.filter(p => p.saudeBateria < 85).length;
   const notasPendentes = _notas.filter(n => n.status === 'Pendente').length;
-  return { totalProdutos, valorTotalEstoque, produtosBateriaFraca, notasPendentes };
+  const produtosEstoqueCritico = getProdutosEstoqueCritico().length;
+  return { totalProdutos, valorTotalEstoque, produtosBateriaFraca, notasPendentes, produtosEstoqueCritico };
 };
 
 export const addProdutoMigrado = async (produto: Produto): Promise<Produto> => {

@@ -86,11 +86,13 @@ export const addSalario = async (
   const existente = getSalarioByColaboradorId(colaboradorId);
   if (existente) throw new Error('Já existe um salário configurado para este colaborador');
 
+  const idempotencyKey = crypto.randomUUID();
   const { data, error } = await withRetry(() => supabase.from('salarios_colaboradores').insert({
     colaborador_id: colaboradorId,
     salario_fixo: salarioFixo,
     ajuda_custo: ajudaCusto,
     percentual_comissao: percentualComissao,
+    idempotency_key: idempotencyKey,
   }).select().single());
   if (error) throw error;
   const mapped = mapSalarioRow(data);

@@ -169,6 +169,7 @@ export const criarPagamentosDeVenda = async (venda: VendaParaPagamento): Promise
       }
     }
 
+    const idempotencyKey = crypto.randomUUID();
     const { data: row, error } = await withRetry(() => supabase.from('pagamentos_financeiros').insert({
       data: new Date().toISOString(),
       descricao: venda.numero ? `Venda #VEN-${new Date().getFullYear()}-${String(venda.numero).padStart(4, '0')} - ${venda.clienteNome}` : `Venda #${venda.id.substring(0, 8)} - ${venda.clienteNome}`,
@@ -177,6 +178,7 @@ export const criarPagamentosDeVenda = async (venda: VendaParaPagamento): Promise
       conta: contaNome,
       loja: venda.lojaVenda,
       status: 'Pendente',
+      idempotency_key: idempotencyKey,
     }).select().single());
 
     if (!error && row) {
@@ -195,6 +197,7 @@ export const getDespesas = (): Despesa[] => {
 };
 
 export const addDespesa = async (despesa: Omit<Despesa, 'id'>): Promise<Despesa> => {
+  const idempotencyKey = crypto.randomUUID();
   const { data: row, error } = await withRetry(() => supabase.from('despesas').insert({
     tipo: despesa.tipo,
     data: despesa.data,
@@ -213,6 +216,7 @@ export const addDespesa = async (despesa: Omit<Despesa, 'id'>): Promise<Despesa>
     pago_por: despesa.pagoPor || null,
     comprovante: despesa.comprovante || null,
     documento: despesa.documento || null,
+    idempotency_key: idempotencyKey,
   }).select().single());
 
   if (error || !row) throw error || new Error('Falha ao inserir despesa');

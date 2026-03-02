@@ -1,120 +1,128 @@
 
-# Auditoria Completa e Correcoes Finais — ERP Thiago Imports
 
-## Status Atual (Ja Implementado)
+# Controle de Visibilidade por Cargo — Sidebar, Dashboard e Rotas Protegidas
 
-As seguintes correcoes ja foram aplicadas com sucesso:
+## Resumo
 
-| Item | Status |
-|------|--------|
-| Sequences + `numero_sequencial` em OS, Despesas, Pagamentos | OK |
-| `withRetry` em assistenciaApi, vendasApi (addVenda), estoqueApi, financeApi | OK |
-| RLS corrigido nas tabelas de movimentacoes (INSERT/UPDATE) | OK |
-| `formatOSNumber()` exibindo `OS-XXXX` na listagem e detalhes | OK |
-| `updateProdutoLoja` sincronizando `lojaAtualId` | OK |
-| Timeline de movimentacao exibindo nomes de lojas | OK |
-| Mappers snake_case em todos os modulos principais | OK |
+Implementar controle de acesso baseado no campo `role` da tabela `user_roles` (via funcao `has_role`) e no cargo do colaborador, filtrando:
+1. Itens visiveis na Sidebar
+2. Cards/secoes visiveis no Dashboard
+3. Bloqueio de rotas por URL (redirecionamento para `/`)
 
-Nenhum erro 403, 400 ou 500 foi detectado nos logs de rede e console atuais. Nenhum loop infinito de requisicoes identificado.
+## Mapeamento de Perfis de Acesso
 
----
+| Perfil | Roles/Cargos | Modulos Permitidos |
+|--------|-------------|-------------------|
+| **Admin** | role `admin` OU Acesso Geral OU CARGO-001/010/011/012/014 | TODOS |
+| **Gestor** | role `gestor` OU CARGO-008 | Tudo EXCETO Financeiro Global e RH Salarios |
+| **Vendedor** | role `vendedor` OU CARGO-004 | Vendas, Estoque, Dados Antigo |
+| **Estoquista** | role `estoquista` OU CARGO-013 | Vendas, Estoque, Dados Antigo |
+| **Tecnico** | CARGO-005 | Assistencia, Estoque, Vendas |
+| **Restrito** | CARGO-006/009 (Motoboy, Auxiliar) | Apenas Dashboard (boas-vindas) |
 
-## Problemas Restantes Identificados
+## Detalhes Tecnicos
 
-### 1. `withRetry` ausente em 30+ APIs secundarias (MEDIO)
-As seguintes APIs fazem escritas no Supabase **sem retry**, vulneraveis a falhas de rede:
-- `cadastrosApi.ts` (addLoja, addCliente, addColaborador, addFornecedor, updateLoja, updateCliente, etc.)
-- `garantiasApi.ts` (addGarantia, updateGarantia)
-- `fiadoApi.ts` (addDividaFiado, addPagamentoFiado)
-- `feedbackApi.ts` (addFeedback)
-- `retiradaPecasApi.ts` (insert/update retiradas)
-- `osApi.ts` (delete produto pendente)
-- `garantiaExtendidaApi.ts` (addTratativa, updateTratativa)
-- `movimentacoesEntreContasApi.ts` (addMovimentacao)
-- `valoresRecomendadosTrocaApi.ts` (criar, atualizar)
-- `gestaoAdministrativaApi.ts` (logs conferencia)
-- `vendasApi.ts` — `cancelarVenda` e `updateVenda` **nao usam** `withRetry`
+### 1. Novo arquivo: `src/hooks/useUserPermissions.ts`
 
-### 2. Erro silencioso em operacoes de escrita (UI) (MEDIO)
-Varios handlers de salvamento em paginas capturam erros mas nao mostram feedback adequado ao usuario:
-- `OSMovimentacaoPecas.tsx` — catch loga no console mas nao informa o usuario
-- `EstoqueMovimentacoesAcessorios.tsx` — idem
-- Algumas paginas de Cadastros fazem `throw` sem `catch` no nivel da UI
+Hook centralizado que determina o perfil de acesso do usuario logado.
 
-### 3. Descricao de pagamento financeiro usa UUID (BAIXO)
-Em `criarPagamentosDeVenda`, a descricao salva e `Venda #${venda.id}` (UUID completo). Deveria usar o numero sequencial: `Venda #VEN-YYYY-XXXX`.
-
-### 4. Vendas: cancelar e editar sem retry (MEDIO)
-`cancelarVenda` e `updateVenda` em `vendasApi.ts` fazem `await supabase.from('vendas').update(...)` direto, sem `withRetry`.
-
----
-
-## Plano de Correcao
-
-### Etapa 1: Aplicar `withRetry` em APIs secundarias criticas
-
-**Arquivos a modificar:**
-- `src/utils/cadastrosApi.ts` — envolver addLoja, addCliente, addColaborador, addFornecedor, updateLoja, updateCliente, updateColaborador, updateFornecedor com `withRetry`
-- `src/utils/garantiasApi.ts` — envolver operacoes de escrita
-- `src/utils/fiadoApi.ts` — envolver inserts/updates
-- `src/utils/vendasApi.ts` — envolver `cancelarVenda` e `updateVenda`
-
-Estrategia: importar `withRetry` e substituir chamadas `await supabase.from(...).insert/update(...)` por `await withRetry(() => supabase.from(...).insert/update(...))`.
-
-### Etapa 2: Melhorar feedback de erro na UI
-
-**Arquivos a modificar:**
-- `src/pages/OSMovimentacaoPecas.tsx` — adicionar `toast.error('Erro ao salvar: ' + error.message)` nos blocos catch
-- `src/pages/EstoqueMovimentacoesAcessorios.tsx` — idem
-- Criar padrao de tratamento de erro reutilizavel nos handlers
-
-Padrao proposto para todos os catch blocks:
 ```text
-catch (error: any) {
-  console.error('[MODULO] Erro:', error);
-  toast.error(
-    error?.message?.includes('permission') ? 'Erro de permissao. Faca login novamente.' :
-    error?.message?.includes('duplicate') ? 'Registro duplicado detectado.' :
-    error?.message || 'Erro ao salvar. Tente novamente.'
-  );
-}
+Logica:
+1. Ler user do useAuthStore (cargo, eh_gestor, eh_vendedor, eh_estoquista)
+2. Ler role da tabela user_roles (ja disponivel via profile.role ou consulta)
+3. Determinar perfil: admin > gestor > tecnico > vendedor/estoquista > restrito
+4. Retornar:
+   - perfil: 'admin' | 'gestor' | 'tecnico' | 'vendedor' | 'estoquista' | 'restrito'
+   - allowedModules: string[] (ex: ['vendas', 'estoque', 'os', ...])
+   - canAccessRoute(path: string): boolean
+   - allowedNavItems: NavItem[] (itens filtrados da sidebar)
 ```
 
-### Etapa 3: Corrigir descricao de pagamento financeiro
+Fonte de dados: O `authStore` ja carrega `cargo` e flags `eh_gestor/eh_vendedor/eh_estoquista` do profile e colaborador. O campo `role` na tabela `profiles` tambem esta disponivel. Vamos adicionar `role` ao `fetchProfile` e ao estado do `User`.
 
-**Arquivo:** `src/utils/financeApi.ts`
-Na funcao `criarPagamentosDeVenda`, trocar:
+### 2. Modificar: `src/store/authStore.ts`
+
+- Adicionar campo `role?: string` na interface `User`
+- No `fetchProfile`, ja retorna `role` (campo existe na tabela profiles)
+- Passar `role` ao estado do usuario no `initialize` e `login`
+
+### 3. Modificar: `src/components/layout/Sidebar.tsx`
+
+- Importar `useUserPermissions`
+- Filtrar `navItems` com base nos modulos permitidos antes de renderizar
+- Mapeamento de navItem.href para modulo:
+
 ```text
-descricao: `Venda #${venda.id} - ${venda.clienteNome}`
+'/' -> sempre visivel
+'/rh' -> modulo 'rh'
+'/financeiro/*' -> modulo 'financeiro'
+'/estoque' -> modulo 'estoque'
+'/vendas' -> modulo 'vendas'
+'/garantias/*' -> modulo 'garantias'
+'/os/*' -> modulo 'assistencia'
+'/gestao-administrativa' -> modulo 'gestao'
+'/relatorios' -> modulo 'relatorios'
+'/cadastros' -> modulo 'cadastros'
+'/dados-sistema-antigo/*' -> modulo 'dados-antigo'
+'/settings' -> sempre visivel
 ```
-Por:
-```text
-descricao: `Venda #VEN-${new Date().getFullYear()}-${String(venda.numero || 0).padStart(4, '0')} - ${venda.clienteNome}`
-```
-E adicionar `numero` a interface `VendaParaPagamento`.
 
-### Etapa 4: Retry em cancelarVenda e updateVenda
+Regras de visibilidade por perfil:
 
-**Arquivo:** `src/utils/vendasApi.ts`
-Envolver as chamadas `supabase.from('vendas').update(...)` em `cancelarVenda` e `updateVenda` com `withRetry`.
+| Modulo | Admin | Gestor | Tecnico | Vendedor | Estoquista | Restrito |
+|--------|-------|--------|---------|----------|------------|----------|
+| rh | Sim | Nao | Nao | Nao | Nao | Nao |
+| financeiro | Sim | Nao | Nao | Nao | Nao | Nao |
+| estoque | Sim | Sim | Sim | Sim | Sim | Nao |
+| vendas | Sim | Sim | Sim | Sim | Sim | Nao |
+| garantias | Sim | Sim | Nao | Nao | Nao | Nao |
+| assistencia | Sim | Sim | Sim | Nao | Nao | Nao |
+| gestao | Sim | Sim | Nao | Nao | Nao | Nao |
+| relatorios | Sim | Sim | Nao | Nao | Nao | Nao |
+| cadastros | Sim | Sim | Nao | Nao | Nao | Nao |
+| dados-antigo | Sim | Sim | Nao | Sim | Sim | Nao |
+| settings | Sim | Sim | Sim | Sim | Sim | Sim |
 
----
+### 4. Modificar: `src/components/auth/ProtectedRoute.tsx`
 
-## Arquivos Modificados
+- Importar `useUserPermissions`
+- Apos verificar autenticacao, checar `canAccessRoute(location.pathname)`
+- Se nao permitido, redirecionar para `/` com `<Navigate to="/" replace />`
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/utils/cadastrosApi.ts` | withRetry em 8+ funcoes de escrita |
-| `src/utils/garantiasApi.ts` | withRetry em inserts/updates |
-| `src/utils/fiadoApi.ts` | withRetry em 4 funcoes |
-| `src/utils/vendasApi.ts` | withRetry em cancelarVenda, updateVenda |
-| `src/utils/financeApi.ts` | Descricao com numero sequencial |
-| `src/pages/OSMovimentacaoPecas.tsx` | Toast de erro detalhado |
-| `src/pages/EstoqueMovimentacoesAcessorios.tsx` | Toast de erro detalhado |
+### 5. Modificar: `src/components/layout/Dashboard.tsx`
+
+- Importar `useUserPermissions`
+- Condicionar cards/secoes baseado no perfil:
+  - **Restrito**: mostrar apenas mensagem de boas-vindas com nome do colaborador
+  - **Vendedor/Estoquista**: mostrar apenas stats de Vendas e Estoque
+  - **Tecnico**: mostrar stats de OS e Estoque
+  - **Gestor**: tudo exceto comissao detalhada
+  - **Admin**: tudo
+
+### 6. Sincronizar `profiles.role` com `user_roles`
+
+A tabela `profiles` tem coluna `role` (text) e a tabela `user_roles` armazena roles separadas. Para consistencia, o hook usara primariamente `user_roles` via `has_role()`, mas como o frontend nao pode chamar funcoes SQL diretamente no client, vamos:
+
+- Usar o campo `profiles.role` como cache do role principal no frontend
+- Garantir que o trigger `handle_new_user` ja sincroniza ambos (ja faz isso)
+- Nao depender de `localStorage` para roles (seguranca)
+
+## Arquivos Criados/Modificados
+
+| Arquivo | Acao |
+|---------|------|
+| `src/hooks/useUserPermissions.ts` | CRIAR — hook centralizado de permissoes |
+| `src/store/authStore.ts` | MODIFICAR — adicionar `role` ao User |
+| `src/components/layout/Sidebar.tsx` | MODIFICAR — filtrar navItems por permissao |
+| `src/components/auth/ProtectedRoute.tsx` | MODIFICAR — bloquear rotas nao permitidas |
+| `src/components/layout/Dashboard.tsx` | MODIFICAR — condicionar secoes por perfil |
 
 ## Resultado Esperado
 
-- Todas as operacoes de escrita criticas protegidas com retry automatico (3 tentativas)
-- Mensagens de erro claras e contextuais para o usuario em caso de falha
-- Descricoes de pagamento financeiro usando IDs legiveis em vez de UUIDs
-- Nenhuma operacao de escrita silenciosamente falhando sem feedback
+- Vendedores veem apenas: Painel, Vendas, Estoque, Dados Antigo, Configuracoes
+- Tecnicos veem apenas: Painel, Assistencia, Estoque, Vendas, Configuracoes
+- Gestores veem tudo exceto RH e Financeiro
+- Admins/Acesso Geral veem tudo
+- Motoboys/Auxiliares veem apenas o Painel com boas-vindas
+- Tentativa de acessar URL proibida redireciona para o Painel
+

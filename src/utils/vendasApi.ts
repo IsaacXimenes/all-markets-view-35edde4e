@@ -352,6 +352,7 @@ export const getHistoricoComprasCliente = (clienteId: string): HistoricoCompraCl
     })));
 };
 
+/** @deprecated Número agora é gerado pela sequence do Postgres (nextval). Mantido apenas para compatibilidade de leitura. */
 export const getNextVendaNumber = (): { id: string; numero: number } => {
   const maxNumero = _vendasCache.reduce((max, v) => Math.max(max, v.numero || 0), 0);
   const nextNum = maxNumero + 1;
@@ -374,17 +375,17 @@ const extrairMarca = (modelo: string): string => {
 };
 
 export const addVenda = async (venda: Omit<Venda, 'id' | 'numero'>): Promise<Venda> => {
-  const { id: newId, numero: newNumero } = getNextVendaNumber();
-
   // Gerar IDs para trade-ins que ainda não têm
   const tradeInsComIds = venda.tradeIns.map(ti => {
     if (!ti.produtoId) ti.produtoId = generateProductId();
     return ti;
   });
 
-  // Insert venda principal
+  // Gerar chave de idempotência para evitar duplicatas em retry
+  const idempotencyKey = crypto.randomUUID();
+
+  // Insert venda principal — numero gerado automaticamente pela sequence do Postgres
   const { data: vendaRow, error: vendaErr } = await withRetry(() => supabase.from('vendas').insert({
-    numero: newNumero,
     data_venda: venda.dataHora || new Date().toISOString(),
     loja_id: venda.lojaVenda || null,
     vendedor_id: venda.vendedor || null,
@@ -418,9 +419,12 @@ export const addVenda = async (venda: Omit<Venda, 'id' | 'numero'>): Promise<Ven
     garantia_extendida: (venda.garantiaExtendida as any) || null,
     hora_venda: (venda as any).horaVenda || null,
     status_pagamento: 'Pendente',
+    idempotency_key: idempotencyKey,
   }).select().single());
 
   if (vendaErr || !vendaRow) throw vendaErr || new Error('Falha ao inserir venda');
+
+  const newNumero = vendaRow.numero || 0;
 
   const vendaId = vendaRow.id;
 
@@ -489,14 +493,24 @@ export const addVenda = async (venda: Omit<Venda, 'id' | 'numero'>): Promise<Ven
 
   _vendasCache.unshift(newVenda);
 
-  // ========== INTEGRAÇÃO: Redução de Estoque de Aparelhos ==========
+  // ========== INTEGRAÇÃO: Redução de Estoque de Aparelhos (atômico) ==========
   for (const item of venda.itens) {
     const produto = getProdutos().find(p => p.id === item.produtoId);
     if (produto) {
-      await updateProduto(item.produtoId, { 
-        statusNota: 'Concluído',
-        quantidade: 0
-      });
+      // Decremento atômico via RPC — previne venda dupla de estoque 1
+      const { data: decrementou } = await supabase.rpc('decrementar_estoque_produto', { p_produto_id: item.produtoId });
+      if (!decrementou) {
+        console.error(`[VENDAS] Estoque insuficiente para produto ${item.produtoId} — possível concorrência`);
+        // Produto já foi vendido por outro vendedor — não registrar movimentação
+        continue;
+      }
+      // Atualizar cache local
+      const idx = getProdutos().findIndex(p => p.id === item.produtoId);
+      if (idx !== -1) {
+        const cached = getProdutos()[idx];
+        cached.quantidade = Math.max(0, cached.quantidade - 1);
+        cached.statusNota = 'Concluído';
+      }
       await addMovimentacao({
         data: new Date().toISOString().split('T')[0],
         produto: produto.modelo,

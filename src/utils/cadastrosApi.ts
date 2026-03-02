@@ -419,7 +419,10 @@ export const updateLoja = async (id: string, updates: Partial<Loja>): Promise<Lo
 
 export const deleteLoja = async (id: string): Promise<void> => {
   const { error } = await supabase.from('lojas').delete().eq('id', id);
-  if (error) console.error('Erro ao deletar loja:', error);
+  if (error) {
+    console.error('Erro ao deletar loja:', error);
+    throw new Error('Não é possível excluir: existem registros vinculados a esta loja.');
+  }
   _lojasCache = _lojasCache.filter(l => l.id !== id);
 };
 
@@ -486,7 +489,10 @@ export const updateCliente = async (id: string, updates: Partial<Cliente>): Prom
 
 export const deleteCliente = async (id: string): Promise<void> => {
   const { error } = await supabase.from('clientes').delete().eq('id', id);
-  if (error) console.error('Erro ao deletar cliente:', error);
+  if (error) {
+    console.error('Erro ao deletar cliente:', error);
+    throw new Error('Não é possível excluir: existem registros vinculados a este cliente.');
+  }
   _clientesCache = _clientesCache.filter(c => c.id !== id);
 };
 
@@ -598,7 +604,10 @@ export const updateColaborador = async (id: string, updates: Partial<Colaborador
 
 export const deleteColaborador = async (id: string): Promise<void> => {
   const { error } = await supabase.from('colaboradores').delete().eq('id', id);
-  if (error) console.error('Erro ao deletar colaborador:', error);
+  if (error) {
+    console.error('Erro ao deletar colaborador:', error);
+    throw new Error('Não é possível excluir: existem registros vinculados a este colaborador.');
+  }
   _colaboradoresCache = _colaboradoresCache.filter(c => c.id !== id);
 };
 
@@ -649,7 +658,10 @@ export const updateFornecedor = async (id: string, updates: Partial<Fornecedor>)
 
 export const deleteFornecedor = async (id: string): Promise<void> => {
   const { error } = await supabase.from('fornecedores').delete().eq('id', id);
-  if (error) console.error('Erro ao deletar fornecedor:', error);
+  if (error) {
+    console.error('Erro ao deletar fornecedor:', error);
+    throw new Error('Não é possível excluir: existem registros vinculados a este fornecedor.');
+  }
   _fornecedoresCache = _fornecedoresCache.filter(f => f.id !== id);
 };
 
@@ -732,7 +744,10 @@ export const updateContaFinanceira = async (id: string, updates: Partial<ContaFi
 
 export const deleteContaFinanceira = async (id: string): Promise<void> => {
   const { error } = await supabase.from('contas_financeiras').delete().eq('id', id);
-  if (error) console.error('Erro ao deletar conta financeira:', error);
+  if (error) {
+    console.error('Erro ao deletar conta financeira:', error);
+    throw new Error('Não é possível excluir: existem registros vinculados a esta conta.');
+  }
   _contasFinanceirasCache = _contasFinanceirasCache.filter(c => c.id !== id);
 };
 
@@ -796,7 +811,10 @@ export const updateMaquinaCartao = async (id: string, updates: Partial<MaquinaCa
 
 export const deleteMaquinaCartao = async (id: string): Promise<void> => {
   const { error } = await supabase.from('maquinas_cartao').delete().eq('id', id);
-  if (error) console.error('Erro ao deletar máquina de cartão:', error);
+  if (error) {
+    console.error('Erro ao deletar máquina de cartão:', error);
+    throw new Error('Não é possível excluir: existem registros vinculados a esta máquina.');
+  }
   _maquinasCartaoCache = _maquinasCartaoCache.filter(m => m.id !== id);
 };
 

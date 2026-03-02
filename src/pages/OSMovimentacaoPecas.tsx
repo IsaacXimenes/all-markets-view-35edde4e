@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { OSLayout } from '@/components/layout/OSLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,9 +22,11 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ResponsiveTableContainer } from '@/components/ui/ResponsiveContainers';
 import { Separator } from '@/components/ui/separator';
+import { supabase } from '@/integrations/supabase/client';
 
 interface MovimentacaoPeca {
   id: string;
+  codigoLegivel: string;
   pecaId: string;
   descricaoPeca: string;
   modelo: string;
@@ -38,9 +40,6 @@ interface MovimentacaoPeca {
   dataRecebimento?: string;
   responsavelRecebimento?: string;
 }
-
-let movimentacoesPecas: MovimentacaoPeca[] = [];
-let movPecaCounter = 1;
 
 export default function OSMovimentacaoPecas() {
   const { toast } = useToast();
@@ -57,7 +56,45 @@ export default function OSMovimentacaoPecas() {
     }
   }, [lojas]);
 
-  const [movimentacoes, setMovimentacoes] = useState<MovimentacaoPeca[]>(movimentacoesPecas);
+  const [movimentacoes, setMovimentacoes] = useState<MovimentacaoPeca[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Carregar movimentações do Supabase
+  const carregarMovimentacoes = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('movimentacoes_pecas_estoque')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const mapped: MovimentacaoPeca[] = (data || []).map((row: any) => ({
+        id: row.id,
+        codigoLegivel: row.codigo_legivel || row.id.substring(0, 8),
+        pecaId: row.peca_id || '',
+        descricaoPeca: row.descricao_peca || '',
+        modelo: row.modelo || '',
+        quantidade: row.quantidade || 1,
+        origem: row.origem || '',
+        destino: row.destino || '',
+        responsavel: row.responsavel || '',
+        motivo: row.motivo || '',
+        data: row.data || '',
+        status: row.status === 'Recebido' ? 'Recebido' : 'Pendente',
+        dataRecebimento: row.data_recebimento || undefined,
+        responsavelRecebimento: row.responsavel_recebimento || undefined,
+      }));
+      setMovimentacoes(mapped);
+    } catch (err) {
+      console.error('Erro ao carregar movimentações de peças:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    carregarMovimentacoes();
+  }, [carregarMovimentacoes]);
+
   const pecas = useMemo(() => getPecas().filter(p => p.status === 'Disponível' && p.quantidade > 0 && p.statusMovimentacao !== 'Em movimentação'), [lojas, movimentacoes]);
 
   // Filtros
@@ -131,7 +168,7 @@ export default function OSMovimentacaoPecas() {
     setFormData({ quantidade: '1', destino: '', responsavel: user?.colaborador?.id || '', motivo: '', data: '' });
   };
 
-  const handleRegistrar = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleRegistrar = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!pecaSelecionada) {
@@ -158,33 +195,44 @@ export default function OSMovimentacaoPecas() {
       return;
     }
 
-    const movId = `MOV-PEC-${String(movPecaCounter++).padStart(4, '0')}`;
+    const dataMovimentacao = formData.data || new Date().toISOString().split('T')[0];
+    const nomeResponsavel = formData.responsavel ? obterNomeColaborador(formData.responsavel) : (user?.colaborador?.nome || 'Não identificado');
 
-    // Marcar peça como "Em movimentação"
-    updatePeca(pecaSelecionada.id, {
-      statusMovimentacao: 'Em movimentação',
-      movimentacaoPecaId: movId,
-    });
+    // Gerar código legível baseado na contagem
+    const codigoLegivel = `MOV-PEC-${String(movimentacoes.length + 1).padStart(4, '0')}`;
 
-    const novaMov: MovimentacaoPeca = {
-      id: movId,
-      pecaId: pecaSelecionada.id,
-      descricaoPeca: pecaSelecionada.descricao,
-      modelo: pecaSelecionada.modelo,
-      quantidade: qtd,
-      origem: pecaSelecionada.lojaId,
-      destino: formData.destino,
-      responsavel: formData.responsavel ? obterNomeColaborador(formData.responsavel) : (user?.colaborador?.nome || 'Não identificado'),
-      motivo: formData.motivo,
-      data: formData.data || (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })(),
-      status: 'Pendente'
-    };
+    try {
+      const { data: inserted, error } = await supabase.from('movimentacoes_pecas_estoque').insert({
+        codigo_legivel: codigoLegivel,
+        peca_id: pecaSelecionada.id,
+        descricao_peca: pecaSelecionada.descricao,
+        modelo: pecaSelecionada.modelo,
+        quantidade: qtd,
+        origem: pecaSelecionada.lojaId,
+        destino: formData.destino,
+        responsavel: nomeResponsavel,
+        motivo: formData.motivo,
+        data: dataMovimentacao,
+        status: 'Pendente',
+      } as any).select().single();
 
-    movimentacoesPecas.push(novaMov);
-    setMovimentacoes([...movimentacoesPecas]);
-    setDialogOpen(false);
-    resetForm();
-    toast({ title: 'Movimentação registrada', description: `${novaMov.id} - Peça marcada como "Em movimentação"` });
+      if (error) throw error;
+
+      // Marcar peça como "Em movimentação"
+      updatePeca(pecaSelecionada.id, {
+        statusMovimentacao: 'Em movimentação',
+        movimentacaoPecaId: codigoLegivel,
+      });
+
+      // Atualizar estado local
+      await carregarMovimentacoes();
+      setDialogOpen(false);
+      resetForm();
+      toast({ title: 'Movimentação registrada', description: `${codigoLegivel} - Peça marcada como "Em movimentação"` });
+    } catch (err) {
+      console.error('Erro ao registrar movimentação:', err);
+      toast({ title: 'Erro', description: 'Falha ao salvar movimentação', variant: 'destructive' });
+    }
   };
 
   // Abrir AlertDialog de confirmação
@@ -193,16 +241,21 @@ export default function OSMovimentacaoPecas() {
     setConfirmDialogOpen(true);
   };
 
-  // Confirmar recebimento com responsável auto-preenchido
-  const handleConfirmarRecebimento = () => {
+  // Confirmar recebimento
+  const handleConfirmarRecebimento = async () => {
     if (!movParaConfirmar) return;
 
-    const idx = movimentacoesPecas.findIndex(m => m.id === movParaConfirmar.id);
-    if (idx !== -1) {
-      movimentacoesPecas[idx].status = 'Recebido';
-      const h = new Date();
-      movimentacoesPecas[idx].dataRecebimento = `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
-      movimentacoesPecas[idx].responsavelRecebimento = user?.colaborador?.nome || 'Não identificado';
+    try {
+      const agora = new Date().toISOString();
+      const nomeResp = user?.colaborador?.nome || 'Não identificado';
+
+      const { error } = await supabase.from('movimentacoes_pecas_estoque').update({
+        status: 'Recebido',
+        data_recebimento: agora,
+        responsavel_recebimento: nomeResp,
+      } as any).eq('id', movParaConfirmar.id);
+
+      if (error) throw error;
 
       // Atualizar lojaId da peça para o destino e limpar bloqueio
       updatePeca(movParaConfirmar.pecaId, {
@@ -211,8 +264,11 @@ export default function OSMovimentacaoPecas() {
         movimentacaoPecaId: undefined,
       });
 
-      setMovimentacoes([...movimentacoesPecas]);
+      await carregarMovimentacoes();
       toast({ title: 'Recebimento confirmado', description: `Peça transferida para ${obterNomeLoja(movParaConfirmar.destino)}` });
+    } catch (err) {
+      console.error('Erro ao confirmar recebimento:', err);
+      toast({ title: 'Erro', description: 'Falha ao confirmar recebimento', variant: 'destructive' });
     }
 
     setConfirmDialogOpen(false);
@@ -232,7 +288,7 @@ export default function OSMovimentacaoPecas() {
     setEditDialogOpen(true);
   };
 
-  const handleSalvarEdicao = () => {
+  const handleSalvarEdicao = async () => {
     if (!movParaEditar) return;
     if (!editForm.destino || !editForm.motivo.trim()) {
       toast({ title: 'Erro', description: 'Preencha destino e motivo', variant: 'destructive' });
@@ -243,12 +299,19 @@ export default function OSMovimentacaoPecas() {
       return;
     }
 
-    const idx = movimentacoesPecas.findIndex(m => m.id === movParaEditar.id);
-    if (idx !== -1) {
-      movimentacoesPecas[idx].destino = editForm.destino;
-      movimentacoesPecas[idx].motivo = editForm.motivo;
-      setMovimentacoes([...movimentacoesPecas]);
+    try {
+      const { error } = await supabase.from('movimentacoes_pecas_estoque').update({
+        destino: editForm.destino,
+        motivo: editForm.motivo,
+      } as any).eq('id', movParaEditar.id);
+
+      if (error) throw error;
+
+      await carregarMovimentacoes();
       toast({ title: 'Movimentação atualizada' });
+    } catch (err) {
+      console.error('Erro ao salvar edição:', err);
+      toast({ title: 'Erro', description: 'Falha ao atualizar movimentação', variant: 'destructive' });
     }
     setEditDialogOpen(false);
     setMovParaEditar(null);
@@ -354,7 +417,15 @@ export default function OSMovimentacaoPecas() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {movimentacoesFiltradas.map(mov => (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
+              </TableRow>
+            ) : movimentacoesFiltradas.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhuma movimentação encontrada</TableCell>
+              </TableRow>
+            ) : movimentacoesFiltradas.map(mov => (
               <TableRow key={mov.id} className={cn(
                 mov.status === 'Pendente' && 'bg-yellow-500/10',
                 mov.status === 'Recebido' && 'bg-green-500/10'
@@ -367,7 +438,7 @@ export default function OSMovimentacaoPecas() {
                     </Badge>
                   )}
                 </TableCell>
-                <TableCell className="font-mono text-xs">{mov.id}</TableCell>
+                <TableCell className="font-mono text-xs">{mov.codigoLegivel}</TableCell>
                 <TableCell className="text-xs">{new Date(mov.data).toLocaleDateString('pt-BR')}</TableCell>
                 <TableCell className="text-xs">{mov.modelo}</TableCell>
                 <TableCell>{mov.quantidade}</TableCell>
@@ -425,375 +496,257 @@ export default function OSMovimentacaoPecas() {
                 </TableCell>
               </TableRow>
             ))}
-            {movimentacoesFiltradas.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                  Nenhuma movimentação encontrada
-                </TableCell>
-              </TableRow>
-            )}
           </TableBody>
         </Table>
       </ResponsiveTableContainer>
 
-      {/* Modal Nova Movimentação */}
+      {/* Dialog: Nova Movimentação */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Registrar Movimentação</DialogTitle>
+            <DialogTitle>Nova Movimentação de Peça</DialogTitle>
           </DialogHeader>
+
           <form onSubmit={handleRegistrar} className="space-y-4">
+            {/* Peça selecionada */}
             <div>
               <Label>Peça *</Label>
               {pecaSelecionada ? (
-                <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50">
+                <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
                   <Package className="h-5 w-5 text-muted-foreground" />
                   <div className="flex-1">
-                    <p className="font-medium">{pecaSelecionada.descricao}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Modelo: {pecaSelecionada.modelo} | Qtd: {pecaSelecionada.quantidade} | Loja: {obterNomeLoja(pecaSelecionada.lojaId)}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Custo: {formatCurrency(pecaSelecionada.valorCusto)} | Recomendado: {formatCurrency(pecaSelecionada.valorRecomendado)}
-                    </p>
+                    <p className="font-medium text-sm">{pecaSelecionada.descricao}</p>
+                    <p className="text-xs text-muted-foreground">{pecaSelecionada.modelo} | Qtd: {pecaSelecionada.quantidade} | {obterNomeLoja(pecaSelecionada.lojaId)}</p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setPecaSelecionada(null);
-                      setFormData(prev => ({ ...prev, quantidade: '1' }));
-                    }}
-                  >
-                    Trocar
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setPecaSelecionada(null)}>
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
               ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => setShowPecaModal(true)}
-                >
+                <Button type="button" variant="outline" className="w-full justify-start" onClick={() => setShowPecaModal(true)}>
                   <Search className="h-4 w-4 mr-2" />
-                  Buscar Peça no Estoque
+                  Buscar peça...
                 </Button>
               )}
             </div>
 
-            <div>
-              <Label htmlFor="quantidade">Quantidade *</Label>
-              <Input
-                id="quantidade"
-                type="number"
-                min="1"
-                max={pecaSelecionada?.quantidade || 1}
-                value={formData.quantidade}
-                onChange={e => setFormData(prev => ({ ...prev, quantidade: e.target.value }))}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="responsavel">Responsável *</Label>
-              {acessoGeral ? (
-                <AutocompleteColaborador
-                  value={formData.responsavel}
-                  onChange={(colId) => setFormData(prev => ({ ...prev, responsavel: colId }))}
-                  placeholder="Selecione o responsável..."
-                />
-              ) : (
-                <Input
-                  value={user?.colaborador?.nome || 'Não identificado'}
-                  disabled
-                  className="bg-muted"
-                />
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="data">Data da Movimentação</Label>
-              <Input
-                id="data"
-                type="date"
-                value={formData.data}
-                onChange={(e) => setFormData(prev => ({ ...prev, data: e.target.value }))}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Se não informado, será usada a data atual
-              </p>
-            </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="origem">Origem</Label>
+                <Label>Quantidade</Label>
                 <Input
-                  value={pecaSelecionada ? obterNomeLoja(pecaSelecionada.lojaId) : ''}
-                  disabled
-                  placeholder="Selecione uma peça"
+                  type="number"
+                  min="1"
+                  max={pecaSelecionada?.quantidade || 1}
+                  value={formData.quantidade}
+                  onChange={(e) => setFormData({ ...formData, quantidade: e.target.value })}
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Preenchido automaticamente
-                </p>
               </div>
               <div>
-                <Label htmlFor="destino">Destino *</Label>
-                <AutocompleteLoja
-                  value={formData.destino}
-                  onChange={(v) => setFormData(prev => ({ ...prev, destino: v }))}
-                  placeholder="Selecione o destino"
-                  filtrarPorTipo="Assistência"
+                <Label>Data</Label>
+                <Input
+                  type="date"
+                  value={formData.data}
+                  onChange={(e) => setFormData({ ...formData, data: e.target.value })}
                 />
               </div>
             </div>
 
             <div>
-              <Label htmlFor="motivo">Motivo *</Label>
+              <Label>Destino *</Label>
+              <AutocompleteLoja
+                value={formData.destino}
+                onChange={(v) => setFormData({ ...formData, destino: v })}
+                placeholder="Selecione o destino"
+                filtrarPorTipo="Assistência"
+              />
+            </div>
+
+            <div>
+              <Label>Responsável</Label>
+              <AutocompleteColaborador
+                value={formData.responsavel}
+                onChange={(v) => setFormData({ ...formData, responsavel: v })}
+                placeholder="Selecione o responsável"
+              />
+            </div>
+
+            <div>
+              <Label>Motivo *</Label>
               <Textarea
-                id="motivo"
                 value={formData.motivo}
-                onChange={(e) => setFormData(prev => ({ ...prev, motivo: e.target.value }))}
+                onChange={(e) => setFormData({ ...formData, motivo: e.target.value })}
                 placeholder="Informe o motivo da movimentação"
-                rows={3}
-                required
               />
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={!pecaSelecionada}>Salvar</Button>
+              <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>Cancelar</Button>
+              <Button type="submit">Registrar Movimentação</Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Busca de Peça */}
+      {/* Dialog: Busca de Peça */}
       <Dialog open={showPecaModal} onOpenChange={setShowPecaModal}>
-        <DialogContent className="max-w-5xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Buscar Peça no Estoque</DialogTitle>
+            <DialogTitle>Selecionar Peça</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="flex-1">
               <Input
                 placeholder="Buscar por descrição, modelo ou ID..."
                 value={buscaPeca}
                 onChange={(e) => setBuscaPeca(e.target.value)}
-                className="flex-1"
               />
-              <Select value={buscaLojaModal} onValueChange={setBuscaLojaModal}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Filtrar por loja" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas as lojas</SelectItem>
-                  {lojas.map(loja => (
-                    <SelectItem key={loja.id} value={loja.id}>{loja.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
-
-            <div className="rounded-md border max-h-[400px] overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Peça</TableHead>
-                    <TableHead>Modelo</TableHead>
-                    <TableHead>Qtd</TableHead>
-                    <TableHead>Custo</TableHead>
-                    <TableHead>Loja</TableHead>
-                    <TableHead>Ação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pecasFiltradas.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                        Nenhuma peça disponível encontrada
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    pecasFiltradas.map(peca => (
-                      <TableRow key={peca.id} className="cursor-pointer hover:bg-muted/50">
-                        <TableCell className="font-medium">{peca.descricao}</TableCell>
-                        <TableCell className="text-sm">{peca.modelo}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{peca.quantidade}</Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">{formatCurrency(peca.valorCusto)}</TableCell>
-                        <TableCell className="text-sm">{obterNomeLoja(peca.lojaId)}</TableCell>
-                        <TableCell>
-                          <Button size="sm" onClick={() => handleSelecionarPeca(peca)}>
-                            Selecionar
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+            <div className="w-full sm:w-56">
+              <AutocompleteLoja
+                value={buscaLojaModal === 'todas' ? '' : buscaLojaModal}
+                onChange={(v) => setBuscaLojaModal(v || 'todas')}
+                placeholder="Todas as lojas"
+                filtrarPorTipo="Assistência"
+              />
             </div>
-
-            <p className="text-sm text-muted-foreground">
-              Exibindo {pecasFiltradas.length} de {pecas.length} peças disponíveis
-            </p>
           </div>
+          <ResponsiveTableContainer>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Modelo</TableHead>
+                  <TableHead>Qtd</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Loja</TableHead>
+                  <TableHead className="text-right">Ação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pecasFiltradas.map(p => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.descricao}</TableCell>
+                    <TableCell>{p.modelo}</TableCell>
+                    <TableCell>{p.quantidade}</TableCell>
+                    <TableCell>{formatCurrency(p.valorCusto)}</TableCell>
+                    <TableCell>{obterNomeLoja(p.lojaId)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" onClick={() => handleSelecionarPeca(p)}>Selecionar</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {pecasFiltradas.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">Nenhuma peça disponível</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </ResponsiveTableContainer>
         </DialogContent>
       </Dialog>
 
-      {/* AlertDialog de Confirmação de Recebimento */}
+      {/* AlertDialog: Confirmação de Recebimento */}
       <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Recebimento</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>Confirma o recebimento da peça na loja de destino? Esta ação irá transferir a peça fisicamente.</p>
-                {movParaConfirmar && (
-                  <div className="rounded-md border p-3 space-y-2 text-sm">
-                    <div><span className="font-medium">Peça:</span> {movParaConfirmar.descricaoPeca}</div>
-                    <div><span className="font-medium">Quantidade:</span> {movParaConfirmar.quantidade}</div>
-                    <div><span className="font-medium">Origem:</span> {obterNomeLoja(movParaConfirmar.origem)}</div>
-                    <div><span className="font-medium">Destino:</span> {obterNomeLoja(movParaConfirmar.destino)}</div>
-                    <Separator />
-                    <div><span className="font-medium">Responsável pelo recebimento:</span></div>
-                    <Input
-                      value={user?.colaborador?.nome || 'Não identificado'}
-                      disabled
-                      className="bg-muted"
-                    />
-                  </div>
-                )}
-              </div>
+            <AlertDialogDescription>
+              Confirmar o recebimento da peça <strong>{movParaConfirmar?.descricaoPeca}</strong> na loja{' '}
+              <strong>{movParaConfirmar ? obterNomeLoja(movParaConfirmar.destino) : ''}</strong>?
+              <br /><br />
+              A peça será transferida para o estoque da loja de destino.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmarRecebimento} className="bg-green-600 hover:bg-green-700">
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Confirmar Recebimento
-            </AlertDialogAction>
+            <AlertDialogCancel onClick={() => setMovParaConfirmar(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmarRecebimento}>Confirmar Recebimento</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Modal Timeline */}
+      {/* Dialog: Timeline */}
       <Dialog open={timelineDialogOpen} onOpenChange={setTimelineDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Timeline - {movTimeline?.id}</DialogTitle>
+            <DialogTitle>Timeline — {movTimeline?.codigoLegivel}</DialogTitle>
           </DialogHeader>
           {movTimeline && (
             <div className="space-y-4">
-              {/* Etapa 1: Envio */}
-              <div className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
-                    <ArrowRight className="h-4 w-4" />
-                  </div>
-                  <div className="w-0.5 flex-1 bg-border mt-1" />
-                </div>
-                <div className="pb-4">
-                  <p className="font-medium text-sm">Envio Registrado</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(movTimeline.data).toLocaleDateString('pt-BR')} às {new Date(movTimeline.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                  <div className="mt-2 text-xs space-y-1 bg-muted/50 rounded-md p-2">
-                    <div><span className="font-medium">Peça:</span> {movTimeline.descricaoPeca}</div>
-                    <div><span className="font-medium">Modelo:</span> {movTimeline.modelo}</div>
-                    <div><span className="font-medium">Quantidade:</span> {movTimeline.quantidade}</div>
-                    <div><span className="font-medium">Origem:</span> {obterNomeLoja(movTimeline.origem)}</div>
-                    <div><span className="font-medium">Destino:</span> {obterNomeLoja(movTimeline.destino)}</div>
-                    <div><span className="font-medium">Responsável:</span> {movTimeline.responsavel}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Etapa 2: Recebimento */}
-              <div className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <div className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center",
-                    movTimeline.status === 'Recebido'
-                      ? "bg-green-600 text-white"
-                      : "bg-muted text-muted-foreground border-2 border-dashed border-muted-foreground/40"
-                  )}>
-                    {movTimeline.status === 'Recebido' ? <CheckCircle className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-                  </div>
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                  <ArrowRight className="h-4 w-4 text-blue-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-sm">
-                    {movTimeline.status === 'Recebido' ? 'Recebimento Confirmado' : 'Aguardando Recebimento'}
+                  <p className="text-sm font-medium">Movimentação registrada</p>
+                  <p className="text-xs text-muted-foreground">{new Date(movTimeline.data).toLocaleDateString('pt-BR')} — {movTimeline.responsavel}</p>
+                  <p className="text-xs mt-1">
+                    <span className="text-muted-foreground">Origem:</span> {obterNomeLoja(movTimeline.origem)} →{' '}
+                    <span className="text-muted-foreground">Destino:</span> {obterNomeLoja(movTimeline.destino)}
                   </p>
-                  {movTimeline.status === 'Recebido' ? (
-                    <>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {movTimeline.dataRecebimento && new Date(movTimeline.dataRecebimento).toLocaleDateString('pt-BR')} às {movTimeline.dataRecebimento && new Date(movTimeline.dataRecebimento).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                      <div className="mt-2 text-xs bg-green-500/10 rounded-md p-2">
-                        <div><span className="font-medium">Responsável:</span> {movTimeline.responsavelRecebimento}</div>
-                        <div><span className="font-medium">Destino confirmado:</span> {obterNomeLoja(movTimeline.destino)}</div>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-xs text-yellow-600 mt-1">Pendente de confirmação</p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-1">Motivo: {movTimeline.motivo}</p>
                 </div>
               </div>
 
-              {/* Motivo */}
               <Separator />
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">Motivo da movimentação</p>
-                <p className="text-sm">{movTimeline.motivo}</p>
-              </div>
+
+              {movTimeline.status === 'Recebido' ? (
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-green-600">Recebido</p>
+                    <p className="text-xs text-muted-foreground">
+                      {movTimeline.dataRecebimento ? new Date(movTimeline.dataRecebimento).toLocaleDateString('pt-BR') : ''}
+                      {' — '}{movTimeline.responsavelRecebimento}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-yellow-100 flex items-center justify-center">
+                    <Clock className="h-4 w-4 text-yellow-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-yellow-600">Aguardando Recebimento</p>
+                    <p className="text-xs text-muted-foreground">Peça em trânsito</p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Modal Edição de Movimentação Pendente */}
+      {/* Dialog: Edição */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar Movimentação - {movParaEditar?.id}</DialogTitle>
+            <DialogTitle>Editar Movimentação — {movParaEditar?.codigoLegivel}</DialogTitle>
           </DialogHeader>
-          {movParaEditar && (
-            <div className="space-y-4">
-              <div>
-                <Label>Peça</Label>
-                <Input value={movParaEditar.descricaoPeca} disabled className="bg-muted" />
-              </div>
-              <div>
-                <Label>Origem</Label>
-                <Input value={obterNomeLoja(movParaEditar.origem)} disabled className="bg-muted" />
-              </div>
-              <div>
-                <Label>Destino *</Label>
-                <AutocompleteLoja
-                  value={editForm.destino}
-                  onChange={(v) => setEditForm(prev => ({ ...prev, destino: v }))}
-                  placeholder="Selecione o destino"
-                  filtrarPorTipo="Assistência"
-                />
-              </div>
-              <div>
-                <Label>Motivo *</Label>
-                <Textarea
-                  value={editForm.motivo}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, motivo: e.target.value }))}
-                  rows={3}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
-                <Button onClick={handleSalvarEdicao}>Salvar</Button>
-              </div>
+          <div className="space-y-4">
+            <div>
+              <Label>Destino</Label>
+              <AutocompleteLoja
+                value={editForm.destino}
+                onChange={(v) => setEditForm({ ...editForm, destino: v })}
+                placeholder="Selecione o destino"
+                filtrarPorTipo="Assistência"
+              />
             </div>
-          )}
+            <div>
+              <Label>Motivo</Label>
+              <Textarea
+                value={editForm.motivo}
+                onChange={(e) => setEditForm({ ...editForm, motivo: e.target.value })}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleSalvarEdicao}>Salvar</Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </OSLayout>

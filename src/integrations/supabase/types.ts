@@ -1885,6 +1885,57 @@ export type Database = {
           },
         ]
       }
+      movimentacoes_acessorios_estoque: {
+        Row: {
+          acessorio_id: string | null
+          codigo_legivel: string | null
+          created_at: string | null
+          data: string | null
+          data_recebimento: string | null
+          destino: string | null
+          id: string
+          motivo: string | null
+          nome_acessorio: string | null
+          origem: string | null
+          quantidade: number | null
+          responsavel: string | null
+          responsavel_recebimento: string | null
+          status: string | null
+        }
+        Insert: {
+          acessorio_id?: string | null
+          codigo_legivel?: string | null
+          created_at?: string | null
+          data?: string | null
+          data_recebimento?: string | null
+          destino?: string | null
+          id?: string
+          motivo?: string | null
+          nome_acessorio?: string | null
+          origem?: string | null
+          quantidade?: number | null
+          responsavel?: string | null
+          responsavel_recebimento?: string | null
+          status?: string | null
+        }
+        Update: {
+          acessorio_id?: string | null
+          codigo_legivel?: string | null
+          created_at?: string | null
+          data?: string | null
+          data_recebimento?: string | null
+          destino?: string | null
+          id?: string
+          motivo?: string | null
+          nome_acessorio?: string | null
+          origem?: string | null
+          quantidade?: number | null
+          responsavel?: string | null
+          responsavel_recebimento?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       movimentacoes_entre_contas: {
         Row: {
           conta_destino_id: string | null
@@ -2036,6 +2087,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      movimentacoes_pecas_estoque: {
+        Row: {
+          codigo_legivel: string | null
+          created_at: string | null
+          data: string | null
+          data_recebimento: string | null
+          descricao_peca: string | null
+          destino: string | null
+          id: string
+          modelo: string | null
+          motivo: string | null
+          origem: string | null
+          peca_id: string | null
+          quantidade: number | null
+          responsavel: string | null
+          responsavel_recebimento: string | null
+          status: string | null
+        }
+        Insert: {
+          codigo_legivel?: string | null
+          created_at?: string | null
+          data?: string | null
+          data_recebimento?: string | null
+          descricao_peca?: string | null
+          destino?: string | null
+          id?: string
+          modelo?: string | null
+          motivo?: string | null
+          origem?: string | null
+          peca_id?: string | null
+          quantidade?: number | null
+          responsavel?: string | null
+          responsavel_recebimento?: string | null
+          status?: string | null
+        }
+        Update: {
+          codigo_legivel?: string | null
+          created_at?: string | null
+          data?: string | null
+          data_recebimento?: string | null
+          descricao_peca?: string | null
+          destino?: string | null
+          id?: string
+          modelo?: string | null
+          motivo?: string | null
+          origem?: string | null
+          peca_id?: string | null
+          quantidade?: number | null
+          responsavel?: string | null
+          responsavel_recebimento?: string | null
+          status?: string | null
+        }
+        Relationships: []
       }
       notas_assistencia: {
         Row: {

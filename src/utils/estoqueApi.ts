@@ -526,7 +526,7 @@ export const updateProdutoLoja = async (id: string, novaLoja: string, responsave
   const produto = _produtos.find(p => p.id === id);
   if (!produto) return null;
   const lojaAntiga = produto.loja;
-  const result = await updateProduto(id, { loja: novaLoja });
+  const result = await updateProduto(id, { loja: novaLoja, lojaAtualId: novaLoja });
   // Register movimentacao
   await supabase.from('movimentacoes_estoque').insert({
     produto_id: id, loja_origem_id: lojaAntiga, loja_destino_id: novaLoja,
@@ -617,7 +617,7 @@ export const confirmarRecebimentoMovimentacao = async (movId: string, responsave
     const timeline = [...(produto.timeline || []), {
       id: `TL-${produto.id}-MOV-${mov.id}`, tipo: 'entrada' as const, data: new Date().toISOString(),
       titulo: 'Movimentação Finalizada',
-      descricao: `Aparelho recebido na loja de destino. Origem: ${mov.origem} → Destino: ${mov.destino}.`,
+      descricao: `Aparelho recebido na loja de destino. Origem: ${useCadastroStore.getState().obterNomeLoja(mov.origem)} → Destino: ${useCadastroStore.getState().obterNomeLoja(mov.destino)}.`,
       responsavel,
     }];
     await updateProduto(produto.id, { loja: mov.destino, lojaAtualId: mov.destino, statusMovimentacao: null, movimentacaoId: undefined, timeline });

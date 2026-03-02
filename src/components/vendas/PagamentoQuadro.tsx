@@ -637,9 +637,11 @@ export function PagamentoQuadro({
                     <SelectValue placeholder="Selecione a máquina" />
                   </SelectTrigger>
                   <SelectContent>
-                    {maquinasCartao.map(maq => (
-                      <SelectItem key={maq.id} value={maq.id}>{maq.nome}</SelectItem>
-                    ))}
+                    {maquinasCartao
+                      .filter(maq => !lojaVendaId || maq.lojaVinculada === lojaVendaId)
+                      .map(maq => (
+                        <SelectItem key={maq.id} value={maq.id}>{maq.nome}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

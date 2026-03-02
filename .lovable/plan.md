@@ -1,46 +1,52 @@
 
+# Cadastrar 18 Contas Financeiras com IDs Padronizados (CTA-XXX)
 
-# Correcao Emergencial: Recursao Infinita na Politica de RLS da Tabela `profiles`
+## Resumo
+Adicionar a coluna `codigo_legivel` na tabela `contas_financeiras` para armazenar o ID padronizado (CTA-001, CTA-002, etc.) e inserir as 18 contas do CSV.
 
-## Diagnostico
+## Etapa 1 - Migration: adicionar coluna `codigo_legivel`
 
-O erro exato retornado pelo Supabase e:
-```
-"infinite recursion detected in policy for relation 'profiles'"
-```
+Adicionar a coluna `codigo_legivel VARCHAR UNIQUE` na tabela `contas_financeiras`, seguindo o mesmo padrao usado em `movimentacoes_acessorios_estoque` e `movimentacoes_pecas_estoque`.
 
-A politica `profiles_select_restritivo` faz um JOIN de volta na tabela `profiles` para verificar se o gestor pertence a mesma loja. Isso cria uma recursao infinita porque o Postgres precisa avaliar a politica RLS para ler `profiles`, mas a propria politica requer ler `profiles`.
+## Etapa 2 - Inserir as 18 contas via INSERT
 
-## Correcao
-
-Remover a politica problematica `profiles_select_restritivo` e substituir por uma versao que usa funcoes `SECURITY DEFINER` (que ignoram RLS) para resolver a loja do usuario, quebrando o ciclo de recursao.
-
-### Migration SQL
-
-1. **DROP** da politica `profiles_select_restritivo` (causa da recursao)
-2. **Criar funcao** `get_user_loja_id_direct` com `SECURITY DEFINER` que busca o `loja_id` do colaborador vinculado ao usuario SEM passar por RLS
-3. **Criar nova politica** `profiles_select_safe` que permite:
-   - `auth.uid() = id` (proprio perfil -- SEMPRE funciona)
-   - `is_acesso_geral(auth.uid())` (Acesso Geral)
-   - `has_role(auth.uid(), 'admin')` (Admin)
-   - Gestor ve perfis da mesma loja usando a funcao SECURITY DEFINER (sem recursao)
-
-### Detalhes Tecnicos
+Mapeamento de lojas:
 
 ```text
-Fluxo ANTES (quebrado):
-  profiles RLS -> JOIN profiles -> profiles RLS -> JOIN profiles -> ... (infinito)
-
-Fluxo DEPOIS (corrigido):
-  profiles RLS -> get_user_loja_id_direct(auth.uid()) [SECURITY DEFINER, ignora RLS]
-               -> compara com loja do perfil alvo via colaboradores [sem RLS em colaboradores para esta funcao]
+Loja - Matriz                -> 6231ea0e-9ff3-4ad6-b822-6f9a8270afa6
+Loja - Online                -> df3995f6-1da1-4661-a68f-20fb548a9468
+Loja - JK Shopping           -> 9009b91c-0436-4070-9d30-670b8e6bd68e
+Loja - Aguas Lindas Shopping -> b2c6ac94-f08b-4c2e-955f-8a91d658d7d6
+Loja - Shopping Sul          -> 0fc4a1f3-9cd6-4e24-b0b5-7a6af4953fad
+Geral - Dinheiro             -> geral-dinheiro (valor especial)
+Geral - Assistencia          -> geral-assistencia (valor especial)
 ```
 
-## Arquivos Modificados
+Todas as 18 contas serao inseridas com:
+- `codigo_legivel`: CTA-001 ate CTA-022 (conforme CSV)
+- `saldo_inicial = 0`, `saldo_atual = 0`
+- `status = 'Ativo'`, `habilitada = true`
+- `nota_fiscal` = true quando "Propria", false quando "Terceirizada"
+- `historico_alteracoes = '[]'`
+
+## Etapa 3 - Atualizar o frontend
+
+### cadastrosApi.ts
+- Adicionar `codigoLegivel` ao tipo `ContaFinanceira`
+- Mapear `codigo_legivel` do banco para o campo do frontend
+- Gerar automaticamente o proximo codigo (CTA-XXX) ao adicionar nova conta
+
+### CadastrosContasFinanceiras.tsx
+- Exibir a coluna "ID" com o `codigoLegivel` (CTA-XXX) em vez do UUID
+
+### PagamentoQuadro.tsx (se necessario)
+- Verificar se o select de "Conta Destino" exibe corretamente as contas apos a insercao
+
+## Detalhes Tecnicos
 
 | Arquivo | Acao |
 |---------|------|
-| Migration SQL | DROP politica recursiva, criar funcao SECURITY DEFINER, criar politica segura |
-
-Nenhuma alteracao no frontend e necessaria -- o codigo ja busca `profiles` corretamente via `auth.uid() = id`. O problema e exclusivamente na politica RLS do banco.
-
+| Migration SQL | ALTER TABLE adicionar `codigo_legivel` |
+| INSERT SQL (via insert tool) | 18 registros com dados do CSV |
+| src/utils/cadastrosApi.ts | Mapear `codigo_legivel`, gerar proximo ID |
+| src/pages/CadastrosContasFinanceiras.tsx | Exibir CTA-XXX na coluna ID |

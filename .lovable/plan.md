@@ -1,146 +1,218 @@
 
-# Varredura Completa de Conformidade — ERP Thiago Imports
+# Varredura Exaustiva — Relatorio de Auditoria Nivel Critico
 
-## 1. Auditoria de Comunicacao com o Banco (Supabase)
+## 1. Race Conditions (Condicoes de Corrida)
 
-### 1.1 Resquicios de localStorage
-- **ENCONTRADO**: `fluxoVendasApi.ts` usa `localStorage` para dados de conferencia de Ordens de Servico (IDs `OS-*`). Isto e uma **excecao documentada** — OS nao tem registro na tabela `fluxo_vendas`, entao metadados de conferencia (validacoes, observacoes, historico) usam localStorage como fallback.
-- **Risco**: Dados de conferencia de OS sao perdidos ao limpar o navegador. Solucao definitiva requer criar colunas JSONB na tabela `ordens_servico` para `aprovacao_gestor` e `aprovacao_financeiro`.
-- **Demais APIs**: Nenhum outro arquivo em `src/utils/*Api.ts` usa localStorage ou dados mockados (`initMockData`). 100% limpo.
+### 1.1 CRITICO: Numero de Venda Sequencial sem Atomicidade
 
-### 1.2 Tratamento de Erros de Rede
-- **COM `withRetry`** (7 arquivos): `cadastrosApi`, `garantiasApi`, `fiadoApi`, `vendasApi`, `estoqueApi`, `financeApi`, `assistenciaApi` — OK
-- **SEM `withRetry`** (5 arquivos com escritas): 
-  - `pecasApi.ts` — 6 escritas desprotegidas (addPeca, updatePeca, deletePeca, darBaixaPeca, addMovimentacaoPeca)
-  - `salarioColaboradorApi.ts` — 4 escritas desprotegidas
-  - `retiradaPecasApi.ts` — 2 escritas desprotegidas
-  - `valoresRecomendadosTrocaApi.ts` — 3 escritas desprotegidas
-  - `movimentacoesEntreContasApi.ts` — 1 escrita desprotegida
-  - `storiesMonitoramentoApi.ts` — 3 escritas desprotegidas
-  - `pendenciasFinanceiraApi.ts` — 1 escrita desprotegida
-  - `osApi.ts` — 2 escritas desprotegidas (upsert/delete)
-  - `whatsappNotificacaoApi.ts` — 2 escritas desprotegidas
-
-### 1.3 Nomenclatura snake_case
-- **OK**: Todos os mappers convertem camelCase (TypeScript) para snake_case (Supabase) corretamente. Campos como `lojaId`, `clienteId`, `vendedorId` existem apenas nas interfaces TS e sao mapeados para `loja_id`, `cliente_id`, `vendedor_id` antes de enviar ao banco.
-
----
-
-## 2. Validacao de Seguranca e Permissoes (RLS)
-
-### 2.1 ProtectedRoute — Bloqueio de Rotas
-- **OK**: O `ProtectedRoute` importa `useUserPermissions` e chama `canAccessRoute(location.pathname)`. Se o usuario nao tem permissao, redireciona para `/`. Isto cobre todas as rotas definidas no `routeToModule()`.
-- **Funcional**: Um vendedor acessando `/financeiro` ou `/rh` sera bloqueado e redirecionado.
-
-### 2.2 Leitura de Roles
-- **OK**: O hook `useUserPermissions` busca roles de `user_roles` (tabela segura, separada de profiles) e combina com flags do colaborador (`eh_gestor`, `eh_vendedor`, `eh_estoquista`) e cargo.
-
-### 2.3 GAP CRITICO — 20 usuarios sem role no banco
-Usuarios com cargos que deveriam ter roles, mas estao com `NULL` na tabela `user_roles`:
-
-| Cargo | Usuarios sem Role | Role Esperada |
-|-------|-------------------|---------------|
-| CARGO-005 (Tecnico) | 5 usuarios | Nenhuma role definida no enum (gap) |
-| CARGO-009 (Auxiliar/Motoboy) | 7 usuarios | Nenhuma role necessaria (restrito) |
-| CARGO-011 (Assistente Adm.) | 5 usuarios | `admin` |
-| CARGO-014 (Marketing/Adm.) | 3 usuarios | `admin` |
-
-**Impacto**: Os 5 usuarios CARGO-011 e 3 usuarios CARGO-014 deveriam ter role `admin` mas nao tem. O hook `useUserPermissions` faz fallback para o cargo, entao o acesso no frontend funciona, mas as **politicas RLS do banco** que dependem de `has_role(auth.uid(), 'admin')` **bloqueiam** esses usuarios em tabelas restritas (salarios, despesas, contas financeiras).
-
-### 2.4 Linter Supabase
-- **1 aviso**: "Leaked Password Protection" desabilitado. Recomendacao: ativar no dashboard Auth.
-
----
-
-## 3. Integridade de IDs e Salvamento
-
-### 3.1 IDs Sequenciais
-- **OK**: Tabelas `ordens_servico`, `despesas` e `pagamentos_financeiros` possuem `numero_sequencial` (BIGINT, via sequences iniciando em 1001).
-- **OK**: Mappers em `assistenciaApi`, `financeApi` extraem `numero_sequencial` corretamente.
-- **Vendas**: Usam campo `numero` (ja existente) para identificacao sequencial `VEN-YYYY-XXXX`.
-
-### 3.2 Fluxo de Salvamento
-- Sem erros de Foreign Key ou Not Null identificados nos logs atuais (console limpo).
-
----
-
-## 4. Carga de Dados e Performance
-
-### 4.1 Inicializacao
-- 21 caches inicializados em paralelo via `Promise.all` no `AppInitializer` — otimo.
-- O `cadastroStore.inicializarDados()` carrega lojas, colaboradores, clientes, fornecedores em paralelo.
-- **Sem loops infinitos**: O `useEffect` no `AppInitializer` so executa quando `inicializado` muda (flag booleana controlada pelo store).
-
-### 4.2 Limite de 1000 rows
-- Com 76 colaboradores e ~165 produtos pendentes, nenhuma tabela ultrapassa o limite do Supabase.
-
----
-
-## 5. Fluxo de Primeiro Acesso
-
-- **OK**: 75 usuarios criados, 43 com `first_login = true` (pendentes de definir senha).
-- **OK**: `FirstLoginRoute` protege `/definir-senha` — redireciona se nao autenticado ou se `first_login = false`.
-- **OK**: `Login.tsx` redireciona para `/definir-senha` quando `isFirstLogin = true`.
-
----
-
-## Plano de Correcoes
-
-### Correcao 1: Inserir roles faltantes para 8 usuarios admin (SQL)
-Inserir role `admin` na tabela `user_roles` para os 8 usuarios com CARGO-011 e CARGO-014 que nao possuem role. Isso corrige o acesso RLS em tabelas restritas.
+**Vulnerabilidade encontrada em `vendasApi.ts` linhas 355-363:**
 
 ```text
-INSERT INTO user_roles (user_id, role)
-SELECT p.id, 'admin'::app_role
-FROM profiles p
-WHERE p.cargo IN ('CARGO-011', 'CARGO-014')
-AND NOT EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = p.id AND ur.role = 'admin')
+getNextVendaNumber() le o maior numero do CACHE LOCAL e incrementa +1.
+Se dois vendedores abrirem a tela de nova venda ao mesmo tempo, ambos
+receberao o MESMO numero sequencial, causando duplicidade.
 ```
 
-### Correcao 2: Aplicar `withRetry` em 9 APIs restantes
-Arquivos a modificar:
-- `pecasApi.ts` — envolver addPeca, updatePeca, deletePeca, darBaixaPeca, addMovimentacaoPeca
-- `salarioColaboradorApi.ts` — envolver insert/update/delete salarios
-- `retiradaPecasApi.ts` — envolver insert/update retiradas
-- `valoresRecomendadosTrocaApi.ts` — envolver criar/atualizar/deletar
-- `movimentacoesEntreContasApi.ts` — envolver addMovimentacao
-- `storiesMonitoramentoApi.ts` — envolver upserts de lotes
-- `pendenciasFinanceiraApi.ts` — envolver insert
-- `osApi.ts` — envolver upsert/delete
-- `whatsappNotificacaoApi.ts` — envolver insert/update
+**Impacto**: Vendas com numeros duplicados (ex: VEN-2026-0045 aparece duas vezes).
 
-### Correcao 3: Migrar localStorage de conferencia OS para banco
-Adicionar colunas JSONB `aprovacao_gestor` e `aprovacao_financeiro` na tabela `ordens_servico`, e atualizar `fluxoVendasApi.ts` para persistir dados de conferencia de OS no Supabase em vez de localStorage. Isso elimina o ultimo ponto de fragilidade de dados.
+**Correcao proposta**: Substituir a geracao de `numero` no frontend por uma **sequence do Postgres** (`nextval('vendas_numero_seq')`), usando um `DEFAULT` na coluna `numero` da tabela `vendas`. O frontend nao precisa mais calcular o numero — ele vem do banco apos o INSERT.
+
+### 1.2 Estoque com Quantidade 1 — Venda Duplicada
+
+Quando dois vendedores tentam vender o mesmo produto (estoque = 1), o fluxo atual e:
+1. Frontend verifica `quantidade > 0` no cache local
+2. INSERT na tabela `vendas` (sem verificar estoque no banco)
+3. UPDATE do produto para `quantidade = 0`
+
+**Risco**: Ambos passam na verificacao do passo 1 (cache local desatualizado). O produto e vendido duas vezes.
+
+**Correcao proposta**: Usar `UPDATE produtos SET quantidade = quantidade - 1 WHERE id = $1 AND quantidade >= 1` com verificacao do `rowCount`. Se zero linhas afetadas, a venda deve ser rejeitada. Alternativamente, usar o campo `bloqueado_em_venda_id` (ja existe) como semaforo via UPDATE atomico.
+
+### 1.3 withRetry e Duplicidade
+
+O `withRetry` **NAO** gera duplicidade em cenarios de timeout. Analise:
+- Erros 409 (Conflict): O status `409` esta na faixa 400-499, e o `isRetryableError` retorna `false` para status HTTP 400-499. Portanto, **nao retenta conflitos**. OK.
+- Timeout real (fetch abortado): O retry pode causar insert duplicado se o primeiro request ja foi processado pelo servidor mas a resposta nao chegou. **Este e um risco real** para operacoes de INSERT sem chave de idempotencia.
+
+**Correcao proposta**: Para operacoes criticas (addVenda, addOS), usar um campo `idempotency_key` (UUID gerado no frontend) com constraint UNIQUE. Se o retry causar duplicata, o banco rejeita com conflict.
 
 ---
 
-## Resumo de Conformidade
+## 2. Tipagem e Nomenclatura (Strict Type Check)
 
-| Area | Status | Acao |
-|------|--------|------|
-| Mock data / localStorage | 95% OK | 1 excecao em fluxoVendasApi (Correcao 3) |
-| snake_case nos mappers | 100% OK | Nenhuma acao |
-| withRetry em escritas | 70% OK | 9 APIs restantes (Correcao 2) |
-| RLS e Roles | 89% OK | 8 usuarios sem role admin (Correcao 1) |
-| IDs sequenciais | 100% OK | Nenhuma acao |
-| Bloqueio de rotas | 100% OK | Nenhuma acao |
-| First login flow | 100% OK | 43 usuarios pendentes (esperado) |
-| Performance/loops | 100% OK | Nenhuma acao |
-| Leaked Password Protection | AVISO | Ativar no dashboard Supabase |
+### 2.1 Uso massivo de `any` nos Mappers
+
+Foram encontradas **390 ocorrencias** de `(row: any)` nos mappers de 38 arquivos API. Exemplos:
+- `mapVendaFromDB(row: any)` — vendasApi.ts
+- `mapProdutoFromDB(row: any)` — estoqueApi.ts
+- `mapPagamentoFromDB(row: any)` — financeApi.ts
+
+**Impacto funcional**: Baixo (os mappers fazem fallback com `|| ''` e `|| 0`). Os campos `null` do banco sao convertidos para strings vazias ou zero, prevenindo `cannot read property of null`.
+
+**Correcao proposta**: Substituir `any` pelo tipo gerado do Supabase (`Database['public']['Tables']['vendas']['Row']`), que ja existe em `src/integrations/supabase/types.ts`. Isto daria **autocomplete** e deteccao de erros em tempo de compilacao. Porem, e uma refatoracao de baixo impacto funcional e alto esforco (38 arquivos).
+
+**Recomendacao**: Prioridade BAIXA. Os fallbacks existentes previnem crashes. Tipagem estrita e uma melhoria de manutenibilidade, nao de seguranca.
+
+### 2.2 Campos null vs string
+
+Os mappers ja tratam todos os campos nullable com fallbacks:
+- `row.cliente_nome || ''` — garante string vazia, nunca null
+- `Number(row.valor_total) || 0` — garante numero, nunca NaN
+- `(row.timeline as any[]) || []` — garante array, nunca null
+
+**Status**: SEM risco de `cannot read property of null`. OK.
+
+---
+
+## 3. Foreign Keys e Integridade Referencial
+
+### 3.1 Delete de Loja com Vendas Vinculadas
+
+A tabela `vendas` tem FK `loja_id -> lojas(id)` **sem ON DELETE CASCADE**. Default do Postgres: `RESTRICT`.
+
+**Comportamento**: Se tentar excluir uma loja com vendas, o banco retorna erro de FK. O frontend:
+- `deleteContaFinanceira`, `deleteColaborador`, `deleteFornecedor`: Apenas fazem `console.error` e removem do cache local **sem verificar o erro**. A tela nao "quebra", mas o item desaparece do cache enquanto persiste no banco.
+
+**Impacto**: O item some da interface mas continua no banco. No proximo refresh, ele reaparece. Confuso para o usuario.
+
+**Correcao proposta**:
+1. Adicionar `try/catch` com `toast.error('Nao e possivel excluir: existem registros vinculados')` em todas as funcoes de delete.
+2. So remover do cache apos confirmacao de sucesso (sem erro).
+
+### 3.2 Mapa de Foreign Keys e Regras de Delete
+
+| Tabela Filha | FK para | Regra Delete |
+|--------------|---------|-------------|
+| venda_itens | vendas | CASCADE |
+| venda_trade_ins | vendas | CASCADE |
+| venda_pagamentos | vendas | CASCADE |
+| os_pagamentos | ordens_servico | CASCADE |
+| os_pecas | ordens_servico | CASCADE |
+| financeiro | vendas | RESTRICT |
+| garantias | vendas | RESTRICT |
+| movimentacoes_estoque | produtos | RESTRICT |
+| colaboradores | lojas | RESTRICT |
+| despesas | lojas | RESTRICT |
+| pecas | lojas | RESTRICT |
+| produtos | lojas | RESTRICT |
+
+**Risco principal**: Deletar um produto que tem movimentacoes ou garantias vinculadas falha silenciosamente. O mesmo para lojas e colaboradores.
+
+---
+
+## 4. Performance e Re-renders
+
+### 4.1 `select('*')` em todas as consultas
+
+Foram encontradas **303 ocorrencias** de `.select('*')` em 40 arquivos. Como todas as consultas carregam dados para cache na inicializacao (e nao em tempo real), o impacto e:
+- **Inicializacao**: Ligeiramente mais lenta (trafega colunas JSONB grandes como `timeline`, `historico_custo`)
+- **Runtime**: Zero impacto (dados vem do cache local, nao do Supabase)
+
+**Recomendacao**: Prioridade BAIXA. Otimizar `select` so faz diferenca se tabelas ultrapassarem 1000+ registros com colunas JSONB pesadas.
+
+### 4.2 Re-renders Infinitos
+
+Nao foram encontrados loops de requisicao. A arquitetura de cache impede isso:
+- Dados sao carregados UMA VEZ na inicializacao (`initXxxCache`)
+- Getters sao sincronos (`getProdutos()`, `getVendas()`)
+- Mutacoes atualizam o cache local + banco em paralelo
+- Componentes re-renderizam apenas quando o estado local muda (useState/useEffect controlados)
+
+### 4.3 Dados de Referencia In-Memory (nao persistidos)
+
+**Encontrado em `cadastrosApi.ts` linhas 177-311**: Origens de Venda, Produtos Cadastro, Tipos Desconto, Cargos e Modelos de Pagamento estao **hardcoded em arrays JavaScript**. Alteracoes feitas pelo usuario (add/update/delete) sao **perdidas ao recarregar a pagina**.
+
+**Impacto**: Medio. Esses dados de referencia raramente mudam, mas se um usuario adicionar uma nova origem de venda, ela desaparece no proximo refresh.
+
+**Correcao proposta**: Migrar para tabelas Supabase (`origens_venda`, `tipos_desconto`, `cargos`, `modelos_pagamento`, `produtos_cadastro`). Porem, como sao dados semi-estaticos, a prioridade e MEDIA.
+
+---
+
+## 5. Auditoria de Seguranca RLS (Bypass Check)
+
+### 5.1 Vendedor injetando loja_id diferente no INSERT
+
+**Politica atual de INSERT em vendas:**
+```text
+vendas_insert: WITH CHECK (
+  is_acesso_geral(auth.uid()) OR
+  has_role(auth.uid(), 'gestor') OR
+  has_role(auth.uid(), 'vendedor')
+)
+```
+
+**VULNERABILIDADE**: A politica permite que qualquer vendedor insira uma venda com **qualquer `loja_id`**. Nao ha verificacao de que o `loja_id` enviado corresponde a loja do vendedor (`get_user_loja_id(auth.uid())`).
+
+**Impacto**: Um vendedor pode manipular o frontend (ou usar a API diretamente) para registrar vendas em nome de outra loja, alterando metricas de performance e comissoes.
+
+**Correcao proposta**: Alterar a politica de INSERT para:
+```text
+WITH CHECK (
+  is_acesso_geral(auth.uid()) OR
+  has_role(auth.uid(), 'gestor') OR
+  (has_role(auth.uid(), 'vendedor') AND loja_id = get_user_loja_id(auth.uid()))
+)
+```
+
+### 5.2 Gestor pode inserir vendas em loja alheia
+
+Mesmo problema: gestores podem inserir vendas com `loja_id` de outra loja. Correcao similar.
+
+### 5.3 Produtos INSERT sem filtro de loja
+
+Politica `produtos_insert`:
+```text
+WITH CHECK (is_acesso_geral(auth.uid()) OR has_role(auth.uid(), 'estoquista'))
+```
+Estoquista pode inserir produto em qualquer loja. Risco menor (estoquistas sao confiaveis), mas inconsistente.
+
+---
+
+## Resumo de Criticidade
+
+| Achado | Severidade | Correcao |
+|--------|-----------|----------|
+| Race condition em numero de venda | CRITICA | Sequence no Postgres |
+| Venda dupla de estoque 1 | CRITICA | UPDATE atomico com WHERE quantidade >= 1 |
+| withRetry sem idempotencia | ALTA | Campo idempotency_key com UNIQUE |
+| RLS vendas_insert sem filtro loja_id | ALTA | Adicionar AND loja_id = get_user_loja_id() |
+| Delete silencioso com FK RESTRICT | MEDIA | try/catch com toast de erro |
+| Dados de referencia in-memory | MEDIA | Migrar para tabelas Supabase |
+| 390x `any` nos mappers | BAIXA | Tipagem com types do Supabase |
+| select('*') em 303 consultas | BAIXA | Otimizar colunas selecionadas |
+
+## Plano de Correcoes Propostas
+
+### Correcao 1: Sequence para numero de venda (SQL + vendasApi.ts)
+- Criar sequence `vendas_numero_seq` com START em max(numero)+1
+- Adicionar DEFAULT `nextval('vendas_numero_seq')` na coluna `numero`
+- Remover `getNextVendaNumber()` do frontend; ler `numero` do retorno do INSERT
+
+### Correcao 2: Update atomico de estoque (vendasApi.ts)
+- Substituir `updateProduto(id, { quantidade: 0 })` por query atomica:
+  `UPDATE produtos SET quantidade = quantidade - 1 WHERE id = $1 AND quantidade >= 1`
+- Verificar resultado antes de prosseguir com a venda
+
+### Correcao 3: RLS vendas_insert com filtro de loja (SQL)
+- ALTER POLICY vendas_insert para incluir `AND loja_id = get_user_loja_id(auth.uid())` no WITH CHECK para vendedores
+
+### Correcao 4: Delete com tratamento de erro (cadastrosApi.ts, estoqueApi.ts)
+- Adicionar verificacao de `error` em todas as funcoes delete
+- So remover do cache se `!error`
+- Mostrar toast de erro ao usuario
+
+### Correcao 5: Campo idempotency_key em vendas (SQL + vendasApi.ts)
+- Adicionar coluna `idempotency_key UUID UNIQUE` na tabela vendas
+- Gerar UUID no frontend antes do INSERT
+- withRetry evita duplicatas automaticamente via constraint UNIQUE
 
 ## Arquivos a Modificar
 
 | Arquivo | Acao |
 |---------|------|
-| `user_roles` (dados) | INSERT roles para 8 usuarios |
-| `src/utils/pecasApi.ts` | withRetry em 5 funcoes |
-| `src/utils/salarioColaboradorApi.ts` | withRetry em 3 funcoes |
-| `src/utils/retiradaPecasApi.ts` | withRetry em 2 funcoes |
-| `src/utils/valoresRecomendadosTrocaApi.ts` | withRetry em 3 funcoes |
-| `src/utils/movimentacoesEntreContasApi.ts` | withRetry em 1 funcao |
-| `src/utils/storiesMonitoramentoApi.ts` | withRetry em 3 funcoes |
-| `src/utils/pendenciasFinanceiraApi.ts` | withRetry em 1 funcao |
-| `src/utils/osApi.ts` | withRetry em 2 funcoes |
-| `src/utils/whatsappNotificacaoApi.ts` | withRetry em 2 funcoes |
-| `supabase/migrations/` | Colunas JSONB em ordens_servico |
-| `src/utils/fluxoVendasApi.ts` | Migrar localStorage para Supabase |
+| `supabase/migrations/` | Sequence vendas_numero_seq, coluna idempotency_key, ALTER POLICY vendas_insert |
+| `src/utils/vendasApi.ts` | Remover getNextVendaNumber, usar retorno do INSERT, update atomico de estoque |
+| `src/utils/cadastrosApi.ts` | Tratamento de erro em deletes (deleteColaborador, deleteFornecedor, etc.) |
+| `src/utils/estoqueApi.ts` | Tratamento de erro em deletes, update atomico de quantidade |
+| `src/pages/VendasNova.tsx` | Remover chamada a getNextVendaNumber |
+| `src/pages/VendasAcessorios.tsx` | Remover chamada a getNextVendaNumber |

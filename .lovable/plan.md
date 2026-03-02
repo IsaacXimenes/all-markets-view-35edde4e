@@ -1,26 +1,40 @@
 
-# Plano: Corrigir Draft Dialog da Consignacao + Filtrar Maquinas por Loja
 
-## Problema 1: Draft Dialog nao aparece no momento correto
+# Plano: Corrigir Modal de Acessorios na Nova Venda
 
-O Dialog de rascunho esta posicionado no JSX da view `detalhamento` (linha 1408), mas quando o usuario entra na view `novo`, o componente retorna cedo (linha 468-581) e nunca renderiza o Dialog. Por isso, o dialog so aparece quando o usuario volta para outra view.
+## Problemas identificados
 
-**Solucao:** Mover o Draft Dialog para dentro do bloco de retorno da view `novo` (antes do fechamento `</OSLayout>` na linha 580).
+1. **ID gigante (UUID)**: Na tabela do modal de acessorios (linha 3566), o campo exibe `acessorio.id` que e o UUID do Supabase. Deve exibir `acessorio.codigo` (padrao AC-XXX) ou, se nao houver codigo, mostrar o ID truncado.
 
-### Arquivo: `src/pages/OSConsignacao.tsx`
-- Copiar o bloco do Draft Dialog (linhas 1408-1429) para dentro da view `novo`, logo antes do `</OSLayout>` na linha 580
-- Remover o Draft Dialog da posicao atual (linha 1408-1429) na view `detalhamento`
+2. **Sem filtro por loja**: O filtro de acessorios (linhas 657-663) nao restringe pela loja da venda. A pagina `VendasAcessorios.tsx` ja implementa o padrao correto usando `getLojasPorPoolEstoque`.
 
-## Problema 2: Maquinas de cartao nao filtradas por loja
+## Alteracoes
 
-Ja planejado anteriormente. Filtrar maquinas por `lojaVendaId`.
+### Arquivo: `src/pages/VendasNova.tsx`
 
-### Arquivo: `src/components/vendas/PagamentoQuadro.tsx`
-- Linha 640: adicionar `.filter(maq => !lojaVendaId || maq.lojaVinculada === lojaVendaId)` antes do `.map()`
+**1. Filtrar acessorios por loja (linhas 657-663)**
+
+Atualizar o `acessoriosFiltrados` para incluir o filtro por pool de estoque, seguindo o mesmo padrao de `VendasAcessorios.tsx`:
+
+```ts
+const acessoriosFiltrados = useMemo(() => {
+  const lojasPool = lojaVenda ? getLojasPorPoolEstoque(lojaVenda) : [];
+  return acessoriosEstoque.filter(a => {
+    if (a.quantidade <= 0) return false;
+    if (lojaVenda && !lojasPool.includes(a.loja)) return false;
+    if (buscaAcessorio && !a.descricao.toLowerCase().includes(buscaAcessorio.toLowerCase())) return false;
+    return true;
+  });
+}, [acessoriosEstoque, buscaAcessorio, lojaVenda]);
+```
+
+**2. Substituir UUID pelo codigo legivel (linha 3566)**
+
+Trocar `{acessorio.id}` por `{acessorio.codigo || acessorio.id.slice(0, 8)}` para exibir o codigo padronizado AC-XXX ou, na ausencia, os primeiros 8 caracteres do UUID.
 
 ## Resumo
 
 | Arquivo | Alteracao |
 |---------|----------|
-| `src/pages/OSConsignacao.tsx` | Mover Draft Dialog para dentro da view 'novo' |
-| `src/components/vendas/PagamentoQuadro.tsx` | Filtrar maquinas de cartao pela loja da venda |
+| `src/pages/VendasNova.tsx` | Filtrar acessorios pelo pool de estoque da loja + exibir codigo legivel no lugar do UUID |
+

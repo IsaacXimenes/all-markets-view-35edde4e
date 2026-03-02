@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Link, useLocation } from 'react-router-dom';
 import circuitBg from '@/assets/sidebar-circuit-bg.png';
+import { useUserPermissions, type ModuleName } from '@/hooks/useUserPermissions';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -22,21 +23,22 @@ interface NavItem {
   title: string;
   icon: React.ElementType;
   href: string;
+  module?: ModuleName; // null/undefined = always visible
 }
 
 const navItems: NavItem[] = [
   { title: 'Painel', icon: Home, href: '/' },
-  { title: 'Recursos Humanos', icon: Users, href: '/rh' },
-  { title: 'Financeiro', icon: Banknote, href: '/financeiro/conferencia' },
-  { title: 'Estoque', icon: Package, href: '/estoque' },
-  { title: 'Vendas', icon: ShoppingCart, href: '/vendas' },
-  { title: 'Garantias', icon: Shield, href: '/garantias/nova' },
-  { title: 'Assistência', icon: Wrench, href: '/os/analise-garantia' },
-  { title: 'Gestão Administrativa', icon: ClipboardCheck, href: '/gestao-administrativa' },
-  { title: 'Relatórios', icon: BarChart3, href: '/relatorios' },
-  { title: 'Cadastros', icon: Database, href: '/cadastros' },
-  { title: 'Dados - Sistema Antigo', icon: Archive, href: '/dados-sistema-antigo/clientes' },
-  { title: 'Configurações', icon: Settings, href: '/settings' },
+  { title: 'Recursos Humanos', icon: Users, href: '/rh', module: 'rh' },
+  { title: 'Financeiro', icon: Banknote, href: '/financeiro/conferencia', module: 'financeiro' },
+  { title: 'Estoque', icon: Package, href: '/estoque', module: 'estoque' },
+  { title: 'Vendas', icon: ShoppingCart, href: '/vendas', module: 'vendas' },
+  { title: 'Garantias', icon: Shield, href: '/garantias/nova', module: 'garantias' },
+  { title: 'Assistência', icon: Wrench, href: '/os/analise-garantia', module: 'assistencia' },
+  { title: 'Gestão Administrativa', icon: ClipboardCheck, href: '/gestao-administrativa', module: 'gestao' },
+  { title: 'Relatórios', icon: BarChart3, href: '/relatorios', module: 'relatorios' },
+  { title: 'Cadastros', icon: Database, href: '/cadastros', module: 'cadastros' },
+  { title: 'Dados - Sistema Antigo', icon: Archive, href: '/dados-sistema-antigo/clientes', module: 'dados-antigo' },
+  { title: 'Configurações', icon: Settings, href: '/settings', module: 'settings' },
 ];
 
 /** Overlay sutil com padrão de circuitos */
@@ -67,6 +69,12 @@ function SidebarContent({
   showToggle?: boolean;
 }) {
   const location = useLocation();
+  const { canAccessModule } = useUserPermissions();
+
+  const filteredNavItems = navItems.filter(item => {
+    if (!item.module) return true; // always visible (Painel)
+    return canAccessModule(item.module);
+  });
 
   const isActiveModule = (href: string) => {
     if (href === '/') return location.pathname === '/';
@@ -107,7 +115,7 @@ function SidebarContent({
       {/* Nav items */}
       <ScrollArea className="flex-1 py-4 relative z-10">
         <nav className={cn("grid px-2", isCollapsed ? "gap-1" : "gap-0.5")}>
-          {navItems.map((item, index) => {
+          {filteredNavItems.map((item, index) => {
             const isActive = isActiveModule(item.href);
             return (
               <Link

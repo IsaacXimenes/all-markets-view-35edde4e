@@ -19,12 +19,16 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import circuitBg from '@/assets/sidebar-circuit-bg.png';
 import { CustoPorOrigemCards, calcularCustosPorOrigem } from '@/components/assistencia/CustoPorOrigemCards';
 import { PieChart, Pie, Cell, Legend, ResponsiveContainer, Tooltip } from 'recharts';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { useAuthStore } from '@/store/authStore';
 
 export function Dashboard() {
   const navigate = useNavigate();
   const [isSidebarCollapsed, toggleSidebar] = useSidebarState();
   const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { perfil, canAccessModule } = useUserPermissions();
+  const user = useAuthStore((s) => s.user);
   
   // Dados reais do sistema
   const vendas = getVendas();
@@ -126,98 +130,128 @@ export function Dashboard() {
               </div>
             </div>
             
-            {/* Stats Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-7 gap-3 mb-4 animate-slide-up" style={{ '--delay': '100ms' } as React.CSSProperties}>
-              <StatsCard 
-                title="Receita Hoje" 
-                value={formatCurrency(receitaHoje)}
-                description={`${vendasHoje.length} vendas`}
-                icon={<Wallet2 />}
-                className="bg-primary/5"
-              />
-              <StatsCard 
-                title="Vendas Totais" 
-                value={formatCurrency(receitaTotal)}
-                description={`${vendas.length} vendas`}
-                icon={<ShoppingCart />}
-                className="bg-primary/5"
-              />
-              <StatsCard 
-                title="Comissão Hoje" 
-                value={formatCurrency(comissaoHoje)}
-                description="Estimativa"
-                icon={<Percent />}
-                className="bg-blue-500/10"
-              />
-              <StatsCard 
-                title="Estoque" 
-                value={produtosEmEstoque.toString()}
-                trend={produtosBaixoEstoque > 0 ? -produtosBaixoEstoque : 0}
-                trendLabel={produtosBaixoEstoque > 0 ? `${produtosBaixoEstoque} com estoque baixo` : 'Estoque OK'}
-                icon={<Package />}
-                className={produtosBaixoEstoque > 0 ? "bg-danger/5" : "bg-success/5"}
-              />
-              <StatsCard 
-                title="OS Abertas" 
-                value={osAbertas.toString()}
-                trend={osUrgentes > 0 ? -osUrgentes : 0}
-                trendLabel={osUrgentes > 0 ? `${osUrgentes} aguardando peça` : 'Sem urgências'}
-                icon={<Wrench />}
-                className={osUrgentes > 0 ? "bg-warning/5" : "bg-success/5"}
-              />
-            </div>
+            {/* Restrito: boas-vindas apenas */}
+            {perfil === 'restrito' && (
+              <Card className="mb-4 animate-slide-up">
+                <CardContent className="p-8 text-center">
+                  <h2 className="text-2xl font-bold mb-2">
+                    Bem-vindo, {user?.colaborador?.nome || user?.username || 'Colaborador'}!
+                  </h2>
+                  <p className="text-muted-foreground">
+                    Você está logado no sistema Thiago Imports. Entre em contato com seu gestor caso precise de acesso a módulos adicionais.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Stats Row — visible for non-restrito */}
+            {perfil !== 'restrito' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-7 gap-3 mb-4 animate-slide-up" style={{ '--delay': '100ms' } as React.CSSProperties}>
+                {canAccessModule('vendas') && (
+                  <>
+                    <StatsCard 
+                      title="Receita Hoje" 
+                      value={formatCurrency(receitaHoje)}
+                      description={`${vendasHoje.length} vendas`}
+                      icon={<Wallet2 />}
+                      className="bg-primary/5"
+                    />
+                    <StatsCard 
+                      title="Vendas Totais" 
+                      value={formatCurrency(receitaTotal)}
+                      description={`${vendas.length} vendas`}
+                      icon={<ShoppingCart />}
+                      className="bg-primary/5"
+                    />
+                  </>
+                )}
+                {perfil === 'admin' && (
+                  <StatsCard 
+                    title="Comissão Hoje" 
+                    value={formatCurrency(comissaoHoje)}
+                    description="Estimativa"
+                    icon={<Percent />}
+                    className="bg-blue-500/10"
+                  />
+                )}
+                {canAccessModule('estoque') && (
+                  <StatsCard 
+                    title="Estoque" 
+                    value={produtosEmEstoque.toString()}
+                    trend={produtosBaixoEstoque > 0 ? -produtosBaixoEstoque : 0}
+                    trendLabel={produtosBaixoEstoque > 0 ? `${produtosBaixoEstoque} com estoque baixo` : 'Estoque OK'}
+                    icon={<Package />}
+                    className={produtosBaixoEstoque > 0 ? "bg-danger/5" : "bg-success/5"}
+                  />
+                )}
+                {canAccessModule('assistencia') && (
+                  <StatsCard 
+                    title="OS Abertas" 
+                    value={osAbertas.toString()}
+                    trend={osUrgentes > 0 ? -osUrgentes : 0}
+                    trendLabel={osUrgentes > 0 ? `${osUrgentes} aguardando peça` : 'Sem urgências'}
+                    icon={<Wrench />}
+                    className={osUrgentes > 0 ? "bg-warning/5" : "bg-success/5"}
+                  />
+                )}
+              </div>
+            )}
             
-            {/* Cards de Garantias */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 animate-slide-up" style={{ '--delay': '150ms' } as React.CSSProperties}>
-              <Card 
-                className={cn(
-                  "cursor-pointer transition-all hover:shadow-md",
-                  garantiasUrgentes.length > 0 ? "border-red-500 bg-red-50 dark:bg-red-950/20" : "bg-muted/30"
-                )}
-                onClick={() => navigate('/garantias/em-andamento')}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-red-500/10">
-                      <ShieldAlert className="h-5 w-5 text-red-500" />
+            {/* Cards de Garantias — admin/gestor only */}
+            {canAccessModule('garantias') && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 animate-slide-up" style={{ '--delay': '150ms' } as React.CSSProperties}>
+                <Card 
+                  className={cn(
+                    "cursor-pointer transition-all hover:shadow-md",
+                    garantiasUrgentes.length > 0 ? "border-red-500 bg-red-50 dark:bg-red-950/20" : "bg-muted/30"
+                  )}
+                  onClick={() => navigate('/garantias/em-andamento')}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-red-500/10">
+                        <ShieldAlert className="h-5 w-5 text-red-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Garantias Urgentes</p>
+                        <p className="text-2xl font-bold">{garantiasUrgentes.length}</p>
+                        <p className="text-xs text-red-500">Expiram em 7 dias</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Garantias Urgentes</p>
-                      <p className="text-2xl font-bold">{garantiasUrgentes.length}</p>
-                      <p className="text-xs text-red-500">Expiram em 7 dias</p>
+                  </CardContent>
+                </Card>
+                <Card 
+                  className={cn(
+                    "cursor-pointer transition-all hover:shadow-md",
+                    garantiasAtencao.length > 0 ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20" : "bg-muted/30"
+                  )}
+                  onClick={() => navigate('/garantias/em-andamento')}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-yellow-500/10">
+                        <Shield className="h-5 w-5 text-yellow-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Garantias Atenção</p>
+                        <p className="text-2xl font-bold">{garantiasAtencao.length}</p>
+                        <p className="text-xs text-yellow-600">Expiram em 30 dias</p>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card 
-                className={cn(
-                  "cursor-pointer transition-all hover:shadow-md",
-                  garantiasAtencao.length > 0 ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20" : "bg-muted/30"
-                )}
-                onClick={() => navigate('/garantias/em-andamento')}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-yellow-500/10">
-                      <Shield className="h-5 w-5 text-yellow-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Garantias Atenção</p>
-                      <p className="text-2xl font-bold">{garantiasAtencao.length}</p>
-                      <p className="text-xs text-yellow-600">Expiram em 30 dias</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-            {/* Custos de Assistência */}
-            <div className="mb-4 animate-slide-up" style={{ '--delay': '175ms' } as React.CSSProperties}>
-              <CustoPorOrigemCards ordensServico={ordensServico} titulo="Custos de Assistência" />
-            </div>
+            {/* Custos de Assistência — admin/gestor/tecnico */}
+            {canAccessModule('assistencia') && (
+              <div className="mb-4 animate-slide-up" style={{ '--delay': '175ms' } as React.CSSProperties}>
+                <CustoPorOrigemCards ordensServico={ordensServico} titulo="Custos de Assistência" />
+              </div>
+            )}
 
-            {/* Gráfico de Composição por Origem da Peça */}
-            {composicaoPorOrigem.length > 0 && (
+            {/* Gráfico por Origem — admin/gestor/tecnico */}
+            {canAccessModule('assistencia') && composicaoPorOrigem.length > 0 && (
               <div className="mb-4 animate-slide-up" style={{ '--delay': '180ms' } as React.CSSProperties}>
                 <Card>
                   <CardHeader className="pb-2">
@@ -250,60 +284,60 @@ export function Dashboard() {
               </div>
             )}
             
-            {/* Main Content Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-4 gap-4 flex-1 min-h-0">
-              {/* Left column - Resumo Rápido */}
-              <div className="lg:col-span-2 2xl:col-span-3 flex flex-col gap-4 animate-slide-up overflow-hidden" style={{ '--delay': '200ms' } as React.CSSProperties}>
-                <Card className="flex-1">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5" />
-                      Resumo do Sistema
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-5 gap-4">
-                      <div className="text-center p-4 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold text-primary">{vendas.length}</p>
-                        <p className="text-sm text-muted-foreground">Vendas</p>
+            {/* Main Content — admin/gestor only */}
+            {(perfil === 'admin' || perfil === 'gestor') && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-4 gap-4 flex-1 min-h-0">
+                <div className="lg:col-span-2 2xl:col-span-3 flex flex-col gap-4 animate-slide-up overflow-hidden" style={{ '--delay': '200ms' } as React.CSSProperties}>
+                  <Card className="flex-1">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5" />
+                        Resumo do Sistema
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-5 gap-4">
+                        <div className="text-center p-4 bg-muted/50 rounded-lg">
+                          <p className="text-2xl font-bold text-primary">{vendas.length}</p>
+                          <p className="text-sm text-muted-foreground">Vendas</p>
+                        </div>
+                        <div className="text-center p-4 bg-muted/50 rounded-lg">
+                          <p className="text-2xl font-bold text-primary">{produtos.length}</p>
+                          <p className="text-sm text-muted-foreground">Produtos</p>
+                        </div>
+                        <div className="text-center p-4 bg-muted/50 rounded-lg">
+                          <p className="text-2xl font-bold text-primary">{ordensServico.length}</p>
+                          <p className="text-sm text-muted-foreground">Ordens de Serviço</p>
+                        </div>
+                        <div className="text-center p-4 bg-muted/50 rounded-lg">
+                          <p className="text-2xl font-bold text-primary">{colaboradoresAtivos}</p>
+                          <p className="text-sm text-muted-foreground">Colaboradores</p>
+                        </div>
                       </div>
-                      <div className="text-center p-4 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold text-primary">{produtos.length}</p>
-                        <p className="text-sm text-muted-foreground">Produtos</p>
-                      </div>
-                      <div className="text-center p-4 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold text-primary">{ordensServico.length}</p>
-                        <p className="text-sm text-muted-foreground">Ordens de Serviço</p>
-                      </div>
-                      <div className="text-center p-4 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold text-primary">{colaboradoresAtivos}</p>
-                        <p className="text-sm text-muted-foreground">Colaboradores</p>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6">
-                      <h3 className="font-semibold mb-3">Últimas Vendas</h3>
-                      <div className="space-y-2">
-                        {vendas.slice(0, 5).map(venda => (
-                          <div key={venda.id} className="flex justify-between items-center p-2 bg-muted/30 rounded">
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium text-sm truncate">{venda.clienteNome}</p>
-                              <p className="text-xs text-muted-foreground">{new Date(venda.dataHora).toLocaleDateString('pt-BR')}</p>
+                      
+                      <div className="mt-6">
+                        <h3 className="font-semibold mb-3">Últimas Vendas</h3>
+                        <div className="space-y-2">
+                          {vendas.slice(0, 5).map(venda => (
+                            <div key={venda.id} className="flex justify-between items-center p-2 bg-muted/30 rounded">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium text-sm truncate">{venda.clienteNome}</p>
+                                <p className="text-xs text-muted-foreground">{new Date(venda.dataHora).toLocaleDateString('pt-BR')}</p>
+                              </div>
+                              <span className="font-semibold text-primary shrink-0 ml-2">{formatCurrency(venda.total)}</span>
                             </div>
-                            <span className="font-semibold text-primary shrink-0 ml-2">{formatCurrency(venda.total)}</span>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <div className="lg:col-span-1 flex flex-col gap-4 animate-slide-up overflow-hidden" style={{ '--delay': '300ms' } as React.CSSProperties}>
+                  <RankingVendedores />
+                </div>
               </div>
-              
-              {/* Right column - Ranking de Vendedores */}
-              <div className="lg:col-span-1 flex flex-col gap-4 animate-slide-up overflow-hidden" style={{ '--delay': '300ms' } as React.CSSProperties}>
-                <RankingVendedores />
-              </div>
-            </div>
+            )}
           </div>
         </main>
       </div>

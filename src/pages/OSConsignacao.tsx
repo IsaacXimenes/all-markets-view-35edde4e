@@ -249,7 +249,7 @@ export default function OSConsignacao() {
       clearDraft();
       setNovoFornecedor('');
       setNovoItens([{ descricao: '', modelo: '', quantidade: '1', valorCusto: '', lojaDestinoId: '' }]);
-      toast({ title: 'Lote criado', description: `${lote.id} cadastrado com ${lote.itens.length} item(s)` });
+      toast({ title: 'Lote criado', description: `${lote.codigo || lote.id} cadastrado com ${lote.itens.length} item(s)` });
       voltar();
     } catch (error) {
       console.error('Erro ao criar lote:', error);
@@ -328,7 +328,7 @@ export default function OSConsignacao() {
     );
 
     if (result) {
-      toast({ title: 'Lote finalizado', description: `${loteSelecionado.id} concluído. Devoluções confirmadas.` });
+      toast({ title: 'Lote finalizado', description: `${loteSelecionado.codigo || loteSelecionado.id} concluído. Devoluções confirmadas.` });
       setFinFormaPagamento('');
       setFinContaBancaria('');
       setFinNomeRecebedor('');
@@ -1357,7 +1357,7 @@ export default function OSConsignacao() {
                 const valorUsado = getValorConsumido(lote);
                 return (
                   <TableRow key={lote.id}>
-                    <TableCell className="font-mono text-xs font-medium">{lote.id}</TableCell>
+                    <TableCell className="font-mono text-xs font-medium">{lote.codigo || lote.id.slice(0, 8)}</TableCell>
                     <TableCell>{getFornecedorNome(lote.fornecedorId)}</TableCell>
                     <TableCell className="text-xs">{new Date(lote.dataCriacao).toLocaleDateString('pt-BR')}</TableCell>
                     <TableCell>{lote.itens.length}</TableCell>

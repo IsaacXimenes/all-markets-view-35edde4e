@@ -1453,6 +1453,7 @@ export type Database = {
       }
       itens_consignacao: {
         Row: {
+          codigo: string | null
           created_at: string | null
           data_consumo: string | null
           data_devolucao: string | null
@@ -1471,6 +1472,7 @@ export type Database = {
           valor_custo: number | null
         }
         Insert: {
+          codigo?: string | null
           created_at?: string | null
           data_consumo?: string | null
           data_devolucao?: string | null
@@ -1489,6 +1491,7 @@ export type Database = {
           valor_custo?: number | null
         }
         Update: {
+          codigo?: string | null
           created_at?: string | null
           data_consumo?: string | null
           data_devolucao?: string | null
@@ -1737,6 +1740,7 @@ export type Database = {
       }
       lotes_consignacao: {
         Row: {
+          codigo: string | null
           created_at: string | null
           data_criacao: string | null
           fornecedor_id: string | null
@@ -1747,6 +1751,7 @@ export type Database = {
           timeline: Json | null
         }
         Insert: {
+          codigo?: string | null
           created_at?: string | null
           data_criacao?: string | null
           fornecedor_id?: string | null
@@ -1757,6 +1762,7 @@ export type Database = {
           timeline?: Json | null
         }
         Update: {
+          codigo?: string | null
           created_at?: string | null
           data_criacao?: string | null
           fornecedor_id?: string | null

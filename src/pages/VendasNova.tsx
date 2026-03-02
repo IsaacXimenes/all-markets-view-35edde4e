@@ -655,12 +655,14 @@ export default function VendasNova() {
 
   // Acessórios filtrados
   const acessoriosFiltrados = useMemo(() => {
+    const lojasPool = lojaVenda ? getLojasPorPoolEstoque(lojaVenda) : [];
     return acessoriosEstoque.filter(a => {
       if (a.quantidade <= 0) return false;
+      if (lojaVenda && !lojasPool.includes(a.loja)) return false;
       if (buscaAcessorio && !a.descricao.toLowerCase().includes(buscaAcessorio.toLowerCase())) return false;
       return true;
     });
-  }, [acessoriosEstoque, buscaAcessorio]);
+  }, [acessoriosEstoque, buscaAcessorio, lojaVenda]);
 
   // Adicionar acessório à venda
   const handleAddAcessorio = (acessorio: Acessorio) => {
@@ -3563,7 +3565,7 @@ export default function VendasNova() {
                   <TableBody>
                     {acessoriosFiltrados.map(acessorio => (
                       <TableRow key={acessorio.id} className={acessorio.quantidade < 10 ? 'bg-destructive/10' : ''}>
-                        <TableCell className="font-mono text-sm">{acessorio.id}</TableCell>
+                        <TableCell className="font-mono text-sm">{acessorio.codigo || acessorio.id.slice(0, 8)}</TableCell>
                         <TableCell className="font-medium">{acessorio.descricao}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{acessorio.categoria}</Badge>

@@ -207,7 +207,7 @@ export default function EstoqueProdutos() {
         </ResponsiveCardGrid>
 
         {/* Filters */}
-        <Card className="overflow-hidden">
+        <Card className="overflow-visible">
           <CardContent className="p-3 sm:p-4">
             <ResponsiveFilterGrid cols={5}>
               <div>
@@ -244,7 +244,6 @@ export default function EstoqueProdutos() {
                   value={lojaFilter === 'todas' ? '' : lojaFilter}
                   onChange={(v) => setLojaFilter(v || 'todas')}
                   placeholder="Todas as lojas"
-                  apenasLojasTipoLoja
                 />
               </div>
 

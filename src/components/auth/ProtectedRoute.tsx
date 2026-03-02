@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { Loader2 } from 'lucide-react';
 
 export const ProtectedRoute = () => {
@@ -8,6 +9,8 @@ export const ProtectedRoute = () => {
   const isLoading = useAuthStore((state) => state.isLoading);
   const isFirstLogin = useAuthStore((state) => state.isFirstLogin);
   const initialize = useAuthStore((state) => state.initialize);
+  const { canAccessRoute } = useUserPermissions();
+  const location = useLocation();
 
   useEffect(() => {
     initialize();
@@ -27,6 +30,11 @@ export const ProtectedRoute = () => {
 
   if (isFirstLogin) {
     return <Navigate to="/definir-senha" replace />;
+  }
+
+  // Block unauthorized routes — redirect to Dashboard
+  if (!canAccessRoute(location.pathname)) {
+    return <Navigate to="/" replace />;
   }
 
   return <Outlet />;

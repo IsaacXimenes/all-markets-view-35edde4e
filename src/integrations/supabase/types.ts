@@ -3178,6 +3178,7 @@ export type Database = {
           first_login: boolean | null
           id: string
           nome_completo: string
+          role: string | null
           updated_at: string | null
           username: string
         }
@@ -3191,6 +3192,7 @@ export type Database = {
           first_login?: boolean | null
           id: string
           nome_completo?: string
+          role?: string | null
           updated_at?: string | null
           username: string
         }
@@ -3204,6 +3206,7 @@ export type Database = {
           first_login?: boolean | null
           id?: string
           nome_completo?: string
+          role?: string | null
           updated_at?: string | null
           username?: string
         }

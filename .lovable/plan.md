@@ -1,39 +1,26 @@
 
-# Plano: Adicionar Quantidade Total no resumo do novo lote de Consignacao
+# Plano: Corrigir Draft Dialog da Consignacao + Filtrar Maquinas por Loja
 
-## Alteracao
+## Problema 1: Draft Dialog nao aparece no momento correto
 
-No arquivo `src/pages/OSConsignacao.tsx`, adicionar o calculo da quantidade total e exibi-la ao lado do valor total no rodape do formulario de novo lote.
+O Dialog de rascunho esta posicionado no JSX da view `detalhamento` (linha 1408), mas quando o usuario entra na view `novo`, o componente retorna cedo (linha 468-581) e nunca renderiza o Dialog. Por isso, o dialog so aparece quando o usuario volta para outra view.
 
-### Detalhes tecnicos
+**Solucao:** Mover o Draft Dialog para dentro do bloco de retorno da view `novo` (antes do fechamento `</OSLayout>` na linha 580).
 
-1. **Calcular quantidade total** (ao lado do `valorTotalNovo`, linha ~219):
-```ts
-const quantidadeTotalNovo = novoItens.reduce((acc, item) => {
-  return acc + (parseInt(item.quantidade) || 0);
-}, 0);
-```
+### Arquivo: `src/pages/OSConsignacao.tsx`
+- Copiar o bloco do Draft Dialog (linhas 1408-1429) para dentro da view `novo`, logo antes do `</OSLayout>` na linha 580
+- Remover o Draft Dialog da posicao atual (linha 1408-1429) na view `detalhamento`
 
-2. **Atualizar o rodape** (linhas 552-555) para exibir ambas as informacoes:
-```tsx
-<div className="mt-4 p-3 bg-muted rounded-lg flex justify-between items-center">
-  <div className="flex gap-6">
-    <div>
-      <span className="text-sm text-muted-foreground">Quantidade:</span>
-      <span className="ml-2 font-bold">{quantidadeTotalNovo}</span>
-    </div>
-    <div>
-      <span className="text-sm text-muted-foreground">Valor Total:</span>
-      <span className="ml-2 text-lg font-bold">{formatCurrency(valorTotalNovo)}</span>
-    </div>
-  </div>
-</div>
-```
+## Problema 2: Maquinas de cartao nao filtradas por loja
 
-A quantidade total soma todas as quantidades dos itens lancados (ex: 3 pecas com quantidade 5 = 15).
+Ja planejado anteriormente. Filtrar maquinas por `lojaVendaId`.
 
-## Arquivo afetado
+### Arquivo: `src/components/vendas/PagamentoQuadro.tsx`
+- Linha 640: adicionar `.filter(maq => !lojaVendaId || maq.lojaVinculada === lojaVendaId)` antes do `.map()`
+
+## Resumo
 
 | Arquivo | Alteracao |
 |---------|----------|
-| `src/pages/OSConsignacao.tsx` | Adicionar calculo e exibicao da quantidade total no resumo do lote |
+| `src/pages/OSConsignacao.tsx` | Mover Draft Dialog para dentro da view 'novo' |
+| `src/components/vendas/PagamentoQuadro.tsx` | Filtrar maquinas de cartao pela loja da venda |

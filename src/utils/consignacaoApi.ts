@@ -14,6 +14,7 @@ export interface TimelineConsignacao {
 
 export interface ItemConsignacao {
   id: string;
+  codigo?: string;
   pecaId: string;
   descricao: string;
   modelo: string;
@@ -42,6 +43,7 @@ export interface PagamentoParcial {
 
 export interface LoteConsignacao {
   id: string;
+  codigo?: string;
   fornecedorId: string;
   dataCriacao: string;
   responsavelCadastro: string;
@@ -70,6 +72,7 @@ export const setNotasRef = (notas: NotaAssistencia[], counter: number) => {
 // ============= MAPPING =============
 const mapItemFromDb = (r: any): ItemConsignacao => ({
   id: r.id,
+  codigo: r.codigo || undefined,
   pecaId: r.peca_id || '',
   descricao: r.descricao || '',
   modelo: r.modelo || '',
@@ -87,6 +90,7 @@ const mapItemFromDb = (r: any): ItemConsignacao => ({
 
 const mapLoteFromDb = (r: any, itens: ItemConsignacao[]): LoteConsignacao => ({
   id: r.id,
+  codigo: r.codigo || undefined,
   fornecedorId: r.fornecedor_id || '',
   dataCriacao: r.data_criacao || r.created_at,
   responsavelCadastro: r.responsavel_cadastro || '',
@@ -98,6 +102,7 @@ const mapLoteFromDb = (r: any, itens: ItemConsignacao[]): LoteConsignacao => ({
 
 const loteToDb = (l: LoteConsignacao) => ({
   id: l.id,
+  codigo: l.codigo || null,
   fornecedor_id: l.fornecedorId,
   data_criacao: l.dataCriacao,
   responsavel_cadastro: l.responsavelCadastro,
@@ -108,6 +113,7 @@ const loteToDb = (l: LoteConsignacao) => ({
 
 const itemToDb = (item: ItemConsignacao, loteId: string) => ({
   id: item.id,
+  codigo: item.codigo || null,
   lote_id: loteId,
   peca_id: item.pecaId,
   descricao: item.descricao,
@@ -155,8 +161,17 @@ export const initConsignacaoCache = async () => {
     });
 
     lotes = (lotesRes.data || []).map(r => mapLoteFromDb(r, itensMap.get(r.id) || []));
-    nextLoteId = lotes.length + 1;
-    nextItemId = (itensRes.data || []).length + 1;
+    // Calculate next sequential IDs from existing codigo values
+    const loteNums = (lotesRes.data || []).map(r => {
+      const m = (r.codigo || '').match(/CONS-(\d+)/);
+      return m ? parseInt(m[1]) : 0;
+    });
+    nextLoteId = (loteNums.length > 0 ? Math.max(...loteNums) : 0) + 1;
+    const itemNums = (itensRes.data || []).map(r => {
+      const m = (r.codigo || '').match(/CONS-ITEM-(\d+)/);
+      return m ? parseInt(m[1]) : 0;
+    });
+    nextItemId = (itemNums.length > 0 ? Math.max(...itemNums) : 0) + 1;
     nextPagamentoId = lotes.reduce((acc, l) => acc + l.pagamentosParciais.length, 0) + 1;
     cacheInitialized = true;
     console.log(`[CONSIGNACAO] Cache: ${lotes.length} lotes, ${(itensRes.data || []).length} itens`);
@@ -188,7 +203,8 @@ export interface CriarLoteInput {
 }
 
 export const criarLoteConsignacao = async (dados: CriarLoteInput): Promise<LoteConsignacao> => {
-  const loteId = `CONS-${String(nextLoteId++).padStart(3, '0')}`;
+  const loteUuid = crypto.randomUUID();
+  const loteCodigo = `CONS-${String(nextLoteId++).padStart(3, '0')}`;
 
   const itensConsignacao: ItemConsignacao[] = await Promise.all(dados.itens.map(async (item) => {
     const pecaCriada = await addPeca({
@@ -201,13 +217,15 @@ export const criarLoteConsignacao = async (dados: CriarLoteInput): Promise<LoteC
       dataEntrada: new Date().toISOString(),
       origem: 'Consignacao',
       status: 'Disponível',
-      loteConsignacaoId: loteId,
+      loteConsignacaoId: loteCodigo,
       fornecedorId: dados.fornecedorId,
     });
 
-    const itemId = `CONS-ITEM-${String(nextItemId++).padStart(3, '0')}`;
+    const itemUuid = crypto.randomUUID();
+    const itemCodigo = `CONS-ITEM-${String(nextItemId++).padStart(3, '0')}`;
     return {
-      id: itemId,
+      id: itemUuid,
+      codigo: itemCodigo,
       pecaId: pecaCriada.id,
       descricao: item.descricao,
       modelo: item.modelo,
@@ -220,7 +238,8 @@ export const criarLoteConsignacao = async (dados: CriarLoteInput): Promise<LoteC
   }));
 
   const lote: LoteConsignacao = {
-    id: loteId,
+    id: loteUuid,
+    codigo: loteCodigo,
     fornecedorId: dados.fornecedorId,
     dataCriacao: new Date().toISOString(),
     responsavelCadastro: dados.responsavel,
@@ -240,7 +259,7 @@ export const criarLoteConsignacao = async (dados: CriarLoteInput): Promise<LoteC
   // Persist to Supabase
   await syncLoteToDb(lote);
   for (const item of itensConsignacao) {
-    await syncItemToDb(item, loteId);
+    await syncItemToDb(item, loteUuid);
   }
 
   return lote;
@@ -789,9 +808,11 @@ export const editarLoteConsignacao = async (loteId: string, dados: EditarLoteInp
         fornecedorId: lote.fornecedorId,
       });
 
-      const itemId = `CONS-ITEM-${String(nextItemId++).padStart(3, '0')}`;
+      const itemUuid = crypto.randomUUID();
+      const itemCodigo = `CONS-ITEM-${String(nextItemId++).padStart(3, '0')}`;
       const newItem: ItemConsignacao = {
-        id: itemId,
+        id: itemUuid,
+        codigo: itemCodigo,
         pecaId: pecaCriada.id,
         descricao: novoItem.descricao,
         modelo: novoItem.modelo,

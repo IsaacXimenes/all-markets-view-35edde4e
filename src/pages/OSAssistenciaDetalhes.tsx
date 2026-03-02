@@ -21,7 +21,8 @@ import {
   formatCurrency, 
   calcularSLADias,
   OrdemServico,
-  updateOrdemServico
+  updateOrdemServico,
+  formatOSNumber
 } from '@/utils/assistenciaApi';
 import { atualizarStatusProdutoPendente } from '@/utils/osApi';
 import { getLoteRevisaoById, atualizarItemRevisao, finalizarLoteComLogisticaReversa, ResultadoItemRevisao, sincronizarNotaComLote, registrarEventoTecnicoNaNota } from '@/utils/loteRevisaoApi';
@@ -518,7 +519,7 @@ export default function OSAssistenciaDetalhes() {
            RECIBO DE SERVIÇO
 ===========================================
 
-Nº OS: ${os.id}
+Nº OS: ${formatOSNumber(os)}
 Data: ${new Date(os.dataHora).toLocaleString('pt-BR')}
 Setor: ${os.setor}
 Status: ${os.status}
@@ -559,13 +560,13 @@ ${os.descricao ? `\nDescrição:\n${os.descricao}` : ''}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `recibo-${os.id}.txt`;
+    a.download = `recibo-${formatOSNumber(os)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
-    <PageLayout title={`Detalhes da OS ${os.id}`}>
+    <PageLayout title={`Detalhes da OS ${formatOSNumber(os)}`}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">

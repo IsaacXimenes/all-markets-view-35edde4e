@@ -213,7 +213,7 @@ export default function FinanceiroCentralDespesas() {
     if (!pagarModal) return;
     await pagarDespesa(pagarModal.id, user?.colaborador?.nome || 'Não identificado', comprovantePagamento || undefined);
     refreshDespesas();
-    toast.success(`Despesa ${pagarModal.id} marcada como Paga`);
+    toast.success(`Despesa ${pagarModal.numeroSequencial ? `DEP-${String(pagarModal.numeroSequencial).padStart(4, '0')}` : pagarModal.id.substring(0, 8)} marcada como Paga`);
     if (pagarModal.recorrente) {
       setProvisionarModal(pagarModal);
     }
@@ -546,7 +546,7 @@ export default function FinanceiroCentralDespesas() {
                 <TableBody>
                   {despesasFiltradas.map(d => (
                     <TableRow key={d.id} className={getRowClass(d.status)}>
-                      <TableCell className="font-mono text-xs">{d.id}</TableCell>
+                      <TableCell className="font-mono text-xs">{d.numeroSequencial ? `DEP-${String(d.numeroSequencial).padStart(4, '0')}` : d.id.substring(0, 8)}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={d.tipo === 'Fixa' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-400' : 'bg-orange-500/10 text-orange-700 dark:text-orange-400'}>
                           {d.tipo}

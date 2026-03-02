@@ -1,5 +1,6 @@
 // Finance API - Supabase
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 import { getContasFinanceiras, ContaFinanceira, addContaFinanceira, updateContaFinanceira, deleteContaFinanceira } from './cadastrosApi';
 
 // Re-exportar tipos e funções de contas para manter compatibilidade
@@ -10,6 +11,7 @@ export const deleteConta = deleteContaFinanceira;
 
 export interface Pagamento {
   id: string;
+  numeroSequencial?: number;
   data: string;
   descricao: string;
   valor: number;
@@ -26,6 +28,7 @@ export const CATEGORIAS_DESPESA = [
 
 export interface Despesa {
   id: string;
+  numeroSequencial?: number;
   tipo: 'Fixa' | 'Variável';
   data: string;
   descricao: string;
@@ -56,6 +59,7 @@ let _finCacheLoaded = false;
 // DB -> App mapping
 const mapPagamentoFromDB = (row: any): Pagamento => ({
   id: row.id,
+  numeroSequencial: row.numero_sequencial || undefined,
   data: row.data ? new Date(row.data).toISOString().split('T')[0] : '',
   descricao: row.descricao || '',
   valor: Number(row.valor) || 0,
@@ -67,6 +71,7 @@ const mapPagamentoFromDB = (row: any): Pagamento => ({
 
 const mapDespesaFromDB = (row: any): Despesa => ({
   id: row.id,
+  numeroSequencial: row.numero_sequencial || undefined,
   tipo: row.tipo || 'Variável',
   data: row.data || '',
   descricao: row.descricao || '',
@@ -163,7 +168,7 @@ export const criarPagamentosDeVenda = async (venda: VendaParaPagamento): Promise
       }
     }
 
-    const { data: row, error } = await supabase.from('pagamentos_financeiros').insert({
+    const { data: row, error } = await withRetry(() => supabase.from('pagamentos_financeiros').insert({
       data: new Date().toISOString(),
       descricao: `Venda #${venda.id} - ${venda.clienteNome}`,
       valor: pag.valor,
@@ -171,7 +176,7 @@ export const criarPagamentosDeVenda = async (venda: VendaParaPagamento): Promise
       conta: contaNome,
       loja: venda.lojaVenda,
       status: 'Pendente',
-    }).select().single();
+    }).select().single());
 
     if (!error && row) {
       const novoPag = mapPagamentoFromDB(row);
@@ -189,7 +194,7 @@ export const getDespesas = (): Despesa[] => {
 };
 
 export const addDespesa = async (despesa: Omit<Despesa, 'id'>): Promise<Despesa> => {
-  const { data: row, error } = await supabase.from('despesas').insert({
+  const { data: row, error } = await withRetry(() => supabase.from('despesas').insert({
     tipo: despesa.tipo,
     data: despesa.data,
     descricao: despesa.descricao,
@@ -207,7 +212,7 @@ export const addDespesa = async (despesa: Omit<Despesa, 'id'>): Promise<Despesa>
     pago_por: despesa.pagoPor || null,
     comprovante: despesa.comprovante || null,
     documento: despesa.documento || null,
-  }).select().single();
+  }).select().single());
 
   if (error || !row) throw error || new Error('Falha ao inserir despesa');
 
@@ -246,7 +251,7 @@ export const updateDespesa = async (id: string, data: Partial<Despesa>): Promise
   if (data.comprovante !== undefined) db.comprovante = data.comprovante;
   if (data.documento !== undefined) db.documento = data.documento;
 
-  const { error } = await supabase.from('despesas').update(db).eq('id', id);
+  const { error } = await withRetry(() => supabase.from('despesas').update(db).eq('id', id));
   if (error) return false;
 
   _despesasCache[index] = { ..._despesasCache[index], ...data };

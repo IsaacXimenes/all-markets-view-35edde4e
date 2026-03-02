@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getOrdensServico, calcularSLADias, formatCurrency, exportOSToCSV, OrdemServico } from '@/utils/assistenciaApi';
+import { getOrdensServico, calcularSLADias, formatCurrency, exportOSToCSV, OrdemServico, formatOSNumber } from '@/utils/assistenciaApi';
 import { getClientes } from '@/utils/cadastrosApi';
 import { useCadastroStore } from '@/store/cadastroStore';
 import { AutocompleteColaborador } from '@/components/AutocompleteColaborador';
@@ -559,7 +559,7 @@ export default function OSAssistencia() {
           <TableBody>
             {ordensFiltradas.map(os => (
               <TableRow key={os.id} className={os.recusadaTecnico ? 'bg-red-500/15' : ''}>
-                <TableCell className="font-mono text-xs font-medium">{os.id}</TableCell>
+                <TableCell className="font-mono text-xs font-medium">{formatOSNumber(os)}</TableCell>
                 <TableCell className="text-xs">
                   {new Date(os.dataHora).toLocaleString('pt-BR')}
                 </TableCell>
@@ -618,7 +618,7 @@ export default function OSAssistencia() {
                       size="sm"
                       title="Gerar Recibo"
                       onClick={() => {
-                        toast.success(`Recibo da OS ${os.id} gerado com sucesso!`);
+                        toast.success(`Recibo da OS ${formatOSNumber(os)} gerado com sucesso!`);
                       }}
                     >
                       <FileText className="h-4 w-4" />

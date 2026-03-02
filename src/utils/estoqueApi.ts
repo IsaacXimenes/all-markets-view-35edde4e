@@ -1,5 +1,6 @@
 // Estoque API - Supabase
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 import { initializeProductIds, registerProductId, generateProductId } from './idManager';
 import { useCadastroStore } from '@/store/cadastroStore';
 
@@ -435,7 +436,7 @@ export const getProdutoByIMEI = (imei: string): Produto | null => _produtos.find
 
 export const updateProduto = async (id: string, updates: Partial<Produto>): Promise<Produto | null> => {
   const dbData = mapProdutoToDB(updates);
-  const { data, error } = await supabase.from('produtos').update(dbData).eq('id', id).select().single();
+  const { data, error } = await withRetry(() => supabase.from('produtos').update(dbData).eq('id', id).select().single());
   if (error || !data) { console.error('[ESTOQUE] updateProduto error:', error); throw error || new Error('updateProduto: no data returned'); }
   const updated = mapProdutoFromDB(data);
   const idx = _produtos.findIndex(p => p.id === id);
@@ -579,10 +580,10 @@ export const addMovimentacao = async (mov: Omit<Movimentacao, 'id' | 'codigoLegi
   const produtoId = mov.produtoId || _produtos.find(p => p.imei === mov.imei)?.id || null;
   // Usar responsavelId (UUID) para o DB, e manter o nome no cache local
   const responsavelIdDb = mov.responsavelId || null;
-  const { data, error } = await supabase.from('movimentacoes_estoque').insert({
+  const { data, error } = await withRetry(() => supabase.from('movimentacoes_estoque').insert({
     produto_id: produtoId, loja_origem_id: mov.origem, loja_destino_id: mov.destino,
     responsavel_id: responsavelIdDb, motivo: mov.motivo, tipo_movimentacao: 'Pendente',
-  }).select().single();
+  }).select().single());
   if (error) throw error;
   const codigoLegivel = generateMovId();
   const newMov: Movimentacao = { ...mov, id: data.id, codigoLegivel, status: 'Pendente' };

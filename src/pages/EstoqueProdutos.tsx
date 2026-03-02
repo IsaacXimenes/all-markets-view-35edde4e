@@ -349,28 +349,24 @@ export default function EstoqueProdutos() {
             </TableHeader>
             <TableBody>
               {produtosFiltrados.map(produto => {
-                // Cores baseadas na saúde da bateria seguindo o padrão do sistema
-                const getRowClassByBattery = (saudeBateria: number) => {
-                  if (saudeBateria >= 90) return 'bg-green-500/10'; // Excelente - verde
-                  if (saudeBateria >= 80) return ''; // Normal - sem cor
-                  if (saudeBateria >= 70) return 'bg-yellow-500/10'; // Atenção - amarelo
-                  return 'bg-destructive/10'; // Crítico - vermelho
+                // Cores baseadas no tipo do produto: Novo = verde, Seminovo = sem cor
+                const getRowClassByTipo = (tipo: string) => {
+                  return tipo === 'Novo' ? 'bg-green-500/10' : '';
                 };
 
-                const getStickyBgByBattery = (saudeBateria: number) => {
-                  if (saudeBateria >= 90) return 'bg-[hsl(142,72%,95%)] dark:bg-[hsl(142,30%,14%)]';
-                  if (saudeBateria >= 80) return 'bg-background';
-                  if (saudeBateria >= 70) return 'bg-[hsl(38,92%,95%)] dark:bg-[hsl(38,40%,14%)]';
-                  return 'bg-[hsl(0,84%,95%)] dark:bg-[hsl(0,40%,14%)]';
+                const getStickyBgByTipo = (tipo: string) => {
+                  return tipo === 'Novo' 
+                    ? 'bg-[hsl(142,72%,95%)] dark:bg-[hsl(142,30%,14%)]' 
+                    : 'bg-background';
                 };
                 
                 return (
                 <TableRow 
                   key={produto.id}
-                  className={getRowClassByBattery(produto.saudeBateria)}
+                  className={getRowClassByTipo(produto.tipo)}
                 >
                   {/* Produto (sticky) */}
-                   <TableCell className={cn("sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[200px] max-w-[260px]", getStickyBgByBattery(produto.saudeBateria))}>
+                   <TableCell className={cn("sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[200px] max-w-[260px]", getStickyBgByTipo(produto.tipo))}>
                     <div className="flex flex-col gap-0.5">
                       <span className="font-medium text-sm truncate max-w-[240px]" title={produto.modelo}>{produto.modelo}</span>
                       <span className="text-xs text-muted-foreground">{produto.cor}</span>

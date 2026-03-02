@@ -107,6 +107,7 @@ export interface HistoricoAlteracaoConta {
 
 export interface ContaFinanceira {
   id: string;
+  codigoLegivel: string;
   nome: string;
   tipo: string;
   lojaVinculada: string;
@@ -350,7 +351,7 @@ const mapRowToFornecedor = (row: any): Fornecedor => ({
 });
 
 const mapRowToContaFinanceira = (row: any): ContaFinanceira => ({
-  id: row.id, nome: row.nome, tipo: row.tipo || '', lojaVinculada: row.loja_vinculada || '',
+  id: row.id, codigoLegivel: row.codigo_legivel || '', nome: row.nome, tipo: row.tipo || '', lojaVinculada: row.loja_vinculada || '',
   banco: row.banco || '', agencia: row.agencia || '', conta: row.conta || '', cnpj: row.cnpj || '',
   saldoInicial: row.saldo_inicial ?? 0, saldoAtual: row.saldo_atual ?? 0,
   status: (row.status as 'Ativo' | 'Inativo') || 'Ativo',
@@ -728,12 +729,24 @@ export const toggleContaFinanceira = async (id: string, usuario: string, observa
 };
 
 export const addContaFinanceira = async (conta: Omit<ContaFinanceira, 'id'>): Promise<ContaFinanceira> => {
+  // Auto-generate codigoLegivel if not provided
+  let codigoLegivel = conta.codigoLegivel;
+  if (!codigoLegivel) {
+    const existingCodes = _contasFinanceirasCache
+      .map(c => c.codigoLegivel)
+      .filter(c => c && c.startsWith('CTA-'))
+      .map(c => parseInt(c.replace('CTA-', ''), 10))
+      .filter(n => !isNaN(n));
+    const nextNum = existingCodes.length > 0 ? Math.max(...existingCodes) + 1 : 1;
+    codigoLegivel = `CTA-${String(nextNum).padStart(3, '0')}`;
+  }
   const { data, error } = await withRetry(() => supabase.from('contas_financeiras').insert({
     nome: conta.nome, tipo: conta.tipo, loja_vinculada: conta.lojaVinculada,
     banco: conta.banco, agencia: conta.agencia, conta: conta.conta, cnpj: conta.cnpj,
     saldo_inicial: conta.saldoInicial, saldo_atual: conta.saldoAtual, status: conta.status || 'Ativo',
     status_maquina: conta.statusMaquina, nota_fiscal: conta.notaFiscal,
     habilitada: conta.habilitada ?? true, historico_alteracoes: (conta.historicoAlteracoes || []) as any,
+    codigo_legivel: codigoLegivel,
   } as any).select().single());
   if (error) throw error;
   const nova = mapRowToContaFinanceira(data);

@@ -100,6 +100,7 @@ export default function CadastrosContasFinanceiras() {
 
     const dataToSave = { 
       ...form, 
+      codigoLegivel: editingConta?.codigoLegivel || '',
       saldoAtual: form.saldoAtual || form.saldoInicial,
       notaFiscal: form.statusMaquina === 'Própria',
       habilitada: true,
@@ -211,7 +212,7 @@ export default function CadastrosContasFinanceiras() {
             <TableBody>
               {contas.map(conta => (
                 <TableRow key={conta.id} className={conta.habilitada === false ? 'opacity-50' : ''}>
-                  <TableCell className="font-mono text-xs">{conta.id}</TableCell>
+                  <TableCell className="font-mono text-xs">{conta.codigoLegivel || conta.id.substring(0, 8)}</TableCell>
                   <TableCell className="text-sm">{getLojaName(conta.lojaVinculada)}</TableCell>
                   <TableCell className="font-medium">{conta.nome}</TableCell>
                   <TableCell className="text-sm">{conta.tipo || '-'}</TableCell>

@@ -1,78 +1,115 @@
 
-# Blindagem de Seguranca - Correcao de 5 Erros Criticos (LGPD)
+# Blindagem Total do Estoque: Auditoria, Validacoes e Sincronizacao entre Modulos
 
-## Resumo do Diagnostico
+## 1. Nova Tabela de Auditoria: `estoque_audit_log`
 
-O Security Scan identificou 5 vulnerabilidades de exposicao de dados em tabelas com informacoes sensiveis. Todas as tabelas ja possuem RLS ativado, mas as politicas estao permissivas demais. A correcao sera feita inteiramente no banco de dados (RLS), garantindo que os dados nao saiam do Supabase para usuarios nao autorizados.
+Criar uma tabela dedicada para registrar TODAS as operacoes que alteram estoque, com campos completos para rastreabilidade:
+
+```text
+estoque_audit_log
++------------------+-------------------+
+| Campo            | Tipo              |
++------------------+-------------------+
+| id               | uuid (PK)         |
+| produto_id       | uuid (FK)         |
+| tipo_acao        | text              |
+|   (Entrada, Saida, Transferencia,    |
+|    Ajuste, Cancelamento)             |
+| quantidade_antes | integer           |
+| quantidade_depois| integer           |
+| loja_origem_id   | uuid              |
+| loja_destino_id  | uuid              |
+| referencia_id    | text              |
+|   (venda_id, os_id, nota_id, etc.)   |
+| referencia_tipo  | text              |
+|   (Venda, OS, NotaCompra, Ajuste,    |
+|    Transferencia, Cancelamento)      |
+| usuario_id       | uuid              |
+| usuario_nome     | text              |
+| descricao        | text              |
+| created_at       | timestamptz       |
++------------------+-------------------+
+```
+
+**RLS:** Somente admin e acesso_geral podem ler. INSERT liberado para authenticated (o sistema registra via funcoes).
+
+## 2. Trigger Automatico no Postgres
+
+Criar um trigger `AFTER UPDATE` na tabela `produtos` que dispara automaticamente quando o campo `quantidade` muda. O trigger grava o log com `quantidade_antes` (OLD) e `quantidade_depois` (NEW), garantindo que NENHUMA alteracao de estoque passe despercebida, mesmo que o frontend falhe.
+
+## 3. Reforco da RPC `decrementar_estoque_produto`
+
+Atualizar a funcao para:
+- Gravar automaticamente um registro no `estoque_audit_log` dentro da mesma transacao
+- Retornar `false` (e nao decrementar) se `quantidade < 1` (ja faz isso, manter)
+
+## 4. Reforco da RPC `transferir_estoque`
+
+A funcao ja valida atomicamente, mas vamos adicionar:
+- Mensagem de erro detalhada com saldo disponivel: `"Falha na Transferencia: Saldo insuficiente na origem (Disponivel: X)"`
+- Registro automatico no audit log
+
+## 5. Constraint de Banco: Bloqueio de Estoque Negativo
+
+Adicionar `CHECK (quantidade >= 0)` na tabela `produtos` para impedir QUALQUER operacao que resulte em estoque negativo, independentemente da origem. Isso e a trava de seguranca definitiva no nivel mais baixo.
+
+Adicionar o mesmo na tabela `pecas`: `CHECK (quantidade >= 0)`.
+
+## 6. Nova Aba "Historico de Auditoria" no Modulo Estoque
+
+Criar pagina `EstoqueAuditoria.tsx` com:
+- Tabela com colunas: Data/Hora, Usuario, Tipo Acao, Produto (Marca/Modelo), IMEI, Qtd Antes, Qtd Depois, Loja Origem, Loja Destino, Referencia
+- Filtros: por tipo de acao, periodo, loja, usuario
+- Dados carregados diretamente do Supabase (sem cache, pois e log de consulta)
+- Adicionar aba no EstoqueLayout
+
+## 7. Revisao dos Fluxos (Deep Check)
+
+### 7a. Venda -> Estoque
+**Status atual:** `addVenda` ja chama `decrementar_estoque_produto` via RPC atomica e registra `addMovimentacao`. O `numero_venda` (vendaId) ja e passado no motivo da movimentacao.
+
+**Melhoria:** Passar o `vendaId` e `numero` como `referencia_id` e `referencia_tipo = 'Venda'` no audit log (via trigger automatico).
+
+### 7b. OS -> Estoque (Pecas)
+**Status atual:** `darBaixaPeca` usa RPC `consumir_peca_os` que ja registra movimentacao na tabela `movimentacoes_pecas`.
+
+**Melhoria:** Adicionar registro no `estoque_audit_log` dentro da RPC `consumir_peca_os` para pecas tambem, com `referencia_tipo = 'OS'`.
+
+### 7c. Venda -> Financeiro
+**Status atual:** `addVenda` ja chama `criarPagamentosDeVenda` que insere na tabela `pagamentos_financeiros`. Funciona corretamente.
+
+**Melhoria:** Nenhuma correcao necessaria -- o fluxo esta correto.
+
+### 7d. Venda -> Comissao
+**Status atual:** `addVenda` ja salva `comissao_vendedor` na tabela `vendas`. O calculo e feito no frontend (`calculoComissaoVenda.ts`).
+
+**Melhoria:** Nenhuma correcao necessaria -- a comissao ja e calculada e salva com a venda.
+
+## 8. Feedback Visual de Conflito de Estoque
+
+No `VendasNova.tsx` e `VendasFinalizarDigital.tsx`, quando `decrementar_estoque_produto` retorna `false`:
+- Exibir toast vermelho destacado: "CONFLITO DE ESTOQUE: Este item acabou de ser vendido por outro usuario!"
+- Remover o item da venda automaticamente
+- Bloquear a finalizacao ate resolver
 
 ---
 
-## Correcoes Detalhadas
+## Resumo de Arquivos
 
-### 1. Tabela `profiles` (ERRO CRITICO)
-**Problema:** Politica "Authenticated users can read all profiles" permite que qualquer usuario autenticado leia TODOS os perfis (usernames, nomes, colaborador_id, cargos).
+### Banco de Dados (Migration)
+- Criar tabela `estoque_audit_log`
+- Criar trigger `trg_audit_produto_quantidade` na tabela `produtos`
+- Adicionar `CHECK (quantidade >= 0)` em `produtos` e `pecas`
+- Atualizar RPC `decrementar_estoque_produto` para gravar audit log
+- Atualizar RPC `transferir_estoque` com mensagem de erro detalhada
+- Atualizar RPC `consumir_peca_os` para gravar audit log
 
-**Correcao:** Substituir a politica ampla por uma que permita:
-- Usuario ve o proprio perfil (ja existe: `auth.uid() = id`)
-- Admin/Acesso Geral ve todos os perfis (necessario para gestao)
-- Gestor ve perfis da sua loja (necessario para autocomplete)
-- Remover a politica "Authenticated users can read all profiles"
-
-### 2. Tabela `colaboradores` (ERRO CRITICO)
-**Problema:** Atualmente so `is_acesso_geral` e o proprio colaborador podem ler. Mas o `cadastroStore` carrega TODOS os colaboradores para dropdowns (autocomplete de vendedor, gestor, responsavel). Os dados incluem CPF, telefone, salario.
-
-**Correcao:**
-- Criar funcao SECURITY DEFINER `get_colaboradores_basicos()` que retorna APENAS campos nao-sensiveis (id, nome, cargo, loja_id, eh_gestor, eh_vendedor, eh_estoquista, ativo, foto) para qualquer usuario autenticado
-- Manter a politica restritiva na tabela (admin/acesso_geral + proprio registro para dados completos)
-- Adicionar politica para admin (`has_role('admin')`) poder ler todos os registros completos
-- Atualizar o `cadastroStore` para usar a funcao basica nos carregamentos de dropdown
-
-### 3. Tabela `clientes` (ERRO CRITICO)
-**Problema:** Politica atual permite ALL (select/insert/update/delete) para qualquer `auth.uid() IS NOT NULL`. Dados sensiveis: CPF, telefone, email, endereco completo.
-
-**Correcao:** Substituir a politica unica por 4 politicas granulares:
-- **SELECT:** Admin/Acesso Geral (todos) + Gestor (propria loja) + Vendedor (propria loja)
-- **INSERT:** Admin/Acesso Geral + Gestor + Vendedor (precisam cadastrar clientes)
-- **UPDATE:** Admin/Acesso Geral + Gestor (propria loja)
-- **DELETE:** Admin/Acesso Geral apenas
-
-### 4. Tabela `contas_financeiras` (ERRO CRITICO)
-**Problema:** Gestor pode ler dados bancarios (conta, agencia, CNPJ, saldo). Deveria ser Admin/Financeiro apenas.
-
-**Correcao:** Remover `has_role('gestor')` da politica `contas_fin_select`. Apenas admin e acesso_geral mantem acesso.
-
-### 5. Tabela `vendas` (ERRO)
-**Problema:** Vendedor pode ver TODAS as vendas da sua loja, incluindo dados de clientes de outros vendedores.
-
-**Correcao:** A politica `vendas_select` ja filtra vendedor por `vendedor_id = get_user_colaborador_id()`. Adicionar `has_role('admin')` ao SELECT para admins que nao sao acesso_geral. Manter gestor vendo vendas da loja (necessario para gestao).
-
----
-
-## Modificacoes no Frontend
-
-### Arquivo: `src/store/cadastroStore.ts`
-- Alterar o carregamento de colaboradores para usar a funcao `get_colaboradores_basicos()` via RPC ao inves de `supabase.from('colaboradores').select('*')`
-- Isso garante que dados sensiveis (CPF, salario) nunca cheguem ao navegador de usuarios sem permissao
-
-### Arquivo: `src/utils/cadastrosApi.ts`
-- Atualizar `getColaboradoresAsync()` para usar a mesma funcao RPC
-- Manter as funcoes de CRUD (add/update/delete) inalteradas (ja protegidas por RLS)
-
----
-
-## Resumo de Alteracoes no Banco
-
-| Tabela | Acao |
-|--------|------|
-| `profiles` | Remover politica "read all", adicionar politica restritiva por role |
-| `colaboradores` | Criar funcao `get_colaboradores_basicos()`, adicionar politica admin |
-| `clientes` | Substituir politica ALL por 4 politicas granulares |
-| `contas_financeiras` | Remover acesso gestor do SELECT |
-| `vendas` | Adicionar admin ao SELECT |
-
-## Resumo de Alteracoes no Frontend
-
+### Frontend
 | Arquivo | Acao |
 |---------|------|
-| `src/store/cadastroStore.ts` | Usar RPC para carregar colaboradores basicos |
-| `src/utils/cadastrosApi.ts` | Usar RPC no `getColaboradoresAsync` |
+| `src/pages/EstoqueAuditoria.tsx` | Criar nova pagina de auditoria |
+| `src/components/layout/EstoqueLayout.tsx` | Adicionar aba "Auditoria" |
+| `src/App.tsx` | Adicionar rota `/estoque/auditoria` |
+| `src/utils/vendasApi.ts` | Melhorar feedback de conflito de estoque |
+| `src/pages/VendasNova.tsx` | Toast vermelho para conflito de concorrencia |
+| `src/pages/VendasFinalizarDigital.tsx` | Toast vermelho para conflito de concorrencia |

@@ -1,218 +1,132 @@
 
-# Varredura Exaustiva — Relatorio de Auditoria Nivel Critico
+# Replicacao de Seguranca, Atomicidade e Performance — Todos os Modulos
 
-## 1. Race Conditions (Condicoes de Corrida)
+## Visao Geral
 
-### 1.1 CRITICO: Numero de Venda Sequencial sem Atomicidade
+Aplicar os mesmos padroes de seguranca ja implementados no modulo de Vendas (sequence atomica, RPC de estoque, idempotencia, protecao FK) em todos os demais modulos do ERP: Assistencia, Estoque, Financeiro, RH e Cadastros.
 
-**Vulnerabilidade encontrada em `vendasApi.ts` linhas 355-363:**
+---
+
+## 1. Assistencia Tecnica
+
+### 1.1 RPC `consumir_peca_os` — Baixa Atomica de Pecas
+Criar funcao RPC no Postgres que decremente a quantidade da peca somente se `quantidade >= 1` e `status = 'Disponivel'`. Retorna `true` se sucesso, `false` se estoque insuficiente.
+
+Substituir a logica em `assistenciaApi.ts` (funcao `reduzirEstoquePecas`, linhas 357-373) que faz verificacao local e `updatePeca` manual pela chamada atomica via `supabase.rpc('consumir_peca_os', { p_peca_id, p_quantidade, p_os_id })`.
+
+### 1.2 Numero de OS via Sequence
+A tabela `ordens_servico` ja possui `numero_sequencial` com sequence (iniciando em 1001). Porem, a funcao `getNextOSNumber()` (linha 252-256) ainda calcula o proximo numero pelo cache local.
+
+**Correcao**: Marcar `getNextOSNumber` como `@deprecated` e garantir que `addOrdemServico` nao envie `numero_sequencial` no INSERT — deixando o banco gerar via DEFAULT. O numero e lido do retorno `data.numero_sequencial`. (Ja funciona assim parcialmente, mas a funcao legada ainda e exportada.)
+
+### 1.3 Tecnico Responsavel — Preenchimento Automatico
+Ja implementado pela regra de arquitetura `responsavel-field-automation`. O campo `tecnicoId` e preenchido com o colaborador logado via `useAuthStore`. Nenhuma alteracao de codigo necessaria — apenas documentar a restricao no plan.
+
+---
+
+## 2. Estoque (Logistica)
+
+### 2.1 RPC `transferir_estoque` — Movimentacao Atomica
+Criar funcao RPC que execute em uma unica transacao:
+1. Marca produto como `status_movimentacao = 'Em movimentacao'` e atualiza `loja_atual_id` para destino
+2. Insere registro na tabela `movimentacoes_estoque`
+3. Se qualquer passo falhar, faz rollback completo
+
+Substituir em `estoqueApi.ts` a logica de `addMovimentacao` (linhas 578-598) que faz insert + updateProduto separadamente.
+
+### 2.2 RPC `confirmar_recebimento_movimentacao` — Recepcao Atomica
+Criar RPC que atualize `tipo_movimentacao = 'Recebido'` na movimentacao e `loja_id`, `loja_atual_id`, `status_movimentacao = NULL` no produto em uma unica transacao. Substituir `confirmarRecebimentoMovimentacao` (linhas 601-627).
+
+### 2.3 Alerta de Estoque Critico
+A tabela `produtos` nao possui coluna `quantidade_minima`. Adicionar coluna `quantidade_minima INTEGER DEFAULT 0`. No frontend, adicionar funcao `getProdutosEstoqueCritico()` que filtra `quantidade > 0 AND quantidade <= quantidade_minima`. Exibir badge/alerta no dashboard do estoque.
+
+---
+
+## 3. Financeiro e RH
+
+### 3.1 Idempotencia em Despesas
+Adicionar coluna `idempotency_key UUID UNIQUE` na tabela `despesas`. Em `financeApi.ts`, gerar `crypto.randomUUID()` antes de cada INSERT em `addDespesa` (linha 198). O `withRetry` ja existente respeita a constraint UNIQUE automaticamente.
+
+### 3.2 Idempotencia em Pagamentos Financeiros
+Adicionar coluna `idempotency_key UUID UNIQUE` na tabela `pagamentos_financeiros`. Atualizar `criarPagamentosDeVenda` (financeApi.ts linha 172) para enviar a chave.
+
+### 3.3 Idempotencia em Salarios
+Adicionar coluna `idempotency_key UUID UNIQUE` na tabela `salarios_colaboradores`. Atualizar `addSalario` (salarioColaboradorApi.ts) para gerar e enviar a chave.
+
+### 3.4 Calculo de Comissoes — Manter no Frontend
+A logica de comissao atual e simples (10% loja fisica, 6% online, aplicado sobre lucro residual) e ja esta centralizada em `calculoComissaoVenda.ts`. Mover para RPC no banco teria complexidade desproporcional pois depende de dados de multiplas tabelas (vendas, itens, trade-ins, taxas) e regras que mudam frequentemente. **Recomendacao**: manter no frontend, ja que o calculo e somente leitura (exibicao) e nao altera dados diretamente.
+
+---
+
+## 4. Cadastros — Protecao de Exclusao (FK Restrict)
+
+### 4.1 Deletes ja Protegidos
+Na auditoria anterior, os deletes de Loja, Colaborador, Fornecedor, Conta Financeira e Maquina de Cartao ja foram atualizados para `throw new Error(...)` caso o banco retorne erro de FK. **Status: OK.**
+
+### 4.2 Delete de Maquina de Cartao
+O `deleteMaquinaCartao` (linha 812) ja possui o tratamento. **Status: OK.**
+
+### 4.3 Mensagens de Erro Amigaveis
+As mensagens atuais sao genericas ("existem registros vinculados"). Melhorar para indicar especificamente qual modulo possui vinculos (ex: "Nao e possivel excluir esta loja: existem vendas, OS ou colaboradores vinculados"). Implementar detectando o `error.code` do Postgres (`23503` = FK violation) e o `error.details` para identificar a tabela filha.
+
+---
+
+## 5. Performance — Selecao Especifica de Colunas
+
+### 5.1 Abordagem Pragmatica
+O sistema usa cache local carregado na inicializacao. Otimizar `select('*')` para colunas especificas so impacta o tempo de carga inicial. Com menos de 1000 registros por tabela, o ganho e marginal.
+
+**Acao**: Otimizar apenas as 3 tabelas mais pesadas (com JSONB grandes):
+- `produtos`: excluir `timeline`, `historico_custo`, `historico_valor_recomendado` do select inicial; carregar sob demanda no detalhe
+- `ordens_servico`: excluir `timeline`, `evidencias` do select de listagem
+- `notas_compra`: excluir `timeline`, `produtos` do select de listagem
+
+Criar funcoes `getProdutoDetalhes(id)`, `getOSDetalhes(id)` que fazem `select('*')` individual quando o usuario abre o detalhe.
+
+---
+
+## Migracao SQL (unica)
 
 ```text
-getNextVendaNumber() le o maior numero do CACHE LOCAL e incrementa +1.
-Se dois vendedores abrirem a tela de nova venda ao mesmo tempo, ambos
-receberao o MESMO numero sequencial, causando duplicidade.
+-- 1. RPC consumir_peca_os
+CREATE OR REPLACE FUNCTION public.consumir_peca_os(
+  p_peca_id UUID, p_quantidade INTEGER, p_os_id UUID DEFAULT NULL
+) RETURNS BOOLEAN ...
+  UPDATE pecas SET quantidade = quantidade - p_quantidade
+  WHERE id = p_peca_id AND quantidade >= p_quantidade AND status = 'Disponível';
+  -- Se afetou linhas, insere movimentacao e retorna true
+
+-- 2. RPC transferir_estoque
+CREATE OR REPLACE FUNCTION public.transferir_estoque(
+  p_produto_id UUID, p_loja_origem UUID, p_loja_destino UUID,
+  p_responsavel_id UUID, p_motivo TEXT
+) RETURNS UUID ...
+  -- Em uma transacao: INSERT movimentacao + UPDATE produto
+
+-- 3. RPC confirmar_recebimento_movimentacao  
+CREATE OR REPLACE FUNCTION public.confirmar_recebimento_movimentacao(
+  p_movimentacao_id UUID, p_loja_destino UUID
+) RETURNS BOOLEAN ...
+  -- UPDATE movimentacao + UPDATE produto atomicamente
+
+-- 4. Colunas de idempotencia
+ALTER TABLE despesas ADD COLUMN IF NOT EXISTS idempotency_key UUID UNIQUE;
+ALTER TABLE pagamentos_financeiros ADD COLUMN IF NOT EXISTS idempotency_key UUID UNIQUE;
+ALTER TABLE salarios_colaboradores ADD COLUMN IF NOT EXISTS idempotency_key UUID UNIQUE;
+
+-- 5. Coluna de estoque minimo
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS quantidade_minima INTEGER DEFAULT 0;
 ```
-
-**Impacto**: Vendas com numeros duplicados (ex: VEN-2026-0045 aparece duas vezes).
-
-**Correcao proposta**: Substituir a geracao de `numero` no frontend por uma **sequence do Postgres** (`nextval('vendas_numero_seq')`), usando um `DEFAULT` na coluna `numero` da tabela `vendas`. O frontend nao precisa mais calcular o numero — ele vem do banco apos o INSERT.
-
-### 1.2 Estoque com Quantidade 1 — Venda Duplicada
-
-Quando dois vendedores tentam vender o mesmo produto (estoque = 1), o fluxo atual e:
-1. Frontend verifica `quantidade > 0` no cache local
-2. INSERT na tabela `vendas` (sem verificar estoque no banco)
-3. UPDATE do produto para `quantidade = 0`
-
-**Risco**: Ambos passam na verificacao do passo 1 (cache local desatualizado). O produto e vendido duas vezes.
-
-**Correcao proposta**: Usar `UPDATE produtos SET quantidade = quantidade - 1 WHERE id = $1 AND quantidade >= 1` com verificacao do `rowCount`. Se zero linhas afetadas, a venda deve ser rejeitada. Alternativamente, usar o campo `bloqueado_em_venda_id` (ja existe) como semaforo via UPDATE atomico.
-
-### 1.3 withRetry e Duplicidade
-
-O `withRetry` **NAO** gera duplicidade em cenarios de timeout. Analise:
-- Erros 409 (Conflict): O status `409` esta na faixa 400-499, e o `isRetryableError` retorna `false` para status HTTP 400-499. Portanto, **nao retenta conflitos**. OK.
-- Timeout real (fetch abortado): O retry pode causar insert duplicado se o primeiro request ja foi processado pelo servidor mas a resposta nao chegou. **Este e um risco real** para operacoes de INSERT sem chave de idempotencia.
-
-**Correcao proposta**: Para operacoes criticas (addVenda, addOS), usar um campo `idempotency_key` (UUID gerado no frontend) com constraint UNIQUE. Se o retry causar duplicata, o banco rejeita com conflict.
-
----
-
-## 2. Tipagem e Nomenclatura (Strict Type Check)
-
-### 2.1 Uso massivo de `any` nos Mappers
-
-Foram encontradas **390 ocorrencias** de `(row: any)` nos mappers de 38 arquivos API. Exemplos:
-- `mapVendaFromDB(row: any)` — vendasApi.ts
-- `mapProdutoFromDB(row: any)` — estoqueApi.ts
-- `mapPagamentoFromDB(row: any)` — financeApi.ts
-
-**Impacto funcional**: Baixo (os mappers fazem fallback com `|| ''` e `|| 0`). Os campos `null` do banco sao convertidos para strings vazias ou zero, prevenindo `cannot read property of null`.
-
-**Correcao proposta**: Substituir `any` pelo tipo gerado do Supabase (`Database['public']['Tables']['vendas']['Row']`), que ja existe em `src/integrations/supabase/types.ts`. Isto daria **autocomplete** e deteccao de erros em tempo de compilacao. Porem, e uma refatoracao de baixo impacto funcional e alto esforco (38 arquivos).
-
-**Recomendacao**: Prioridade BAIXA. Os fallbacks existentes previnem crashes. Tipagem estrita e uma melhoria de manutenibilidade, nao de seguranca.
-
-### 2.2 Campos null vs string
-
-Os mappers ja tratam todos os campos nullable com fallbacks:
-- `row.cliente_nome || ''` — garante string vazia, nunca null
-- `Number(row.valor_total) || 0` — garante numero, nunca NaN
-- `(row.timeline as any[]) || []` — garante array, nunca null
-
-**Status**: SEM risco de `cannot read property of null`. OK.
-
----
-
-## 3. Foreign Keys e Integridade Referencial
-
-### 3.1 Delete de Loja com Vendas Vinculadas
-
-A tabela `vendas` tem FK `loja_id -> lojas(id)` **sem ON DELETE CASCADE**. Default do Postgres: `RESTRICT`.
-
-**Comportamento**: Se tentar excluir uma loja com vendas, o banco retorna erro de FK. O frontend:
-- `deleteContaFinanceira`, `deleteColaborador`, `deleteFornecedor`: Apenas fazem `console.error` e removem do cache local **sem verificar o erro**. A tela nao "quebra", mas o item desaparece do cache enquanto persiste no banco.
-
-**Impacto**: O item some da interface mas continua no banco. No proximo refresh, ele reaparece. Confuso para o usuario.
-
-**Correcao proposta**:
-1. Adicionar `try/catch` com `toast.error('Nao e possivel excluir: existem registros vinculados')` em todas as funcoes de delete.
-2. So remover do cache apos confirmacao de sucesso (sem erro).
-
-### 3.2 Mapa de Foreign Keys e Regras de Delete
-
-| Tabela Filha | FK para | Regra Delete |
-|--------------|---------|-------------|
-| venda_itens | vendas | CASCADE |
-| venda_trade_ins | vendas | CASCADE |
-| venda_pagamentos | vendas | CASCADE |
-| os_pagamentos | ordens_servico | CASCADE |
-| os_pecas | ordens_servico | CASCADE |
-| financeiro | vendas | RESTRICT |
-| garantias | vendas | RESTRICT |
-| movimentacoes_estoque | produtos | RESTRICT |
-| colaboradores | lojas | RESTRICT |
-| despesas | lojas | RESTRICT |
-| pecas | lojas | RESTRICT |
-| produtos | lojas | RESTRICT |
-
-**Risco principal**: Deletar um produto que tem movimentacoes ou garantias vinculadas falha silenciosamente. O mesmo para lojas e colaboradores.
-
----
-
-## 4. Performance e Re-renders
-
-### 4.1 `select('*')` em todas as consultas
-
-Foram encontradas **303 ocorrencias** de `.select('*')` em 40 arquivos. Como todas as consultas carregam dados para cache na inicializacao (e nao em tempo real), o impacto e:
-- **Inicializacao**: Ligeiramente mais lenta (trafega colunas JSONB grandes como `timeline`, `historico_custo`)
-- **Runtime**: Zero impacto (dados vem do cache local, nao do Supabase)
-
-**Recomendacao**: Prioridade BAIXA. Otimizar `select` so faz diferenca se tabelas ultrapassarem 1000+ registros com colunas JSONB pesadas.
-
-### 4.2 Re-renders Infinitos
-
-Nao foram encontrados loops de requisicao. A arquitetura de cache impede isso:
-- Dados sao carregados UMA VEZ na inicializacao (`initXxxCache`)
-- Getters sao sincronos (`getProdutos()`, `getVendas()`)
-- Mutacoes atualizam o cache local + banco em paralelo
-- Componentes re-renderizam apenas quando o estado local muda (useState/useEffect controlados)
-
-### 4.3 Dados de Referencia In-Memory (nao persistidos)
-
-**Encontrado em `cadastrosApi.ts` linhas 177-311**: Origens de Venda, Produtos Cadastro, Tipos Desconto, Cargos e Modelos de Pagamento estao **hardcoded em arrays JavaScript**. Alteracoes feitas pelo usuario (add/update/delete) sao **perdidas ao recarregar a pagina**.
-
-**Impacto**: Medio. Esses dados de referencia raramente mudam, mas se um usuario adicionar uma nova origem de venda, ela desaparece no proximo refresh.
-
-**Correcao proposta**: Migrar para tabelas Supabase (`origens_venda`, `tipos_desconto`, `cargos`, `modelos_pagamento`, `produtos_cadastro`). Porem, como sao dados semi-estaticos, a prioridade e MEDIA.
-
----
-
-## 5. Auditoria de Seguranca RLS (Bypass Check)
-
-### 5.1 Vendedor injetando loja_id diferente no INSERT
-
-**Politica atual de INSERT em vendas:**
-```text
-vendas_insert: WITH CHECK (
-  is_acesso_geral(auth.uid()) OR
-  has_role(auth.uid(), 'gestor') OR
-  has_role(auth.uid(), 'vendedor')
-)
-```
-
-**VULNERABILIDADE**: A politica permite que qualquer vendedor insira uma venda com **qualquer `loja_id`**. Nao ha verificacao de que o `loja_id` enviado corresponde a loja do vendedor (`get_user_loja_id(auth.uid())`).
-
-**Impacto**: Um vendedor pode manipular o frontend (ou usar a API diretamente) para registrar vendas em nome de outra loja, alterando metricas de performance e comissoes.
-
-**Correcao proposta**: Alterar a politica de INSERT para:
-```text
-WITH CHECK (
-  is_acesso_geral(auth.uid()) OR
-  has_role(auth.uid(), 'gestor') OR
-  (has_role(auth.uid(), 'vendedor') AND loja_id = get_user_loja_id(auth.uid()))
-)
-```
-
-### 5.2 Gestor pode inserir vendas em loja alheia
-
-Mesmo problema: gestores podem inserir vendas com `loja_id` de outra loja. Correcao similar.
-
-### 5.3 Produtos INSERT sem filtro de loja
-
-Politica `produtos_insert`:
-```text
-WITH CHECK (is_acesso_geral(auth.uid()) OR has_role(auth.uid(), 'estoquista'))
-```
-Estoquista pode inserir produto em qualquer loja. Risco menor (estoquistas sao confiaveis), mas inconsistente.
-
----
-
-## Resumo de Criticidade
-
-| Achado | Severidade | Correcao |
-|--------|-----------|----------|
-| Race condition em numero de venda | CRITICA | Sequence no Postgres |
-| Venda dupla de estoque 1 | CRITICA | UPDATE atomico com WHERE quantidade >= 1 |
-| withRetry sem idempotencia | ALTA | Campo idempotency_key com UNIQUE |
-| RLS vendas_insert sem filtro loja_id | ALTA | Adicionar AND loja_id = get_user_loja_id() |
-| Delete silencioso com FK RESTRICT | MEDIA | try/catch com toast de erro |
-| Dados de referencia in-memory | MEDIA | Migrar para tabelas Supabase |
-| 390x `any` nos mappers | BAIXA | Tipagem com types do Supabase |
-| select('*') em 303 consultas | BAIXA | Otimizar colunas selecionadas |
-
-## Plano de Correcoes Propostas
-
-### Correcao 1: Sequence para numero de venda (SQL + vendasApi.ts)
-- Criar sequence `vendas_numero_seq` com START em max(numero)+1
-- Adicionar DEFAULT `nextval('vendas_numero_seq')` na coluna `numero`
-- Remover `getNextVendaNumber()` do frontend; ler `numero` do retorno do INSERT
-
-### Correcao 2: Update atomico de estoque (vendasApi.ts)
-- Substituir `updateProduto(id, { quantidade: 0 })` por query atomica:
-  `UPDATE produtos SET quantidade = quantidade - 1 WHERE id = $1 AND quantidade >= 1`
-- Verificar resultado antes de prosseguir com a venda
-
-### Correcao 3: RLS vendas_insert com filtro de loja (SQL)
-- ALTER POLICY vendas_insert para incluir `AND loja_id = get_user_loja_id(auth.uid())` no WITH CHECK para vendedores
-
-### Correcao 4: Delete com tratamento de erro (cadastrosApi.ts, estoqueApi.ts)
-- Adicionar verificacao de `error` em todas as funcoes delete
-- So remover do cache se `!error`
-- Mostrar toast de erro ao usuario
-
-### Correcao 5: Campo idempotency_key em vendas (SQL + vendasApi.ts)
-- Adicionar coluna `idempotency_key UUID UNIQUE` na tabela vendas
-- Gerar UUID no frontend antes do INSERT
-- withRetry evita duplicatas automaticamente via constraint UNIQUE
 
 ## Arquivos a Modificar
 
 | Arquivo | Acao |
 |---------|------|
-| `supabase/migrations/` | Sequence vendas_numero_seq, coluna idempotency_key, ALTER POLICY vendas_insert |
-| `src/utils/vendasApi.ts` | Remover getNextVendaNumber, usar retorno do INSERT, update atomico de estoque |
-| `src/utils/cadastrosApi.ts` | Tratamento de erro em deletes (deleteColaborador, deleteFornecedor, etc.) |
-| `src/utils/estoqueApi.ts` | Tratamento de erro em deletes, update atomico de quantidade |
-| `src/pages/VendasNova.tsx` | Remover chamada a getNextVendaNumber |
-| `src/pages/VendasAcessorios.tsx` | Remover chamada a getNextVendaNumber |
+| `supabase/migrations/` | RPCs + colunas de idempotencia + quantidade_minima |
+| `src/integrations/supabase/types.ts` | Atualizar tipos gerados |
+| `src/utils/assistenciaApi.ts` | Usar RPC `consumir_peca_os` em `reduzirEstoquePecas` |
+| `src/utils/estoqueApi.ts` | Usar RPCs `transferir_estoque` e `confirmar_recebimento`; adicionar `getProdutosEstoqueCritico()`; selecao otimizada de colunas em `initEstoqueCache` |
+| `src/utils/financeApi.ts` | Idempotency_key em `addDespesa` e `criarPagamentosDeVenda` |
+| `src/utils/salarioColaboradorApi.ts` | Idempotency_key em `addSalario` |
+| `src/utils/cadastrosApi.ts` | Melhorar mensagens de erro FK com deteccao de tabela filha |
+| `src/utils/pecasApi.ts` | Usar RPC `consumir_peca_os` em `darBaixaPeca` |

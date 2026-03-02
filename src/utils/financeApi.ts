@@ -142,6 +142,7 @@ export const conferirPagamento = async (id: string): Promise<boolean> => {
 // Interface para receber dados de venda para criar pagamento
 export interface VendaParaPagamento {
   id: string;
+  numero?: number;
   clienteNome: string;
   valorTotal: number;
   lojaVenda: string;
@@ -170,7 +171,7 @@ export const criarPagamentosDeVenda = async (venda: VendaParaPagamento): Promise
 
     const { data: row, error } = await withRetry(() => supabase.from('pagamentos_financeiros').insert({
       data: new Date().toISOString(),
-      descricao: `Venda #${venda.id} - ${venda.clienteNome}`,
+      descricao: venda.numero ? `Venda #VEN-${new Date().getFullYear()}-${String(venda.numero).padStart(4, '0')} - ${venda.clienteNome}` : `Venda #${venda.id.substring(0, 8)} - ${venda.clienteNome}`,
       valor: pag.valor,
       meio_pagamento: pag.meio,
       conta: contaNome,

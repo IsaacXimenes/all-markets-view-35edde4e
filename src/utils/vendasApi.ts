@@ -522,6 +522,7 @@ export const addVenda = async (venda: Omit<Venda, 'id' | 'numero'>): Promise<Ven
     try {
       criarPagamentosDeVenda({
         id: vendaId,
+        numero: newNumero,
         clienteNome: venda.clienteNome,
         valorTotal: venda.total,
         lojaVenda: venda.lojaVenda,
@@ -584,10 +585,10 @@ export const cancelarVenda = async (id: string, motivo: string): Promise<Venda |
     }
   }
 
-  await supabase.from('vendas').update({
+  await withRetry(() => supabase.from('vendas').update({
     status_atual: 'Cancelada',
     motivo_cancelamento: motivo,
-  }).eq('id', id);
+  }).eq('id', id));
 
   venda.status = 'Cancelada';
   venda.statusAtual = 'Cancelada';
@@ -659,7 +660,7 @@ export const updateVenda = async (vendaId: string, updates: Partial<Venda>): Pro
   if (updates.garantiaExtendida !== undefined) db.garantia_extendida = updates.garantiaExtendida as any;
 
   if (Object.keys(db).length > 0) {
-    await supabase.from('vendas').update(db).eq('id', vendaId);
+    await withRetry(() => supabase.from('vendas').update(db).eq('id', vendaId));
   }
 
   return _vendasCache[index];

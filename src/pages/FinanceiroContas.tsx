@@ -91,7 +91,8 @@ export default function FinanceiroContas() {
       return;
     }
 
-    const contaData: Omit<ContaFinanceira, 'id'> = {
+    const contaData: Omit<ContaFinanceira, 'id'> & { codigoLegivel?: string } = {
+      codigoLegivel: editingConta?.codigoLegivel || '',
       nome: form.nome,
       tipo: form.tipo,
       lojaVinculada: form.lojaVinculada,

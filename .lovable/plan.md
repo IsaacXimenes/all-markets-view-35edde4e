@@ -1,40 +1,39 @@
 
+# Plano: Adicionar Quantidade Total no resumo do novo lote de Consignacao
 
-# Plano: Draft na Consignacao + Correcao Conta Destino
+## Alteracao
 
-## Problema 1: Contas de Destino nao aparecem no PagamentoQuadro
+No arquivo `src/pages/OSConsignacao.tsx`, adicionar o calculo da quantidade total e exibi-la ao lado do valor total no rodape do formulario de novo lote.
 
-O filtro na linha 890 do `PagamentoQuadro.tsx` restringe as contas a `c.lojaVinculada === lojaVendaId`. Isso causa dois problemas:
-- Contas "gerais" (loja_vinculada = `geral-dinheiro` ou `geral-assistencia`) nunca aparecem em vendas normais
-- Quando `lojaVendaId` e passado mas nao coincide com nenhuma conta, a lista fica vazia
+### Detalhes tecnicos
 
-**Solucao:** Ajustar o filtro para tambem incluir contas com `lojaVinculada` do tipo "geral-dinheiro" em todos os contextos (exceto quando `apenasContasAssistencia` esta ativo). Isso garante que a conta "Dinheiro" (CTA-020) sempre apareca.
+1. **Calcular quantidade total** (ao lado do `valorTotalNovo`, linha ~219):
+```ts
+const quantidadeTotalNovo = novoItens.reduce((acc, item) => {
+  return acc + (parseInt(item.quantidade) || 0);
+}, 0);
+```
 
-### Arquivo: `src/components/vendas/PagamentoQuadro.tsx`
-- Alterar o filtro (linhas 886-891) para incluir contas "gerais" (geral-dinheiro) alem das contas da loja selecionada
-- Manter o filtro `geral-assistencia` apenas quando `apenasContasAssistencia = true`
+2. **Atualizar o rodape** (linhas 552-555) para exibir ambas as informacoes:
+```tsx
+<div className="mt-4 p-3 bg-muted rounded-lg flex justify-between items-center">
+  <div className="flex gap-6">
+    <div>
+      <span className="text-sm text-muted-foreground">Quantidade:</span>
+      <span className="ml-2 font-bold">{quantidadeTotalNovo}</span>
+    </div>
+    <div>
+      <span className="text-sm text-muted-foreground">Valor Total:</span>
+      <span className="ml-2 text-lg font-bold">{formatCurrency(valorTotalNovo)}</span>
+    </div>
+  </div>
+</div>
+```
 
-## Problema 2: Adicionar Draft (rascunho) na aba de Consignacao
+A quantidade total soma todas as quantidades dos itens lancados (ex: 3 pecas com quantidade 5 = 15).
 
-Reutilizar o hook `useDraftVenda` existente para salvar automaticamente o rascunho do formulario de novo lote de consignacao.
-
-### Arquivo: `src/pages/OSConsignacao.tsx`
-- Importar `useDraftVenda`
-- Instanciar com chave `draft-consignacao-novo-lote`
-- Salvar rascunho automaticamente quando o usuario alterar fornecedor ou itens (via `useEffect` com debounce simples usando `useRef`)
-- Ao entrar na tela "novo", verificar se existe rascunho e exibir um dialog perguntando se deseja restaurar
-- Limpar rascunho ao criar o lote com sucesso
-- Adicionar botao visual indicando que existe rascunho salvo (igual ao padrao de VendasNova)
-
-### Detalhes do Draft
-- Dados salvos: `novoFornecedor` e `novoItens` (descricao, modelo, quantidade, valorCusto, lojaDestinoId)
-- Expiracao: 20 minutos (padrao do hook)
-- Modal de restauracao aparece ao clicar em "Novo Lote" se houver rascunho
-
-## Resumo de Arquivos
+## Arquivo afetado
 
 | Arquivo | Alteracao |
 |---------|----------|
-| `src/components/vendas/PagamentoQuadro.tsx` | Corrigir filtro de contas para incluir contas gerais |
-| `src/pages/OSConsignacao.tsx` | Adicionar funcionalidade de draft ao cadastrar novo lote |
-
+| `src/pages/OSConsignacao.tsx` | Adicionar calculo e exibicao da quantidade total no resumo do lote |

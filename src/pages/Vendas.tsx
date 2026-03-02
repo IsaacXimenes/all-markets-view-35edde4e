@@ -192,7 +192,7 @@ export default function Vendas() {
       
       if (imeiFiltro) {
         const temImei = v.itens.some(item => 
-          item.imei.includes(imeiFiltro)
+          item.imei.includes(imeiFiltro.replace(/\D/g, ''))
         );
         if (!temImei) return false;
       }

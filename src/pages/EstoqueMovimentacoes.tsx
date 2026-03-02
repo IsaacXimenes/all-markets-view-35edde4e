@@ -102,7 +102,7 @@ export default function EstoqueMovimentacoes() {
       const busca = buscaProduto.toLowerCase();
       resultado = resultado.filter(p => 
         p.modelo.toLowerCase().includes(busca) ||
-        p.imei.includes(busca) ||
+        p.imei.includes(busca.replace(/\D/g, '')) ||
         p.marca.toLowerCase().includes(busca)
       );
     }

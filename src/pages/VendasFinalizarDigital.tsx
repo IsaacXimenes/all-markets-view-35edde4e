@@ -591,7 +591,7 @@ export default function VendasFinalizarDigital() {
         const lojaEfetivaProduto = (p as any).lojaAtualId || p.loja;
         if (lojaEfetivaProduto !== filtroLojaProduto) return false;
       }
-      if (buscaProduto && !p.imei.includes(buscaProduto)) return false;
+      if (buscaProduto && !p.imei.includes(buscaProduto.replace(/\D/g, ''))) return false;
       if (buscaModeloProduto && !p.modelo.toLowerCase().includes(buscaModeloProduto.toLowerCase())) return false;
       return true;
     });
@@ -608,7 +608,7 @@ export default function VendasFinalizarDigital() {
       if ((p as any).statusEmprestimo) return false;
       const lojaEfetivaProduto = (p as any).lojaAtualId || p.loja;
       if (lojasPool.includes(lojaEfetivaProduto)) return false;
-      if (buscaProduto && !p.imei.includes(buscaProduto)) return false;
+      if (buscaProduto && !p.imei.includes(buscaProduto.replace(/\D/g, ''))) return false;
       if (buscaModeloProduto && !p.modelo.toLowerCase().includes(buscaModeloProduto.toLowerCase())) return false;
       return true;
     });
@@ -2433,7 +2433,7 @@ export default function VendasFinalizarDigital() {
                   <TableBody>
                     {produtosPendentes.filter(p => {
                       if (filtroLojaProduto && obterNomeLoja(p.loja) !== filtroLojaProduto) return false;
-                      if (buscaProduto && !p.imei.includes(buscaProduto)) return false;
+                      if (buscaProduto && !p.imei.includes(buscaProduto.replace(/\D/g, ''))) return false;
                       if (buscaModeloProduto && !p.modelo.toLowerCase().includes(buscaModeloProduto.toLowerCase())) return false;
                       return true;
                     }).map(produto => (

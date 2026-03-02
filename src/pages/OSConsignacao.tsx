@@ -217,6 +217,10 @@ export default function OSConsignacao() {
     return acc + val * qty;
   }, 0);
 
+  const quantidadeTotalNovo = novoItens.reduce((acc, item) => {
+    return acc + (parseInt(item.quantidade) || 0);
+  }, 0);
+
   const handleCriarLote = async () => {
     if (!novoFornecedor) {
       toast({ title: 'Erro', description: 'Selecione um fornecedor', variant: 'destructive' });
@@ -550,8 +554,16 @@ export default function OSConsignacao() {
                   ))}
                 </div>
                 <div className="mt-4 p-3 bg-muted rounded-lg flex justify-between items-center">
-                  <span className="font-medium">Valor Total do Lote:</span>
-                  <span className="text-lg font-bold">{formatCurrency(valorTotalNovo)}</span>
+                  <div className="flex gap-6">
+                    <div>
+                      <span className="text-sm text-muted-foreground">Quantidade:</span>
+                      <span className="ml-2 font-bold">{quantidadeTotalNovo}</span>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Valor Total:</span>
+                      <span className="ml-2 text-lg font-bold">{formatCurrency(valorTotalNovo)}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 

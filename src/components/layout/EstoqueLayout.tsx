@@ -1,6 +1,6 @@
 import { PageLayout } from '@/components/layout/PageLayout';
 import { CarouselTabsNavigation } from '@/components/layout/CarouselTabsNavigation';
-import { LayoutDashboard, Package, FileText, ArrowRightLeft, Clock, Headphones, Building, RefreshCw, DollarSign } from 'lucide-react';
+import { LayoutDashboard, Package, FileText, ArrowRightLeft, Clock, Headphones, Building, RefreshCw, DollarSign, ClipboardList } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
 interface EstoqueLayoutProps {
@@ -20,6 +20,7 @@ const tabs = [
   { name: 'Movimentações - Acessórios', href: '/estoque/movimentacoes-acessorios', icon: ArrowRightLeft },
   { name: 'Movimentações - Matriz', href: '/estoque/movimentacoes-matriz', icon: Building },
   { name: 'Valores de Troca', href: '/estoque/valores-troca', icon: DollarSign },
+  { name: 'Auditoria', href: '/estoque/auditoria', icon: ClipboardList },
 ];
 
 export function EstoqueLayout({ children, title, icon = Package }: EstoqueLayoutProps) {

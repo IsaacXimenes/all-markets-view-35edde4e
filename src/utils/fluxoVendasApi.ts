@@ -599,9 +599,47 @@ export const exportFluxoToCSV = (data: VendaComFluxo[], filename: string) => {
   document.body.removeChild(link);
 };
 
-// ============= CONFERENCE DATA HELPERS (replacing localStorage) =============
-// For OS IDs (starting with "OS-"), we fall back to localStorage since they don't have fluxo_vendas entries.
+// ============= CONFERENCE DATA HELPERS =============
+// OS IDs now use ordens_servico.conferencia_gestor/conferencia_financeiro JSONB columns
 const isOSId = (id: string) => id.startsWith('OS-');
+
+// In-memory cache for OS conference data (loaded on demand from Supabase)
+const _osConferenciaCache: Record<string, { gestor?: ConferenciaGestorData; financeiro?: ConferenciaFinanceiroData }> = {};
+
+const loadOSConferenciaFromDB = async (osId: string): Promise<void> => {
+  if (_osConferenciaCache[osId]) return;
+  try {
+    const { data } = await supabase.from('ordens_servico').select('conferencia_gestor, conferencia_financeiro').eq('id', osId).maybeSingle();
+    if (data) {
+      _osConferenciaCache[osId] = {
+        gestor: data.conferencia_gestor as any || {},
+        financeiro: data.conferencia_financeiro as any || {},
+      };
+    } else {
+      _osConferenciaCache[osId] = {};
+    }
+  } catch {
+    _osConferenciaCache[osId] = {};
+  }
+};
+
+const saveOSConferenciaGestor = async (osId: string, data: ConferenciaGestorData) => {
+  _osConferenciaCache[osId] = { ..._osConferenciaCache[osId], gestor: data };
+  try {
+    await supabase.from('ordens_servico').update({ conferencia_gestor: data as any }).eq('id', osId);
+  } catch (err) {
+    console.error('[FluxoVendas] Erro ao salvar conferencia_gestor OS:', err);
+  }
+};
+
+const saveOSConferenciaFinanceiro = async (osId: string, data: ConferenciaFinanceiroData) => {
+  _osConferenciaCache[osId] = { ..._osConferenciaCache[osId], financeiro: data };
+  try {
+    await supabase.from('ordens_servico').update({ conferencia_financeiro: data as any }).eq('id', osId);
+  } catch (err) {
+    console.error('[FluxoVendas] Erro ao salvar conferencia_financeiro OS:', err);
+  }
+};
 
 export interface ConferenciaFinanceiroData {
   validacoesPagamento?: Array<{
@@ -652,10 +690,15 @@ export interface ConferenciaGestorData {
   };
 }
 
-/** Get financial conference data from fluxo_vendas.aprovacao_financeiro JSONB (or localStorage for OS) */
+/** Get financial conference data from fluxo_vendas.aprovacao_financeiro JSONB (or ordens_servico for OS) */
 export const getConferenciaFinanceiroData = (vendaId: string): ConferenciaFinanceiroData => {
   if (isOSId(vendaId)) {
-    // Fallback to localStorage for OS items
+    // Read from in-memory cache (loaded from ordens_servico)
+    const cached = _osConferenciaCache[vendaId]?.financeiro;
+    if (cached) return cached;
+    // Trigger async load for next call
+    loadOSConferenciaFromDB(vendaId);
+    // Fallback: try localStorage for migration compatibility
     try {
       const validacoesRaw = localStorage.getItem(`validacao_pagamentos_financeiro_${vendaId}`);
       const obsRaw = localStorage.getItem(`observacao_financeiro_${vendaId}`);
@@ -663,7 +706,7 @@ export const getConferenciaFinanceiroData = (vendaId: string): ConferenciaFinanc
       const finRaw = localStorage.getItem(`data_finalizacao_${vendaId}`);
       const contaRaw = localStorage.getItem(`conta_destino_${vendaId}`);
       const rejRaw = localStorage.getItem(`rejeicao_financeiro_${vendaId}`);
-      return {
+      const result: ConferenciaFinanceiroData = {
         validacoesPagamento: validacoesRaw ? JSON.parse(validacoesRaw) : undefined,
         observacaoFinanceiro: obsRaw ? JSON.parse(obsRaw) : undefined,
         historicoConferencias: histRaw ? JSON.parse(histRaw) : undefined,
@@ -671,6 +714,13 @@ export const getConferenciaFinanceiroData = (vendaId: string): ConferenciaFinanc
         contaDestinoId: contaRaw || undefined,
         rejeicao: rejRaw ? JSON.parse(rejRaw) : undefined,
       };
+      // Migrate to DB if there was data in localStorage
+      if (validacoesRaw || obsRaw || histRaw) {
+        saveOSConferenciaFinanceiro(vendaId, result);
+        // Clean up localStorage
+        ['validacao_pagamentos_financeiro_', 'observacao_financeiro_', 'historico_conferencias_', 'data_finalizacao_', 'conta_destino_', 'rejeicao_financeiro_', 'nota_emitida_', 'data_emissao_nota_'].forEach(prefix => localStorage.removeItem(`${prefix}${vendaId}`));
+      }
+      return result;
     } catch { return {}; }
   }
   const dados = fluxoCache[vendaId];
@@ -688,34 +738,12 @@ export const getConferenciaFinanceiroData = (vendaId: string): ConferenciaFinanc
   };
 };
 
-/** Save financial conference data to fluxo_vendas.aprovacao_financeiro JSONB (or localStorage for OS) */
+/** Save financial conference data to fluxo_vendas.aprovacao_financeiro JSONB (or ordens_servico for OS) */
 export const salvarConferenciaFinanceiroData = async (vendaId: string, conferencia: Partial<ConferenciaFinanceiroData>) => {
   if (isOSId(vendaId)) {
-    // Fallback to localStorage for OS items
-    if (conferencia.validacoesPagamento !== undefined) {
-      localStorage.setItem(`validacao_pagamentos_financeiro_${vendaId}`, JSON.stringify(conferencia.validacoesPagamento));
-    }
-    if (conferencia.observacaoFinanceiro !== undefined) {
-      localStorage.setItem(`observacao_financeiro_${vendaId}`, JSON.stringify(conferencia.observacaoFinanceiro));
-    }
-    if (conferencia.historicoConferencias !== undefined) {
-      localStorage.setItem(`historico_conferencias_${vendaId}`, JSON.stringify(conferencia.historicoConferencias));
-    }
-    if (conferencia.dataFinalizacao !== undefined) {
-      localStorage.setItem(`data_finalizacao_${vendaId}`, conferencia.dataFinalizacao);
-    }
-    if (conferencia.contaDestinoId !== undefined) {
-      localStorage.setItem(`conta_destino_${vendaId}`, conferencia.contaDestinoId);
-    }
-    if (conferencia.rejeicao !== undefined) {
-      localStorage.setItem(`rejeicao_financeiro_${vendaId}`, JSON.stringify(conferencia.rejeicao));
-    }
-    if (conferencia.notaEmitida !== undefined) {
-      localStorage.setItem(`nota_emitida_${vendaId}`, String(conferencia.notaEmitida));
-    }
-    if (conferencia.dataEmissaoNota !== undefined) {
-      localStorage.setItem(`data_emissao_nota_${vendaId}`, conferencia.dataEmissaoNota);
-    }
+    const existing = _osConferenciaCache[vendaId]?.financeiro || {};
+    const merged = { ...existing, ...conferencia };
+    await saveOSConferenciaFinanceiro(vendaId, merged);
     return;
   }
   const dados = fluxoCache[vendaId] || {};
@@ -726,17 +754,26 @@ export const salvarConferenciaFinanceiroData = async (vendaId: string, conferenc
   await saveFluxoToSupabase(vendaId, updated);
 };
 
-/** Get gestor conference data from fluxo_vendas.aprovacao_gestor JSONB (or localStorage for OS) */
+/** Get gestor conference data from fluxo_vendas.aprovacao_gestor JSONB (or ordens_servico for OS) */
 export const getConferenciaGestorData = (vendaId: string): ConferenciaGestorData => {
   if (isOSId(vendaId)) {
+    const cached = _osConferenciaCache[vendaId]?.gestor;
+    if (cached) return cached;
+    loadOSConferenciaFromDB(vendaId);
+    // Fallback: try localStorage for migration
     try {
       const valRaw = localStorage.getItem(`validacao_pagamentos_${vendaId}`);
-      const obsKey = `observacao_gestor_os_${vendaId}`;
-      const obsRaw = localStorage.getItem(obsKey);
-      return {
+      const obsRaw = localStorage.getItem(`observacao_gestor_os_${vendaId}`);
+      const result: ConferenciaGestorData = {
         validacoesPagamento: valRaw ? JSON.parse(valRaw) : undefined,
         observacao: obsRaw ? JSON.parse(obsRaw) : undefined,
       };
+      if (valRaw || obsRaw) {
+        saveOSConferenciaGestor(vendaId, result);
+        localStorage.removeItem(`validacao_pagamentos_${vendaId}`);
+        localStorage.removeItem(`observacao_gestor_os_${vendaId}`);
+      }
+      return result;
     } catch { return {}; }
   }
   const dados = fluxoCache[vendaId];
@@ -750,6 +787,12 @@ export const getConferenciaGestorData = (vendaId: string): ConferenciaGestorData
 
 /** Save gestor conference data to fluxo_vendas.aprovacao_gestor JSONB */
 export const salvarConferenciaGestorData = async (vendaId: string, conferencia: Partial<ConferenciaGestorData>) => {
+  if (isOSId(vendaId)) {
+    const existing = _osConferenciaCache[vendaId]?.gestor || {};
+    const merged = { ...existing, ...conferencia };
+    await saveOSConferenciaGestor(vendaId, merged);
+    return;
+  }
   const dados = fluxoCache[vendaId] || {};
   const existingAg = (dados.aprovacaoGestor || {}) as any;
   const updatedAg = { ...existingAg, ...conferencia };

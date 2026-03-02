@@ -1,5 +1,6 @@
 // Salário Colaborador API - Supabase Integration
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 import { getColaboradores, Colaborador } from './cadastrosApi';
 import { getComissaoColaboradorPorLoja } from './comissaoPorLojaApi';
 
@@ -85,12 +86,12 @@ export const addSalario = async (
   const existente = getSalarioByColaboradorId(colaboradorId);
   if (existente) throw new Error('Já existe um salário configurado para este colaborador');
 
-  const { data, error } = await supabase.from('salarios_colaboradores').insert({
+  const { data, error } = await withRetry(() => supabase.from('salarios_colaboradores').insert({
     colaborador_id: colaboradorId,
     salario_fixo: salarioFixo,
     ajuda_custo: ajudaCusto,
     percentual_comissao: percentualComissao,
-  }).select().single();
+  }).select().single());
   if (error) throw error;
   const mapped = mapSalarioRow(data);
   salariosCache.push(mapped);
@@ -133,7 +134,7 @@ export const updateSalario = async (
   if (updates.percentualComissao !== undefined) dbUpdates.percentual_comissao = updates.percentualComissao;
   dbUpdates.updated_at = new Date().toISOString();
 
-  const { data, error } = await supabase.from('salarios_colaboradores').update(dbUpdates).eq('colaborador_id', colaboradorId).select().single();
+  const { data, error } = await withRetry(() => supabase.from('salarios_colaboradores').update(dbUpdates).eq('colaborador_id', colaboradorId).select().single());
   if (error || !data) return null;
   const mapped = mapSalarioRow(data);
   const idx = salariosCache.findIndex(s => s.colaboradorId === colaboradorId);
@@ -166,7 +167,7 @@ export const updateSalario = async (
 };
 
 export const deleteSalario = async (colaboradorId: string): Promise<boolean> => {
-  const { error } = await supabase.from('salarios_colaboradores').delete().eq('colaborador_id', colaboradorId);
+  const { error } = await withRetry(() => supabase.from('salarios_colaboradores').delete().eq('colaborador_id', colaboradorId).select());
   if (error) return false;
   salariosCache = salariosCache.filter(s => s.colaboradorId !== colaboradorId);
   return true;

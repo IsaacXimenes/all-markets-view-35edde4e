@@ -1,6 +1,7 @@
 // API para gerenciamento de pendências financeiras de notas de compra
 // MIGRADO PARA SUPABASE - tabela pendencias_financeiras
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 import { NotaCompra, TimelineEntry, getNotasCompra, getNotaById, updateNota } from './estoqueApi';
 import { addNotification } from './notificationsApi';
 
@@ -135,7 +136,7 @@ export const criarPendenciaFinanceira = async (nota: NotaCompra): Promise<Penden
     origem: nota.origem || 'Normal'
   };
 
-  const { error } = await supabase.from('pendencias_financeiras').insert(pendenciaToDb(novaPendencia) as any);
+  const { error } = await withRetry(() => supabase.from('pendencias_financeiras').insert(pendenciaToDb(novaPendencia) as any).select());
   if (error) {
     console.error('[PendenciasFinanceiras] Erro insert:', error);
     throw error;
@@ -187,7 +188,7 @@ export const atualizarPendencia = async (
     addNotification({ type: 'aparelho_validado', title: `Progresso - ${notaId}`, description: `${pendencia.aparelhosConferidos}/${pendencia.aparelhosTotal} validados (${pendencia.percentualConferencia}%)`, targetUsers: ['financeiro'] });
   }
 
-  const { error } = await supabase.from('pendencias_financeiras').update(pendenciaToDb(pendencia) as any).eq('id', pendencia.id);
+  const { error } = await withRetry(() => supabase.from('pendencias_financeiras').update(pendenciaToDb(pendencia) as any).eq('id', pendencia.id).select());
   if (error) {
     console.error('[PendenciasFinanceiras] Erro update:', error);
     throw error;
@@ -207,7 +208,7 @@ export const finalizarPagamentoPendencia = async (
   pendencia.dataPagamento = new Date().toISOString();
   pendencia.timeline = [{ id: `TL-${notaId}-${String(pendencia.timeline.length + 1).padStart(3, '0')}`, data: new Date().toISOString(), tipo: 'pagamento', titulo: 'Pagamento Confirmado', descricao: `Pagamento de ${formatCurrency(pendencia.valorTotal)} via ${pagamento.formaPagamento}. ${pagamento.observacoes || ''}`, responsavel: pagamento.responsavel, valor: pendencia.valorTotal, comprovante: pagamento.comprovante }, ...pendencia.timeline];
 
-  const { error } = await supabase.from('pendencias_financeiras').update(pendenciaToDb(pendencia) as any).eq('id', pendencia.id);
+  const { error } = await withRetry(() => supabase.from('pendencias_financeiras').update(pendenciaToDb(pendencia) as any).eq('id', pendencia.id).select());
   if (error) {
     console.error('[PendenciasFinanceiras] Erro update pagamento:', error);
     throw error;
@@ -236,7 +237,7 @@ export const forcarFinalizacaoPendencia = async (
   pendencia.dataPagamento = new Date().toISOString();
   pendencia.timeline = [{ id: `TL-${notaId}-${String(pendencia.timeline.length + 1).padStart(3, '0')}`, data: new Date().toISOString(), tipo: 'pagamento', titulo: 'Finalizada com Pendência', descricao: `Pagamento forçado com ${pendencia.percentualConferencia}% conferido. Valor não conferido: ${formatCurrency(valorNaoConferido)}. ${pagamento.observacoes || ''}`, responsavel: pagamento.responsavel, valor: pendencia.valorTotal, comprovante: pagamento.comprovante }, ...pendencia.timeline];
 
-  const { error } = await supabase.from('pendencias_financeiras').update(pendenciaToDb(pendencia) as any).eq('id', pendencia.id);
+  const { error } = await withRetry(() => supabase.from('pendencias_financeiras').update(pendenciaToDb(pendencia) as any).eq('id', pendencia.id).select());
   if (error) {
     console.error('[PendenciasFinanceiras] Erro update forçado:', error);
     throw error;

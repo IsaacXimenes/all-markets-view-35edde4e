@@ -1,5 +1,6 @@
 // API para Lista de Reparos (OS)
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 import { Produto, addProdutoMigrado, validarAparelhoNota, verificarConferenciaNota } from './estoqueApi';
 import { generateProductId, registerProductId, isProductIdRegistered } from './idManager';
 import { encaminharParaAnaliseGarantia } from './garantiasApi';
@@ -134,7 +135,7 @@ const mapProdutoToRow = (p: ProdutoPendente): any => ({
 const syncToSupabase = async (produto: ProdutoPendente) => {
   try {
     const row = mapProdutoToRow(produto);
-    await supabase.from('produtos_pendentes_os').upsert(row as any, { onConflict: 'id' });
+    await withRetry(() => supabase.from('produtos_pendentes_os').upsert(row as any, { onConflict: 'id' }).select());
   } catch (err) {
     console.error('[osApi] Erro ao sincronizar com Supabase:', err);
   }
@@ -142,7 +143,7 @@ const syncToSupabase = async (produto: ProdutoPendente) => {
 
 const deleteFromSupabase = async (id: string) => {
   try {
-    await supabase.from('produtos_pendentes_os').delete().eq('id', id);
+    await withRetry(() => supabase.from('produtos_pendentes_os').delete().eq('id', id).select());
   } catch (err) {
     console.error('[osApi] Erro ao deletar do Supabase:', err);
   }

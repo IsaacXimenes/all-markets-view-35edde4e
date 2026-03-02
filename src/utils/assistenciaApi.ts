@@ -1,5 +1,6 @@
 // Assistência API - Supabase
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 import { getClientes, getLojas, getColaboradoresByPermissao, getFornecedores, addCliente, Cliente } from './cadastrosApi';
 import { getPecaById, getPecaByDescricao, updatePeca } from './pecasApi';
 import { formatCurrency } from './formatUtils';
@@ -50,6 +51,7 @@ export interface TimelineOS {
 
 export interface OrdemServico {
   id: string;
+  numeroSequencial?: number;
   dataHora: string;
   clienteId: string;
   setor: 'GARANTIA' | 'ASSISTÊNCIA' | 'TROCA';
@@ -148,6 +150,7 @@ const mapPagamentoFromDB = (row: any): Pagamento => ({
 
 const mapOSFromDB = (row: any, pecas: PecaServico[], pagamentos: Pagamento[]): OrdemServico => ({
   id: row.id,
+  numeroSequencial: row.numero_sequencial || undefined,
   dataHora: row.created_at || new Date().toISOString(),
   clienteId: row.cliente_nome || '', // OS uses cliente_nome directly
   setor: (row.setor || 'ASSISTÊNCIA') as any,
@@ -247,9 +250,15 @@ export const isOSIdRegistered = (id: string): boolean => {
 };
 
 export const getNextOSNumber = (): { numero: number; id: string } => {
-  // Generate UUID-based ID - the DB will handle it
-  const id = crypto.randomUUID();
-  return { numero: _osCache.length + 1, id };
+  // Calcula próximo sequencial baseado no cache (o banco gera o real via sequence)
+  const maxSeq = _osCache.reduce((max, os) => Math.max(max, os.numeroSequencial || 0), 0);
+  return { numero: maxSeq + 1, id: crypto.randomUUID() };
+};
+
+// Helper para formatar número sequencial da OS
+export const formatOSNumber = (os: OrdemServico): string => {
+  if (os.numeroSequencial) return `OS-${String(os.numeroSequencial).padStart(4, '0')}`;
+  return os.id.substring(0, 8);
 };
 
 // ==================== CRUD ====================
@@ -259,7 +268,7 @@ export const getOrdensServico = () => [..._osCache];
 export const getOrdemServicoById = (id: string) => _osCache.find(os => os.id === id);
 
 export const addOrdemServico = async (os: Omit<OrdemServico, 'id'>): Promise<OrdemServico> => {
-  const { data, error } = await supabase
+  const { data, error } = await withRetry(() => supabase
     .from('ordens_servico')
     .insert({
       cliente_nome: os.clienteId, // OS stores clienteId as cliente_nome
@@ -295,7 +304,7 @@ export const addOrdemServico = async (os: Omit<OrdemServico, 'id'>): Promise<Ord
       evidencias: os.evidencias as any || [],
     })
     .select()
-    .single();
+    .single());
 
   if (error) throw error;
 
@@ -339,7 +348,7 @@ export const addOrdemServico = async (os: Omit<OrdemServico, 'id'>): Promise<Ord
     );
   }
 
-  const newOS: OrdemServico = { ...os, id: data.id };
+  const newOS: OrdemServico = { ...os, id: data.id, numeroSequencial: (data as any).numero_sequencial };
   _osCache.unshift(newOS);
   return newOS;
 };
@@ -401,7 +410,7 @@ export const updateOrdemServico = async (id: string, updates: Partial<OrdemServi
   if ((updates as any).parecer !== undefined) dbUpdates.parecer_tecnico = (updates as any).parecer;
 
   if (Object.keys(dbUpdates).length > 0) {
-    const { error } = await supabase.from('ordens_servico').update(dbUpdates).eq('id', id);
+    const { error } = await withRetry(() => supabase.from('ordens_servico').update(dbUpdates).eq('id', id));
     if (error) { console.error('[ASSISTÊNCIA] Erro ao atualizar OS:', error); throw error; }
   }
 

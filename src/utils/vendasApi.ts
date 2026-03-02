@@ -1,5 +1,6 @@
 // Vendas API - Supabase
 import { supabase } from '@/integrations/supabase/client';
+import { withRetry } from './supabaseRetry';
 import { generateProductId } from './idManager';
 import { getProdutos, updateProduto, addMovimentacao } from './estoqueApi';
 import { subtrairEstoqueAcessorio, VendaAcessorio } from './acessoriosApi';
@@ -382,7 +383,7 @@ export const addVenda = async (venda: Omit<Venda, 'id' | 'numero'>): Promise<Ven
   });
 
   // Insert venda principal
-  const { data: vendaRow, error: vendaErr } = await supabase.from('vendas').insert({
+  const { data: vendaRow, error: vendaErr } = await withRetry(() => supabase.from('vendas').insert({
     numero: newNumero,
     data_venda: venda.dataHora || new Date().toISOString(),
     loja_id: venda.lojaVenda || null,
@@ -417,7 +418,7 @@ export const addVenda = async (venda: Omit<Venda, 'id' | 'numero'>): Promise<Ven
     garantia_extendida: (venda.garantiaExtendida as any) || null,
     hora_venda: (venda as any).horaVenda || null,
     status_pagamento: 'Pendente',
-  }).select().single();
+  }).select().single());
 
   if (vendaErr || !vendaRow) throw vendaErr || new Error('Falha ao inserir venda');
 

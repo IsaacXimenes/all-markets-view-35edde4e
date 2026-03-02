@@ -859,6 +859,7 @@ export type Database = {
           documento: string | null
           id: string
           loja_id: string | null
+          numero_sequencial: number | null
           observacoes: string | null
           pago_por: string | null
           periodicidade: string | null
@@ -880,6 +881,7 @@ export type Database = {
           documento?: string | null
           id?: string
           loja_id?: string | null
+          numero_sequencial?: number | null
           observacoes?: string | null
           pago_por?: string | null
           periodicidade?: string | null
@@ -901,6 +903,7 @@ export type Database = {
           documento?: string | null
           id?: string
           loja_id?: string | null
+          numero_sequencial?: number | null
           observacoes?: string | null
           pago_por?: string | null
           periodicidade?: string | null
@@ -2400,6 +2403,7 @@ export type Database = {
           loja_id: string | null
           modelo_aparelho: string | null
           motivo_recusa_tecnico: string | null
+          numero_sequencial: number | null
           observacao_origem: string | null
           origem_os: string | null
           parecer_tecnico: string | null
@@ -2437,6 +2441,7 @@ export type Database = {
           loja_id?: string | null
           modelo_aparelho?: string | null
           motivo_recusa_tecnico?: string | null
+          numero_sequencial?: number | null
           observacao_origem?: string | null
           origem_os?: string | null
           parecer_tecnico?: string | null
@@ -2474,6 +2479,7 @@ export type Database = {
           loja_id?: string | null
           modelo_aparelho?: string | null
           motivo_recusa_tecnico?: string | null
+          numero_sequencial?: number | null
           observacao_origem?: string | null
           origem_os?: string | null
           parecer_tecnico?: string | null
@@ -2712,6 +2718,7 @@ export type Database = {
           id: string
           loja: string | null
           meio_pagamento: string | null
+          numero_sequencial: number | null
           status: string | null
           valor: number | null
         }
@@ -2723,6 +2730,7 @@ export type Database = {
           id?: string
           loja?: string | null
           meio_pagamento?: string | null
+          numero_sequencial?: number | null
           status?: string | null
           valor?: number | null
         }
@@ -2734,6 +2742,7 @@ export type Database = {
           id?: string
           loja?: string | null
           meio_pagamento?: string | null
+          numero_sequencial?: number | null
           status?: string | null
           valor?: number | null
         }

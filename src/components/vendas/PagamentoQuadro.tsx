@@ -887,7 +887,8 @@ export function PagamentoQuadro({
                       if (apenasContasAssistencia) {
                         return c.lojaVinculada === 'geral-assistencia';
                       }
-                      return !lojaVendaId || c.lojaVinculada === lojaVendaId;
+                      if (!lojaVendaId) return c.lojaVinculada !== 'geral-assistencia';
+                      return c.lojaVinculada === lojaVendaId || c.lojaVinculada === 'geral-dinheiro';
                     })
                     .map(conta => {
                       const lojaNome = conta.lojaVinculada ? obterNomeLoja(conta.lojaVinculada) : '';

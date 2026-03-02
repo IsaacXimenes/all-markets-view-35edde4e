@@ -1,5 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { OSLayout } from '@/components/layout/OSLayout';
+import { useDraftVenda } from '@/hooks/useDraftVenda';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatsCard } from '@/components/ui/StatsCard';
 import { Button } from '@/components/ui/button';
@@ -34,7 +36,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   Plus, Eye, Trash2, Package, PackageCheck, Clock, DollarSign, Pencil,
   FileText, ArrowRightLeft, CheckCircle, AlertTriangle, ArrowLeft, Undo2, Truck,
-  History, Lock, XCircle,
+  History, Lock, XCircle, Save,
 } from 'lucide-react';
 
 type ViewMode = 'lista' | 'novo' | 'detalhamento';
@@ -87,6 +89,50 @@ export default function OSConsignacao() {
   const [finObservacao, setFinObservacao] = useState('');
 
   const refreshLotes = () => setLotes(getLotesConsignacao());
+
+  // Draft (rascunho) para novo lote
+  const { saveDraft, loadDraft, clearDraft, hasDraft, getDraftAge, formatDraftAge } = useDraftVenda('draft-consignacao-novo-lote');
+  const [showDraftDialog, setShowDraftDialog] = useState(false);
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-save draft when novoFornecedor or novoItens change (debounce 2s)
+  useEffect(() => {
+    if (viewMode !== 'novo') return;
+    if (!novoFornecedor && novoItens.length === 1 && !novoItens[0].descricao && !novoItens[0].valorCusto) return;
+
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      saveDraft({ novoFornecedor, novoItens });
+    }, 2000);
+
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
+  }, [viewMode, novoFornecedor, novoItens, saveDraft]);
+
+  const handleNovoLoteClick = () => {
+    if (hasDraft()) {
+      setShowDraftDialog(true);
+    } else {
+      setViewMode('novo');
+    }
+  };
+
+  const handleRestaurarDraft = () => {
+    const draft = loadDraft();
+    if (draft) {
+      setNovoFornecedor(draft.novoFornecedor || '');
+      setNovoItens(draft.novoItens || [{ descricao: '', modelo: '', quantidade: '1', valorCusto: '', lojaDestinoId: '' }]);
+    }
+    setShowDraftDialog(false);
+    setViewMode('novo');
+  };
+
+  const handleDescartarDraft = () => {
+    clearDraft();
+    setNovoFornecedor('');
+    setNovoItens([{ descricao: '', modelo: '', quantidade: '1', valorCusto: '', lojaDestinoId: '' }]);
+    setShowDraftDialog(false);
+    setViewMode('novo');
+  };
 
   const getFornecedorNome = (id: string) => fornecedores.find(f => f.id === id)?.nome || id;
 
@@ -192,6 +238,7 @@ export default function OSConsignacao() {
     };
 
     const lote = await criarLoteConsignacao(input);
+    clearDraft();
     setNovoFornecedor('');
     setNovoItens([{ descricao: '', modelo: '', quantidade: '1', valorCusto: '', lojaDestinoId: '' }]);
     toast({ title: 'Lote criado', description: `${lote.id} cadastrado com ${lote.itens.length} item(s)` });
@@ -1107,7 +1154,6 @@ export default function OSConsignacao() {
             </TabsContent>
           </Tabs>
 
-
           {/* Timeline fixa */}
           <Card>
             <CardHeader>
@@ -1226,7 +1272,7 @@ export default function OSConsignacao() {
           <Input type="date" value={filtroData} onChange={e => setFiltroData(e.target.value)} />
         </div>
         <div className="flex items-end gap-2">
-          <Button size="sm" onClick={() => setViewMode('novo')} className="flex-1">
+          <Button size="sm" onClick={handleNovoLoteClick} className="flex-1">
             <Plus className="h-4 w-4 mr-2" />
             Novo Lote
           </Button>
@@ -1338,6 +1384,29 @@ export default function OSConsignacao() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Draft Dialog */}
+      <Dialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Save className="h-5 w-5" />
+              Rascunho encontrado
+            </DialogTitle>
+            <DialogDescription>
+              Existe um rascunho salvo {formatDraftAge(getDraftAge())}. Deseja restaurar os dados?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={handleDescartarDraft}>
+              Descartar
+            </Button>
+            <Button onClick={handleRestaurarDraft}>
+              Restaurar Rascunho
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </OSLayout>
   );
 }

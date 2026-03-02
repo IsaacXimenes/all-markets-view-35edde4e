@@ -1,128 +1,146 @@
 
+# Varredura Completa de Conformidade — ERP Thiago Imports
 
-# Controle de Visibilidade por Cargo — Sidebar, Dashboard e Rotas Protegidas
+## 1. Auditoria de Comunicacao com o Banco (Supabase)
 
-## Resumo
+### 1.1 Resquicios de localStorage
+- **ENCONTRADO**: `fluxoVendasApi.ts` usa `localStorage` para dados de conferencia de Ordens de Servico (IDs `OS-*`). Isto e uma **excecao documentada** — OS nao tem registro na tabela `fluxo_vendas`, entao metadados de conferencia (validacoes, observacoes, historico) usam localStorage como fallback.
+- **Risco**: Dados de conferencia de OS sao perdidos ao limpar o navegador. Solucao definitiva requer criar colunas JSONB na tabela `ordens_servico` para `aprovacao_gestor` e `aprovacao_financeiro`.
+- **Demais APIs**: Nenhum outro arquivo em `src/utils/*Api.ts` usa localStorage ou dados mockados (`initMockData`). 100% limpo.
 
-Implementar controle de acesso baseado no campo `role` da tabela `user_roles` (via funcao `has_role`) e no cargo do colaborador, filtrando:
-1. Itens visiveis na Sidebar
-2. Cards/secoes visiveis no Dashboard
-3. Bloqueio de rotas por URL (redirecionamento para `/`)
+### 1.2 Tratamento de Erros de Rede
+- **COM `withRetry`** (7 arquivos): `cadastrosApi`, `garantiasApi`, `fiadoApi`, `vendasApi`, `estoqueApi`, `financeApi`, `assistenciaApi` — OK
+- **SEM `withRetry`** (5 arquivos com escritas): 
+  - `pecasApi.ts` — 6 escritas desprotegidas (addPeca, updatePeca, deletePeca, darBaixaPeca, addMovimentacaoPeca)
+  - `salarioColaboradorApi.ts` — 4 escritas desprotegidas
+  - `retiradaPecasApi.ts` — 2 escritas desprotegidas
+  - `valoresRecomendadosTrocaApi.ts` — 3 escritas desprotegidas
+  - `movimentacoesEntreContasApi.ts` — 1 escrita desprotegida
+  - `storiesMonitoramentoApi.ts` — 3 escritas desprotegidas
+  - `pendenciasFinanceiraApi.ts` — 1 escrita desprotegida
+  - `osApi.ts` — 2 escritas desprotegidas (upsert/delete)
+  - `whatsappNotificacaoApi.ts` — 2 escritas desprotegidas
 
-## Mapeamento de Perfis de Acesso
+### 1.3 Nomenclatura snake_case
+- **OK**: Todos os mappers convertem camelCase (TypeScript) para snake_case (Supabase) corretamente. Campos como `lojaId`, `clienteId`, `vendedorId` existem apenas nas interfaces TS e sao mapeados para `loja_id`, `cliente_id`, `vendedor_id` antes de enviar ao banco.
 
-| Perfil | Roles/Cargos | Modulos Permitidos |
-|--------|-------------|-------------------|
-| **Admin** | role `admin` OU Acesso Geral OU CARGO-001/010/011/012/014 | TODOS |
-| **Gestor** | role `gestor` OU CARGO-008 | Tudo EXCETO Financeiro Global e RH Salarios |
-| **Vendedor** | role `vendedor` OU CARGO-004 | Vendas, Estoque, Dados Antigo |
-| **Estoquista** | role `estoquista` OU CARGO-013 | Vendas, Estoque, Dados Antigo |
-| **Tecnico** | CARGO-005 | Assistencia, Estoque, Vendas |
-| **Restrito** | CARGO-006/009 (Motoboy, Auxiliar) | Apenas Dashboard (boas-vindas) |
+---
 
-## Detalhes Tecnicos
+## 2. Validacao de Seguranca e Permissoes (RLS)
 
-### 1. Novo arquivo: `src/hooks/useUserPermissions.ts`
+### 2.1 ProtectedRoute — Bloqueio de Rotas
+- **OK**: O `ProtectedRoute` importa `useUserPermissions` e chama `canAccessRoute(location.pathname)`. Se o usuario nao tem permissao, redireciona para `/`. Isto cobre todas as rotas definidas no `routeToModule()`.
+- **Funcional**: Um vendedor acessando `/financeiro` ou `/rh` sera bloqueado e redirecionado.
 
-Hook centralizado que determina o perfil de acesso do usuario logado.
+### 2.2 Leitura de Roles
+- **OK**: O hook `useUserPermissions` busca roles de `user_roles` (tabela segura, separada de profiles) e combina com flags do colaborador (`eh_gestor`, `eh_vendedor`, `eh_estoquista`) e cargo.
+
+### 2.3 GAP CRITICO — 20 usuarios sem role no banco
+Usuarios com cargos que deveriam ter roles, mas estao com `NULL` na tabela `user_roles`:
+
+| Cargo | Usuarios sem Role | Role Esperada |
+|-------|-------------------|---------------|
+| CARGO-005 (Tecnico) | 5 usuarios | Nenhuma role definida no enum (gap) |
+| CARGO-009 (Auxiliar/Motoboy) | 7 usuarios | Nenhuma role necessaria (restrito) |
+| CARGO-011 (Assistente Adm.) | 5 usuarios | `admin` |
+| CARGO-014 (Marketing/Adm.) | 3 usuarios | `admin` |
+
+**Impacto**: Os 5 usuarios CARGO-011 e 3 usuarios CARGO-014 deveriam ter role `admin` mas nao tem. O hook `useUserPermissions` faz fallback para o cargo, entao o acesso no frontend funciona, mas as **politicas RLS do banco** que dependem de `has_role(auth.uid(), 'admin')` **bloqueiam** esses usuarios em tabelas restritas (salarios, despesas, contas financeiras).
+
+### 2.4 Linter Supabase
+- **1 aviso**: "Leaked Password Protection" desabilitado. Recomendacao: ativar no dashboard Auth.
+
+---
+
+## 3. Integridade de IDs e Salvamento
+
+### 3.1 IDs Sequenciais
+- **OK**: Tabelas `ordens_servico`, `despesas` e `pagamentos_financeiros` possuem `numero_sequencial` (BIGINT, via sequences iniciando em 1001).
+- **OK**: Mappers em `assistenciaApi`, `financeApi` extraem `numero_sequencial` corretamente.
+- **Vendas**: Usam campo `numero` (ja existente) para identificacao sequencial `VEN-YYYY-XXXX`.
+
+### 3.2 Fluxo de Salvamento
+- Sem erros de Foreign Key ou Not Null identificados nos logs atuais (console limpo).
+
+---
+
+## 4. Carga de Dados e Performance
+
+### 4.1 Inicializacao
+- 21 caches inicializados em paralelo via `Promise.all` no `AppInitializer` — otimo.
+- O `cadastroStore.inicializarDados()` carrega lojas, colaboradores, clientes, fornecedores em paralelo.
+- **Sem loops infinitos**: O `useEffect` no `AppInitializer` so executa quando `inicializado` muda (flag booleana controlada pelo store).
+
+### 4.2 Limite de 1000 rows
+- Com 76 colaboradores e ~165 produtos pendentes, nenhuma tabela ultrapassa o limite do Supabase.
+
+---
+
+## 5. Fluxo de Primeiro Acesso
+
+- **OK**: 75 usuarios criados, 43 com `first_login = true` (pendentes de definir senha).
+- **OK**: `FirstLoginRoute` protege `/definir-senha` — redireciona se nao autenticado ou se `first_login = false`.
+- **OK**: `Login.tsx` redireciona para `/definir-senha` quando `isFirstLogin = true`.
+
+---
+
+## Plano de Correcoes
+
+### Correcao 1: Inserir roles faltantes para 8 usuarios admin (SQL)
+Inserir role `admin` na tabela `user_roles` para os 8 usuarios com CARGO-011 e CARGO-014 que nao possuem role. Isso corrige o acesso RLS em tabelas restritas.
 
 ```text
-Logica:
-1. Ler user do useAuthStore (cargo, eh_gestor, eh_vendedor, eh_estoquista)
-2. Ler role da tabela user_roles (ja disponivel via profile.role ou consulta)
-3. Determinar perfil: admin > gestor > tecnico > vendedor/estoquista > restrito
-4. Retornar:
-   - perfil: 'admin' | 'gestor' | 'tecnico' | 'vendedor' | 'estoquista' | 'restrito'
-   - allowedModules: string[] (ex: ['vendas', 'estoque', 'os', ...])
-   - canAccessRoute(path: string): boolean
-   - allowedNavItems: NavItem[] (itens filtrados da sidebar)
+INSERT INTO user_roles (user_id, role)
+SELECT p.id, 'admin'::app_role
+FROM profiles p
+WHERE p.cargo IN ('CARGO-011', 'CARGO-014')
+AND NOT EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = p.id AND ur.role = 'admin')
 ```
 
-Fonte de dados: O `authStore` ja carrega `cargo` e flags `eh_gestor/eh_vendedor/eh_estoquista` do profile e colaborador. O campo `role` na tabela `profiles` tambem esta disponivel. Vamos adicionar `role` ao `fetchProfile` e ao estado do `User`.
+### Correcao 2: Aplicar `withRetry` em 9 APIs restantes
+Arquivos a modificar:
+- `pecasApi.ts` — envolver addPeca, updatePeca, deletePeca, darBaixaPeca, addMovimentacaoPeca
+- `salarioColaboradorApi.ts` — envolver insert/update/delete salarios
+- `retiradaPecasApi.ts` — envolver insert/update retiradas
+- `valoresRecomendadosTrocaApi.ts` — envolver criar/atualizar/deletar
+- `movimentacoesEntreContasApi.ts` — envolver addMovimentacao
+- `storiesMonitoramentoApi.ts` — envolver upserts de lotes
+- `pendenciasFinanceiraApi.ts` — envolver insert
+- `osApi.ts` — envolver upsert/delete
+- `whatsappNotificacaoApi.ts` — envolver insert/update
 
-### 2. Modificar: `src/store/authStore.ts`
+### Correcao 3: Migrar localStorage de conferencia OS para banco
+Adicionar colunas JSONB `aprovacao_gestor` e `aprovacao_financeiro` na tabela `ordens_servico`, e atualizar `fluxoVendasApi.ts` para persistir dados de conferencia de OS no Supabase em vez de localStorage. Isso elimina o ultimo ponto de fragilidade de dados.
 
-- Adicionar campo `role?: string` na interface `User`
-- No `fetchProfile`, ja retorna `role` (campo existe na tabela profiles)
-- Passar `role` ao estado do usuario no `initialize` e `login`
+---
 
-### 3. Modificar: `src/components/layout/Sidebar.tsx`
+## Resumo de Conformidade
 
-- Importar `useUserPermissions`
-- Filtrar `navItems` com base nos modulos permitidos antes de renderizar
-- Mapeamento de navItem.href para modulo:
+| Area | Status | Acao |
+|------|--------|------|
+| Mock data / localStorage | 95% OK | 1 excecao em fluxoVendasApi (Correcao 3) |
+| snake_case nos mappers | 100% OK | Nenhuma acao |
+| withRetry em escritas | 70% OK | 9 APIs restantes (Correcao 2) |
+| RLS e Roles | 89% OK | 8 usuarios sem role admin (Correcao 1) |
+| IDs sequenciais | 100% OK | Nenhuma acao |
+| Bloqueio de rotas | 100% OK | Nenhuma acao |
+| First login flow | 100% OK | 43 usuarios pendentes (esperado) |
+| Performance/loops | 100% OK | Nenhuma acao |
+| Leaked Password Protection | AVISO | Ativar no dashboard Supabase |
 
-```text
-'/' -> sempre visivel
-'/rh' -> modulo 'rh'
-'/financeiro/*' -> modulo 'financeiro'
-'/estoque' -> modulo 'estoque'
-'/vendas' -> modulo 'vendas'
-'/garantias/*' -> modulo 'garantias'
-'/os/*' -> modulo 'assistencia'
-'/gestao-administrativa' -> modulo 'gestao'
-'/relatorios' -> modulo 'relatorios'
-'/cadastros' -> modulo 'cadastros'
-'/dados-sistema-antigo/*' -> modulo 'dados-antigo'
-'/settings' -> sempre visivel
-```
-
-Regras de visibilidade por perfil:
-
-| Modulo | Admin | Gestor | Tecnico | Vendedor | Estoquista | Restrito |
-|--------|-------|--------|---------|----------|------------|----------|
-| rh | Sim | Nao | Nao | Nao | Nao | Nao |
-| financeiro | Sim | Nao | Nao | Nao | Nao | Nao |
-| estoque | Sim | Sim | Sim | Sim | Sim | Nao |
-| vendas | Sim | Sim | Sim | Sim | Sim | Nao |
-| garantias | Sim | Sim | Nao | Nao | Nao | Nao |
-| assistencia | Sim | Sim | Sim | Nao | Nao | Nao |
-| gestao | Sim | Sim | Nao | Nao | Nao | Nao |
-| relatorios | Sim | Sim | Nao | Nao | Nao | Nao |
-| cadastros | Sim | Sim | Nao | Nao | Nao | Nao |
-| dados-antigo | Sim | Sim | Nao | Sim | Sim | Nao |
-| settings | Sim | Sim | Sim | Sim | Sim | Sim |
-
-### 4. Modificar: `src/components/auth/ProtectedRoute.tsx`
-
-- Importar `useUserPermissions`
-- Apos verificar autenticacao, checar `canAccessRoute(location.pathname)`
-- Se nao permitido, redirecionar para `/` com `<Navigate to="/" replace />`
-
-### 5. Modificar: `src/components/layout/Dashboard.tsx`
-
-- Importar `useUserPermissions`
-- Condicionar cards/secoes baseado no perfil:
-  - **Restrito**: mostrar apenas mensagem de boas-vindas com nome do colaborador
-  - **Vendedor/Estoquista**: mostrar apenas stats de Vendas e Estoque
-  - **Tecnico**: mostrar stats de OS e Estoque
-  - **Gestor**: tudo exceto comissao detalhada
-  - **Admin**: tudo
-
-### 6. Sincronizar `profiles.role` com `user_roles`
-
-A tabela `profiles` tem coluna `role` (text) e a tabela `user_roles` armazena roles separadas. Para consistencia, o hook usara primariamente `user_roles` via `has_role()`, mas como o frontend nao pode chamar funcoes SQL diretamente no client, vamos:
-
-- Usar o campo `profiles.role` como cache do role principal no frontend
-- Garantir que o trigger `handle_new_user` ja sincroniza ambos (ja faz isso)
-- Nao depender de `localStorage` para roles (seguranca)
-
-## Arquivos Criados/Modificados
+## Arquivos a Modificar
 
 | Arquivo | Acao |
 |---------|------|
-| `src/hooks/useUserPermissions.ts` | CRIAR — hook centralizado de permissoes |
-| `src/store/authStore.ts` | MODIFICAR — adicionar `role` ao User |
-| `src/components/layout/Sidebar.tsx` | MODIFICAR — filtrar navItems por permissao |
-| `src/components/auth/ProtectedRoute.tsx` | MODIFICAR — bloquear rotas nao permitidas |
-| `src/components/layout/Dashboard.tsx` | MODIFICAR — condicionar secoes por perfil |
-
-## Resultado Esperado
-
-- Vendedores veem apenas: Painel, Vendas, Estoque, Dados Antigo, Configuracoes
-- Tecnicos veem apenas: Painel, Assistencia, Estoque, Vendas, Configuracoes
-- Gestores veem tudo exceto RH e Financeiro
-- Admins/Acesso Geral veem tudo
-- Motoboys/Auxiliares veem apenas o Painel com boas-vindas
-- Tentativa de acessar URL proibida redireciona para o Painel
-
+| `user_roles` (dados) | INSERT roles para 8 usuarios |
+| `src/utils/pecasApi.ts` | withRetry em 5 funcoes |
+| `src/utils/salarioColaboradorApi.ts` | withRetry em 3 funcoes |
+| `src/utils/retiradaPecasApi.ts` | withRetry em 2 funcoes |
+| `src/utils/valoresRecomendadosTrocaApi.ts` | withRetry em 3 funcoes |
+| `src/utils/movimentacoesEntreContasApi.ts` | withRetry em 1 funcao |
+| `src/utils/storiesMonitoramentoApi.ts` | withRetry em 3 funcoes |
+| `src/utils/pendenciasFinanceiraApi.ts` | withRetry em 1 funcao |
+| `src/utils/osApi.ts` | withRetry em 2 funcoes |
+| `src/utils/whatsappNotificacaoApi.ts` | withRetry em 2 funcoes |
+| `supabase/migrations/` | Colunas JSONB em ordens_servico |
+| `src/utils/fluxoVendasApi.ts` | Migrar localStorage para Supabase |

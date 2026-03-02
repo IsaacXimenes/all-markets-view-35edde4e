@@ -643,6 +643,7 @@ export type Database = {
           agencia: string | null
           banco: string | null
           cnpj: string | null
+          codigo_legivel: string | null
           conta: string | null
           created_at: string | null
           habilitada: boolean | null
@@ -662,6 +663,7 @@ export type Database = {
           agencia?: string | null
           banco?: string | null
           cnpj?: string | null
+          codigo_legivel?: string | null
           conta?: string | null
           created_at?: string | null
           habilitada?: boolean | null
@@ -681,6 +683,7 @@ export type Database = {
           agencia?: string | null
           banco?: string | null
           cnpj?: string | null
+          codigo_legivel?: string | null
           conta?: string | null
           created_at?: string | null
           habilitada?: boolean | null

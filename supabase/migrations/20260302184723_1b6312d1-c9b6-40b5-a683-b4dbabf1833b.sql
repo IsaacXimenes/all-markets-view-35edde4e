@@ -1,0 +1,1 @@
+ALTER TABLE public.contas_financeiras ADD COLUMN codigo_legivel VARCHAR UNIQUE;

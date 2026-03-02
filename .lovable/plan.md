@@ -1,52 +1,40 @@
 
-# Cadastrar 18 Contas Financeiras com IDs Padronizados (CTA-XXX)
 
-## Resumo
-Adicionar a coluna `codigo_legivel` na tabela `contas_financeiras` para armazenar o ID padronizado (CTA-001, CTA-002, etc.) e inserir as 18 contas do CSV.
+# Plano: Draft na Consignacao + Correcao Conta Destino
 
-## Etapa 1 - Migration: adicionar coluna `codigo_legivel`
+## Problema 1: Contas de Destino nao aparecem no PagamentoQuadro
 
-Adicionar a coluna `codigo_legivel VARCHAR UNIQUE` na tabela `contas_financeiras`, seguindo o mesmo padrao usado em `movimentacoes_acessorios_estoque` e `movimentacoes_pecas_estoque`.
+O filtro na linha 890 do `PagamentoQuadro.tsx` restringe as contas a `c.lojaVinculada === lojaVendaId`. Isso causa dois problemas:
+- Contas "gerais" (loja_vinculada = `geral-dinheiro` ou `geral-assistencia`) nunca aparecem em vendas normais
+- Quando `lojaVendaId` e passado mas nao coincide com nenhuma conta, a lista fica vazia
 
-## Etapa 2 - Inserir as 18 contas via INSERT
+**Solucao:** Ajustar o filtro para tambem incluir contas com `lojaVinculada` do tipo "geral-dinheiro" em todos os contextos (exceto quando `apenasContasAssistencia` esta ativo). Isso garante que a conta "Dinheiro" (CTA-020) sempre apareca.
 
-Mapeamento de lojas:
+### Arquivo: `src/components/vendas/PagamentoQuadro.tsx`
+- Alterar o filtro (linhas 886-891) para incluir contas "gerais" (geral-dinheiro) alem das contas da loja selecionada
+- Manter o filtro `geral-assistencia` apenas quando `apenasContasAssistencia = true`
 
-```text
-Loja - Matriz                -> 6231ea0e-9ff3-4ad6-b822-6f9a8270afa6
-Loja - Online                -> df3995f6-1da1-4661-a68f-20fb548a9468
-Loja - JK Shopping           -> 9009b91c-0436-4070-9d30-670b8e6bd68e
-Loja - Aguas Lindas Shopping -> b2c6ac94-f08b-4c2e-955f-8a91d658d7d6
-Loja - Shopping Sul          -> 0fc4a1f3-9cd6-4e24-b0b5-7a6af4953fad
-Geral - Dinheiro             -> geral-dinheiro (valor especial)
-Geral - Assistencia          -> geral-assistencia (valor especial)
-```
+## Problema 2: Adicionar Draft (rascunho) na aba de Consignacao
 
-Todas as 18 contas serao inseridas com:
-- `codigo_legivel`: CTA-001 ate CTA-022 (conforme CSV)
-- `saldo_inicial = 0`, `saldo_atual = 0`
-- `status = 'Ativo'`, `habilitada = true`
-- `nota_fiscal` = true quando "Propria", false quando "Terceirizada"
-- `historico_alteracoes = '[]'`
+Reutilizar o hook `useDraftVenda` existente para salvar automaticamente o rascunho do formulario de novo lote de consignacao.
 
-## Etapa 3 - Atualizar o frontend
+### Arquivo: `src/pages/OSConsignacao.tsx`
+- Importar `useDraftVenda`
+- Instanciar com chave `draft-consignacao-novo-lote`
+- Salvar rascunho automaticamente quando o usuario alterar fornecedor ou itens (via `useEffect` com debounce simples usando `useRef`)
+- Ao entrar na tela "novo", verificar se existe rascunho e exibir um dialog perguntando se deseja restaurar
+- Limpar rascunho ao criar o lote com sucesso
+- Adicionar botao visual indicando que existe rascunho salvo (igual ao padrao de VendasNova)
 
-### cadastrosApi.ts
-- Adicionar `codigoLegivel` ao tipo `ContaFinanceira`
-- Mapear `codigo_legivel` do banco para o campo do frontend
-- Gerar automaticamente o proximo codigo (CTA-XXX) ao adicionar nova conta
+### Detalhes do Draft
+- Dados salvos: `novoFornecedor` e `novoItens` (descricao, modelo, quantidade, valorCusto, lojaDestinoId)
+- Expiracao: 20 minutos (padrao do hook)
+- Modal de restauracao aparece ao clicar em "Novo Lote" se houver rascunho
 
-### CadastrosContasFinanceiras.tsx
-- Exibir a coluna "ID" com o `codigoLegivel` (CTA-XXX) em vez do UUID
+## Resumo de Arquivos
 
-### PagamentoQuadro.tsx (se necessario)
-- Verificar se o select de "Conta Destino" exibe corretamente as contas apos a insercao
+| Arquivo | Alteracao |
+|---------|----------|
+| `src/components/vendas/PagamentoQuadro.tsx` | Corrigir filtro de contas para incluir contas gerais |
+| `src/pages/OSConsignacao.tsx` | Adicionar funcionalidade de draft ao cadastrar novo lote |
 
-## Detalhes Tecnicos
-
-| Arquivo | Acao |
-|---------|------|
-| Migration SQL | ALTER TABLE adicionar `codigo_legivel` |
-| INSERT SQL (via insert tool) | 18 registros com dados do CSV |
-| src/utils/cadastrosApi.ts | Mapear `codigo_legivel`, gerar proximo ID |
-| src/pages/CadastrosContasFinanceiras.tsx | Exibir CTA-XXX na coluna ID |

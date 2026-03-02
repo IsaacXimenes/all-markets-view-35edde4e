@@ -1012,6 +1012,16 @@ export default function VendasNova() {
     
     const venda = await addVenda(vendaData);
 
+    // Verificar conflitos de estoque
+    const conflitos = (venda as any)._itensComConflito as string[] | undefined;
+    if (conflitos && conflitos.length > 0) {
+      toast({
+        title: "⚠️ CONFLITO DE ESTOQUE",
+        description: `Os seguintes itens acabaram de ser vendidos por outro usuário: ${conflitos.join(', ')}. A venda foi registrada mas esses itens NÃO tiveram estoque baixado.`,
+        variant: "destructive",
+      });
+    }
+
     // CONFERÊNCIA AUTOMÁTICA: Para cada item com movimentacaoId, conferir automaticamente
     itens.forEach(item => {
       const produto = produtosEstoque.find(p => p.id === item.produtoId);

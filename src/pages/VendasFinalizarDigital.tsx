@@ -788,6 +788,12 @@ export default function VendasFinalizarDigital() {
       bloqueadoParaEdicao: false
     });
 
+    // Verificar conflitos de estoque
+    const conflitos = (vendaRegistrada as any)._itensComConflito as string[] | undefined;
+    if (conflitos && conflitos.length > 0) {
+      toast.error(`⚠️ CONFLITO DE ESTOQUE: Os seguintes itens acabaram de ser vendidos por outro usuário: ${conflitos.join(', ')}. Estoque NÃO foi baixado para esses itens.`);
+    }
+
     // Inicializar venda no fluxo de conferência
     const vendedorNome = obterNomeColaborador(venda.responsavelVendaId);
     inicializarVendaNoFluxo(vendaRegistrada.id, venda.responsavelVendaId, vendedorNome);

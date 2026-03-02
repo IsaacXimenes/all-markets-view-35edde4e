@@ -494,6 +494,7 @@ export const addVenda = async (venda: Omit<Venda, 'id' | 'numero'>): Promise<Ven
   _vendasCache.unshift(newVenda);
 
   // ========== INTEGRAÇÃO: Redução de Estoque de Aparelhos (atômico) ==========
+  const itensComConflito: string[] = [];
   for (const item of venda.itens) {
     const produto = getProdutos().find(p => p.id === item.produtoId);
     if (produto) {
@@ -501,6 +502,7 @@ export const addVenda = async (venda: Omit<Venda, 'id' | 'numero'>): Promise<Ven
       const { data: decrementou } = await supabase.rpc('decrementar_estoque_produto', { p_produto_id: item.produtoId });
       if (!decrementou) {
         console.error(`[VENDAS] Estoque insuficiente para produto ${item.produtoId} — possível concorrência`);
+        itensComConflito.push(item.produto || produto.modelo || item.produtoId);
         // Produto já foi vendido por outro vendedor — não registrar movimentação
         continue;
       }
@@ -574,6 +576,8 @@ export const addVenda = async (venda: Omit<Venda, 'id' | 'numero'>): Promise<Ven
     }
   }
 
+  // Anexar info de conflitos à venda retornada
+  (newVenda as any)._itensComConflito = itensComConflito;
   return newVenda;
 };
 

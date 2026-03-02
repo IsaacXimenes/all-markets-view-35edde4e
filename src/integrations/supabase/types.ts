@@ -973,6 +973,62 @@ export type Database = {
         }
         Relationships: []
       }
+      estoque_audit_log: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          id: string
+          loja_destino_id: string | null
+          loja_origem_id: string | null
+          produto_id: string | null
+          quantidade_antes: number | null
+          quantidade_depois: number | null
+          referencia_id: string | null
+          referencia_tipo: string | null
+          tipo_acao: string
+          usuario_id: string | null
+          usuario_nome: string | null
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          loja_destino_id?: string | null
+          loja_origem_id?: string | null
+          produto_id?: string | null
+          quantidade_antes?: number | null
+          quantidade_depois?: number | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          tipo_acao: string
+          usuario_id?: string | null
+          usuario_nome?: string | null
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          loja_destino_id?: string | null
+          loja_origem_id?: string | null
+          produto_id?: string | null
+          quantidade_antes?: number | null
+          quantidade_depois?: number | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          tipo_acao?: string
+          usuario_id?: string | null
+          usuario_nome?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estoque_audit_log_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       execucoes_atividades: {
         Row: {
           atividade_id: string

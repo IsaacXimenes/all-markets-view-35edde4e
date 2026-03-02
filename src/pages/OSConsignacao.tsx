@@ -577,6 +577,29 @@ export default function OSConsignacao() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Draft Dialog */}
+        <Dialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Save className="h-5 w-5" />
+                Rascunho encontrado
+              </DialogTitle>
+              <DialogDescription>
+                Existe um rascunho salvo {formatDraftAge(getDraftAge())}. Deseja restaurar os dados?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={handleDescartarDraft}>
+                Descartar
+              </Button>
+              <Button onClick={handleRestaurarDraft}>
+                Restaurar Rascunho
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </OSLayout>
     );
   }
@@ -1405,28 +1428,6 @@ export default function OSConsignacao() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Draft Dialog */}
-      <Dialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Save className="h-5 w-5" />
-              Rascunho encontrado
-            </DialogTitle>
-            <DialogDescription>
-              Existe um rascunho salvo {formatDraftAge(getDraftAge())}. Deseja restaurar os dados?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={handleDescartarDraft}>
-              Descartar
-            </Button>
-            <Button onClick={handleRestaurarDraft}>
-              Restaurar Rascunho
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </OSLayout>
   );
 }

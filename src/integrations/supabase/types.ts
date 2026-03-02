@@ -4054,6 +4054,7 @@ export type Database = {
           garantia_extendida: Json | null
           hora_venda: string | null
           id: string
+          idempotency_key: string | null
           local_retirada: string | null
           loja_id: string | null
           lucro: number | null
@@ -4093,6 +4094,7 @@ export type Database = {
           garantia_extendida?: Json | null
           hora_venda?: string | null
           id?: string
+          idempotency_key?: string | null
           local_retirada?: string | null
           loja_id?: string | null
           lucro?: number | null
@@ -4132,6 +4134,7 @@ export type Database = {
           garantia_extendida?: Json | null
           hora_venda?: string | null
           id?: string
+          idempotency_key?: string | null
           local_retirada?: string | null
           loja_id?: string | null
           lucro?: number | null
@@ -4313,6 +4316,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      decrementar_estoque_produto: {
+        Args: { p_produto_id: string }
+        Returns: boolean
+      }
       get_user_colaborador_id: { Args: { _user_id: string }; Returns: string }
       get_user_loja_id: { Args: { _user_id: string }; Returns: string }
       has_role: {

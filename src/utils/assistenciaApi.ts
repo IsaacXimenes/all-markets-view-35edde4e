@@ -249,8 +249,8 @@ export const isOSIdRegistered = (id: string): boolean => {
   return _osCache.some(os => os.id === id);
 };
 
+/** @deprecated O banco gera o numero_sequencial via DEFAULT sequence. Use o retorno de addOrdemServico. */
 export const getNextOSNumber = (): { numero: number; id: string } => {
-  // Calcula próximo sequencial baseado no cache (o banco gera o real via sequence)
   const maxSeq = _osCache.reduce((max, os) => Math.max(max, os.numeroSequencial || 0), 0);
   return { numero: maxSeq + 1, id: crypto.randomUUID() };
 };
@@ -353,8 +353,8 @@ export const addOrdemServico = async (os: Omit<OrdemServico, 'id'>): Promise<Ord
   return newOS;
 };
 
-// Função para reduzir estoque de peças quando OS é concluída
-const reduzirEstoquePecas = async (pecas: PecaServico[]): Promise<void> => {
+// Função para reduzir estoque de peças quando OS é concluída (via RPC atômica)
+const reduzirEstoquePecas = async (pecas: PecaServico[], osId?: string): Promise<void> => {
   for (const peca of pecas) {
     if (peca.pecaNoEstoque && !peca.servicoTerceirizado) {
       let pecaEstoque = getPecaById(peca.id);
@@ -362,11 +362,21 @@ const reduzirEstoquePecas = async (pecas: PecaServico[]): Promise<void> => {
         pecaEstoque = getPecaByDescricao(peca.peca);
       }
       if (pecaEstoque && pecaEstoque.quantidade > 0) {
-        await updatePeca(pecaEstoque.id, {
-          quantidade: pecaEstoque.quantidade - 1,
-          status: pecaEstoque.quantidade - 1 === 0 ? 'Utilizada' : pecaEstoque.status
+        const { data: sucesso, error } = await supabase.rpc('consumir_peca_os', {
+          p_peca_id: pecaEstoque.id,
+          p_quantidade: 1,
+          p_os_id: osId || null,
         });
-        console.log(`[ASSISTÊNCIA] Peça ${peca.peca} reduzida do estoque`);
+        if (error) {
+          console.error(`[ASSISTÊNCIA] Erro RPC consumir_peca_os:`, error);
+        } else if (sucesso) {
+          // Atualizar cache local
+          pecaEstoque.quantidade -= 1;
+          if (pecaEstoque.quantidade === 0) pecaEstoque.status = 'Utilizada';
+          console.log(`[ASSISTÊNCIA] Peça ${peca.peca} reduzida atomicamente do estoque`);
+        } else {
+          console.warn(`[ASSISTÊNCIA] Estoque insuficiente para peça ${peca.peca}`);
+        }
       }
     }
   }
@@ -471,7 +481,7 @@ export const updateOrdemServico = async (id: string, updates: Partial<OrdemServi
 
   // Side effects
   if (updates.status === 'Serviço concluído' && osAnterior.status !== 'Serviço concluído') {
-    await reduzirEstoquePecas(_osCache[index].pecas);
+    await reduzirEstoquePecas(_osCache[index].pecas, id);
     console.log(`[ASSISTÊNCIA] OS ${id} concluída - peças reduzidas do estoque`);
   }
 

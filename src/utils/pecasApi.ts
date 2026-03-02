@@ -154,28 +154,30 @@ export const setOnConsumoPecaConsignada = (cb: (pecaId: string, osId: string, te
   onConsumoPecaConsignada = cb;
 };
 
-// Dar baixa em peça do estoque
+// Dar baixa em peça do estoque (via RPC atômica)
 export const darBaixaPeca = async (id: string, quantidade: number = 1, osId?: string, tecnico?: string): Promise<{ sucesso: boolean; mensagem: string }> => {
   const peca = _pecasCache.find(p => p.id === id);
   if (!peca) return { sucesso: false, mensagem: `Peça ${id} não encontrada no estoque` };
-  if (peca.status !== 'Disponível') return { sucesso: false, mensagem: `Peça ${peca.descricao} não está disponível (status: ${peca.status})` };
-  if (peca.quantidade < quantidade) return { sucesso: false, mensagem: `Quantidade insuficiente de ${peca.descricao}. Disponível: ${peca.quantidade}, Solicitado: ${quantidade}` };
 
-  const novaQtd = peca.quantidade - quantidade;
-  const novoStatus = novaQtd === 0 ? 'Utilizada' : peca.status;
+  // Usar RPC atômica — o banco valida quantidade e status
+  const { data: sucesso, error } = await supabase.rpc('consumir_peca_os', {
+    p_peca_id: id,
+    p_quantidade: quantidade,
+    p_os_id: osId || null,
+  });
 
-  await withRetry(() => supabase.from('pecas').update({ quantidade: novaQtd, status: novoStatus }).eq('id', id).select());
-  peca.quantidade = novaQtd;
-  peca.status = novoStatus as Peca['status'];
+  if (error) {
+    console.error('[PECAS] Erro RPC consumir_peca_os:', error);
+    return { sucesso: false, mensagem: `Erro ao dar baixa: ${error.message}` };
+  }
 
-  await withRetry(() => supabase.from('movimentacoes_pecas').insert({
-    peca_id: id,
-    tipo: 'Saída',
-    quantidade,
-    data: new Date().toISOString(),
-    os_id: osId || null,
-    descricao: `Baixa para OS${osId ? ` ${osId}` : ''} - ${peca.descricao}`,
-  }).select());
+  if (!sucesso) {
+    return { sucesso: false, mensagem: `Estoque insuficiente ou peça indisponível: ${peca.descricao}` };
+  }
+
+  // Atualizar cache local
+  peca.quantidade -= quantidade;
+  if (peca.quantidade === 0) peca.status = 'Utilizada';
 
   if (peca.loteConsignacaoId && onConsumoPecaConsignada && osId) {
     onConsumoPecaConsignada(id, osId, tecnico || 'Sistema', quantidade);

@@ -858,6 +858,7 @@ export type Database = {
           descricao: string | null
           documento: string | null
           id: string
+          idempotency_key: string | null
           loja_id: string | null
           numero_sequencial: number | null
           observacoes: string | null
@@ -880,6 +881,7 @@ export type Database = {
           descricao?: string | null
           documento?: string | null
           id?: string
+          idempotency_key?: string | null
           loja_id?: string | null
           numero_sequencial?: number | null
           observacoes?: string | null
@@ -902,6 +904,7 @@ export type Database = {
           descricao?: string | null
           documento?: string | null
           id?: string
+          idempotency_key?: string | null
           loja_id?: string | null
           numero_sequencial?: number | null
           observacoes?: string | null
@@ -2722,6 +2725,7 @@ export type Database = {
           data: string | null
           descricao: string | null
           id: string
+          idempotency_key: string | null
           loja: string | null
           meio_pagamento: string | null
           numero_sequencial: number | null
@@ -2734,6 +2738,7 @@ export type Database = {
           data?: string | null
           descricao?: string | null
           id?: string
+          idempotency_key?: string | null
           loja?: string | null
           meio_pagamento?: string | null
           numero_sequencial?: number | null
@@ -2746,6 +2751,7 @@ export type Database = {
           data?: string | null
           descricao?: string | null
           id?: string
+          idempotency_key?: string | null
           loja?: string | null
           meio_pagamento?: string | null
           numero_sequencial?: number | null
@@ -2969,6 +2975,7 @@ export type Database = {
           origem_entrada: string | null
           pareceres: string | null
           quantidade: number | null
+          quantidade_minima: number | null
           retirada_pecas_id: string | null
           saude_bateria: number | null
           status: string | null
@@ -3013,6 +3020,7 @@ export type Database = {
           origem_entrada?: string | null
           pareceres?: string | null
           quantidade?: number | null
+          quantidade_minima?: number | null
           retirada_pecas_id?: string | null
           saude_bateria?: number | null
           status?: string | null
@@ -3057,6 +3065,7 @@ export type Database = {
           origem_entrada?: string | null
           pareceres?: string | null
           quantidade?: number | null
+          quantidade_minima?: number | null
           retirada_pecas_id?: string | null
           saude_bateria?: number | null
           status?: string | null
@@ -3451,6 +3460,7 @@ export type Database = {
           colaborador_id: string
           created_at: string | null
           id: string
+          idempotency_key: string | null
           percentual_comissao: number | null
           salario_fixo: number | null
           updated_at: string | null
@@ -3460,6 +3470,7 @@ export type Database = {
           colaborador_id: string
           created_at?: string | null
           id?: string
+          idempotency_key?: string | null
           percentual_comissao?: number | null
           salario_fixo?: number | null
           updated_at?: string | null
@@ -3469,6 +3480,7 @@ export type Database = {
           colaborador_id?: string
           created_at?: string | null
           id?: string
+          idempotency_key?: string | null
           percentual_comissao?: number | null
           salario_fixo?: number | null
           updated_at?: string | null
@@ -4316,6 +4328,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      confirmar_recebimento_movimentacao: {
+        Args: { p_loja_destino: string; p_movimentacao_id: string }
+        Returns: boolean
+      }
+      consumir_peca_os: {
+        Args: { p_os_id?: string; p_peca_id: string; p_quantidade: number }
+        Returns: boolean
+      }
       decrementar_estoque_produto: {
         Args: { p_produto_id: string }
         Returns: boolean
@@ -4330,6 +4350,16 @@ export type Database = {
         Returns: boolean
       }
       is_acesso_geral: { Args: { _user_id: string }; Returns: boolean }
+      transferir_estoque: {
+        Args: {
+          p_loja_destino: string
+          p_loja_origem: string
+          p_motivo?: string
+          p_produto_id: string
+          p_responsavel_id: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "admin" | "gestor" | "vendedor" | "estoquista"

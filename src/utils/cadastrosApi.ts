@@ -421,7 +421,10 @@ export const deleteLoja = async (id: string): Promise<void> => {
   const { error } = await supabase.from('lojas').delete().eq('id', id);
   if (error) {
     console.error('Erro ao deletar loja:', error);
-    throw new Error('Não é possível excluir: existem registros vinculados a esta loja.');
+    const tabela = (error as any)?.details?.match(/table "(\w+)"/)?.[1];
+    const mapTabela: Record<string, string> = { vendas: 'Vendas', ordens_servico: 'Ordens de Serviço', colaboradores: 'Colaboradores', produtos: 'Produtos', despesas: 'Despesas', pecas: 'Peças' };
+    const modulo = tabela ? mapTabela[tabela] || tabela : 'outros módulos';
+    throw new Error(`Não é possível excluir esta loja: existem registros vinculados em ${modulo}.`);
   }
   _lojasCache = _lojasCache.filter(l => l.id !== id);
 };
@@ -606,7 +609,10 @@ export const deleteColaborador = async (id: string): Promise<void> => {
   const { error } = await supabase.from('colaboradores').delete().eq('id', id);
   if (error) {
     console.error('Erro ao deletar colaborador:', error);
-    throw new Error('Não é possível excluir: existem registros vinculados a este colaborador.');
+    const tabela = (error as any)?.details?.match(/table "(\w+)"/)?.[1];
+    const mapTabela: Record<string, string> = { vendas: 'Vendas', ordens_servico: 'Ordens de Serviço', salarios_colaboradores: 'Salários', profiles: 'Perfis de Usuário' };
+    const modulo = tabela ? mapTabela[tabela] || tabela : 'outros módulos';
+    throw new Error(`Não é possível excluir este colaborador: existem registros vinculados em ${modulo}.`);
   }
   _colaboradoresCache = _colaboradoresCache.filter(c => c.id !== id);
 };
@@ -660,7 +666,10 @@ export const deleteFornecedor = async (id: string): Promise<void> => {
   const { error } = await supabase.from('fornecedores').delete().eq('id', id);
   if (error) {
     console.error('Erro ao deletar fornecedor:', error);
-    throw new Error('Não é possível excluir: existem registros vinculados a este fornecedor.');
+    const tabela = (error as any)?.details?.match(/table "(\w+)"/)?.[1];
+    const mapTabela: Record<string, string> = { notas_compra: 'Notas de Compra', pecas: 'Peças', creditos_fornecedor: 'Créditos' };
+    const modulo = tabela ? mapTabela[tabela] || tabela : 'outros módulos';
+    throw new Error(`Não é possível excluir este fornecedor: existem registros vinculados em ${modulo}.`);
   }
   _fornecedoresCache = _fornecedoresCache.filter(f => f.id !== id);
 };
@@ -746,7 +755,10 @@ export const deleteContaFinanceira = async (id: string): Promise<void> => {
   const { error } = await supabase.from('contas_financeiras').delete().eq('id', id);
   if (error) {
     console.error('Erro ao deletar conta financeira:', error);
-    throw new Error('Não é possível excluir: existem registros vinculados a esta conta.');
+    const tabela = (error as any)?.details?.match(/table "(\w+)"/)?.[1];
+    const mapTabela: Record<string, string> = { despesas: 'Despesas', pagamentos_financeiros: 'Pagamentos' };
+    const modulo = tabela ? mapTabela[tabela] || tabela : 'outros módulos';
+    throw new Error(`Não é possível excluir esta conta: existem registros vinculados em ${modulo}.`);
   }
   _contasFinanceirasCache = _contasFinanceirasCache.filter(c => c.id !== id);
 };
@@ -813,7 +825,10 @@ export const deleteMaquinaCartao = async (id: string): Promise<void> => {
   const { error } = await supabase.from('maquinas_cartao').delete().eq('id', id);
   if (error) {
     console.error('Erro ao deletar máquina de cartão:', error);
-    throw new Error('Não é possível excluir: existem registros vinculados a esta máquina.');
+    const tabela = (error as any)?.details?.match(/table "(\w+)"/)?.[1];
+    const mapTabela: Record<string, string> = { venda_pagamentos: 'Pagamentos de Vendas', os_pagamentos: 'Pagamentos de OS' };
+    const modulo = tabela ? mapTabela[tabela] || tabela : 'outros módulos';
+    throw new Error(`Não é possível excluir esta máquina: existem registros vinculados em ${modulo}.`);
   }
   _maquinasCartaoCache = _maquinasCartaoCache.filter(m => m.id !== id);
 };

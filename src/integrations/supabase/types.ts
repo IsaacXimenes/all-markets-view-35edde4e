@@ -4414,6 +4414,7 @@ export type Database = {
       }
       get_user_colaborador_id: { Args: { _user_id: string }; Returns: string }
       get_user_loja_id: { Args: { _user_id: string }; Returns: string }
+      get_user_loja_id_direct: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

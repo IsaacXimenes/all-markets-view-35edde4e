@@ -132,7 +132,7 @@ export default function EstoqueMovimentacoes() {
   };
 
   // Confirmar recebimento de uma movimentação
-  const handleConfirmarRecebimento = () => {
+  const handleConfirmarRecebimento = async () => {
     if (!movimentacaoParaConfirmar || !responsavelConfirmacao) {
       toast({
         title: 'Campo obrigatório',
@@ -143,7 +143,7 @@ export default function EstoqueMovimentacoes() {
     }
 
     const nomeResponsavel = colaboradores.find(c => c.id === responsavelConfirmacao)?.nome || responsavelConfirmacao;
-    const result = confirmarRecebimentoMovimentacao(movimentacaoParaConfirmar, nomeResponsavel);
+    const result = await confirmarRecebimentoMovimentacao(movimentacaoParaConfirmar, nomeResponsavel);
     
     if (result) {
       setMovimentacoes(getMovimentacoes());

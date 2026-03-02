@@ -156,7 +156,7 @@ export default function EstoqueProdutos() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs sm:text-sm text-muted-foreground truncate">Valor Total Estoque</p>
-                  <p className="text-xl sm:text-2xl font-bold truncate" title={formatCurrency(statsFiltrados.valorTotalEstoque)}>{formatCurrency(statsFiltrados.valorTotalEstoque)}</p>
+                  <p className="text-lg sm:text-xl font-bold" title={formatCurrency(statsFiltrados.valorTotalEstoque)}>{formatCurrency(statsFiltrados.valorTotalEstoque)}</p>
                 </div>
               </div>
             </CardContent>
@@ -330,7 +330,7 @@ export default function EstoqueProdutos() {
           <Table className="min-w-[1100px]">
             <TableHeader>
               <TableRow>
-                <TableHead className="sticky left-0 z-20 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[120px] max-w-[160px]">Produto</TableHead>
+                <TableHead className="sticky left-0 z-20 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[200px] max-w-[260px]">Produto</TableHead>
                 <TableHead>Saúde</TableHead>
                 <TableHead>Loja</TableHead>
                 <TableHead>Venda Recomendada</TableHead>
@@ -370,9 +370,9 @@ export default function EstoqueProdutos() {
                   className={getRowClassByBattery(produto.saudeBateria)}
                 >
                   {/* Produto (sticky) */}
-                   <TableCell className={cn("sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[120px] max-w-[160px]", getStickyBgByBattery(produto.saudeBateria))}>
+                   <TableCell className={cn("sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] min-w-[200px] max-w-[260px]", getStickyBgByBattery(produto.saudeBateria))}>
                     <div className="flex flex-col gap-0.5">
-                      <span className="font-medium text-sm truncate max-w-[140px]" title={produto.modelo}>{produto.modelo}</span>
+                      <span className="font-medium text-sm truncate max-w-[240px]" title={produto.modelo}>{produto.modelo}</span>
                       <span className="text-xs text-muted-foreground">{produto.cor}</span>
                       {verificarEstoqueBaixo(produto.modelo, produto.quantidade) && (
                         <Badge variant="destructive" className="text-[10px] px-1.5 py-0 w-fit">

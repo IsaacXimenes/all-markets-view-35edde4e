@@ -18,14 +18,9 @@ export type ModuleName =
   | 'dados-antigo'
   | 'settings';
 
-const MODULE_MAP: Record<UserProfile, ModuleName[]> = {
-  admin: ['rh', 'financeiro', 'estoque', 'vendas', 'garantias', 'assistencia', 'gestao', 'relatorios', 'cadastros', 'dados-antigo', 'settings'],
-  gestor: ['estoque', 'vendas', 'garantias', 'assistencia', 'gestao', 'relatorios', 'cadastros', 'dados-antigo', 'settings'],
-  tecnico: ['assistencia', 'estoque', 'vendas', 'settings'],
-  vendedor: ['vendas', 'estoque', 'dados-antigo', 'settings'],
-  estoquista: ['vendas', 'estoque', 'dados-antigo', 'settings'],
-  restrito: ['settings'],
-};
+const ALL_MODULES: ModuleName[] = ['rh', 'financeiro', 'estoque', 'vendas', 'garantias', 'assistencia', 'gestao', 'relatorios', 'cadastros', 'dados-antigo', 'settings'];
+const RESTRICTED_MODULES: ModuleName[] = ['rh', 'financeiro'];
+const ID_FINANCEIRO = '0485360d-4e6e-458c-96a4-0e6ba6705214';
 
 /** Maps a route path to a module name. Returns null for always-visible routes. */
 function routeToModule(path: string): ModuleName | null {
@@ -101,7 +96,12 @@ export function useUserPermissions() {
     return 'restrito';
   }, [dbRoles, isAcessoGeral, user]);
 
-  const allowedModules = useMemo(() => MODULE_MAP[perfil], [perfil]);
+  const allowedModules = useMemo(() => {
+    if (isAcessoGeral) return ALL_MODULES;
+    const lojaId = user?.colaborador?.loja_id;
+    if (lojaId === ID_FINANCEIRO) return ALL_MODULES;
+    return ALL_MODULES.filter(m => !RESTRICTED_MODULES.includes(m));
+  }, [isAcessoGeral, user]);
 
   const canAccessRoute = useMemo(() => {
     return (path: string): boolean => {

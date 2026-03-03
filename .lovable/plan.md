@@ -1,56 +1,49 @@
 
 
-# Plano: Corrigir falha ao cadastrar lote de Consignacao
+# Plano: Simplificar Permissoes de Modulos
 
-## Causa raiz
+## Nova regra
 
-As tabelas no Supabase usam colunas `id` do tipo `uuid`, mas o codigo gera IDs textuais como `CONS-001` e `CONS-ITEM-001`. Ao fazer o `upsert`, o Postgres rejeita o valor por incompatibilidade de tipo. O mesmo ocorre com `pecas.lote_consignacao_id` que e `uuid` mas recebe a string `CONS-XXX`.
+- **Todos os funcionarios** veem todos os modulos, EXCETO Financeiro e RH.
+- **Funcionarios lotados na unidade "Financeiro"** (ID: 0485360d) tambem podem ver Financeiro e RH.
+- **Funcionarios lotados em "Acesso Geral"** (ID: 90dc7c04) possuem acesso total a tudo, como ja funciona hoje.
 
-## Solucao
+## Alteracao
 
-Adicionar colunas `codigo` (text) nas tabelas para manter os IDs legiveis, e usar UUIDs reais para as chaves primarias.
+### Arquivo: `src/hooks/useUserPermissions.ts`
 
-### 1. Migracao SQL
+A logica atual e baseada em perfis (admin, gestor, tecnico, vendedor, estoquista, restrito), cada um com um conjunto fixo de modulos. Vamos simplificar radicalmente:
 
-```sql
--- Adicionar coluna codigo nas tabelas
-ALTER TABLE lotes_consignacao ADD COLUMN IF NOT EXISTS codigo text;
-ALTER TABLE itens_consignacao ADD COLUMN IF NOT EXISTS codigo text;
+1. **Remover o `MODULE_MAP` por perfil** -- nao sera mais necessario.
 
--- Alterar lote_consignacao_id em pecas para text (aceitar CONS-XXX)
-ALTER TABLE pecas ALTER COLUMN lote_consignacao_id TYPE text;
+2. **Nova logica de `allowedModules`:**
+   - Definir a lista completa de modulos.
+   - Se o usuario for Acesso Geral (`isAcessoGeral`), retornar todos os modulos.
+   - Verificar se o `loja_id` do colaborador corresponde a unidade "Financeiro" (`0485360d-4e6e-458c-96a4-0e6ba6705214`). Se sim, tambem retornar todos.
+   - Caso contrario, retornar todos os modulos EXCETO `'rh'` e `'financeiro'`.
+
+3. **Manter o `perfil`** para uso em outras partes do sistema (ex: RLS, exibicao condicional), mas ele nao controlara mais a visibilidade de modulos no Sidebar/rotas.
+
+4. **`canAccessRoute` e `canAccessModule`** continuam funcionando normalmente, pois consomem `allowedModules`.
+
+### Logica simplificada (pseudocodigo):
+
+```text
+ALL_MODULES = [rh, financeiro, estoque, vendas, garantias, assistencia, gestao, relatorios, cadastros, dados-antigo, settings]
+RESTRICTED = [rh, financeiro]
+
+se isAcessoGeral -> ALL_MODULES
+se loja_id == ID_FINANCEIRO -> ALL_MODULES
+senao -> ALL_MODULES sem RESTRICTED
 ```
 
-### 2. Alteracoes em `src/utils/consignacaoApi.ts`
+### Nenhuma outra alteracao necessaria
 
-**Gerar UUIDs reais para o banco + manter codigo legivel:**
-
-Na funcao `criarLoteConsignacao` (linha 190):
-- Gerar `id` com `crypto.randomUUID()` para o lote
-- Manter o `CONS-XXX` como campo `codigo` no objeto e na coluna do banco
-- Fazer o mesmo para itens: UUID real no `id`, `CONS-ITEM-XXX` no `codigo`
-
-**Atualizar `loteToDb`** (linha 99): incluir `codigo` no mapeamento.
-
-**Atualizar `itemToDb`** (linha 109): incluir `codigo` no mapeamento.
-
-**Atualizar `mapLoteFromDb`** (linha 88): ler `codigo` do banco e usar como campo de exibicao.
-
-**Atualizar `mapItemFromDb`** (linha 71): ler `codigo` do banco.
-
-**Atualizar interfaces** `LoteConsignacao` e `ItemConsignacao`: adicionar campo `codigo` opcional.
-
-**Ajustar `nextLoteId` e `nextItemId`**: o calculo do proximo sequencial deve buscar pelo campo `codigo` em vez de `id`.
-
-### 3. Alteracoes em `src/pages/OSConsignacao.tsx`
-
-Onde o codigo exibe `lote.id` como identificador visivel (tabela de lotes, toast, timeline), substituir por `lote.codigo || lote.id` para manter a exibicao legivel.
+O Sidebar (`Sidebar.tsx`) e o `ProtectedRoute.tsx` ja consomem `canAccessModule` e `canAccessRoute` do hook, entao a mudanca no hook se propaga automaticamente para toda a interface.
 
 ## Resumo
 
-| Recurso | Alteracao |
+| Arquivo | Alteracao |
 |---------|----------|
-| Migracao SQL | Adicionar `codigo` em lotes_consignacao e itens_consignacao; alterar tipo de pecas.lote_consignacao_id |
-| `src/utils/consignacaoApi.ts` | Usar UUID real no id, CONS-XXX no codigo; atualizar mappings e interfaces |
-| `src/pages/OSConsignacao.tsx` | Exibir `codigo` em vez de `id` nos pontos de exibicao |
+| `src/hooks/useUserPermissions.ts` | Simplificar logica: todos veem tudo, exceto Financeiro e RH (restritos a lotados no Financeiro ou Acesso Geral) |
 
